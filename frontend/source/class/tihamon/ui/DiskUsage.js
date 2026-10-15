@@ -1,6 +1,6 @@
 /**
- * "Disk kullanımı ve veri silme" penceresi (Loglar sayfasındaki, yalnız 'logs.manage' yetkisiyle
- * görünen düğmeden açılır). Sekmeler: log türleri (sistem, komut), rsyslog log kuyruğu, sensör
+ * "Disk kullanımı" sayfasının (bkz. page.DiskUsage — Sistem altında, 'logs.manage' yetkisiyle)
+ * veri sekmeleri: log türleri (sistem, komut), rsyslog log kuyruğu, sensör
  * verileri, görev kuyruğu, sorun tespiti raporları ve yedekler (/data/backups).
  * Her sekme bir ui.DiskUsageTab'dır; burada yalnız türlere özgü sütunlar, yükleme ve silme istekleri
  * tanımlanır (backend: LogStatsApi, LogQueueStatsApi, MetricStatsApi, JobStatsApi, BackupStatsApi).
@@ -14,37 +14,28 @@ qx.Class.define("tihamon.ui.DiskUsage", {
     BACKUP_GROUP: { full: "tam yedekler", config: "yapılandırma yedekleri", grafana: "Grafana yedekleri" },
 
     /**
-     * @param page {tihamon.page.Logs} tablo yardımcıları + silme sonrası tazelenecek log grid'i
-     * @param mode {String} açılışta seçilecek sekme: log türü ("system" | "command") ya da "queue" |
-     *   "metrics" | "jobs" | "diagnose" | "backups" (bkz. spec.mode — Genel bakış kartları da kullanır)
+     * Sekme tanımları, sayfadaki sırasıyla (bkz. page.DiskUsage). Her tanımın `mode`'u sekmenin
+     * anahtarıdır (Shell OPEN_PAGE {diskUsage: mode}, Genel bakış kartları, Özet dilimleri) ve
+     * `size()`'ı Özet sekmesi için o veri türünün diskteki toplam boyutunu döner.
      */
-    open(page, mode) {
-      // maximizable: büyütülebilir, ama normal boyutta açılır (bkz. Dialog.js window()).
-      const win = tihamon.ui.Dialog.window("Disk kullanımı ve veri silme", 960, { maximizable: true });
-      win.setHeight(600);
-      const tabs = new qx.ui.tabview.TabView();
-      const specs = [
-        this.__logSpec(page, "system", "Sistem logları", "sistem log kaydı"),
-        this.__logSpec(page, "command", "Komut logları", "komut log kaydı"),
+    specs() {
+      return [
+        this.__logSpec("system", "Sistem logları", "sistem log kaydı"),
+        this.__logSpec("command", "Komut logları", "komut log kaydı"),
         this.__logQueueSpec(),
         this.__metricSpec(),
         this.__jobSpec(),
         this.__diagnoseSpec(),
         this.__backupSpec()
       ];
-      specs.forEach(spec => {
-        const tab = new tihamon.ui.DiskUsageTab(page, spec);
-        tabs.add(tab);
-        if (spec.mode && spec.mode === mode) {
-          tabs.setSelection([tab]);
-        }
-      });
-      win.add(tabs, { flex: 1 });
+    },
 
-      const close = new qx.ui.form.Button("Kapat");
-      close.addListener("execute", () => win.close());
-      tihamon.ui.Dialog.buttons(win, [close]);
-      win.open();
+    /** size(): uç noktanın "total.bytes" alanı + /data disk bilgisi (yükleme yapılmadan, Özet için). */
+    __sizer(url, params) {
+      return async () => {
+        const data = await tihamon.io.Api.get(url, params);
+        return { bytes: Number(data.total && data.total.bytes) || 0, disk: data.disk || null };
+      };
     },
 
     /** Sekmenin son yüklemesindeki disk bilgisini saklayan ortak durum satırı. */
@@ -77,10 +68,10 @@ qx.Class.define("tihamon.ui.DiskUsage", {
     },
 
     /** Sistem / komut logları: tahta başına (+ eşleşmeyen + tümü), /api/logs/stats. */
-    __logSpec(page, type, label, noun) {
+    __logSpec(type, label, noun) {
       const F = tihamon.util.Format;
       const spec = this.__withDisk({
-        mode: type, label, noun,
+        mode: type, label, noun, size: this.__sizer("/logs/stats", { type }),
         columns: this.__scopeColumns("Kayıt sayısı"),
         load: async () => {
           const data = await tihamon.io.Api.get("/logs/stats", { type });
@@ -101,8 +92,7 @@ qx.Class.define("tihamon.ui.DiskUsage", {
         remove: async row => {
           const search = new URLSearchParams({ type, ...row.scope });
           return (await tihamon.io.Api.del("/logs?" + search.toString())).deleted;
-        },
-        onDeleted: () => page.refresh() // arkadaki ana log grid'i de güncel kalsın.
+        }
       });
       return spec;
     },
@@ -111,7 +101,7 @@ qx.Class.define("tihamon.ui.DiskUsage", {
     __metricSpec() {
       const F = tihamon.util.Format;
       const spec = this.__withDisk({
-        mode: "metrics", label: "Sensör verileri", noun: "sensör ölçümü (ham + özet)",
+        mode: "metrics", size: this.__sizer("/storage/metrics"), label: "Sensör verileri", noun: "sensör ölçümü (ham + özet)",
         columns: [
           { id: "name", label: "Tahta" },
           { id: "series", label: "Seri", width: 70 },
@@ -152,7 +142,7 @@ qx.Class.define("tihamon.ui.DiskUsage", {
       const F = tihamon.util.Format;
       const status = tihamon.ui.DiskUsage.JOB_STATUS;
       const spec = this.__withDisk({
-        mode: "jobs", label: "Görev kuyruğu", noun: "görev kaydı (tahta sonuçları ve çıktı akışıyla birlikte)",
+        mode: "jobs", size: this.__sizer("/storage/jobs"), label: "Görev kuyruğu", noun: "görev kaydı (tahta sonuçları ve çıktı akışıyla birlikte)",
         columns: [
           { id: "name", label: "Görev" },
           { id: "type", label: "Tür", width: 90 },
@@ -206,7 +196,7 @@ qx.Class.define("tihamon.ui.DiskUsage", {
       const F = tihamon.util.Format;
       const status = tihamon.ui.DiskUsage.JOB_STATUS;
       const spec = this.__withDisk({
-        mode: "diagnose", label: "Sorun tespiti",
+        mode: "diagnose", size: this.__sizer("/storage/diagnose"), label: "Sorun tespiti",
         noun: "sorun tespiti raporu (tahta sonuçlarıyla birlikte; silinen tahtalar otomatik taramada yeniden denetlenir)",
         columns: [
           { id: "name", label: "Tarama" },
@@ -256,7 +246,7 @@ qx.Class.define("tihamon.ui.DiskUsage", {
       const F = tihamon.util.Format;
       const kinds = tihamon.ui.DiskUsage.BACKUP_KIND;
       const spec = this.__withDisk({
-        mode: "backups", label: "Yedekler", noun: "yedek dosyası",
+        mode: "backups", size: this.__sizer("/storage/backups"), label: "Yedekler", noun: "yedek dosyası",
         columns: [
           { id: "name", label: "Dosya" },
           { id: "kind", label: "Tür", width: 200 },
@@ -310,7 +300,7 @@ qx.Class.define("tihamon.ui.DiskUsage", {
     __logQueueSpec() {
       const F = tihamon.util.Format;
       const spec = this.__withDisk({
-        mode: "queue", label: "Log kuyruğu", noun: "kuyruk dosyası (içindeki, veritabanına henüz yazılmamış loglar kaybolur)",
+        mode: "queue", size: this.__sizer("/storage/logqueue"), label: "Log kuyruğu", noun: "kuyruk dosyası (içindeki, veritabanına henüz yazılmamış loglar kaybolur)",
         columns: [
           { id: "name", label: "Ad" },
           { id: "kind", label: "Tür", width: 330 },

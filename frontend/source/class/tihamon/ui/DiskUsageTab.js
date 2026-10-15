@@ -1,5 +1,5 @@
 /**
- * Disk kullanımı penceresinin (bkz. ui.DiskUsage) tek bir sekmesi: bir veri türünün kapsamlarını
+ * Disk kullanımı sayfasının (bkz. page.DiskUsage, ui.DiskUsage) tek bir veri sekmesi: bir veri türünün kapsamlarını
  * (tahta, görev, "tümü"…) kayıt sayısı ve YAKLAŞIK boyutuyla listeler; Ctrl/Shift ile tekli ya da
  * çoklu seçilen kapsamları sağ menüden veya "Seçilenleri sil" düğmesinden KALICI olarak siler.
  * Türün kendine özgü kısmı (sütunlar, yükleme, silme isteği) `spec` ile verilir:
@@ -58,6 +58,12 @@ qx.Class.define("tihamon.ui.DiskUsageTab", {
 
   members: {
     __spec: null,
+
+    /** Sekmenin tanımı (page.DiskUsage.openWith sekmeyi spec.mode ile bulur). */
+    getSpec() {
+      return this.__spec;
+    },
+
     __table: null,
     __status: null,
     __deleteBtn: null,

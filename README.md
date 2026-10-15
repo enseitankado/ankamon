@@ -161,3 +161,12 @@ Tek konteynerde bir süreci yeniden başlatmak: `docker compose exec tiha-mon su
 
 Yeni şema değişikliği için `db/migrations/` altına sıradaki numarayla dosya ekleyin; uygulanmış dosyalar
 değiştirilmez.
+
+## Kaldırma
+
+```bash
+cd /opt/tiha-mon && sudo docker compose down     # servisleri durdur (veriler data/ altında kalır)
+sudo rm -rf /opt/tiha-mon                          # veriler ve yedekler DAHİL her şeyi sil
+```
+
+Silmeden önce yedekleri saklamak için `data/backups/` dizinini başka bir yere kopyalayın.
