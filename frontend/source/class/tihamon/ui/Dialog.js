@@ -45,8 +45,18 @@ qx.Class.define("tihamon.ui.Dialog", {
       win.open();
     },
 
+    /**
+     * Hata penceresi. API hatalarında (bkz. io.Api) kısa açıklamanın altında tanı ayrıntıları da
+     * gösterilir: sunucunun açıklaması, istek, durum kodu, arka uç ve zaman (seçilip kopyalanabilir).
+     */
     error(error) {
-      this.alert(qx.bom.String.escape(error && error.message ? error.message : String(error)), "Hata");
+      const esc = qx.bom.String.escape;
+      let html = esc(error && error.message ? error.message : String(error));
+      if (error && error.details && error.details.length) {
+        html += '<div style="margin-top:10px;font-size:11px;line-height:1.5;opacity:.75;font-family:monospace">' +
+          error.details.map(line => esc(line)).join("<br>") + "</div>";
+      }
+      this.alert(html, "Hata");
     },
 
     /**
