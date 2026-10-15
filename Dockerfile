@@ -38,7 +38,9 @@ RUN npx qx compile --target=build \
 # ---------------------------------------------------------------- 1b) Dosya yöneticisi (FileBrowser
 # Quantum): resmi imajdan yalnız statik ikili + derlenmiş arayüz alınır (bkz. aşağıdaki COPY --from).
 # Alpine/musl ile doğrudan uyumlu, bağımlılıksız bir Go ikili — ayrı bir derleme adımı gerekmez.
-FROM gtstef/filebrowser:latest AS filemanager
+# Sürüm SABİT (digest ile): v1.5.9+ arayüzü ikiliye gömdü, /home/filebrowser/http yok ve yapılandırma
+# biçimi değişti — yükseltme ayrıca denenmeli.
+FROM gtstef/filebrowser:v1.5.8-stable@sha256:68455d4953bad8e984e1bc5d112ed1e9c918a0a04f104c13c9ece50790308894 AS filemanager
 
 # ---------------------------------------------------------------- 1c) Ekran yansıtma aktarıcısı (MediaMTX):
 # resmi imajdan yalnız statik Go ikilisi alınır (Alpine deposunda paketi yok). Sürüm sabit tutulur.

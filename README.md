@@ -154,7 +154,15 @@ Yayın akışı: değişiklikleri commit'leyip `main`'e gönderin; kurulu sunucu
 bkz. `.gitignore`; okul verisi arayüzden ya da veritabanından girilir.
 
 Topluluk temaları `frontend/themes-src/themes.txt`'teki sabit commit'lerden indirilir; tiha-mon yamaları
-`<ad>.patch` dosyalarındadır (indirilen `frontend/themes/` düzenlenmez, depoda da tutulmaz).
+`<ad>.patch` dosyalarındadır (indirilen `frontend/themes/` düzenlenmez, depoda da tutulmaz). Arayüzü
+konteyner dışında derlemek için önce temaları indirin (host'ta node gerekmez):
+
+```bash
+docker run --rm -e OWNER="$(id -u):$(id -g)" -v "$PWD/frontend:/f" \
+  -v "$PWD/docker/rootfs/certs/meb-ca.crt:/meb.crt:ro" node:22-alpine sh -c '
+    cat /meb.crt >> /etc/ssl/certs/ca-certificates.crt; sed -i s,https://,http://, /etc/apk/repositories
+    apk add -q curl patch && sh /f/themes-src/fetch-themes.sh /f/themes-src /f/themes && chown -R "$OWNER" /f/themes'
+```
 
 Tek konteynerde bir süreci yeniden başlatmak: `docker compose exec tiha-mon supervisorctl restart <ad>`
 (adlar: postgres, rsyslog, telegraf, grafana, php-fpm, nginx, worker, runner, mediamtx, backup).
