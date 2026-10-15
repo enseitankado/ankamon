@@ -14,6 +14,9 @@
 # ekler, yeni imajı eski sistem çalışırken derler, sonra geçer; yeni sürüm sağlıklı açılmazsa önceki
 # sürüme kendiliğinden döner.
 set -euo pipefail
+# Gövde tek bir blokta: bash bloğu ÇALIŞTIRMADAN önce sonuna kadar okur — "curl … | bash" ile çalışırken
+# alt süreçlerin stdin'i okuması betiğin kalanını kesemez. Blok dosyanın son satırında kapanır.
+{
 
 REPO_URL="${TIHA_MON_REPO:-https://github.com/enseitankado/tiha-mon.git}"
 BRANCH="${TIHA_MON_BRANCH:-main}"
@@ -205,7 +208,8 @@ cd "$INSTALL_DIR"
 # Dizin başka kullanıcıya aitse (ör. /opt altında) dosya işlemleri root ile yapılır.
 if [ -w . ]; then run() { "$@"; }; else run() { as_root "$@"; }; fi
 git_() { run git -c safe.directory="$INSTALL_DIR" "$@"; }
-compose() { "${DOCKER[@]}" compose "$@"; }
+# stdin kapalı: "curl … | bash" ile çalışırken docker betiğin kalanını stdin'den yutmasın.
+compose() { "${DOCKER[@]}" compose "$@" </dev/null; }
 stack_running() { [ -n "$(compose ps -q 2>/dev/null)" ]; }
 
 OLD_REV=
@@ -343,7 +347,7 @@ fi
 # Yeniden derlemelerden kalan adsız (dangling) imaj katmanları disk doldurmasın.
 "${DOCKER[@]}" image prune -f >/dev/null 2>&1 || true
 
-ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}')
+ADDRESS=$( (hostname -I 2>/dev/null || ip -4 -o route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p') | awk '{print $1}' || true)
 URL="http://${ADDRESS:-localhost}$([ "$HTTP_PORT" = 80 ] || echo ":$HTTP_PORT")"
 CA_URL="$URL/tihamon-ca.crt"
 [ "$HTTPS_PORT" = 0 ] || URL="https://${ADDRESS:-localhost}$([ "$HTTPS_PORT" = 443 ] || echo ":$HTTPS_PORT")"
@@ -369,3 +373,5 @@ fi
 echo "    Log sunucusu  : ${ADDRESS:-bu sunucu}:$SYSLOG_PORT (TCP/UDP) — TiHA'nın \"Merkezi log sunucusu\" adımına bu adresi yazın"
 echo "    Veri ve yedek : $INSTALL_DIR/data"
 echo "    Güncelleme    : sudo $INSTALL_DIR/install.sh --update"
+exit 0
+}
