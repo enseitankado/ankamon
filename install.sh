@@ -277,7 +277,7 @@ pre_update_backup() {
         mkdir -p $dir
         pg_dump -Fc -Z 6 -d tihamon --exclude-table-data='_timescaledb_internal.*' -f $dir/pre-update-$ts-tihamon.dump.tmp
         pg_dump -Fc -Z 6 -d grafana -f $dir/pre-update-$ts-grafana.dump.tmp
-        for f in $dir/pre-update-$ts-*.dump.tmp; do mv \"\$f\" \"\${f%.tmp}\"; done
+        for f in $dir/pre-update-$ts-*.dump.tmp; do chmod 600 \"\$f\"; mv \"\$f\" \"\${f%.tmp}\"; done
         ls -1t $dir/pre-update-*-tihamon.dump | tail -n +$((PRE_UPDATE_KEEP + 1)) | while read -r f; do
             rm -f \"\$f\" \"\${f%-tihamon.dump}-grafana.dump\"
         done
