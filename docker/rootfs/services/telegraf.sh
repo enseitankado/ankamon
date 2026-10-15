@@ -1,0 +1,12 @@
+#!/bin/sh
+# Tahtaların node_exporter uçlarını okuyup Postgres'e yazar. Hedefler worker tarafından
+# /data/telegraf/targets.conf içine üretilir; --watch-config ile değişince yeniden yüklenir.
+set -eu
+
+. /opt/tiha-mon/services/wait-db.sh
+
+export PG_PASSWORD="$POSTGRES_PASSWORD" SCRAPE_INTERVAL="${SCRAPE_INTERVAL:-60s}"
+exec telegraf \
+    --config /etc/tiha-mon/telegraf.conf \
+    --config /data/telegraf/targets.conf \
+    --watch-config poll

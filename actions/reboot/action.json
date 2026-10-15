@@ -1,0 +1,9 @@
+{
+  "title": "Yeniden başlat",
+  "description": "Seçilen tahtaları yeniden başlatır. Açık oturumlar kapanır.",
+  "category": "Güç",
+  "feature": "power",
+  "confirm": true,
+  "timeout": 30,
+  "params": []
+}

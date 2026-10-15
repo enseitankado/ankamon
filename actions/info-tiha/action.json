@@ -1,0 +1,8 @@
+{
+  "title": "TiHA durumu",
+  "description": "Tahtada hangi TiHA adımlarının uygulanmış olduğunu (log iletimi, metrik izleme, SSH/Samba, NTP, dinamik ad, otomatik kapanma, uzaktan uyandırma…) denetler. Tahtada değişiklik yapmaz.",
+  "category": "Bilgi",
+  "feature": "actions",
+  "timeout": 30,
+  "params": []
+}

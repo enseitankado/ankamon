@@ -1,0 +1,364 @@
+/**
+ * "Disk kullanımı ve veri silme" penceresi (Loglar sayfasındaki, yalnız 'logs.manage' yetkisiyle
+ * görünen düğmeden açılır). Sekmeler: log türleri (sistem, komut), rsyslog log kuyruğu, sensör
+ * verileri, görev kuyruğu, sorun tespiti raporları ve yedekler (/data/backups).
+ * Her sekme bir ui.DiskUsageTab'dır; burada yalnız türlere özgü sütunlar, yükleme ve silme istekleri
+ * tanımlanır (backend: LogStatsApi, LogQueueStatsApi, MetricStatsApi, JobStatsApi, BackupStatsApi).
+ */
+qx.Class.define("tihamon.ui.DiskUsage", {
+  type: "static",
+
+  statics: {
+    JOB_STATUS: { queued: "Kuyrukta", running: "Çalışıyor", done: "Tamamlandı", failed: "Hatalı" },
+    BACKUP_KIND: { full: "Tam (loglar + sensör dahil)", config: "Yapılandırma", grafana: "Grafana" },
+    BACKUP_GROUP: { full: "tam yedekler", config: "yapılandırma yedekleri", grafana: "Grafana yedekleri" },
+
+    /**
+     * @param page {tihamon.page.Logs} tablo yardımcıları + silme sonrası tazelenecek log grid'i
+     * @param mode {String} açılışta seçilecek sekme: log türü ("system" | "command") ya da "queue" |
+     *   "metrics" | "jobs" | "diagnose" | "backups" (bkz. spec.mode — Genel bakış kartları da kullanır)
+     */
+    open(page, mode) {
+      // maximizable: büyütülebilir, ama normal boyutta açılır (bkz. Dialog.js window()).
+      const win = tihamon.ui.Dialog.window("Disk kullanımı ve veri silme", 960, { maximizable: true });
+      win.setHeight(600);
+      const tabs = new qx.ui.tabview.TabView();
+      const specs = [
+        this.__logSpec(page, "system", "Sistem logları", "sistem log kaydı"),
+        this.__logSpec(page, "command", "Komut logları", "komut log kaydı"),
+        this.__logQueueSpec(),
+        this.__metricSpec(),
+        this.__jobSpec(),
+        this.__diagnoseSpec(),
+        this.__backupSpec()
+      ];
+      specs.forEach(spec => {
+        const tab = new tihamon.ui.DiskUsageTab(page, spec);
+        tabs.add(tab);
+        if (spec.mode && spec.mode === mode) {
+          tabs.setSelection([tab]);
+        }
+      });
+      win.add(tabs, { flex: 1 });
+
+      const close = new qx.ui.form.Button("Kapat");
+      close.addListener("execute", () => win.close());
+      tihamon.ui.Dialog.buttons(win, [close]);
+      win.open();
+    },
+
+    /** Sekmenin son yüklemesindeki disk bilgisini saklayan ortak durum satırı. */
+    __info(spec, data, text) {
+      spec.disk = data.disk;
+      const F = tihamon.util.Format;
+      const disk = data.disk && data.disk.total != null && data.disk.free != null
+        ? ` · Disk (/data): toplam ${F.bytes(data.disk.total)}, boş ${F.bytes(data.disk.free)}`
+        : "";
+      return text + disk;
+    },
+
+    __withDisk(spec) {
+      spec.lastDisk = () => spec.disk;
+      return spec;
+    },
+
+    __scopeColumns(countLabel) {
+      return [
+        { id: "name", label: "Tahta" },
+        { id: "n", label: countLabel, width: 120 },
+        { id: "first", label: "İlk kayıt", width: 160 },
+        { id: "last", label: "Son kayıt", width: 160 },
+        { id: "size", label: "Tahmini boyut (~)", width: 140 }
+      ];
+    },
+
+    __size(bytes, estimated) {
+      return (estimated ? "~" : "") + tihamon.util.Format.bytes(bytes);
+    },
+
+    /** Sistem / komut logları: tahta başına (+ eşleşmeyen + tümü), /api/logs/stats. */
+    __logSpec(page, type, label, noun) {
+      const F = tihamon.util.Format;
+      const spec = this.__withDisk({
+        mode: type, label, noun,
+        columns: this.__scopeColumns("Kayıt sayısı"),
+        load: async () => {
+          const data = await tihamon.io.Api.get("/logs/stats", { type });
+          const rows = [{
+            all: true, scope: {}, name: "— Tüm tahtalar —",
+            n: data.total.n, first: data.total.first, last: data.total.last, bytes: data.total.bytes, estimated: false
+          }];
+          if (data.unmatched) {
+            rows.push({ scope: { board: "unmatched" }, name: "— Tahtasız / eşleşmeyen —", ...data.unmatched, bytes: data.unmatched.est_bytes, estimated: true });
+          }
+          data.boards.forEach(b => rows.push({ scope: { board: b.board_id }, ...b, bytes: b.est_bytes, estimated: true }));
+          rows.forEach(r => {
+            r.deletable = true;
+            r.cells = [r.name, r.n, F.dateTime(r.first), F.dateTime(r.last), this.__size(r.bytes, r.estimated)];
+          });
+          return { rows, info: this.__info(spec, data, `${data.total.n} kayıt, ${F.bytes(data.total.bytes)}`) };
+        },
+        remove: async row => {
+          const search = new URLSearchParams({ type, ...row.scope });
+          return (await tihamon.io.Api.del("/logs?" + search.toString())).deleted;
+        },
+        onDeleted: () => page.refresh() // arkadaki ana log grid'i de güncel kalsın.
+      });
+      return spec;
+    },
+
+    /** Sensör verileri: tahta başına ham ölçüm + 5 dk/1 sa özetleri, /api/storage/metrics. */
+    __metricSpec() {
+      const F = tihamon.util.Format;
+      const spec = this.__withDisk({
+        mode: "metrics", label: "Sensör verileri", noun: "sensör ölçümü (ham + özet)",
+        columns: [
+          { id: "name", label: "Tahta" },
+          { id: "series", label: "Seri", width: 70 },
+          { id: "n", label: "Ham ölçüm", width: 110 },
+          { id: "agg", label: "Özet (5 dk/1 sa)", width: 130 },
+          { id: "first", label: "İlk ölçüm", width: 160 },
+          { id: "last", label: "Son ölçüm", width: 160 },
+          { id: "size", label: "Tahmini boyut (~)", width: 140 }
+        ],
+        load: async () => {
+          const data = await tihamon.io.Api.get("/storage/metrics");
+          const rows = [{ all: true, scope: {}, ...data.total, name: "— Tüm tahtalar —", bytes: data.total.bytes, estimated: false }];
+          if (data.unmatched) {
+            rows.push({ scope: { board: "unmatched" }, ...data.unmatched, name: "— Tahtasız / eşleşmeyen —", bytes: data.unmatched.est_bytes, estimated: true });
+          }
+          data.boards.forEach(b => rows.push({ scope: { board: b.board_id }, ...b, bytes: b.est_bytes, estimated: true }));
+          rows.forEach(r => {
+            r.records = r.n;
+            r.n = r.records + r.agg; // onay metni ve silinebilirlik için toplam satır
+            r.deletable = true;
+            r.cells = [r.name, r.series, r.records, r.agg, F.dateTime(r.first), F.dateTime(r.last), this.__size(r.bytes, r.estimated)];
+          });
+          return {
+            rows,
+            info: this.__info(spec, data, `${data.total.n} ham ölçüm + ${data.total.agg} özet, ${F.bytes(data.total.bytes)}`)
+          };
+        },
+        remove: async row => {
+          const search = new URLSearchParams(row.scope);
+          return (await tihamon.io.Api.del("/storage/metrics?" + search.toString())).deleted;
+        }
+      });
+      return spec;
+    },
+
+    /** Görev kuyruğu: görev başına (çıktı + olay akışıyla), /api/storage/jobs. Yalnız bitmişler silinir. */
+    __jobSpec() {
+      const F = tihamon.util.Format;
+      const status = tihamon.ui.DiskUsage.JOB_STATUS;
+      const spec = this.__withDisk({
+        mode: "jobs", label: "Görev kuyruğu", noun: "görev kaydı (tahta sonuçları ve çıktı akışıyla birlikte)",
+        columns: [
+          { id: "name", label: "Görev" },
+          { id: "type", label: "Tür", width: 90 },
+          { id: "status", label: "Durum", width: 100 },
+          { id: "targets", label: "Hedef", width: 170 },
+          { id: "by", label: "Oluşturan", width: 100 },
+          { id: "created", label: "Oluşturma", width: 150 },
+          { id: "events", label: "Çıktı satırı", width: 95 },
+          { id: "size", label: "Tahmini boyut (~)", width: 130 }
+        ],
+        load: async () => {
+          const data = await tihamon.io.Api.get("/storage/jobs");
+          const rows = [{
+            all: true, scope: { all: "1" }, name: "— Bitmiş tüm görevler —", n: data.finished.n,
+            bytes: data.finished.est_bytes, estimated: true, deletable: true,
+            cells: ["— Bitmiş tüm görevler —", "", "", "", "", "", "", this.__size(data.finished.est_bytes, true)]
+          }];
+          data.jobs.forEach(j => {
+            const names = j.target_names.join(", ");
+            const targets = j.targets > j.target_names.length ? `${j.targets} tahta (${names}…)` : names;
+            const name = `#${j.id} ${j.title || j.type}`;
+            rows.push({
+              scope: { ids: String(j.id) }, name, n: 1, bytes: j.est_bytes, estimated: true,
+              // Kuyrukta bekleyen/çalışan görev silinemez (runner sonucunu yazacak yer bulamaz).
+              deletable: j.deletable,
+              cells: [name, j.type, status[j.status] || j.status, targets, j.created_by || "",
+                F.dateTime(j.created_at), j.events, this.__size(j.est_bytes, true)]
+            });
+          });
+          return {
+            rows,
+            info: this.__info(spec, data,
+              `${data.total.n} görev (${data.finished.n} bitmiş), ~${F.bytes(data.total.bytes)} — bekleyen/çalışan görevler silinemez; ` +
+              "sorun tespiti taramaları kendi sekmesinde")
+          };
+        },
+        remove: async row => {
+          const search = new URLSearchParams(row.scope);
+          return (await tihamon.io.Api.del("/storage/jobs?" + search.toString())).deleted;
+        }
+      });
+      return spec;
+    },
+
+    /**
+     * Sorun tespiti raporları: tarama ("diagnose" görevi) başına, /api/storage/diagnose. Görev kuyruğu
+     * sekmesi bunları saymaz. Yalnız bitmiş taramalar silinir; silinen tahtalar otomatik zamanlayıcıca
+     * (bkz. worker tasks/diagnose_schedule.py) bir sonraki uygun anda yeniden taranır.
+     */
+    __diagnoseSpec() {
+      const F = tihamon.util.Format;
+      const status = tihamon.ui.DiskUsage.JOB_STATUS;
+      const spec = this.__withDisk({
+        mode: "diagnose", label: "Sorun tespiti",
+        noun: "sorun tespiti raporu (tahta sonuçlarıyla birlikte; silinen tahtalar otomatik taramada yeniden denetlenir)",
+        columns: [
+          { id: "name", label: "Tarama" },
+          { id: "kind", label: "Başlatan", width: 120 },
+          { id: "status", label: "Durum", width: 100 },
+          { id: "targets", label: "Tahtalar", width: 220 },
+          { id: "created", label: "Tarih", width: 150 },
+          { id: "events", label: "Çıktı satırı", width: 95 },
+          { id: "size", label: "Tahmini boyut (~)", width: 130 }
+        ],
+        load: async () => {
+          const data = await tihamon.io.Api.get("/storage/diagnose");
+          const rows = [{
+            all: true, scope: { all: "1" }, name: "— Bitmiş tüm taramalar —", n: data.finished.n,
+            bytes: data.finished.est_bytes, estimated: true, deletable: true,
+            cells: ["— Bitmiş tüm taramalar —", "", "", "", "", "", this.__size(data.finished.est_bytes, true)]
+          }];
+          data.jobs.forEach(j => {
+            const names = j.target_names.join(", ");
+            const targets = j.targets > j.target_names.length ? `${j.targets} tahta (${names}…)` : names;
+            const name = `#${j.id} Sorun tespiti`;
+            rows.push({
+              scope: { ids: String(j.id) }, name, n: 1, bytes: j.est_bytes, estimated: true, deletable: j.deletable,
+              cells: [name, j.auto ? "Otomatik" : (j.created_by || "Elle"), status[j.status] || j.status, targets,
+                F.dateTime(j.created_at), j.events, this.__size(j.est_bytes, true)]
+            });
+          });
+          return {
+            rows,
+            info: this.__info(spec, data,
+              `${data.total.n} tarama (${data.finished.n} bitmiş), ~${F.bytes(data.total.bytes)} — süren taramalar silinemez`)
+          };
+        },
+        remove: async row => {
+          const search = new URLSearchParams(row.scope);
+          return (await tihamon.io.Api.del("/storage/diagnose?" + search.toString())).deleted;
+        }
+      });
+      return spec;
+    },
+
+    /**
+     * Yedekler: /data/backups'taki döküm dosyaları (gerçek boyut), /api/storage/backups. Silme yedek
+     * servisine (root) bir istekle yaptırılır — bkz. backend BackupStatsApi.
+     */
+    __backupSpec() {
+      const F = tihamon.util.Format;
+      const kinds = tihamon.ui.DiskUsage.BACKUP_KIND;
+      const spec = this.__withDisk({
+        mode: "backups", label: "Yedekler", noun: "yedek dosyası",
+        columns: [
+          { id: "name", label: "Dosya" },
+          { id: "kind", label: "Tür", width: 200 },
+          { id: "time", label: "Alınma zamanı", width: 170 },
+          { id: "size", label: "Boyut", width: 120 }
+        ],
+        load: async () => {
+          const data = await tihamon.io.Api.get("/storage/backups");
+          const rows = [{
+            all: true, scope: { all: "1" }, name: "— Tüm yedekler —", n: data.total.n, bytes: data.total.bytes,
+            estimated: false, deletable: true, cells: ["— Tüm yedekler —", "", "", F.bytes(data.total.bytes)]
+          }];
+          // Tür grupları: o türün tüm dosyalarını tek satırdan silmek için (sunucu kind= ile o anki
+          // dosyaları siler).
+          Object.keys(kinds).forEach(kind => {
+            const files = data.files.filter(f => f.kind === kind);
+            if (!files.length) {
+              return;
+            }
+            const bytes = files.reduce((sum, f) => sum + f.bytes, 0);
+            const name = `— Tüm ${tihamon.ui.DiskUsage.BACKUP_GROUP[kind]} (${files.length}) —`;
+            rows.push({
+              groupAll: kind, scope: { kind }, name, n: files.length, bytes, estimated: false, deletable: true,
+              cells: [name, kinds[kind], F.dateTime(Math.max(...files.map(f => f.mtime))), F.bytes(bytes)]
+            });
+          });
+          data.files.forEach(f => rows.push({
+            group: f.kind, scope: { names: f.name }, name: f.name, n: 1, bytes: f.bytes, estimated: false, deletable: true,
+            cells: [f.name, kinds[f.kind] || f.kind, F.dateTime(f.mtime), F.bytes(f.bytes)]
+          }));
+          return {
+            rows,
+            info: this.__info(spec, data,
+              `${data.total.n} dosya, ${F.bytes(data.total.bytes)} (${qx.bom.String.escape(data.dir)}; ` +
+              `saklanan: ${data.keep_full} tam, ${data.keep_config} yapılandırma)`)
+          };
+        },
+        remove: async row => {
+          const search = new URLSearchParams(row.scope);
+          return (await tihamon.io.Api.del("/storage/backups?" + search.toString())).deleted;
+        }
+      });
+      return spec;
+    },
+
+    /**
+     * Log kuyruğu: rsyslog'un /data/rsyslog'daki disk kuyruğu (veritabanına henüz yazılamamış loglar)
+     * ve açılışta kenara alınmış bozuk kuyruk klasörleri, /api/storage/logqueue. Canlı kuyruk parça
+     * parça silinemez (konum dosyası bozulur) — yalnız grup satırıyla bütün olarak silinir.
+     */
+    __logQueueSpec() {
+      const F = tihamon.util.Format;
+      const spec = this.__withDisk({
+        mode: "queue", label: "Log kuyruğu", noun: "kuyruk dosyası (içindeki, veritabanına henüz yazılmamış loglar kaybolur)",
+        columns: [
+          { id: "name", label: "Ad" },
+          { id: "kind", label: "Tür", width: 330 },
+          { id: "files", label: "Dosya", width: 70 },
+          { id: "time", label: "Son değişiklik", width: 160 },
+          { id: "size", label: "Boyut", width: 110 }
+        ],
+        load: async () => {
+          const data = await tihamon.io.Api.get("/storage/logqueue");
+          const live = data.live;
+          const fileCount = live.files.length + data.quarantine.reduce((sum, q) => sum + q.files, 0);
+          const rows = [{
+            all: true, scope: { all: "1" }, name: "— Tümü —", n: fileCount, bytes: data.total.bytes,
+            estimated: false, deletable: true,
+            cells: ["— Tümü —", "Canlı kuyruk + bozuk kuyruk klasörleri", fileCount, "", F.bytes(data.total.bytes)]
+          }];
+          if (live.files.length) {
+            const name = `— Bekleyen canlı kuyruk (${live.files.length} dosya) —`;
+            rows.push({
+              groupAll: "live", scope: { names: "live" }, name, n: live.files.length, bytes: live.bytes,
+              estimated: false, deletable: true,
+              cells: [name, "Canlı kuyruk — rsyslog kısa süre durdurulup silinir", live.files.length,
+                F.dateTime(live.newest), F.bytes(live.bytes)]
+            });
+            live.files.forEach(f => rows.push({
+              group: "live", name: f.name, n: 1, bytes: f.bytes, estimated: false, deletable: false,
+              cells: [f.name, f.name.endsWith(".qi") ? "Kuyruk konum dosyası" : "Kuyruk parçası (yalnız grup olarak silinir)",
+                1, F.dateTime(f.mtime), F.bytes(f.bytes)]
+            }));
+          }
+          data.quarantine.forEach(q => rows.push({
+            scope: { names: q.name }, name: q.name, n: q.files, bytes: q.bytes, estimated: false, deletable: true,
+            cells: [q.name, "Bozuk kuyruk (açılışta kenara alınmış)", q.files, F.dateTime(q.mtime), F.bytes(q.bytes)]
+          }));
+          const state = live.bytes > 0
+            ? `bekleyen kuyruk ${F.bytes(live.bytes)} — büyüyorsa loglar veritabanına ulaşmıyor`
+            : "bekleyen kuyruk boş";
+          return {
+            rows,
+            info: this.__info(spec, data, `${qx.bom.String.escape(data.dir)}: ${state}, ${data.quarantine.length} bozuk klasör`)
+          };
+        },
+        remove: async row => {
+          const search = new URLSearchParams(row.scope);
+          return (await tihamon.io.Api.del("/storage/logqueue?" + search.toString())).deleted;
+        }
+      });
+      return spec;
+    }
+  }
+});

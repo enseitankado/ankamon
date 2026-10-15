@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiha-Mon — Ekranımı yansıt</title>
+<link rel="icon" href="data:,">
+<!--
+  Ekran yansıtma: bu bilgisayarın ekranını (ya da bir pencereyi/sekmeyi) seçili tahtalarda tam ekran gösterir.
+  Adres: /cast/#<base64(JSON {boards:[{id,name,online}], quality?, audio?})> — bilgi URL fragmanında taşınır
+  (bkz. ui/BoardOps.cast). quality ("text"|"video"|"low") verilirse (Tahtalar/Ekranlar sağ menüsü "Ekranımı
+  yansıt ▸ <kalite>") ayar satırı yerine seçilen ayarların özeti görünür ve paylaşım kendiliğinden başlar.
+  Akış:
+    1) getDisplayMedia → RTCPeerConnection → WHIP: POST /cast/mtx/<yayın>/whip (nginx → MediaMTX, "cast" yetkisi).
+       Yayın adı "c-<32 rastgele karakter>": tahtaların okuma anahtarı da budur (bkz. services/mediamtx.sh).
+    2) Bağlantı kurulunca POST /api/jobs {type: cast_start} — runner her tahtada SSH ile ekranı uyandırır,
+       ekran koruyucuyu kapatır ve mpv'yi tam ekran başlatır (bkz. worker/tihamon/executor/cast.py).
+    3) Durdur / sekmeyi kapat / tarayıcının "Paylaşımı durdur"u: WHIP oturumu silinir, cast_stop görevi
+       gönderilir (tahtadaki oynatıcı yayın bitince zaten kendiliğinden kapanır; görev ekran koruyucuyu
+       hemen geri kurar).
+  Ekran yakalama yalnız güvenli bağlamda (HTTPS) çalışır — Tiha-Mon HTTPS ile açılmalı (bkz. services/tls.sh).
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: #111; font-family: Segoe UI, Roboto, sans-serif; color: #ddd; }
+  header { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #0e2a47; }
+  header h1 { flex: 1; margin: 0; font-size: 15px; font-weight: 600; }
+  header .state { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #33404f; }
+  header .state.live { background: #b3261e; color: #fff; }
+  main { padding: 12px; display: grid; gap: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  label { font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+  select, button { font: inherit; font-size: 13px; }
+  select { padding: 4px 6px; background: #1f2630; color: #ddd; border: 1px solid #3a4553; border-radius: 4px; }
+  button { padding: 6px 14px; border: 0; border-radius: 4px; background: #0067c0; color: #fff; cursor: pointer; }
+  button:hover:not(:disabled) { background: #1b7ad1; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.stop { background: #b3261e; }
+  button.stop:hover:not(:disabled) { background: #d13a31; }
+  button.ghost { background: #2b3542; }
+  #start.big { font-size: 18px; padding: 14px 28px; }
+  body.live #start.big { font-size: 13px; padding: 6px 14px; }
+  video { width: 100%; max-height: 38vh; background: #000; border-radius: 4px; display: none; }
+  body.live video { display: block; }
+  .note { font-size: 12px; color: #aab; line-height: 1.45; }
+  .note a { color: #6af; }
+  .error { background: #4a1714; color: #fdd; padding: 8px 10px; border-radius: 4px; font-size: 13px; display: none; white-space: pre-line; }
+  .error.show { display: block; }
+  ul { list-style: none; margin: 0; padding: 0; border: 1px solid #2b3542; border-radius: 4px; }
+  li { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border-top: 1px solid #222a33; font-size: 13px; }
+  li:first-child { border-top: 0; }
+  li .dot { width: 9px; height: 9px; border-radius: 50%; background: #666; flex: 0 0 auto; }
+  li .name { flex: 0 0 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  li .msg { flex: 1; color: #99a; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  li button { padding: 2px 8px; font-size: 12px; }
+  li.busy .dot { background: #e0a800; }
+  li.ok .dot { background: #3c3; }
+  li.fail .dot { background: #e44; }
+  li.off .dot { background: #444; }
+  .stats { font-size: 12px; color: #889; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ekranımı yansıt</h1>
+  <span class="state" id="state">Hazır</span>
+</header>
+<main>
+  <div class="error" id="error"></div>
+  <div class="row" id="options">
+    <label>Kalite
+      <select id="quality">
+        <option value="text">Sunum / metin — 1080p, 15 kare/sn (keskin yazı)</option>
+        <option value="video">Video / hareket — 720p, 30 kare/sn (akıcı)</option>
+        <option value="low">Zayıf ağ — 720p, 10 kare/sn</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="audio"> Ses</label>
+  </div>
+  <div class="row">
+    <button id="start">Paylaşmayı başlat</button>
+    <button id="switch" class="ghost" disabled>Kaynağı değiştir</button>
+    <button id="stop" class="stop" disabled>Durdur</button>
+    <span class="stats" id="stats"></span>
+  </div>
+  <video id="preview" muted playsinline autoplay></video>
+  <ul id="boards"></ul>
+  <div class="note">
+    Tahtada görüntü tam ekran açılır, gerekirse ekran uyandırılır ve ekran koruyucu kapatılır; yansıtma bitince
+    eski hâline döner. Bu pencereyi kapatmak ya da tarayıcının “Paylaşımı durdur” düğmesi yansıtmayı bitirir.
+    Ses: Chrome/Edge'de sekme sesi her sistemde, tüm sistem sesi yalnız Windows'ta paylaşılabilir.
+  </div>
+</main>
+<script type="module">
+const $ = id => document.getElementById(id);
+const QUALITY = {
+  text:  { width: 1920, height: 1080, fps: 15, bitrate: 2_500_000, hint: "detail" },
+  video: { width: 1280, height: 720,  fps: 30, bitrate: 3_000_000, hint: "motion" },
+  low:   { width: 1280, height: 720,  fps: 10, bitrate: 900_000,   hint: "detail" },
+};
+
+let spec = { boards: [] };
+try {
+  spec = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1)))));
+} catch { /* boş/bozuk fragman: aşağıda uyarılır */ }
+const boards = (spec.boards || []).map(b => ({ ...b, state: b.online === false ? "off" : "idle", msg: "" }));
+
+let media = null;       // MediaStream (ekran)
+let pc = null;          // RTCPeerConnection
+let whipUrl = null;     // WHIP oturum adresi (DELETE ile kapatılır)
+let stream = null;      // yayın adı (c-…)
+let live = false;
+let statsTimer = null;
+
+function api(method, path, body) {
+  return fetch("/api" + path, {
+    method, credentials: "same-origin", keepalive: method !== "GET",
+    headers: { "X-Requested-With": "tihamon", ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  }).then(async r => {
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `Sunucu hatası (${r.status})`);
+    return data;
+  });
+}
+
+function showError(text) {
+  $("error").textContent = text || "";
+  $("error").classList.toggle("show", !!text);
+}
+
+function setState(text, isLive = false) {
+  $("state").textContent = text;
+  $("state").classList.toggle("live", isLive);
+}
+
+function render() {
+  const ul = $("boards");
+  ul.replaceChildren(...boards.map(b => {
+    const li = document.createElement("li");
+    li.className = { busy: "busy", ok: "ok", fail: "fail", off: "off" }[b.state] || "";
+    const dot = Object.assign(document.createElement("span"), { className: "dot" });
+    const name = Object.assign(document.createElement("span"), { className: "name", textContent: b.name });
+    const msg = Object.assign(document.createElement("span"), {
+      className: "msg",
+      textContent: b.msg || { idle: "Bekliyor", off: "Kapalı — atlanır", busy: "Başlatılıyor…", ok: "Yansıtılıyor" }[b.state] || "",
+      title: b.msg || "",
+    });
+    li.append(dot, name, msg);
+    if (live && b.state === "fail") {
+      const retry = Object.assign(document.createElement("button"), { className: "ghost", textContent: "Yeniden dene" });
+      retry.addEventListener("click", () => castTo([b]));
+      li.append(retry);
+    }
+    return li;
+  }));
+  $("start").disabled = live || !boards.some(b => b.state !== "off");
+  $("stop").disabled = !live;
+  $("switch").disabled = !live;
+  $("quality").disabled = live;
+  $("audio").disabled = live;
+  document.body.classList.toggle("live", live);
+}
+
+function randomName() {
+  const abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return "c-" + Array.from(bytes, x => abc[x % abc.length]).join("");
+}
+
+async function capture() {
+  const q = QUALITY[$("quality").value];
+  const m = await navigator.mediaDevices.getDisplayMedia({
+    video: { width: { max: q.width }, height: { max: q.height }, frameRate: { ideal: q.fps, max: q.fps } },
+    audio: $("audio").checked,
+    // Seçim penceresinde "Tüm ekran" önde gelsin; Tiha-Mon sekmesinin kendisi listelenmesin.
+    surfaceSwitching: "include",
+    selfBrowserSurface: "exclude",
+    systemAudio: "include",
+    monitorTypeSurfaces: "include",
+  });
+  const [video] = m.getVideoTracks();
+  video.contentHint = q.hint;
+  video.addEventListener("ended", () => { if (live && media === m) stop(); });
+  return m;
+}
+
+// Tahtalar H264'ü (Intel iGPU, vaapi) donanımsal çözer; tarayıcı varsayılanı VP8 olabilir.
+function preferH264(transceiver) {
+  const caps = RTCRtpSender.getCapabilities?.("video");
+  if (!caps || !transceiver.setCodecPreferences) return;
+  const rank = c => {
+    if (c.mimeType.toLowerCase() !== "video/h264") return 2;
+    return /packetization-mode=1/.test(c.sdpFmtpLine || "") && /profile-level-id=42e0/.test(c.sdpFmtpLine || "") ? 0 : 1;
+  };
+  transceiver.setCodecPreferences([...caps.codecs].sort((a, b) => rank(a) - rank(b)));
+}
+
+// Chrome bant genişliği tahminine 300 kbit/sn'den başlar ve yavaş yükselir: yansıtma ilk saniyelerde
+// bulanık (320×180) açılıyordu. Yerel ağda başlangıç/alt sınır yanıt SDP'sinde bildirilir (diğer
+// tarayıcılar bu parametreleri yok sayar).
+function startBitrate(sdp, max) {
+  const kbps = Math.round(max / 1000);
+  const start = Math.round(kbps * 0.8), min = Math.round(kbps * 0.3);
+  const video = new Set();
+  let inVideo = false;
+  for (const line of sdp.split("\r\n")) {
+    if (line.startsWith("m=")) inVideo = line.startsWith("m=video");
+    const m = inVideo && line.match(/^a=rtpmap:(\d+) (H264|VP8|VP9|AV1)\//i);
+    if (m) video.add(m[1]);
+  }
+  return sdp.split("\r\n").map(line => {
+    const m = line.match(/^a=fmtp:(\d+) /);
+    return m && video.has(m[1]) && !line.includes("x-google-")
+      ? `${line};x-google-start-bitrate=${start};x-google-min-bitrate=${min};x-google-max-bitrate=${kbps}` : line;
+  }).join("\r\n");
+}
+
+async function waitIce(peer) {
+  if (peer.iceGatheringState === "complete") return;
+  await new Promise(resolve => {
+    const t = setTimeout(resolve, 2500); // yerel ağda adaylar anında gelir; STUN yok
+    peer.addEventListener("icegatheringstatechange", () => {
+      if (peer.iceGatheringState === "complete") { clearTimeout(t); resolve(); }
+    });
+  });
+}
+
+async function publish() {
+  const q = QUALITY[$("quality").value];
+  pc = new RTCPeerConnection({ bundlePolicy: "max-bundle" });
+  const vt = pc.addTransceiver(media.getVideoTracks()[0], { direction: "sendonly", streams: [media] });
+  preferH264(vt);
+  const [audio] = media.getAudioTracks();
+  if (audio) pc.addTransceiver(audio, { direction: "sendonly", streams: [media] });
+
+  const params = vt.sender.getParameters();
+  params.encodings = params.encodings?.length ? params.encodings : [{}];
+  params.encodings[0].maxBitrate = q.bitrate;
+  params.encodings[0].maxFramerate = q.fps;
+  params.degradationPreference = q.hint === "motion" ? "maintain-framerate" : "maintain-resolution";
+
+  await pc.setLocalDescription(await pc.createOffer());
+  await waitIce(pc);
+  const r = await fetch(`/cast/mtx/${stream}/whip`, {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/sdp" }, body: pc.localDescription.sdp,
+  });
+  if (r.status === 401 || r.status === 403) throw new Error("Ekran yansıtma yetkiniz yok.");
+  if (r.status !== 201) throw new Error(`Yayın sunucusu yanıtı: ${r.status} ${await r.text().catch(() => "")}`.trim());
+  // Oturum adresi (DELETE ile kapatılır): MediaMTX kendi kökünü ("/") bilir, nginx'te /cast/mtx/ altındadır.
+  const loc = r.headers.get("Location");
+  if (loc) {
+    whipUrl = loc.startsWith("/") ? (loc.startsWith("/cast/mtx/") ? loc : "/cast/mtx" + loc)
+                                  : new URL(loc, location.origin + `/cast/mtx/${stream}/whip`).pathname;
+  }
+  await pc.setRemoteDescription({ type: "answer", sdp: startBitrate(await r.text(), q.bitrate) });
+  try { await vt.sender.setParameters(params); } catch { /* bazı tarayıcılar alanların bir kısmını desteklemez */ }
+
+  await new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(
+      "Medya bağlantısı kurulamadı. Bu bilgisayardan Tiha-Mon sunucusunun 8189 (UDP/TCP) portuna erişilebilmeli.")), 15000);
+    const check = () => {
+      if (pc.connectionState === "connected") { clearTimeout(t); resolve(); }
+      else if (pc.connectionState === "failed") { clearTimeout(t); reject(new Error("Medya bağlantısı başarısız (ICE).")); }
+    };
+    pc.addEventListener("connectionstatechange", check);
+    check();
+  });
+  pc.addEventListener("connectionstatechange", () => {
+    if (live && pc && pc.connectionState === "failed") {
+      showError("Yayın sunucusuyla bağlantı koptu.");
+      stop();
+    }
+  });
+}
+
+async function pollJob(id, targets, okText) {
+  for (let i = 0; i < 90; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    let job;
+    try { ({ job } = await api("GET", "/jobs/" + id)); } catch { continue; }
+    for (const t of job.targets || []) {
+      const b = targets.find(x => x.id === t.board_id);
+      if (!b || t.status === "queued" || t.status === "running") continue;
+      b.state = t.status === "ok" ? "ok" : "fail";
+      const lines = String(t.output || "").trim().split("\n").filter(Boolean);
+      b.msg = b.state === "ok" ? okText(lines) : (lines.slice(-1)[0] || "Başarısız");
+    }
+    render();
+    if (!["queued", "running"].includes(job.status)) return;
+  }
+}
+
+async function castTo(targets) {
+  targets = targets.filter(b => b.state !== "off");
+  if (!targets.length || !live) return;
+  targets.forEach(b => { b.state = "busy"; b.msg = ""; });
+  render();
+  try {
+    const { id } = await api("POST", "/jobs", {
+      type: "cast_start", board_ids: targets.map(b => b.id), stream, audio: media.getAudioTracks().length > 0,
+    });
+    await pollJob(id, targets, lines =>
+      lines.some(l => /koruyucu/.test(l)) ? "Yansıtılıyor (ekran koruyucu kapatıldı)" : "Yansıtılıyor");
+  } catch (e) {
+    targets.forEach(b => { b.state = "fail"; b.msg = e.message; });
+    render();
+  }
+}
+
+async function start() {
+  showError("");
+  if (!window.isSecureContext || !navigator.mediaDevices?.getDisplayMedia) {
+    const https = location.protocol === "http:" ? location.href.replace(/^http:/, "https:") : null;
+    showError("Bu tarayıcı ekran paylaşımına izin vermiyor: sayfa HTTPS ile açılmalı" +
+      (https ? ` (${https})` : "") + " ve tarayıcı güncel olmalı (Chrome/Edge/Firefox).");
+    return;
+  }
+  try {
+    media = await capture();
+  } catch (e) {
+    if (e.name !== "NotAllowedError" && e.name !== "AbortError") showError("Ekran seçilemedi: " + e.message);
+    return;
+  }
+  $("preview").srcObject = media;
+  stream = randomName();
+  setState("Bağlanıyor…");
+  try {
+    await publish();
+  } catch (e) {
+    showError(e.message);
+    await teardown();
+    setState("Hazır");
+    return;
+  }
+  live = true;
+  setState("● YAYINDA", true);
+  startStats();
+  await castTo(boards);
+}
+
+async function switchSource() {
+  let m;
+  try { m = await capture(); } catch { return; }
+  const old = media;
+  media = m;
+  const senders = pc.getSenders();
+  await senders.find(s => s.track?.kind === "video")?.replaceTrack(m.getVideoTracks()[0]);
+  const audioSender = senders.find(s => s.track?.kind === "audio");
+  if (audioSender) await audioSender.replaceTrack(m.getAudioTracks()[0] || null);
+  $("preview").srcObject = m;
+  old.getTracks().forEach(t => t.stop());
+}
+
+function startStats() {
+  let last = null;
+  statsTimer = setInterval(async () => {
+    if (!pc) return;
+    const report = await pc.getStats();
+    report.forEach(s => {
+      if (s.type !== "outbound-rtp" || s.kind !== "video") return;
+      if (last) {
+        const kbps = ((s.bytesSent - last.bytesSent) * 8) / ((s.timestamp - last.timestamp) || 1);
+        const codec = report.get(s.codecId)?.mimeType?.split("/")[1] || "";
+        $("stats").textContent = `${codec} · ${s.frameWidth || "?"}×${s.frameHeight || "?"} · ` +
+          `${Math.round(s.framesPerSecond || 0)} kare/sn · ${Math.round(kbps)} kbit/sn`;
+      }
+      last = s;
+    });
+  }, 2000);
+}
+
+async function teardown() {
+  clearInterval(statsTimer);
+  $("stats").textContent = "";
+  // Önce WHIP oturumu silinir, sonra bağlantı kapanır (tersi olunca MediaMTX oturumu zaten kapatmış
+  // oluyor, DELETE 404 dönüyordu). Yanıt beklenmez: en çok 1,5 sn.
+  if (whipUrl) {
+    const del = fetch(whipUrl, { method: "DELETE", credentials: "same-origin", keepalive: true }).catch(() => {});
+    whipUrl = null;
+    await Promise.race([del, new Promise(r => setTimeout(r, 1500))]);
+  }
+  pc?.close();
+  pc = null;
+  media?.getTracks().forEach(t => t.stop());
+  media = null;
+  $("preview").srcObject = null;
+}
+
+async function stop() {
+  if (!live) return;
+  live = false;
+  const targets = boards.filter(b => b.state === "ok" || b.state === "busy" || b.state === "fail");
+  await teardown();
+  setState("Durduruluyor…");
+  targets.forEach(b => { b.state = "busy"; b.msg = "Durduruluyor…"; });
+  render();
+  if (targets.length) {
+    try {
+      const { id } = await api("POST", "/jobs", { type: "cast_stop", board_ids: targets.map(b => b.id) });
+      await pollJob(id, targets, () => "Durduruldu");
+    } catch { /* tahtadaki oynatıcı yayın bitince zaten kapanır */ }
+  }
+  targets.forEach(b => { b.state = "idle"; b.msg = "Durduruldu"; });
+  setState("Hazır");
+  render();
+}
+
+$("start").addEventListener("click", start);
+$("stop").addEventListener("click", stop);
+$("switch").addEventListener("click", switchSource);
+window.addEventListener("beforeunload", e => { if (live) e.preventDefault(); });
+// Pencere kapanırken: WHIP oturumu ve tahtalardaki oynatıcılar (keepalive istekleri sayfa gittikten sonra da tamamlanır).
+window.addEventListener("pagehide", () => {
+  if (!live) return;
+  live = false;
+  const ids = boards.filter(b => b.state !== "off" && b.state !== "idle").map(b => b.id);
+  if (whipUrl) fetch(whipUrl, { method: "DELETE", credentials: "same-origin", keepalive: true }).catch(() => {});
+  if (ids.length) api("POST", "/jobs", { type: "cast_stop", board_ids: ids }).catch(() => {});
+});
+
+if (!boards.length) showError("Tahta seçilmemiş. Tahtalar sayfasında tahtaları işaretleyip “Yansıt”ı kullanın.");
+
+// Ön ayar (sağ menü "Ekranımı yansıt ▸ <kalite>", ses menüdeki onay kutusundan): ayarlar sorulmaz, özetlenir.
+// getDisplayMedia bir kullanıcı hareketi (transient activation) ister ve menüdeki tıklama window.open ile
+// açılan bu pencereye TAŞINMAZ — sayfa yüklenince çağrılan start() sessizce düşerdi. Bu yüzden yalnız
+// etkileşim varsa kendiliğinden başlatılır; yoksa büyük, odaklanmış tek bir "Paylaşmayı başlat" düğmesi
+// kalır (Enter/Boşluk da çalışır) — tarayıcının ekran seçme penceresini açan tek tık budur.
+const preset = Object.hasOwn(QUALITY, spec.quality || "");
+if (preset) {
+  // Başvurular ÖNCE alınır: replaceChildren kontrolleri (#options içindeki <label>'larla birlikte) DOM'dan
+  // çıkarır, sonra $("quality") null dönüyordu → capture() "Cannot read properties of null (reading 'value')".
+  const quality = $("quality"), audio = $("audio");
+  quality.value = spec.quality;
+  audio.checked = spec.audio !== false;
+  const label = quality.selectedOptions[0].textContent;
+  $("options").replaceChildren(Object.assign(document.createElement("span"), {
+    className: "note", textContent: `Kalite: ${label} · Ses: ${audio.checked ? "açık" : "kapalı"}`,
+  }));
+  // Kontroller gizli olarak sayfaya geri eklenir: capture()/publish()/render() onları okumaya devam eder.
+  document.body.append(Object.assign(quality, { hidden: true }), Object.assign(audio, { hidden: true }));
+}
+render();
+if (preset && boards.some(b => b.state !== "off")) {
+  $("start").classList.add("big");
+  $("start").focus();
+  if (navigator.userActivation?.isActive) {
+    start();
+  } else {
+    setState("Ekranı seçmek için “Paylaşmayı başlat”a basın");
+  }
+}
+</script>
+</body>
+</html>

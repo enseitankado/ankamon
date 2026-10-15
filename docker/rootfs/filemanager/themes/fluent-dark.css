@@ -1,0 +1,41 @@
+/*
+ * FileBrowser Quantum teması: tiha-mon "Fluent Koyu (Windows 11)" (fluent-dark) temasının renkleri.
+ * Renkler, tiha-mon arayüzünde bu tema seçiliyken qooxdoo renk yöneticisinin çözdüğü değerlerden alındı
+ * (app-background, app-nav, surface, app-border, text-primary-on-surface, app-muted, primary, error).
+ * FileBrowser'ın açık/koyu kip seçiminden bağımsız aynı görünsün diye değişkenler hem :root hem
+ * .dark-mode için tanımlanır. Seçim: dosya yöneticisi → Ayarlar → Profil → Tema (bkz. filemanager.sh).
+ */
+:root,
+.dark-mode {
+  color-scheme: dark;
+  --background: #1F1F1F;
+  --alt-background: #292929;
+  --surfacePrimary: #292929;
+  --surfaceSecondary: #666666;
+  --surfaceTertiary: #292929;
+  --textPrimary: #ffffff;
+  --textSecondary: #ADADAD;
+  --divider: #666666;
+  --borderColor: #666666;
+  --borderPrimary: #666666;
+  --iconBackground: #292929;
+  --activeWhiteIcon: white;
+  --primaryColor: #479EF5;
+  --blue: #479EF5;
+  --dark-blue: #479EF5;
+  --errorColor: #DC626D;
+  --red: #DC626D;
+}
+
+/* Üst çubuk, kenar çubuğu ve durum çubuğu: FileBrowser zemin üstüne sabit yarı saydam bir ton bindiriyor
+   (header[data-v-…], #sidebar, #status-bar — !important ile); tiha-mon'un sol menüsü gibi temanın gezinme
+   rengini (app-nav) alsınlar. :not(#tm…) yalnız özgüllüğü artırır — bileşen hash'ine (data-v-…) bağlı
+   kalınmasın, FileBrowser sürümü değişince de çalışsın diye. */
+body {
+  color: var(--textPrimary);
+}
+header:not(#tm-a):not(#tm-b),
+#sidebar:not(#tm-a),
+#status-bar:not(#tm-a) {
+  background-color: var(--alt-background) !important;
+}

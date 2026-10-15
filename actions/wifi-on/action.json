@@ -1,0 +1,9 @@
+{
+  "title": "Wi-Fi'yi aç",
+  "description": "\"Wi-Fi'yi kapat\" ile kapatılan kablosuz ağ kartının radyosunu yeniden açar (nmcli radio wifi on) ve giriş ekranının Wi-Fi'yi yönetmesini engelleyen kuralı kaldırır. Kayıtlı bir kablosuz ağ varsa NetworkManager ona kendiliğinden bağlanır.",
+  "category": "Ağ",
+  "feature": "actions",
+  "confirm": false,
+  "timeout": 30,
+  "params": []
+}

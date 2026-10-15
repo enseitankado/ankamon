@@ -1,0 +1,16 @@
+{
+  "name": "tihamon-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tiha-Mon web arayüzü (qooxdoo)",
+  "scripts": {
+    "build": "qx compile --target=build",
+    "watch": "qx compile --watch"
+  },
+  "devDependencies": {
+    "@qooxdoo/framework": "7.9.3"
+  },
+  "dependencies": {
+    "vis-timeline": "^8.5.4"
+  }
+}

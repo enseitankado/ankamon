@@ -1,0 +1,14 @@
+# Kuruluma özel (install.sh üretir) ve çalışma verisi — depoya ASLA girmez.
+/.env
+/data/
+# Geliştirme ortamına özel notlar/erişim bilgileri.
+/CLAUDE.md
+/.claude/
+# Derlemede indirilen/üretilenler (bkz. Dockerfile "frontend" aşaması).
+/frontend/node_modules/
+/frontend/compiled/
+/frontend/.qooxdoo/
+/frontend/themes/
+/worker/tihamon/netscan/manuf.gz
+__pycache__/
+*.pyc

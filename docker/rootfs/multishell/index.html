@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Tiha-Mon — Çoklu web terminal</title>
+<style>
+  :root { --border: #d0d4da; --bar: #0e2a47; --bar-text: #fff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #f3f3f3; font-family: Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; }
+
+  #toolbar {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+    background: var(--bar); color: var(--bar-text); flex: 0 0 auto;
+  }
+  #toolbar .title { font-weight: bold; margin-right: 4px; white-space: nowrap; }
+  #toolbar input[type=text] {
+    flex: 1; min-width: 120px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px;
+  }
+  #toolbar button {
+    padding: 6px 12px; border: 1px solid transparent; border-radius: 4px; background: #0067c0; color: #fff;
+    cursor: pointer; font-size: 13px; white-space: nowrap;
+  }
+  #toolbar button:hover { background: #1b7ad1; }
+  #toolbar button.secondary { background: #3a3f47; }
+  #toolbar button.secondary:hover { background: #4c525c; }
+  #toolbar .count { opacity: .85; font-size: 12px; white-space: nowrap; }
+
+  #grid {
+    flex: 1; display: grid; gap: 2px; background: var(--border); overflow: auto;
+  }
+  .pane { display: flex; flex-direction: column; background: #000; min-height: 160px; }
+  .pane .pane-title {
+    flex: 0 0 auto; padding: 3px 8px; background: #1f2630; color: #ddd; font-size: 12px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pane iframe { flex: 1; border: 0; width: 100%; height: 100%; }
+
+  #empty { margin: 40px auto; color: #666; font-size: 14px; }
+</style>
+</head>
+<body>
+  <div id="toolbar">
+    <span class="title">Toplu komut:</span>
+    <input type="text" id="cmd" placeholder="Tüm panolara gönderilecek komut — Enter'a basın">
+    <button id="send">Gönder</button>
+    <button id="ctrlc" class="secondary" title="Çalışan komutu durdurur (SIGINT)">Ctrl+C</button>
+    <button id="reload" class="secondary" title="Bağlantısı kopan panoları yeniden bağlar">Yeniden bağla</button>
+    <span class="count" id="count"></span>
+  </div>
+  <div id="grid"></div>
+  <div id="empty" style="display:none">Gösterilecek tahta yok. Bu pencereyi Tahtalar sayfasından, birden fazla tahta işaretleyip "Web terminal" ile açın.</div>
+
+<script>
+(function () {
+  "use strict";
+
+  function paneUrl(c) {
+    var p = new URLSearchParams();
+    p.set("hostname", c.hostname);
+    p.set("port", c.port);
+    p.set("username", c.username);
+    p.set("password", c.password);
+    p.set("title", c.title || c.hostname);
+    return "/webshell/?" + p.toString();
+  }
+
+  // Parolayı taşıyan veri yalnız URL fragmanında (#...) kalır; tarayıcı bunu sunucuya hiç göndermez.
+  function readPanes() {
+    var hash = location.hash.replace(/^#/, "");
+    if (!hash) {
+      return [];
+    }
+    try {
+      return JSON.parse(decodeURIComponent(escape(atob(hash))));
+    } catch (e) {
+      console.error("Pano verisi okunamadı:", e);
+      return [];
+    }
+  }
+
+  var panes = readPanes();
+  var grid = document.getElementById("grid");
+  var frames = [];
+
+  if (!panes.length) {
+    document.getElementById("empty").style.display = "block";
+  } else {
+    var cols = Math.ceil(Math.sqrt(panes.length));
+    var rows = Math.ceil(panes.length / cols);
+    grid.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
+    grid.style.gridTemplateRows = "repeat(" + rows + ", 1fr)";
+
+    panes.forEach(function (c) {
+      var pane = document.createElement("div");
+      pane.className = "pane";
+      var title = document.createElement("div");
+      title.className = "pane-title";
+      title.textContent = (c.title || c.hostname) + " — " + c.hostname;
+      var iframe = document.createElement("iframe");
+      iframe.src = paneUrl(c);
+      pane.appendChild(title);
+      pane.appendChild(iframe);
+      grid.appendChild(pane);
+      frames.push(iframe);
+    });
+
+    document.getElementById("count").textContent = panes.length + " pano";
+  }
+
+  // Her panonun webssh sayfası "wssh" nesnesini pencere düzeyinde açık bırakır (webssh'in kendi
+  // "for console use" arayüzü). Düz metin \r ile sonlandırılır (satır gibi çalışır); geçerli bir
+  // JSON dizgesi verilirse olduğu gibi (ham, \r eklenmeden) iletilir — kontrol tuşları (Ctrl+C vb.)
+  // bu yolla, webssh'e hiç dokunmadan gönderilir.
+  function broadcast(raw) {
+    frames.forEach(function (iframe) {
+      try {
+        var w = iframe.contentWindow;
+        if (w && w.wssh && typeof w.wssh.send === "function") {
+          w.wssh.send(raw);
+        }
+      } catch (e) {
+        // Pano henüz bağlanmamış olabilir; sessizce atla.
+      }
+    });
+  }
+
+  function sendLine() {
+    var input = document.getElementById("cmd");
+    var text = input.value;
+    if (!text) {
+      return;
+    }
+    broadcast(text);
+    input.value = "";
+    input.focus();
+  }
+
+  document.getElementById("send").addEventListener("click", sendLine);
+  document.getElementById("cmd").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      sendLine();
+    }
+  });
+  document.getElementById("ctrlc").addEventListener("click", function () {
+    broadcast(JSON.stringify({ data: "\u0003" }));
+  });
+  document.getElementById("reload").addEventListener("click", function () {
+    frames.forEach(function (iframe) { iframe.src = iframe.src; });
+  });
+}());
+</script>
+</body>
+</html>

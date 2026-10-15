@@ -1,0 +1,873 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiha-Mon — Tahta ekranı</title>
+<script>
+  // Senkron (modül betiğinden ÖNCE çalışır — modül betiği <defer> gibi ertelenir): embed/single
+  // sınıfını <html>'e HEMEN ekler. Bu olmadan tarayıcı, modül betiği devreye girip .embed'e özgü
+  // küçük kutucuk ızgarasını kurmadan ÖNCE bir kare boyayabiliyordu; o karede varsayılan (tam
+  // boy, koyu) #grid görünüyordu — kısa bir "maximize" parıltısı (bkz. kullanıcı bildirimi).
+  try {
+    var __spec = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1)))));
+    if (__spec.embed) {
+      document.documentElement.classList.add("embed");
+    } else if ((__spec.boards || []).length === 1) {
+      document.documentElement.classList.add("single");
+    }
+  } catch (e) { /* boş/bozuk fragman: modül betiği asıl ayrıştırmayı yine yapacak */ }
+</script>
+<!--
+  Canlı tahta ekranı (salt izleme). Tek tahta (q=view) ya da çoklu önizleme kutucukları (q=thumb).
+  Adres: /screen/#<base64(JSON {boards:[{id,name,online,whoami?}], q})> — bilgi URL fragmanında taşınır,
+  sunucuya gitmez. `whoami` varsa (bkz. Boards.js __whoamiState — "Oturumları sorgula", "Oturum aç"/"Oturumu kapat"
+  sağ menülerinin tetiklediği SSH işleri) önizlemede sol altta sürmekte olan iş ("… açılıyor…") ya da
+  sonuç gösterilir (bkz. Tile.setWhoami).
+  Her kutucuk /screen/ws/<id> WebSocket'ine bağlanır; ekran köprüsü tahtada x11vnc'yi SSH ile başlatır.
+  Kaynak tasarrufu: görünmeyen (kaydırılmış) kutucuklar ve gizli sekme bağlantıyı kapatır, görününce açar.
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #111; font-family: Segoe UI, Roboto, sans-serif; color: #ddd; }
+  body { display: flex; flex-direction: column; }
+  #toolbar { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: #0e2a47; flex: 0 0 auto; }
+  #toolbar .count { font-size: 12px; opacity: .85; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #toolbar button { padding: 4px 10px; border: 0; border-radius: 4px; background: #0067c0; color: #fff; cursor: pointer; font-size: 13px; }
+  #toolbar button:hover { background: #1b7ad1; }
+  #grid { flex: 1; display: grid; gap: 2px; overflow: auto; min-height: 0; }
+  .tile { position: relative; display: flex; flex-direction: column; background: #000; min-height: 120px; min-width: 0; }
+  .tile .title { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; padding: 2px 8px; background: #1f2630; font-size: 12px; white-space: nowrap; overflow: hidden; }
+  .tile .title .name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .tile .title .dot { width: 8px; height: 8px; border-radius: 50%; background: #777; flex: 0 0 auto; }
+  .tile.live .title .dot { background: #3c3; }
+  .tile.error .title .dot { background: #e44; }
+  .tile .title button { padding: 0 6px; border: 0; background: transparent; color: #ccc; cursor: pointer; font-size: 14px; }
+  .tile .title button:hover { color: #fff; }
+  .tile .view { flex: 1; min-height: 0; position: relative; }
+  /* Her akış kendi katmanında (bkz. Tile.connect/reconnect): kip/kalite değişiminde yeni akış eski
+     görüntünün ALTINDA kurulur, ilk karesi gelince eskisi kaldırılır — ekran kararmaz. */
+  .tile .view > .screen { position: absolute; inset: 0; }
+  /* noVNC tahtanın imlecini tuvale satır içi stil olarak yazar (salt izlemede de); müdahale kapalıyken
+     görüntü alanında fare imleci değişmesin (kullanıcı isteği) — !important satır içi stili ezer. */
+  .tile:not(.control) .view, .tile:not(.control) .view * { cursor: default !important; }
+  .tile .msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; font-size: 13px; color: #bbb; pointer-events: none; }
+  .tile .msg a { pointer-events: auto; color: #6af; }
+  .tile.live .msg { display: none; }
+  html.single #toolbar { display: none; }
+  /* Gömülü kip (Tahtalar sayfasının "Ekranlar" sekmesi): sabit oranlı küçük kutucuklar, aşağı kaydırılır.
+     Sınıf <html>'e eklenir (bkz. baştaki senkron betik), body'ye değil: <body> ayrıştırılmadan önce
+     de erişilebilsin diye — aksi halde ilk boyama bu kurallar uygulanmadan, FOUC ile olurdu. */
+  html.embed #toolbar { display: none; }
+  html.embed #grid { grid-template-columns: repeat(auto-fill, minmax(var(--tile-min, 300px), 1fr)); grid-auto-rows: auto;
+    align-content: start; gap: 6px; padding: 6px; background: #f3f3f3; }
+  html.embed .tile { min-height: 0; border-radius: 4px; overflow: hidden; }
+  /* Kutucuk seçimi (Shift/Ctrl/dikdörtgen seçim) ve sürükle-bırak sıralama — yalnız gömülü kipte
+     (Tahtalar sayfasının Ekranlar sekmesi). Seçim: mavi çerçeve. Sürüklenen: soluk; bırakılacak
+     kutucuk: kesik çizgili çerçeve. */
+  html.embed .tile.selected { outline: 3px solid #0096ff; outline-offset: -3px; z-index: 1; }
+  /* Sürüklenen kutucuk sürükleme boyunca bırakılacağı yerde durur (canlı yerleşim — bkz. dragOver):
+     soluk + kesik çizgili çerçeveyle "buraya yerleşecek" yer tutucusu olarak görünür. */
+  html.embed .tile.dragging { opacity: .4; outline: 3px dashed #0096ff; outline-offset: -3px; }
+  /* Sürükleme yalnız başlık çubuğundan başlar (bkz. Tile dragstart) — metin seçiminin sürüklemeyle
+     çakışmaması ve tutamaç olduğunun anlaşılması için. */
+  html.embed .tile .title { cursor: move; user-select: none; }
+  html.embed .tile .title button { cursor: pointer; }
+  .marquee { position: fixed; border: 1px dashed #4af; background: rgba(70, 150, 255, .15); z-index: 999; pointer-events: none; }
+  html.embed .tile .view { flex: none; aspect-ratio: 16 / 9; }
+  /* Önizleme kutucuğu tam ekran olunca gömülü kipin sabit 16:9 kutu boyutu geçersiz kılınır —
+     yoksa .view tam ekran tile'ın küçük bir köşesinde sıkışıp kanvas görünmez kalabilir. */
+  .tile:fullscreen { background: #000; }
+  .tile:fullscreen .view { flex: 1; aspect-ratio: auto; }
+  .tile.offline .msg { color: #888; }
+  /* Önizlemede (q=thumb) oturum durumu — "Oturumları sorgula" sonucu ve "Oturum aç"/"Oturumu kapat"
+     ilerlemesi; sol alt köşe, siyah zemin beyaz yazı. Bkz. Tile.setWhoami / Boards.js __whoamiState. */
+  /* Birden fazla oturum varsa adlar oturum açma sırasıyla virgülle gelir ("ali, veli" — bkz. worker
+     executor/whoami.py); sığmazsa en çok iki satıra sarılır, fazlası "…" ile kesilir. */
+  .tile .whoami { position: absolute; left: 4px; bottom: 4px; max-width: calc(100% - 8px); overflow: hidden;
+    padding: 3px 8px; border-radius: 3px; background: #000; color: #fff;
+    font-size: 14px; font-weight: 600; line-height: 1.25; pointer-events: none;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+  .tile .whoami[hidden] { display: none; }
+  .tile .whoami.querying { font-style: italic; }
+  .tile .whoami.error { background: rgba(140, 20, 20, .75); }
+  /* Alt bar (yalnız Ekranlar sekmesi — gömülü kip): üst başlık çubuğunun aynısı; tahtanın son
+     işlemci/bellek kullanımı ve işlemci sıcaklığı (bkz. Tile.setStats, Boards.js __previewList).
+     Eşik aşılınca değer turuncu/kırmızı olur. */
+  .tile .stats { display: none; }
+  html.embed .tile .stats { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 0 10px; align-items: center; padding: 2px 8px;
+    background: #1f2630; font-size: 12px; white-space: nowrap; overflow: hidden; }
+  html.embed .tile:fullscreen .stats { display: none; }
+  .tile .stats .k { opacity: .65; margin-right: 3px; }
+  .tile .stats .warn { color: #ffb74d; }
+  .tile .stats .crit { color: #ff6b6b; font-weight: 600; }
+  .tile .stats .none { opacity: .55; }
+  /* Ekranlar araç çubuğunun "Donanım" düğmesi kapalıyken alt bar gizlenir (bkz. tm-view). */
+  html.embed.nostats .tile .stats { display: none; }
+  /* "Başarım" görünümü: htop'un üst sol (çekirdek başına CPU, Mem, Swp) ve sağ (görevler, yük,
+     çalışma süresi) panelleri ekran önizlemesinin üstünde, saniyelik (bkz. Tile.renderPerf,
+     worker/tihamon/screen/perf.py). Yazı kutucukla ölçeklenir (container query); satır çoksa
+     (--rows) yüksekliğe sığacak kadar küçülür. Ekran katmanlarının üstünde, .msg/.whoami'nin altında. */
+  .tile .perf { position: absolute; inset: 0; container-type: size; pointer-events: none;
+    background: rgba(8, 12, 18, .8); color: #e6edf3; font-family: "DejaVu Sans Mono", ui-monospace, monospace; }
+  .tile .perf[hidden] { display: none; }
+  .tile .perf .in { display: grid; grid-template-columns: 1.15fr 1fr; gap: 0 4cqw; padding: 2.5cqh 3cqw;
+    font-size: clamp(6px, min(2.8cqw, calc(88cqh / var(--rows, 6) / 1.3)), 22px); line-height: 1.3; }
+  .tile .perf .row { display: flex; align-items: center; gap: .45em; white-space: nowrap; min-width: 0; }
+  .tile .perf .lbl { flex: none; width: 2.2em; text-align: right; color: #58a6ff; }
+  .tile .perf .bar { flex: 1; min-width: 2em; height: .8em; display: flex; overflow: hidden; border-radius: 2px; background: #2a313c; }
+  .tile .perf .bar i { display: block; height: 100%; }
+  .tile .perf .v { flex: none; min-width: 3.3em; text-align: right; }
+  .tile .perf .u { background: #3fb950; }   /* kullanıcı / kullanılan bellek */
+  .tile .perf .n { background: #58a6ff; }   /* nice / tampon */
+  .tile .perf .s { background: #f85149; }   /* sistem (+irq) */
+  .tile .perf .o { background: #8b949e; }   /* iowait + steal */
+  .tile .perf .c { background: #d29922; }   /* önbellek */
+  .tile .perf .r .row { display: block; overflow: hidden; text-overflow: ellipsis; }
+  .tile .perf .k { color: #58a6ff; }
+  .tile .perf .hi { color: #f85149; font-weight: 600; }
+  .tile .perf .wait { grid-column: 1 / -1; opacity: .7; }
+  #empty { margin: 40px; color: #888; }
+  .tile .title button.ctl.on { color: #fff; background: #c62828; border-radius: 3px; }
+</style>
+</head>
+<body>
+  <div id="toolbar">
+    <span class="count" id="count"></span>
+    <button id="full" title="Bütün sayfayı tam ekran yapar">⛶ Tam ekran</button>
+  </div>
+  <div id="grid"></div>
+
+<script type="module">
+import RFB from "./novnc/core/rfb.js";
+
+const PROFILE = {
+  view:  { quality: 6, compression: 2, retry: 4000 },
+  thumb: { quality: 4, compression: 6, retry: 15000 }
+};
+const MESSAGES = {
+  4001: "Tahta kaydı ya da IP adresi bulunamadı.",
+  4002: "Tahtaya SSH ile ulaşılamadı (kapalı ya da ağda değil). Yeniden deneniyor…",
+  4003: "SSH girişi reddedildi — Ayarlar'daki SSH kullanıcı/parolasını denetleyin.",
+  4004: "Tahtada x11vnc kurulu değil. Tahtada: apt install x11vnc",
+  4005: "Ekran paylaşımı başlatılamadı",
+  4029: "Eşzamanlı izleme sınırına ulaşıldı.",
+  4030: "Fare/klavye ile müdahale yetkiniz yok (yönetici \"Tahta ekranını uzaktan yönetme\" yetkisini verebilir).",
+  4900: "Bağlantı zaman aşımına uğradı. Yeniden deneniyor…"   // istemci tarafı (bkz. Tile.CONNECT_TIMEOUT_MS)
+};
+const FINAL = new Set([4001, 4003, 4004, 4029, 4030]);   // kendiliğinden yeniden denenmez
+
+let spec = { boards: [], q: "view" };
+try {
+  spec = Object.assign(spec, JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1))))));
+} catch (e) { /* boş/bozuk fragman */ }
+const embed = !!spec.embed;   // Tahtalar sayfasının "Ekranlar" sekmesi: liste üst sayfadan güncellenir
+// Ekranlar araç çubuğunun aç/kapa düğmeleri (üst sayfadan "tm-view"): alt donanım barı, başarım görünümü.
+const view = { stats: true, perf: false };
+const single = !embed && spec.boards.length === 1;
+// Sınıflar normalde baştaki senkron betikte zaten eklenir (FOUC önleme); burada tekrar eklemek
+// zararsız (idempotent) ve hash'in o betikte beklenmedik şekilde ayrıştırılamadığı bir durum için güvence.
+if (single) document.documentElement.classList.add("single");
+if (embed) document.documentElement.classList.add("embed");
+document.getElementById("count").textContent =
+  spec.boards.length + " tahta" + (spec.q === "thumb" ? " · önizleme" : "") + " · çift tıkla: tam ekran";
+
+const grid = document.getElementById("grid");
+if (!embed) {
+  const cols = Math.max(1, Math.ceil(Math.sqrt(spec.boards.length)));
+  grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+  grid.style.gridAutoRows = `minmax(0, 1fr)`;
+}
+
+class Tile {
+  constructor(board) {
+    this.board = board;
+    this.base = spec.q in PROFILE ? spec.q : "view";
+    this.q = this.base;
+    this.wanted = false;      // görünür + sekme açık + tahta çevrimiçi (ilk refreshWanted bağlar)
+    this.inView = true;       // kutucuk görünür alanda (IntersectionObserver)
+    this.rfb = null;
+    this.timer = null;
+    this.el = document.createElement("div");
+    this.el.className = "tile";
+    this.el._boardId = board.id;   // orderedIds() DOM sırasını buradan okur
+    this.control = false;     // fare/klavye ile müdahale (yalnız "screen.control" yetkisiyle; sunucu da denetler)
+    this.el.innerHTML = `<div class="title"><span class="dot"></span><span class="name"></span>
+      ${spec.control ? '<button class="ctl" title="Fare ve klavye ile tahtayı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
+      <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div>
+      <div class="whoami" hidden></div></div><div class="stats"></div>`;
+    this.el.querySelector(".name").textContent = board.name || ("#" + board.id);
+    this.view = this.el.querySelector(".view");
+    this.msg = this.el.querySelector(".msg");
+    this.whoamiEl = this.el.querySelector(".whoami");
+    this.statsEl = this.el.querySelector(".stats");
+    this.perfEl = this.el.querySelector(".perf");
+    this.perfIn = this.el.querySelector(".perf .in");
+    this.perfWs = null;
+    this.perfTimer = null;
+    this.setWhoami(board.whoami);
+    this.setStats(board.stats);
+    this.el.querySelector("button.fs").addEventListener("click", () => toggleFullscreen(single ? document.documentElement : this.el));
+    const ctl = this.el.querySelector("button.ctl");
+    if (ctl) ctl.addEventListener("click", () => this.setControl(!this.control));
+    // Müdahale kipinde çift tıklama tahtaya gider; tam ekran yalnız ⛶ düğmesiyle.
+    this.el.addEventListener("dblclick", () => {
+      if (!this.control) toggleFullscreen(single ? document.documentElement : this.el);
+    });
+    // Gömülü kipte sağ tık, Tahtalar grid'inin satır menüsüyle AYNI menüyü açar: menü üst sayfada
+    // (qooxdoo, Boards.__rowMenu) kurulur — burada yalnız tahta kimliği, o anki çoklu seçim ve konum
+    // iletilir (bkz. Boards.__openPreviewMenu). Müdahale kipinde sağ tık tahtaya gider.
+    if (embed) {
+      // Yakalama aşamasında dinlenir: noVNC tuvali olayı kendisi durdurduğu için kabarcıklanma aşamasına ulaşmıyor.
+      this.el.addEventListener("contextmenu", e => {
+        if (this.control) return;
+        e.preventDefault();
+        e.stopPropagation();
+        // Seçim dışı bir kutucuğa sağ tıklanırsa (çoğu dosya yöneticisindeki gibi) seçim ona
+        // sıfırlanır; zaten seçimin bir parçasıysa (Shift/Ctrl ile yapılmış) seçim KORUNUR.
+        if (!selected.has(this.board.id)) setSelected([this.board.id]);
+        window.parent.postMessage(
+          { type: "tm-menu", id: this.board.id, ids: [...selected], x: e.clientX, y: e.clientY }, location.origin);
+      }, true);
+      // Basınca seçilir (görüntü alanı dahil — müdahale kipinde değilse): düz basış bu kutucuğu TEK
+      // seçili yapar; Ctrl/⌘ tekli ekler/çıkarır; Shift, son seçilenden buna kadarki (görünür DOM
+      // sırasındaki) aralığı seçer. "click" değil "pointerdown": noVNC tuvalde basılınca bütün sayfayı
+      // kaplayan bir yakalama katmanı açıyor (novnc/core/util/events.js setCapture), bırakma o katmanda
+      // olduğundan "click" kutucuğa hiç ulaşmıyor. Yakalama aşaması: tuvalin kendi dinleyicilerinden önce.
+      // Zaten çoklu seçimin parçası olan kutucuğa düz basışta seçim hemen daraltılmaz — sürükleme
+      // başlamazsa bırakınca daraltılır (Explorer'daki gibi; çoklu seçimi bozmadan sürüklenebilsin).
+      this.el.addEventListener("pointerdown", e => {
+        if (e.button !== 0 || this.control || e.target.closest("button")) return;
+        const id = this.board.id;
+        const ids = orderedIds();
+        if (e.shiftKey && selectAnchor !== null && ids.includes(selectAnchor)) {
+          const a = ids.indexOf(selectAnchor);
+          const b = ids.indexOf(id);
+          setSelected(ids.slice(Math.min(a, b), Math.max(a, b) + 1));
+          return; // çapa yerinde kalır: Shift ile aralık genişletilebilir
+        }
+        selectAnchor = id;
+        if (e.ctrlKey || e.metaKey) {
+          toggleSelected(id);
+        } else if (selected.has(id) && selected.size > 1) {
+          // Her basışın kendi jetonu: sürükleme bırakmayı (pointerup) yutarsa kalan eski dinleyici
+          // sonraki bir basışın bekleyen daraltmasını yanlışlıkla iptal etmesin.
+          const token = pendingCollapse = { id };
+          document.addEventListener("pointerup", () => {
+            if (pendingCollapse !== token) return;
+            pendingCollapse = null;
+            setSelected([id]);
+          }, { once: true, capture: true });
+        } else {
+          setSelected([id]);
+        }
+      }, true);
+      // Sürükle-bırak yeniden sıralama: yalnız BAŞLIK ÇUBUĞUNDAN (düğmeler hariç) tutup sürüklenir.
+      // Görüntü alanı (noVNC tuvali) KESİNLİKLE sürükleme başlatamaz: RFB kendi "mousedown"
+      // dinleyicisini tuvale doğrudan bağlıyor ve HER ZAMAN preventDefault()+stopPropagation()
+      // çağırıyor (bkz. novnc/core/rfb.js _connect/handleMouse — viewOnly'de de, FIXME yorumuyla
+      // kendileri de belirtmiş) — bu, tarayıcının yerel sürükleme başlatma hareketini (mousedown+
+      // hareket) o alanda baştan engelliyor; title.css'teki user-select:none de metin SEÇİMİNİN
+      // sürüklemeyle çakışmasını (adın üstüne tam basınca bazen metin seçimi "kazanabiliyor") önler.
+      // dragstart'ın hedefi HER ZAMAN draggable öğenin kendisidir (.tile) — basılan alt öğe değil;
+      // bu yüzden "başlıktan mı tutuldu" bilgisi basış anında (pointerdown, yakalama aşaması) saklanır.
+      this.el.draggable = true;
+      this.el.addEventListener("pointerdown", e => {
+        this.dragArmed = !!e.target.closest(".title") && !e.target.closest("button");
+      }, true);
+      this.el.addEventListener("dragstart", e => {
+        if (!this.dragArmed) {
+          e.preventDefault();
+          return;
+        }
+        pendingCollapse = null; // sürükleme başladı: çoklu seçim bırakınca daraltılmasın
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", String(this.board.id));
+        dragStart(this);
+      });
+      this.el.addEventListener("dragend", () => {
+        this.dragArmed = false;
+        dragEnd();
+      });
+      // Canlı yerleşim: sürüklenen kutucuk üzerinden geçilen kutucuğun yerine HEMEN taşınır, diğerleri
+      // kayarak yer açar (bkz. dragOver). Bırakma yeri ayrıca işaretlenmez — kutucuk zaten oradadır.
+      this.el.addEventListener("dragover", e => {
+        if (!drag) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        dragOver(this);
+      });
+    }
+        grid.appendChild(this.el);
+  }
+
+  /** Ad/durum güncellemesi (gömülü kipte üst sayfadan gelen liste). */
+  setBoard(board) {
+    this.board = board;
+    this.el._boardId = board.id;
+    this.el.querySelector(".name").textContent = board.name || ("#" + board.id);
+    this.setWhoami(board.whoami);
+    this.setStats(board.stats);
+    this.refreshWanted();
+  }
+
+  /**
+   * Alt bar: `stats` {cpu, mem, temp, disk_temp, fan, battery} (yüzde/°C/RPM/V, her biri null
+   * olabilir — fan/pil tahtada Super I/O sürücüsü yüklüyse gelir) ya da null (kapalı tahta /
+   * son 5 dakikada ölçüm yok — bkz. backend MetricsApi::latest). Yalnız gömülü kipte görünür (CSS).
+   */
+  setStats(stats) {
+    const key = JSON.stringify(stats || null);
+    if (key === this.statsKey) return;
+    this.statsKey = key;
+    if (!stats) {
+      this.statsEl.innerHTML = `<span class="none">${this.board.online === false ? "Tahta kapalı" : "Ölçüm yok"}</span>`;
+      return;
+    }
+    // Eşikler: warn/crit değerin üstünde ise renklenir; pilde ters (alt eşik) — CR2032 ~3 V, 2.5 V altı biter.
+    const val = (value, text, warn, crit, low) => {
+      if (value === null || value === undefined) return `<span class="none">—</span>`;
+      const bad = low ? v => v <= crit : v => v >= crit, mid = low ? v => v <= warn : v => v >= warn;
+      return `<span class="${bad(value) ? "crit" : mid(value) ? "warn" : ""}">${text}</span>`;
+    };
+    const item = (label, ...parts) => `<span><span class="k">${label}</span>${parts.join(" - ")}</span>`;
+    const temp = v => Math.round(v) + " °C";
+    this.statsEl.innerHTML =
+      item("CPU:", val(stats.cpu, "%" + Math.round(stats.cpu), 70, 90),
+        val(stats.temp, temp(stats.temp ?? 0), 70, 85)) +
+      item("RAM:", val(stats.mem, "%" + Math.round(stats.mem), 80, 92)) +
+      item("HDD:", val(stats.disk_temp, temp(stats.disk_temp ?? 0), 50, 60)) +
+      item("Fan:", val(stats.fan, Math.round(stats.fan ?? 0) + " RPM", Infinity, Infinity)) +
+      item("Pil:", val(stats.battery, (stats.battery ?? 0).toFixed(2) + " V", 2.8, 2.5, true));
+  }
+
+  /**
+   * "Oturumları sorgula" ve "Oturum aç"/"Oturumu kapat" (bkz. Boards.js __sessionJob)
+   * sonucunu sol altta gösterir — yalnız önizlemede (q=thumb); tam ekran/tek tahta görünümünde
+   * (q=view) zaten canlı ekranın kendisi yeterli, rozet gereksiz. `whoami`: null (hiç sorgulanmadı,
+   * gizli), {status:"querying", text?}, ya da {status:"ok"|"error", text}.
+   */
+  setWhoami(whoami) {
+    if (!whoami || spec.q !== "thumb") {
+      this.whoamiEl.hidden = true;
+      return;
+    }
+    this.whoamiEl.classList.toggle("querying", whoami.status === "querying");
+    this.whoamiEl.classList.toggle("error", whoami.status === "error");
+    // "querying": sürmekte olan iş — metni üst sayfa verir ("ali oturumu açılıyor…", "Oturum sorgulanıyor…").
+    this.whoamiEl.textContent = whoami.status === "querying"
+      ? (whoami.text || "Oturum sorgulanıyor…") : (whoami.text || "Oturum açık kullanıcı yok");
+    this.whoamiEl.hidden = false;
+  }
+
+  /** Bağlı kalmalı mı: sekme görünür, kutucuk görünür alanda ve tahta çevrimiçi (kapalı tahtaya SSH denenmez). */
+  refreshWanted() {
+    const offline = this.board.online === false;
+    this.el.classList.toggle("offline", offline);
+    if (offline) {
+      this.wanted = false;
+      this.disconnect();
+      this.syncPerf();
+      this.setState("offline", "Tahta kapalı");
+      return;
+    }
+    this.setWanted(!document.hidden && this.inView);
+  }
+
+  setState(state, text) {
+    this.el.classList.toggle("live", state === "live");
+    this.el.classList.toggle("error", state === "error");
+    if (text !== undefined) this.msg.innerHTML = text;
+  }
+
+  /**
+   * @param prev {Map?} {rfb, wrap} — kesintisiz geçiş (bkz. reconnect): yeni bağlantı kurulup ilk
+   *   görüntüsü gelene dek eski akış ekranda (yeni katmanın ÜSTÜNDE) kalır, sonra kaldırılır.
+   */
+  connect(prev) {
+    clearTimeout(this.timer);
+    if (this.rfb || !this.wanted) {
+      if (prev) Tile.dropLayer(prev);
+      return;
+    }
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${proto}//${location.host}/screen/ws/${this.board.id}?q=${this.q}${this.control ? "&control=1" : ""}${embed ? "&nolog=1" : ""}`);
+    const token = this.token = {};                  // eski bağlantının geç gelen "close"u yenisini bozmasın
+    // Her bağlantı kendi katmanında: yeni katman en alta eklenir, böylece geçişte eski görüntü
+    // üstte kalır (.msg/.whoami katmanları da hep üstte).
+    const wrap = document.createElement("div");
+    wrap.className = "screen";
+    this.view.insertBefore(wrap, this.view.firstChild);
+    ws.addEventListener("close", e => {
+      if (this.token !== token) return;
+      if (prev) { Tile.dropLayer(prev); prev = null; }
+      this.onClose(e.code, e.reason);
+    });
+    const p = PROFILE[this.q];
+    const rfb = new RFB(wrap, ws, { shared: true });
+    rfb.viewOnly = !this.control;
+    rfb.scaleViewport = true;
+    rfb.resizeSession = false;
+    rfb.focusOnClick = this.control;   // müdahalede ekrana tıklayınca klavye de tahtaya gider
+    rfb.qualityLevel = p.quality;
+    rfb.compressionLevel = p.compression;
+    rfb.background = "#000";
+    rfb.addEventListener("connect", () => {
+      this.setState("live");
+      if (this.control) rfb.focus();
+      if (prev) {
+        // "connect" ilk kareden hemen önce gelir; yeni akış ilk görüntüsünü çizene dek eskisi kalsın.
+        const old = prev;
+        prev = null;
+        setTimeout(() => Tile.dropLayer(old), Tile.SWAP_MS);
+      }
+    });
+    this.rfb = rfb;
+    this.wrap = wrap;
+    if (!prev) this.setState("connecting", "Bağlanıyor…");
+    // El sıkışma bir yerde takılırsa (ör. tahta yeni açılmış, X/x11vnc hazır değil) "Bağlanıyor…"da
+    // süresiz kalmasın: süre dolunca bu akış bırakılır ve olağan yeniden deneme yoluna girilir.
+    this.timer = setTimeout(() => {
+      if (this.token !== token || this.el.classList.contains("live")) return;
+      this.token = null;
+      Tile.dropLayer({ rfb, wrap });
+      if (prev) Tile.dropLayer(prev);
+      this.onClose(4900, "");
+    }, Tile.CONNECT_TIMEOUT_MS);
+  }
+
+  disconnect() {
+    clearTimeout(this.timer);
+    this.token = null;
+    const layer = { rfb: this.rfb, wrap: this.wrap };
+    this.rfb = null;
+    this.wrap = null;
+    Tile.dropLayer(layer);
+  }
+
+  /**
+   * Siyah ekran / "Bağlanıyor…" göstermeden yeni bir akışa geçer (müdahale kipi aç/kapa, kalite
+   * değişimi). Tahtadaki x11vnc salt izleme (-viewonly) ya da girdi kabul eden kipte başlatıldığından
+   * (güvenlik tahta tarafında, bkz. worker/tihamon/screen/remote.py) kip değişimi yeni bir bağlantı
+   * gerektirir — ama o kurulurken eski görüntü canlı kalır.
+   */
+  reconnect() {
+    clearTimeout(this.timer);
+    const prev = this.rfb ? { rfb: this.rfb, wrap: this.wrap } : null;
+    this.rfb = null;
+    this.wrap = null;
+    this.token = null;   // eski akışın "close"u artık yeni bağlantıyı etkilemesin
+    this.connect(prev);
+  }
+
+  static dropLayer(layer) {
+    if (layer.rfb) { try { layer.rfb.disconnect(); } catch (e) { /* zaten kapalı */ } }
+    if (layer.wrap) layer.wrap.remove();
+  }
+
+  onClose(code, reason) {
+    this.rfb = null;
+    this.token = null;
+    if (this.wrap) { this.wrap.remove(); this.wrap = null; }   // ölü akışın katmanı birikmesin
+    if (code === 4030) this.setControl(false, true);   // yetki yok: salt izlemeye dön (yeniden bağlanmadan)
+    if (!this.wanted) return;                       // bilerek kapatıldı (görünmüyor / sekme gizli)
+    if (code === 4010) { this.connect(); return; }  // tahtada oturum değişti: yeni ekrana hemen bağlan
+    let text = MESSAGES[code] || "Bağlantı kesildi. Yeniden deneniyor…";
+    if (code === 4005 && reason) text += ": " + reason.replace(/[<>&]/g, "");
+    if (code === 1006 && !this.el.classList.contains("live")) text = "Bağlantı kurulamadı (yetki ya da sunucu). Yeniden deneniyor…";
+    this.setState("error", text + (FINAL.has(code) ? ' <br><a href="#" data-retry>Yeniden dene</a>' : ""));
+    const retry = this.msg.querySelector("[data-retry]");
+    if (retry) retry.addEventListener("click", ev => { ev.preventDefault(); this.connect(); });
+    if (!FINAL.has(code)) this.timer = setTimeout(() => this.connect(), PROFILE[this.q].retry);
+  }
+
+  setWanted(wanted) {
+    if (wanted === this.wanted) return;
+    this.wanted = wanted;
+    // "Ekranı yönet" (sağ menü — bkz. ui/BoardOps.screen manage): ilk bağlantı doğrudan müdahale kipinde.
+    if (spec.manage && spec.control) this.setControl(true, true);
+    wanted ? this.connect() : this.disconnect();
+    this.syncPerf();
+  }
+
+  /**
+   * "Başarım" görünümü: yalnız görünüm açıkken VE kutucuk bağlı kalmalıyken (sekme açık, görünür
+   * alanda, tahta çevrimiçi — bkz. refreshWanted) tahta başına tek bir WebSocket; kopunca 5 sn sonra
+   * yeniden denenir. Kapanınca akış ve tahtadaki döngü biter (bkz. worker/tihamon/screen/perf.py).
+   */
+  syncPerf() {
+    const want = view.perf && this.wanted;
+    this.perfEl.hidden = !want;
+    if (!want) {
+      this.perfStop();
+      return;
+    }
+    if (this.perfWs || this.perfTimer) return;
+    if (!this.perfIn.firstChild) this.perfIn.innerHTML = '<div class="wait">Başarım verisi bekleniyor…</div>';
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = this.perfWs = new WebSocket(`${proto}//${location.host}/screen/ws/perf/${this.board.id}`);
+    ws.addEventListener("message", e => this.renderPerf(JSON.parse(e.data)));
+    ws.addEventListener("close", () => {
+      if (this.perfWs !== ws) return;           // bilerek kapatıldı (perfStop)
+      this.perfWs = null;
+      this.perfTimer = setTimeout(() => { this.perfTimer = null; this.syncPerf(); }, 5000);
+    });
+  }
+
+  perfStop() {
+    clearTimeout(this.perfTimer);
+    this.perfTimer = null;
+    const ws = this.perfWs;
+    this.perfWs = null;
+    if (ws) ws.close();
+    this.perfIn.innerHTML = "";
+  }
+
+  /** htop'un üst panelleri (bkz. perf.py mesajı); sayılar KiB, yüzde ve saniye. */
+  renderPerf(p) {
+    const esc = s => String(s).replace(/[<>&]/g, "");
+    const size = kib => kib >= 1048576 ? (kib / 1048576).toFixed(2) + "G" : Math.round(kib / 1024) + "M";
+    const seg = (cls, pct) => pct > 0 ? `<i class="${cls}" style="width:${Math.min(100, pct)}%"></i>` : "";
+    const row = (lbl, bar, v) => `<div class="row"><span class="lbl">${lbl}</span><span class="bar">${bar}</span><span class="v">${v}</span></div>`;
+    const cpus = p.cpus.map((c, i) => {
+      const busy = c[0] + c[1] + c[2] + c[3];
+      return row(i + 1, seg("u", c[0]) + seg("n", c[1]) + seg("s", c[2]) + seg("o", c[3]),
+        `<span class="${busy >= 90 ? "hi" : ""}">${busy.toFixed(1)}%</span>`);
+    }).join("");
+    const m = p.mem, mt = m.total || 1, st = p.swap.total || 1;
+    const mem = row("Mem", seg("u", 100 * m.used / mt) + seg("n", 100 * m.buffers / mt) + seg("c", 100 * m.cache / mt),
+      `${size(m.used)}/${size(m.total)}`);
+    const swp = row("Swp", seg("s", 100 * p.swap.used / st), `${size(p.swap.used)}/${size(p.swap.total)}`);
+    const up = p.uptime, d = Math.floor(up / 86400);
+    const hms = [Math.floor(up % 86400 / 3600), Math.floor(up % 3600 / 60), up % 60].map(n => String(n).padStart(2, "0")).join(":");
+    const right =
+      `<div class="row"><span class="k">Görevler:</span> ${esc(p.tasks)}, ${esc(p.threads)} thr</div>` +
+      `<div class="row"><span class="k">Çalışan:</span> ${esc(p.running)}</div>` +
+      `<div class="row"><span class="k">Yük ort.:</span> ${p.load.map(v => Number(v).toFixed(2)).join(" ")}</div>` +
+      `<div class="row"><span class="k">Çalışma:</span> ${d ? d + " gün, " : ""}${hms}</div>`;
+    this.perfIn.style.setProperty("--rows", Math.max(p.cpus.length + 2, 4));
+    this.perfIn.innerHTML = `<div class="l">${cpus}${mem}${swp}</div><div class="r">${right}</div>`;
+  }
+
+  /**
+   * Müdahale kipini açar/kapatır: tahtadaki x11vnc girdi kabul eden kipte yeniden başlatılır.
+   * Onay istemez (kullanıcı isteğiyle kaldırıldı) — yetki zaten "screen.control" özelliğiyle
+   * denetleniyor (bkz. Kullanıcılar sayfası); oturum açılışı yine de command/etkinlik loguna yazılır.
+   */
+  setControl(on, noReconnect) {
+    this.control = on;
+    // Yalnız düğme kırmızı olur (kullanıcı isteğiyle); kutucukta ekstra çerçeve/rozet yok.
+    const ctl = this.el.querySelector("button.ctl");
+    if (ctl) ctl.classList.toggle("on", on);
+    this.el.classList.toggle("control", on); // görünüm değişmez; yalnız imleç kuralı (bkz. CSS)
+    if (on) this.q = "view";
+    if (!noReconnect) this.reconnect();
+  }
+
+  /** Önizlemedeki kutucuk tam ekrana geçince yüksek kaliteye, çıkınca önizleme kalitesine döner. */
+  setQuality(q) {
+    if (this.control) q = "view";
+    if (q === this.q) return;
+    this.q = q;
+    this.reconnect();
+  }
+}
+// Kesintisiz geçişte yeni akış "connect" olduktan sonra eski görüntünün kaldırılmadan önce
+// beklediği süre (ilk tam kare genelde bundan önce çizilir).
+Tile.SWAP_MS = 700;
+// Köprü x11vnc'yi ~2 sn'de başlatır (ssh ConnectTimeout 8 sn, başlatma en çok 30 sn bekler) — bu
+// süre içinde "connect" gelmezse akış takılmış sayılır.
+Tile.CONNECT_TIMEOUT_MS = 40000;
+
+function toggleFullscreen(el) {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+}
+
+const tiles = new Map();   // tahta id → Tile
+
+// Kutucuk seçimi (yalnız gömülü kip — Tahtalar sayfasının Ekranlar sekmesi): Tile.click/contextmenu
+// ve aşağıdaki dikdörtgen (fare ile sürükleyerek) seçim bunları kullanır. `selected` DOM sırasıyla
+// değil, kimlik kümesiyle tutulur; görünür vurgu setSelected() ile kutucukların kendi sınıfına yansır.
+let selected = new Set();
+let selectAnchor = null;   // Shift ile aralık seçiminde "diğer uç" (son tıklanan kutucuk)
+let pendingCollapse = null; // çoklu seçimdeki kutucuğa düz basıldı: sürüklenmezse bırakınca tek seçime iner
+
+/**
+ * Seçimi verilen kimlik kümesine EŞİTLER (öncekini temizler) ve kutucukların vurgusunu günceller.
+ * Seçim, Tahtalar grid'inin onay kutularıyla TEK kaynaktır: burada değişen seçim "tm-select" ile üst
+ * sayfaya bildirilir (grid işaretleri ona eşitlenir — araç çubuğundaki Sil/Komut çalıştır/Kapat…
+ * böylece Ekranlar sekmesinde de seçili kutucuklara uygulanır); üst sayfadan gelen "tm-selection"
+ * (Tümünü işaretle, grid'de işaretleme) ise fromParent=true ile, geri bildirilmeden uygulanır.
+ */
+function setSelected(ids, fromParent = false) {
+  const next = new Set(ids);
+  const changed = next.size !== selected.size || [...next].some(id => !selected.has(id));
+  selected = next;
+  tiles.forEach((t, id) => t.el.classList.toggle("selected", selected.has(id)));
+  if (embed && changed && !fromParent) {
+    window.parent.postMessage({ type: "tm-select", ids: [...selected] }, location.origin);
+  }
+}
+
+function toggleSelected(id) {
+  const next = new Set(selected);
+  next.has(id) ? next.delete(id) : next.add(id);
+  setSelected(next);
+}
+
+/** Kutucukların şu anki GÖRÜNÜR (DOM) sırasındaki kimlikleri — sürükle-bırak sonrası bu sıra değişir. */
+function orderedIds() {
+  return [...grid.children].filter(el => el.classList.contains("tile")).map(el => el._boardId);
+}
+
+/*
+ * Sürükle-bırak sıralama, CANLI yerleşimle (kullanıcı isteği): sürüklenen kutucuk bir başka
+ * kutucuğun üzerine gelince DOM'da hemen onun yerine taşınır; aradaki kutucuklar kayar. Kayma FLIP
+ * ile canlandırılır (eski konumları ölç → taşı → transform ile eski yerden yenisine kaydır), böylece
+ * hangi kutucuğun nereye gittiği izlenebilir. Bırakınca sıra kalıcılaşır (tm-reorder); Esc ile ya da
+ * ızgara dışına bırakarak vazgeçilirse ilk sıraya dönülür.
+ */
+let drag = null; // { tile, startOrder, moved, dropped }
+const FLIP_MS = 180;
+
+function dragStart(tile) {
+  drag = { tile, startOrder: orderedIds(), dropped: false };
+  // Sınıf bir sonraki karede eklenir: aynı karede eklenirse tarayıcının sürükleme görüntüsü (anlık
+  // görüntü) de soluk/çerçeveli çıkar.
+  requestAnimationFrame(() => drag && drag.tile.el.classList.add("dragging"));
+}
+
+/** Kutucukları verilen düzenleme işleminden sonra eski yerlerinden yenilerine kaydırarak canlandırır. */
+function flip(mutate) {
+  const els = [...grid.children].filter(el => el.classList.contains("tile"));
+  const before = new Map(els.map(el => [el, el.getBoundingClientRect()]));
+  mutate();
+  els.forEach(el => {
+    const a = before.get(el), b = el.getBoundingClientRect();
+    const dx = a.left - b.left, dy = a.top - b.top;
+    if (!dx && !dy) return;
+    el.style.transition = "none";
+    el.style.transform = `translate(${dx}px, ${dy}px)`;
+    el._flipUntil = performance.now() + FLIP_MS;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.style.transition = `transform ${FLIP_MS}ms ease`;
+      el.style.transform = "";
+    }));
+  });
+}
+
+function dragOver(target) {
+  const dragged = drag.tile.el;
+  // Kendi üzerinde ya da kayması süren bir kutucuğun üzerinde (imleç altından kayıp geçerken ileri
+  // geri titremesin diye) yer değiştirilmez.
+  if (target.el === dragged || (target.el._flipUntil || 0) > performance.now()) return;
+  const els = [...grid.children];
+  const from = els.indexOf(dragged), to = els.indexOf(target.el);
+  // İleri sürüklerken hedefin ARKASINA, geri sürüklerken ÖNÜNE: hedef kutucuk sürüklenenin eski
+  // tarafına geçer (dosya yöneticilerindeki/telefon ana ekranındaki gibi).
+  flip(() => grid.insertBefore(dragged, from < to ? target.el.nextSibling : target.el));
+}
+
+function dragEnd() {
+  if (!drag) return;
+  const { tile, startOrder, dropped } = drag;
+  drag = null;
+  tile.el.classList.remove("dragging");
+  const now = orderedIds();
+  if (!dropped) {
+    // Vazgeçildi (Esc ya da ızgara dışına bırakıldı): ilk sıraya dön.
+    if (now.join() !== startOrder.join()) flip(() => startOrder.forEach(id => grid.appendChild(tiles.get(id).el)));
+    return;
+  }
+  if (embed && now.join() !== startOrder.join()) {
+    window.parent.postMessage({ type: "tm-reorder", order: now }, location.origin);
+  }
+}
+
+// Izgaranın herhangi bir yerine (kutucuklar arası boşluk dahil) bırakmak geçerlidir: kutucuk zaten
+// sürükleme sırasında yerine taşınmıştır.
+grid.addEventListener("dragover", e => {
+  if (!drag) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+});
+grid.addEventListener("drop", e => {
+  if (!drag) return;
+  e.preventDefault();
+  drag.dropped = true;
+});
+
+if (embed) {
+  // Boş alana basılı tutup sürükleyerek dikdörtgenle çoklu seçim (Explorer'daki "rubber band" gibi);
+  // hareketsiz bir tıklama (sürükleme yok) seçimi temizler — Shift/Ctrl basılıyken ekler, değiştirmez.
+  grid.addEventListener("pointerdown", e => {
+    if (e.button !== 0 || e.target.closest(".tile")) return;
+    const startX = e.clientX, startY = e.clientY;
+    const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+    const base = additive ? new Set(selected) : new Set();
+    let box = null;
+    const update = (cx, cy) => {
+      const x0 = Math.min(startX, cx), x1 = Math.max(startX, cx);
+      const y0 = Math.min(startY, cy), y1 = Math.max(startY, cy);
+      if (!box && (Math.abs(cx - startX) > 3 || Math.abs(cy - startY) > 3)) {
+        box = document.createElement("div");
+        box.className = "marquee";
+        document.body.appendChild(box);
+      }
+      if (box) {
+        box.style.left = x0 + "px"; box.style.top = y0 + "px";
+        box.style.width = (x1 - x0) + "px"; box.style.height = (y1 - y0) + "px";
+      }
+      const hit = [];
+      tiles.forEach((t, id) => {
+        const r = t.el.getBoundingClientRect();
+        if (r.right >= x0 && r.left <= x1 && r.bottom >= y0 && r.top <= y1) hit.push(id);
+      });
+      setSelected([...base, ...hit]);
+    };
+    const onMove = ev => update(ev.clientX, ev.clientY);
+    const onUp = () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      if (box) {
+        box.remove();
+      } else if (!additive) {
+        setSelected([]); // hareketsiz tıklama, boş alan: seçim kalkar
+      }
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  });
+
+  // Ctrl/⌘+A (kullanıcı isteği): o an gösterilen TÜM kutucukları seçer; zaten hepsi seçiliyse
+  // tekrar basınca seçim kalkar (aç/kapa) — grid'in Ctrl+A'sıyla aynı aç/kapa mantığı.
+  document.addEventListener("keydown", e => {
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "a") return;
+    e.preventDefault();
+    const allIds = [...tiles.keys()];
+    if (!allIds.length) return;
+    const allSelected = allIds.every(id => selected.has(id));
+    setSelected(allSelected ? [] : allIds);
+  });
+}
+
+const io = "IntersectionObserver" in window && (embed || spec.boards.length > 1)
+  ? new IntersectionObserver(entries => {
+      // Gömülü kipte iframe'in kendisi gizlenince (Liste sekmesi) bütün kutucuklar "görünmez" olur;
+      // o durumda bağlantılar burada kesilmez — üst sayfa 10 sn sonra iframe'i kaldırarak durdurur
+      // (sekmeler arasında hızlı gidip gelmede yeniden bağlanma olmasın).
+      if (embed && grid.clientWidth === 0) return;
+      entries.forEach(e => {
+        const t = [...tiles.values()].find(t => t.el === e.target);
+        // Tam ekrandaki kutucuk hariç: tarayıcı onu "top layer"a taşıdığından `root: grid`
+        // kesişimi bozulup yanlışlıkla isIntersecting=false gelebilir — bu, fullscreenchange'in
+        // az önce kurduğu bağlantıyı hemen disconnect() ile koparır ("Bağlanıyor…" mesajı hiç
+        // güncellenmeden asılı kalır, bkz. aşağıdaki fullscreenchange). Tam ekrandaki kutucuk
+        // tanım gereği zaten görünürdür, IO'nun aksini söylemesi önemsizdir.
+        if (t && t.el !== document.fullscreenElement) { t.inView = e.isIntersecting; t.refreshWanted(); }
+      });
+    }, { root: grid })
+  : null;
+
+// Güvence: IO "görünmüyor" dedikten sonra kutucuk görünür olduğu hâlde bir daha tetiklenmezse (yerleşim
+// ilk ölçülürken iframe boyutu henüz oturmamışsa olabiliyor) kutucuk bağlanmadan "Bağlanıyor…"da kalırdı.
+// Görünmez sayılanlar ara sıra gerçek geometriyle yeniden denetlenir; yalnız kaçırılmış "görünür"
+// durumunu düzeltir, gereksiz bağlantı açmaz.
+if (io) {
+  setInterval(() => {
+    if (document.hidden || grid.clientWidth === 0) return;
+    const g = grid.getBoundingClientRect();
+    tiles.forEach(t => {
+      if (t.inView || t.el === document.fullscreenElement) return;
+      const r = t.el.getBoundingClientRect();
+      if (r.bottom > g.top && r.top < g.bottom && r.right > g.left && r.left < g.right) {
+        t.inView = true;
+        t.refreshWanted();
+      }
+    });
+  }, 3000);
+}
+
+/** Kutucukları verilen listeye eşitler: yenileri ekler, gidenleri kaldırır, kalanları günceller (yeniden bağlanmadan). */
+function setBoards(list) {
+  const ids = new Set(list.map(b => b.id));
+  for (const [id, t] of tiles) {
+    if (!ids.has(id)) {
+      t.disconnect();
+      t.perfStop();
+      if (io) io.unobserve(t.el);
+      t.el.remove();
+      tiles.delete(id);
+    }
+  }
+  let empty = document.getElementById("empty");
+  if (empty && list.length) {
+    empty.remove();
+    empty = null;
+  }
+  list.forEach((b, i) => {
+    let t = tiles.get(b.id);
+    if (!t) {
+      t = new Tile(b);
+      tiles.set(b.id, t);
+      if (io) io.observe(t.el);
+    }
+    // Sırayı listeyle aynı tut — yalnız yeri gerçekten farklıysa taşınır: her tazelemede bütün
+    // kutucukları yeniden eklemek, o an sürüklenen kutucuğun yerel sürüklemesini iptal ediyordu.
+    // Sürükleme sürerken sıraya dokunulmaz: canlı yerleşimle değişmiş sıra, üst sayfanın henüz eski
+    // sırayı taşıyan tazelemesiyle geri alınmasın (bırakınca tm-reorder ile yeni sıra kaydedilir).
+    if (!drag && grid.children[i] !== t.el) grid.insertBefore(t.el, grid.children[i] || null);
+    t.setBoard(b);
+  });
+  if (!list.length && !empty) {
+    empty = document.createElement("div");
+    empty.id = "empty";
+    empty.textContent = "Gösterilecek tahta yok.";
+    grid.appendChild(empty);
+  }
+  // Artık gösterilmeyen tahtaların seçimi de kalkar (süzgeç değişince "hayalet" seçim kalmasın).
+  if ([...selected].some(id => !ids.has(id))) {
+    setSelected([...selected].filter(id => ids.has(id)), true); // grid zaten yalnız gösterilenleri tutar
+  }
+}
+
+document.getElementById("full").addEventListener("click", () => toggleFullscreen(document.documentElement));
+document.addEventListener("fullscreenchange", () => {
+  const fs = document.fullscreenElement;
+  tiles.forEach(t => {
+    if (t.el === fs) {
+      // IO bu tur içinde henüz güncellenmemiş/yanlış olabilir (yukarıdaki not) — tam ekrana YENİ
+      // giren kutucuk için görünürlüğü burada kesin olarak doğru işaretle.
+      t.inView = true;
+    }
+    t.setQuality(fs === t.el ? "view" : t.base);
+  });
+});
+// Yalnız görünen kutucuklar bağlı kalır (onlarca tahtalık önizlemede kaydırılan kutucuklar akış tutmaz).
+document.addEventListener("visibilitychange", () => tiles.forEach(t => t.refreshWanted()));
+
+if (embed) {
+  // Üst sayfa (Tahtalar) grid'deki tahta listesini her değiştiğinde gönderir.
+  window.addEventListener("message", e => {
+    if (e.source !== window.parent || e.origin !== location.origin || !e.data) return;
+    if (e.data.type === "tm-boards") setBoards(e.data.boards || []);
+    else if (e.data.type === "tm-selection") setSelected((e.data.ids || []).filter(id => tiles.has(id)), true);
+    else if (e.data.type === "tm-size") document.documentElement.style.setProperty("--tile-min", e.data.px + "px");
+    else if (e.data.type === "tm-view") {
+      view.stats = e.data.stats !== false;
+      view.perf = !!e.data.perf;
+      document.documentElement.classList.toggle("nostats", !view.stats);
+      tiles.forEach(t => t.syncPerf());
+    }
+  });
+  // Kutucuklara tıklayınca üst sayfadaki açık sağ menü kapansın (tıklama iframe'den dışarı çıkmaz).
+  document.addEventListener("pointerdown", () =>
+    window.parent.postMessage({ type: "tm-click" }, location.origin));
+  // Hazırım: üst sayfa güncel listeyi göndersin (yükleme sırasında gelen güncelleme kaybolmasın).
+  window.parent.postMessage({ type: "tm-ready" }, location.origin);
+}
+setBoards(spec.boards);
+</script>
+</body>
+</html>

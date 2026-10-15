@@ -1,0 +1,8 @@
+{
+  "title": "Deneme logu gönder",
+  "description": "Tahtada bir deneme kaydı üretir. Kayıt birkaç saniye içinde Loglar sayfasında görünüyorsa log iletimi çalışıyordur.",
+  "category": "Loglar",
+  "feature": "actions",
+  "timeout": 20,
+  "params": []
+}

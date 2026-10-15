@@ -1,0 +1,15 @@
+{
+  "title": "Sistem güncelleme",
+  "description": "Tahtanın tüm paketlerini günceller: yarım kalmış kurulumları tamamlar, paket listelerini yeniler (apt update), bozuk bağımlılıkları onarır, bütün paketleri yükseltir (apt full-upgrade), gereksiz paketleri ve kaldırılmış paketlerin artık ayarlarını siler (autoremove --purge), indirilen paket dosyalarını temizler (apt clean); flatpak kuruluysa onu da günceller. Güncelleme tahtada arka planda (systemd birimi) çalışır: bağlantı koparsa ya da pencere kapanırsa yarıda kalmaz; aynı tahtada yeniden başlatılırsa süren güncellemenin çıktısı izlenir. Paket deposuna erişim gerekir; tahta başına birkaç dakikadan yarım saate kadar sürebilir.",
+  "category": "Sistem",
+  "feature": "actions",
+  "confirm": true,
+  "timeout": 3600,
+  "params": [
+    {"key": "REBOOT", "label": "Güncelleme yeniden başlatma gerektirirse", "type": "select", "default": "hayir",
+     "options": [
+       {"value": "hayir", "label": "Yeniden başlatma, yalnız bildir"},
+       {"value": "evet", "label": "1 dakika sonra yeniden başlat"}
+     ]}
+  ]
+}

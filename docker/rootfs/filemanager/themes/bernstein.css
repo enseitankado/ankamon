@@ -1,0 +1,41 @@
+/*
+ * FileBrowser Quantum teması: tiha-mon "Bernstein (koyu amber)" (bernstein) temasının renkleri.
+ * Renkler, tiha-mon arayüzünde bu tema seçiliyken qooxdoo renk yöneticisinin çözdüğü değerlerden alındı
+ * (app-background, app-nav, surface, app-border, text-primary-on-surface, app-muted, primary, error).
+ * FileBrowser'ın açık/koyu kip seçiminden bağımsız aynı görünsün diye değişkenler hem :root hem
+ * .dark-mode için tanımlanır. Seçim: dosya yöneticisi → Ayarlar → Profil → Tema (bkz. filemanager.sh).
+ */
+:root,
+.dark-mode {
+  color-scheme: dark;
+  --background: #171717;
+  --alt-background: #1E1E1E;
+  --surfacePrimary: #1E1E1E;
+  --surfaceSecondary: #050505;
+  --surfaceTertiary: #1E1E1E;
+  --textPrimary: #C8C8C8;
+  --textSecondary: #8A8A8A;
+  --divider: #2A2A2A;
+  --borderColor: #2A2A2A;
+  --borderPrimary: #2A2A2A;
+  --iconBackground: #1E1E1E;
+  --activeWhiteIcon: white;
+  --primaryColor: #D18F14;
+  --blue: #D18F14;
+  --dark-blue: #D18F14;
+  --errorColor: #E05A47;
+  --red: #E05A47;
+}
+
+/* Üst çubuk, kenar çubuğu ve durum çubuğu: FileBrowser zemin üstüne sabit yarı saydam bir ton bindiriyor
+   (header[data-v-…], #sidebar, #status-bar — !important ile); tiha-mon'un sol menüsü gibi temanın gezinme
+   rengini (app-nav) alsınlar. :not(#tm…) yalnız özgüllüğü artırır — bileşen hash'ine (data-v-…) bağlı
+   kalınmasın, FileBrowser sürümü değişince de çalışsın diye. */
+body {
+  color: var(--textPrimary);
+}
+header:not(#tm-a):not(#tm-b),
+#sidebar:not(#tm-a),
+#status-bar:not(#tm-a) {
+  background-color: var(--alt-background) !important;
+}

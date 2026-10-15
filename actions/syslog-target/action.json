@@ -1,0 +1,20 @@
+{
+  "title": "Log sunucusunu ayarla",
+  "description": "Tahtanın sistem kayıtlarını merkezi log sunucusuna yönlendirir (TiHA'nın \"Merkezi log sunucusu\" adımıyla aynı yapılandırma: sunucu kapalıyken kayıtlar tahtada birikir, dönünce gönderilir). Sunucu adresi boş bırakılırsa bu Tiha-Mon sunucusu kullanılır.",
+  "category": "Loglar",
+  "feature": "actions",
+  "confirm": true,
+  "timeout": 180,
+  "params": [
+    {"key": "HOST", "label": "Sunucu adresi", "type": "text", "default": ""},
+    {"key": "PORT", "label": "Port", "type": "number", "default": "514", "required": true},
+    {"key": "PROTO", "label": "Protokol", "type": "select", "default": "tcp",
+     "options": [{"value": "tcp", "label": "TCP"}, {"value": "udp", "label": "UDP"}]},
+    {"key": "PROFILE", "label": "Kapsam", "type": "select", "default": "bakim",
+     "options": [
+       {"value": "bakim", "label": "Bakım (önerilen)"},
+       {"value": "guvenlik", "label": "Yalnız güvenlik"},
+       {"value": "kapsamli", "label": "Kapsamlı (her mesaj — yalnız sorun ayıklarken)"}
+     ]}
+  ]
+}

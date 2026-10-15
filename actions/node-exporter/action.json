@@ -1,0 +1,11 @@
+{
+  "title": "Metrik izlemeyi kur",
+  "description": "Tahtaya sensör verisini sunan prometheus-node-exporter ve sıcaklık okumaları için lm-sensors paketlerini kurar (TiHA'daki \"metrik izleme\" seçeneğiyle aynı). Tiha-Mon bu porttan işlemci, bellek, disk, ağ ve sıcaklık bilgilerini okur. Paket deposuna erişim gerekir.",
+  "category": "Sensörler",
+  "feature": "actions",
+  "confirm": true,
+  "timeout": 600,
+  "params": [
+    {"key": "PORT", "label": "Dinleme portu", "type": "number", "default": "9100", "required": true}
+  ]
+}

@@ -1,0 +1,58 @@
+--- a/source/class/ville/theme/fluent/Appearance.js
++++ b/source/class/ville/theme/fluent/Appearance.js
+@@ -30,13 +30,9 @@
+ qx.Theme.define("ville.theme.fluent.Appearance",
+ {
+   
+-  boot : function(){
+-    qx.Class.include(qx.ui.basic.Image, ville.theme.MImage);
+-    qx.Class.include(qx.ui.basic.Atom, ville.theme.MEmbed);
+-    qx.Class.include(qx.ui.menu.AbstractButton, ville.theme.MEmbed);
+-    qx.Class.include(qx.ui.menu.Menu, ville.theme.MMenu);
+-    qx.Class.include(qx.ui.tabview.TabView, ville.theme.MTabView);
+-  },
++  // tiha-mon yaması: özgün "boot" bu mixin'leri tema TANIMLANIRKEN ekliyordu; derlenmiş pakette o anda
++  // qx.ui.basic.Image vb. henüz yüklenmemiş olduğundan uygulama hiç açılmıyordu ("reading 'Image'").
++  // Ekleme artık Fluent ilk kez SEÇİLDİĞİNDE yapılır — bkz. tihamon.theme.Registry.__setupFluent.
+   
+   appearances :
+   {    
+--- a/source/class/ville/theme/MMenu.js
++++ b/source/class/ville/theme/MMenu.js
+@@ -8,6 +8,11 @@
+       var plftstart = menubounds.left;
+ 
+       var popupup = this.getOpenAnimation();
++      // tiha-mon yaması: bu mixin Fluent yüklenince TÜM menülere eklenir; Fluent dışı bir tema
++      // seçiliyken openAnimation tanımsızdır — animasyonsuz açıl (aksi halde menüler hata verir).
++      if (!popupup) {
++        return;
++      }
+ 
+       if (this.hasState("submenu")) {
+         var rtlftoffset = this.getHorizontalAnimationOffset();
+@@ -45,18 +50,24 @@
+   {
+     openAnimation :
+     {
++      init : null,
++      nullable : true,
+       check : "Map",
+       themeable: true
+     },
+ 
+     verticalAnimationOffset :
+     {
++      init : null,
++      nullable : true,
+       check : "Integer",
+       themeable: true
+     },
+ 
+     horizontalAnimationOffset :
+     {
++      init : null,
++      nullable : true,
+       check : "Integer",
+       themeable: true
+     }

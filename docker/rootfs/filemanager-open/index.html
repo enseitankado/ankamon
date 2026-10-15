@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Dosya yöneticisi</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333;
+         display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+  .msg { text-align: center; max-width: 28em; padding: 0 1em; }
+  .err { color: #c62828; }
+</style>
+</head>
+<body>
+<div class="msg" id="msg">Bağlanılıyor…</div>
+<script>
+(function () {
+  // Bağlantı bilgisi BoardOps.filemanager()'dan gelir: yalnız tahta kimliği (+ başlık için host/ad).
+  // Kimlik bilgisi tarayıcıya hiç gelmez — bağlama köprüsü onu kendisi veritabanından okur.
+  var q = new URLSearchParams(location.search);
+  var board = q.get("board"), hostname = q.get("hostname"), title = q.get("title") || hostname || board;
+  document.title = "Dosya yöneticisi — " + title;
+  var msg = document.getElementById("msg");
+  function fail(text) { msg.className = "err"; msg.textContent = text; }
+  if (!board) {
+    fail("Eksik bağlantı bilgisi."); return;
+  }
+
+  // 1) Tahtayı bu makineye bağla (sshfs; idempotent — zaten bağlıysa anında döner).
+  fetch("/filemanager-mount/mount/" + encodeURIComponent(board), {
+    method: "POST",
+    headers: { "X-Requested-With": "tihamon" }
+  }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+    .then(function (res) {
+      if (!res.ok || !res.data.ok) {
+        throw new Error((res.data && res.data.error) || "Bağlanılamadı.");
+      }
+      // 2) FileBrowser Quantum'un o anki tahtanın dizinine girer; parola/kimlik bilgisi FileBrowser'a
+      // hiç gitmez (nginx her isteğe sabit bir X-Auth-User ekliyor — bkz. nginx-default.conf).
+      // "tahtalar" kaynağın adı (bkz. services/filemanager.sh), res.data.path "<takma ad>/" (boşluk,
+      // Türkçe karakter içerebilir; kodlanır). Açılış dizini tahtanın /home'u (kullanıcı isteği);
+      // kökten yukarı gezinmek yine serbest.
+      location.replace("/filemanager/files/tahtalar/" +
+        encodeURIComponent(res.data.path.replace(/\/$/, "")) + "/home/");
+    })
+    .catch(function (e) {
+      fail("Dosya yöneticisi açılamadı: " + e.message);
+    });
+})();
+</script>
+</body>
+</html>

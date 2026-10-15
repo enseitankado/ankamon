@@ -1,0 +1,9 @@
+{
+  "title": "Uzaktan uyandırmayı (WoL) etkinleştir",
+  "description": "TiHA'nın \"Uzaktan uyandırma (Wake-on-LAN)\" adımını seçili tahtalara uygular (TiHA ile birebir aynı dosyalar): ethtool kurulur (yoksa), her açılışta birincil ağ arayüzünde sihirli paketle uyandırmayı açan /usr/local/sbin/tiha-wake-on-lan.sh betiği ve tiha-wake-on-lan.service servisi yazılıp etkinleştirilir ve hemen bir kez çalıştırılır; sonunda ağ kartının Wake-on durumu doğrulanır. Zaten uygulanmış tahtada güvenle yeniden çalıştırılabilir. BIOS'taki \"Wake on LAN\" ayarına dokunmaz: orada açık, \"ErP\"/\"Deep Sleep\" kapalı olmalıdır.",
+  "category": "Güç",
+  "feature": "actions",
+  "confirm": false,
+  "timeout": 240,
+  "params": []
+}

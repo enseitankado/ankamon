@@ -1,0 +1,12 @@
+.git
+.env
+data
+CLAUDE.md
+.claude
+frontend/node_modules
+frontend/compiled
+frontend/.qooxdoo
+frontend/themes
+worker/tihamon/netscan/manuf.gz
+**/__pycache__
+**/*.pyc

@@ -1,0 +1,9 @@
+{
+  "title": "Kapat",
+  "description": "Seçilen tahtaları kapatır. Yeniden açmak için Uyandır (Wake-on-LAN) kullanılır.",
+  "category": "Güç",
+  "feature": "power",
+  "confirm": true,
+  "timeout": 30,
+  "params": []
+}

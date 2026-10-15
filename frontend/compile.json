@@ -1,0 +1,20 @@
+{
+  "$schema": "https://qooxdoo.org/schema/compile-1-0-0.json",
+  "targets": [
+    { "type": "source", "outputPath": "compiled/source", "bundle": { "include": "qx.*" } },
+    { "type": "build", "outputPath": "compiled/build" }
+  ],
+  "defaultTarget": "source",
+  "libraries": [".", "themes/fluent", "themes/silverblue", "themes/graydient", "themes/darktheme", "themes/bernstein"],
+  "locales": ["tr", "en"],
+  "environment": { "qx.icontheme": "Tango" },
+  "applications": [
+    {
+      "class": "tihamon.Application",
+      "theme": "tihamon.theme.Theme",
+      "name": "tihamon",
+      "title": "Tiha-Mon",
+      "bootPath": "source/boot"
+    }
+  ]
+}

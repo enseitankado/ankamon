@@ -1,0 +1,8 @@
+{
+  "title": "Sıcaklık ve disk sağlığı",
+  "description": "lm-sensors sıcaklık okumalarını ve disklerin SMART sağlık özetini gösterir. Tahtada değişiklik yapmaz.",
+  "category": "Bilgi",
+  "feature": "actions",
+  "timeout": 60,
+  "params": []
+}

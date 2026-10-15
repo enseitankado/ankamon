@@ -1,0 +1,69 @@
+# Tiha-Mon — her şey tek konteynerde (supervisord). Kalıcı veri yalnız ${DATA_DIR} altındadır.
+name: tiha-mon
+
+services:
+  tiha-mon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tiha-mon
+    restart: always
+    environment:
+      TZ: ${TZ:-Europe/Istanbul}
+      # Parolalar (install.sh .env içinde üretir)
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD .env içinde tanımlı olmalı}
+      PG_GRAFANA_PASSWORD: ${PG_GRAFANA_PASSWORD:?PG_GRAFANA_PASSWORD .env içinde tanımlı olmalı}
+      PG_READONLY_PASSWORD: ${PG_READONLY_PASSWORD:?PG_READONLY_PASSWORD .env içinde tanımlı olmalı}
+      GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD .env içinde tanımlı olmalı}
+      ETAPADMIN_PASSWORD: ${ETAPADMIN_PASSWORD:?ETAPADMIN_PASSWORD .env içinde tanımlı olmalı}
+      # Tahtalara erişim (ilk kurulumda tohumlanır, sonra arayüzden değişir)
+      BOARD_SSH_USER: ${BOARD_SSH_USER:-root}
+      BOARD_SSH_PASSWORD: ${BOARD_SSH_PASSWORD:-}
+      BOARD_SMB_USER: ${BOARD_SMB_USER:-root}
+      BOARD_SMB_PASSWORD: ${BOARD_SMB_PASSWORD:-}
+      # İzleme ve saklama
+      HTTP_PORT: ${HTTP_PORT:-80}
+      SYSLOG_PORT: ${SYSLOG_PORT:-514}
+      HTTPS_PORT: ${HTTPS_PORT:-443}
+      CAST_RTSP_PORT: ${CAST_RTSP_PORT:-8554}
+      CAST_ICE_PORT: ${CAST_ICE_PORT:-8189}
+      SCRAPE_INTERVAL: ${SCRAPE_INTERVAL:-60s}
+      METRICS_RAW_DAYS: ${METRICS_RAW_DAYS:-30}
+      METRICS_5M_DAYS: ${METRICS_5M_DAYS:-180}
+      METRICS_1H_DAYS: ${METRICS_1H_DAYS:-1825}
+      LOG_DAYS: ${LOG_DAYS:-90}
+      # Yedekleme
+      BACKUP_CONFIG_EVERY_HOURS: ${BACKUP_CONFIG_EVERY_HOURS:-6}
+      BACKUP_FULL_AT: ${BACKUP_FULL_AT:-03:30}
+      BACKUP_KEEP_CONFIG: ${BACKUP_KEEP_CONFIG:-28}
+      BACKUP_KEEP_FULL: ${BACKUP_KEEP_FULL:-7}
+    # Host ağı doğrudan kullanılır (bridge değil): Wake-on-LAN sihirli paketi (bkz. worker/tihamon/
+    # executor/wol.py) bir UDP yayınıdır (broadcast) ve Docker'ın köprü ağından fiziksel LAN'a asla
+    # çıkamaz (yalnızca köprünün kendi izole alt ağında kalır) — çekirdek, yönlendirilmiş (subnet)
+    # yayınları da güvenlik nedeniyle arayüzler arası iletmez. Host ağında konteyner doğrudan host'un
+    # gerçek arayüzünden yayın yapabildiği için uyandırma gerçekten çalışır. Bunun bedeli: `ports:` ile
+    # port eşleme artık mümkün değil, nginx/rsyslog HTTP_PORT/SYSLOG_PORT'u doğrudan kendi dinleme
+    # portu olarak kullanır (bkz. services/nginx.sh, services/rsyslog.sh). İç servisler (postgres,
+    # grafana, php-fpm, webssh) zaten 127.0.0.1'e bağlı olduğundan host ağında yeni bir şey dışa açılmaz.
+    network_mode: host
+    # Dosya yöneticisi (bkz. worker/tihamon/filemanager) tahtanın dosya sistemini sshfs ile bağlar;
+    # FUSE bağlama SYS_ADMIN + /dev/fuse ister, Docker'ın varsayılan AppArmor profili de FUSE bağlamayı
+    # engellediğinden kapatılır (yalnızca bağlama syscall'ı için — konteynerin ağ/erişim sınırlarını
+    # değiştirmez, zaten root SSH kimlik bilgilerini tutan tek konteynerin blast radius'unu artırmaz).
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - ${DATA_DIR:-./data}:/data
+    # PostgreSQL'in temiz kapanabilmesi için (güç kesintisi direnci: WAL + sağlama toplamları zaten açık).
+    stop_grace_period: 90s
+    shm_size: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:${HTTP_PORT:-80}/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s

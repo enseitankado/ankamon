@@ -1,0 +1,17 @@
+{
+  "title": "BIOS parolasını sıfırla",
+  "description": "eta-112 aracıyla BIOS parolasını temizler (flash'a yazar, geri-okuyarak doğrular). Yalnız desteklenen modellerde çalışır (Vestel 14MB24A, 14MB37C1, 14MB57 — Faz 1/Faz 2); diğerlerinde hiçbir şey yazılmaz. Etkili olması için tahta yeniden başlatılmalıdır. Araç sunucudan SFTP ile /opt/eta-112'ye kopyalanır; tahtada flashrom/dmidecode yoksa apt ile kurulur.",
+  "category": "BIOS",
+  "feature": "actions",
+  "confirm": true,
+  "timeout": 300,
+  "tools": ["eta-112"],
+  "params": [
+    {"key": "SLOT", "label": "Sıfırlanacak parola", "type": "select", "default": "all", "required": true,
+     "options": [
+       {"value": "all", "label": "Yönetici ve kullanıcı (ikisi de)"},
+       {"value": "yonetici", "label": "Yalnız yönetici"},
+       {"value": "kullanici", "label": "Yalnız kullanıcı"}
+     ]}
+  ]
+}

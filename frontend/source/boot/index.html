@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Tiha-Mon</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #f3f5f8; font-family: system-ui, sans-serif; }
+    #boot { position: fixed; inset: 0; display: grid; place-items: center; color: #5b6675; }
+  </style>
+  ${preBootJs}
+  <script src="${appPath}index.js" defer></script>
+</head>
+<body>
+  <div id="boot">Tiha-Mon yükleniyor…</div>
+  <noscript>Tiha-Mon arayüzü için JavaScript gereklidir.</noscript>
+</body>
+</html>
