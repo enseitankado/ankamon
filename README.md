@@ -131,6 +131,11 @@ o an kapalı olanlar "Çevrim dışı" olarak kalır. Cihaz kimliği MAC adresid
   üretici + açık portlar + nmap cihaz sınıfı + Tiha-Mon tahta kaydından tahmin edilir; elle de seçilebilir.
 - Takma ad: her tarama sonunda boş takma adlar Tahtalar'daki adla ve `net_known_aliases` tablosundaki
   MAC → ad kayıtlarıyla (ör. eski envanterden aktarılmış) doldurulur; elle girilen ad ezilmez.
+- ETAP faz veritabanı (`worker/tihamon/netscan/etap_phase.py`): MAC'ten akıllı tahta modeli ve FATİH fazı.
+  `etap_prefixes.tsv` yalnız maskelenmiş önekler tutar (6–10 onaltılık hane, en dar 256 adres; tam MAC ve
+  okul bilgisi yok) → anakart modeli; `etap_models.json` model → faz/marka/işlemci ve güven düzeyi (kaynaklı /
+  veri / çıkarım — elle düzeltilebilir). Önekler ülke çapı ETAP envanterinden `scripts/build-etap-phases.py`
+  ile üretilir (envanter depoda değildir); dışarıda bırakılan %20 üzerinde kapsama %99,6, doğruluk %99,9.
 - Yetkiler: `network` (görüntüleme), `network.manage` (ekle/düzenle/sil, ağ adı, tarama).
 - Not: nmap port taraması ağdaki saldırı tespit sistemlerinde uyarı üretebilir; gerekirse ağın sağ tık
   menüsünden taraması kapatılabilir.

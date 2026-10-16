@@ -15,7 +15,7 @@ final class BoardsApi
 {
     private const COLUMNS = "b.id, b.hostname, b.mac::text AS mac, host(b.ip) AS ip, b.label, b.location, b.notes,
         b.source, b.monitor_enabled, b.exporter_port, b.online,
-        b.ssh_ok, b.exporter_ok, b.facts,
+        b.ssh_ok, b.exporter_ok, b.facts, b.etap,
         b.session_username, b.session_locked, extract(epoch FROM b.session_checked_at)::bigint AS session_checked_at,
         extract(epoch FROM b.last_seen_at)::bigint AS last_seen_at,
         extract(epoch FROM GREATEST(b.last_log_at, rl.at))::bigint AS last_log_at";
@@ -220,6 +220,8 @@ final class BoardsApi
     private static function decode(array $board): array
     {
         $board['facts'] = json_decode((string) $board['facts'], true) ?: new \stdClass();
+        // ETAP faz bilgisi (bkz. migration 018, worker netscan/etap_phase.py); yoksa null.
+        $board['etap'] = isset($board['etap']) ? json_decode((string) $board['etap'], true) : null;
         return $board;
     }
 }
