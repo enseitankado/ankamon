@@ -16,6 +16,7 @@ final class SettingsApi
         return [
             'ssh_access' => self::redacted(Settings::get('ssh_access')),
             'samba_access' => self::redacted(Settings::get('samba_access')),
+            'screen_vnc_autoinstall' => (bool) Settings::get('screen_vnc_autoinstall'),
             'syslog_port' => (int) (getenv('SYSLOG_PORT') ?: 514),
             'scrape_interval' => getenv('SCRAPE_INTERVAL') ?: '60s',
         ];
@@ -29,6 +30,10 @@ final class SettingsApi
                 self::saveAccess($key, $input);
                 $changed[] = $key;
             }
+        }
+        if ($request->input('screen_vnc_autoinstall') !== null) {
+            Settings::set('screen_vnc_autoinstall', (bool) $request->input('screen_vnc_autoinstall'));
+            $changed[] = 'screen_vnc_autoinstall';
         }
         Audit::log($user, $request, 'settings.update', implode(',', $changed));
         return ['ok' => true];

@@ -15,6 +15,9 @@ final class Settings
         // Okulun ders saatleri (bkz. Api\LessonTimesApi): hangi günler ders var (1=Pzt … 7=Paz) ve
         // [{name, start: "HH:MM", end: "HH:MM"}] — Oturumlar çizelgesi oturumu derslere eşler.
         'lesson_times' => ['days' => [1, 2, 3, 4, 5], 'lessons' => []],
+        // Ekranlar: tahtada x11vnc yoksa "Ekran istemcisini kur" (actions/vnc-install) arka planda
+        // kendiliğinden çalıştırılsın mı (bkz. worker/tihamon/screen/__main__.py). Varsayılan: evet.
+        'screen_vnc_autoinstall' => true,
     ];
 
     public static function get(string $key): mixed

@@ -1,0 +1,9 @@
+{
+  "title": "Ekran istemcisini (x11vnc) kur",
+  "description": "Ekranlar sekmesindeki canlı önizleme ve fare/klavye ile müdahale için tahtada gereken x11vnc paketini kurar; kuruluysa hiçbir şey yapılmaz. Tahtada kalıcı bir VNC servisi ya da ağa açık port oluşturulmaz: x11vnc yalnız izleme istendiğinde SSH üzerinden, tahtanın kendi içinde başlatılır. Ayarlarda \"Ekran istemcisini otomatik kur\" açıksa Ekranlar sekmesi bu işlemi gerektiğinde kendiliğinden, arka planda çalıştırır. Paket deposuna erişim gerekir.",
+  "category": "Ekran",
+  "feature": "actions",
+  "confirm": false,
+  "timeout": 900,
+  "params": []
+}
