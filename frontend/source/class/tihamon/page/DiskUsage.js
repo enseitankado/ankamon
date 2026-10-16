@@ -14,6 +14,7 @@ qx.Class.define("tihamon.page.DiskUsage", {
     this.__summary = new tihamon.ui.DiskUsageSummary(specs, mode => this.openWith({ tab: mode }));
     this.__tabs.add(this.__summary);
     specs.forEach(spec => this.__tabs.add(new tihamon.ui.DiskUsageTab(this, spec)));
+    this._rememberTab(this.__tabs, "diskusage"); // son seçili sekme (bkz. Base._rememberTab)
     this.add(this.__tabs, { flex: 1 });
   },
 

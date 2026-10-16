@@ -28,6 +28,7 @@ qx.Class.define("tihamon.page.Sessions", {
     this.__users = new tihamon.ui.sessions.Users(this);
     this.__tabs.add(this.__list);
     this.__tabs.add(this.__users);
+    this._rememberTab(this.__tabs, "sessions"); // son seçili sekme (bkz. Base._rememberTab)
     this.add(this.__tabs, { flex: 1 });
 
     // Oturum açma/kapama worker'da "anında" (hızlı döngü) işlendiğinden, sayfa da kısa aralıkla

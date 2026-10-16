@@ -27,6 +27,7 @@ qx.Class.define("tihamon.page.Maintenance", {
     };
     add("diagnose", "Bakım", "diagnose", tihamon.page.Diagnose);
     add("metrics", "Sensörler", "metrics", tihamon.page.Metrics);
+    this._rememberTab(this.__tabs, "maintenance"); // son seçili sekme (dinleyiciden önce: activate tetiklenmesin)
     this.__tabs.addListener("changeSelection", () => {
       const page = this.__current();
       if (page && !this.__switching) {

@@ -210,7 +210,9 @@ qx.Class.define("tihamon.page.Base", {
       const button = new qx.ui.form.Button(label);
       button.addListener("execute", handler, this);
       if (this._compact) {
-        button.set({ padding: [3, 9], font: "small" });
+        // Yalnız YATAY dolgu: dikey dolgu temada kalır. Bazı temalar (ör. SilverBlue [1, 7, 4, 5]) çerçeve
+        // asimetrisini dikey dolguyla dengeler; eşit dikey dolgu etiketi alt kenara itiyordu.
+        button.set({ paddingLeft: 9, paddingRight: 9, font: "small" });
       }
       this._actions.add(button);
       return button;
@@ -466,6 +468,31 @@ qx.Class.define("tihamon.page.Base", {
       });
     },
 
+    /**
+     * Sekme hafızası (kullanıcı isteği): sayfadaki TabView'ın son seçili sekmesi kullanıcı başına
+     * sunucuda (users.ui_prefs["tab.<name>"], bkz. AuthApi::prefs) saklanır; sayfa yeniden açılınca ya
+     * da tarayıcı tazelenince o sekme seçili gelir. Sekme kimliği: userData "key" varsa o, yoksa
+     * etiketi (sondaki "(3)" gibi sayaç hariç). Kayıtlı sekme artık yoksa (yetki değişti) ilk sekme kalır.
+     * Sayfanın kendi changeSelection dinleyicisinden ÖNCE çağrılmalı: geri yükleme onu tetiklemesin.
+     * @param tabs {qx.ui.tabview.TabView} sekmeleri eklenmiş görünüm
+     * @param name {String} sayfaya özgü kısa ad, ör. "boards"
+     */
+    _rememberTab(tabs, name) {
+      const key = "tab." + name;
+      const idOf = tab => tab.getUserData("key") || String(tab.getLabel() || "").replace(/\s*\(\d+\)$/, "");
+      const saved = (this._user.ui_prefs || {})[key];
+      const tab = saved && tabs.getChildren().find(t => idOf(t) === saved);
+      if (tab && tabs.getSelection()[0] !== tab) {
+        tabs.setSelection([tab]);
+      }
+      tabs.addListener("changeSelection", e => {
+        const selected = e.getData()[0];
+        if (selected && idOf(selected) !== (this._user.ui_prefs || {})[key]) {
+          this.__savePref(key, idOf(selected));
+        }
+      });
+    },
+
     /** Tek bir arayüz tercihini sunucuya yazar (bkz. Base.savePref). */
     __savePref(name, value) {
       tihamon.page.Base.savePref(this._user, name, value);
@@ -508,8 +535,10 @@ qx.Class.define("tihamon.page.Base", {
       });
       columns.forEach((column, index) => columnModel.setHeaderCellRenderer(index + offset, renderer));
       // Varsayılan (16) yalnız etiket için; süzgeç kutusu (22 px, bkz. FilterHeaderCell) alt satıra
-      // ekleniyor, ikisine de yer açılır.
-      table.setHeaderCellHeight(48);
+      // ekleniyor, ikisine de yer açılır. 52 + kutu etiketin hemen altında (bkz. FilterHeaderCell
+      // rowFlex): kutunun altında en dar temada (Gümüş Mavi, etiketi 21 px) 2 px, diğerlerinde 4-7 px
+      // pay kalır (48'de Gümüş Mavi'de 4 px kesiliyordu) — 17 temanın hepsinde tarayıcıda ölçüldü.
+      table.setHeaderCellHeight(52);
       return fields;
     },
 

@@ -20,7 +20,9 @@ qx.Class.define("tihamon.ui.table.FilterHeaderCell", {
     this.__filterField = new qx.ui.form.TextField().set({
       liveUpdate: true,
       allowGrowX: true,
-      marginTop: 3,
+      // Etiketle arası dar (1): bazı temalarda (ör. Gümüş Mavi) başlık etiketi 21 px — 3 px'te kutunun
+      // alt kenarı başlık satırınca kırpılıyordu (bkz. Base._addColumnFilters setHeaderCellHeight).
+      marginTop: 1,
       height: 22,
       padding: [1, 6],
       font: "app-filter", // ince yazı (başlığın kalınlığını devralmaz, bkz. theme/Font.js)
@@ -35,6 +37,14 @@ qx.Class.define("tihamon.ui.table.FilterHeaderCell", {
     this.__filterField.addListener("pointerdown", e => e.stopPropagation());
     this.__filterField.addListener("dbltap", e => e.stopPropagation());
     this._add(this.__filterField, { row: 1, column: 0, colSpan: 3 });
+    // Başlık yüksekliğinin fazlası etiket satırına değil kutunun satırına gitsin ve kutu etiketin
+    // hemen altında (üste hizalı) dursun: aksi hâlde birçok temada (Açık/Koyu Mavi, Indigo, Simple…)
+    // HeaderCell'in Grid'i etiket satırını esnetip kutuyu hücrenin dibine itiyordu — etiketle kutu
+    // arası açılıyor, kutunun alt kenarı başlığın alt kenarına yapışıyordu (tarayıcıda ölçüldü).
+    const layout = this._getLayout();
+    layout.setRowFlex(0, 0);
+    layout.setRowFlex(1, 1);
+    this.__filterField.setAlignY("top");
   },
 
   statics: {

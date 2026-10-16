@@ -14,6 +14,7 @@ qx.Class.define("tihamon.page.System", {
     [tihamon.ui.system.Overview, tihamon.ui.system.Services, tihamon.ui.system.Schedules,
       tihamon.ui.system.Database, tihamon.ui.system.Config]
       .forEach(Tab => this.__tabs.add(new Tab(this)));
+    this._rememberTab(this.__tabs, "system"); // son seçili sekme (bkz. Base._rememberTab)
     this.add(this.__tabs, { flex: 1 });
   },
 
