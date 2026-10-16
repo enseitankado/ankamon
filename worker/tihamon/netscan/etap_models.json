@@ -1,0 +1,38 @@
+{
+  "_aciklama": "tiha-mon ETAP faz veritabanı — anakart modeli → faz. Anahtarlar etap_prefixes.tsv'deki model anahtarlarıdır (bkz. scripts/build-etap-phases.py model_key). guven: kaynakli = yayımlanmış kaynakla doğrulandı · veri = envanter verisiyle (aynı dokunmatik panel/işlemci/katalog eşi) doğrulandı · cikarim = eleme/dönem uyumuyla çıkarıldı, doğrulanmadı. Burada OLMAYAN bir modele düşen MAC: ETAP'a kayıtlı cihaz (ör. ETAP kurulu laboratuvar PC'si), akıllı tahta olduğu bilinmiyor. Elle düzeltilebilir; önek tablosunu yeniden üretmek gerekmez.",
+  "_kaynaklar": {
+    "faz12": "https://www.nedir-bu.com/fatih-projesi-faz-1-ve-faz-2-akilli-tahta-ozellikleri/ ; https://adana.meb.gov.tr/bt/dosya/dokuman/fatih_projesi_okul_faz_bilgisi_tespit_etme_7dzly9.pdf",
+    "vestel_intel_amd": "https://basiskele.meb.gov.tr/meb_iys_dosyalar/2015_04/16022255_vet_teknik_brosuruintel_amd.pdf",
+    "14mb37a1_faz2": "https://www.ledtvkarti.com/14mb37a1-ves65ops02-mnt-pc-65190-gt-sol-a-sag-a-v3-0-vestel-etkilesimli-akilli-tahta-anakarti-mainboard.html",
+    "aidata_i3_10100": "https://www.dmo.gov.tr/Katalog/Urun/Detay/3576079_1064253 ; https://www.teknolojikogretmenler.com/wp-content/uploads/2023/04/aidataakillitahtateknikozellikler.pdf",
+    "faz3_arcelik_aidata": "https://mardinhatuniyemesleklisesi.meb.k12.tr/icerikler/etkilesimlitahtadosyalari_15731537.html ; https://www.teknolojikogretmenler.com/fatih-projesi-3-faz-arcelik-etkilesimli-tahta-incelemesi/",
+    "arcelik_ops": "https://www.arcelik.com.tr/arcelik-akilli-tahta",
+    "ops62a_2022": "https://linux-hardware.org/?probe=ad85836549"
+  },
+  "modeller": {
+    "vestel-14mb24a":  {"faz": 1, "marka": "Vestel", "islemci": "Intel i3-2330M / i3-2310M", "dokunmatik": "IRTouch (6615:0C20)", "not": "Siyah çerçeve", "guven": "kaynakli"},
+    "ecs-14mb24a":     {"faz": 1, "marka": "Vestel", "islemci": "Intel i3-2330M / i3-2310M", "not": "14MB24A'nın farklı satıcı adlı kaydı", "guven": "veri"},
+    "laserb-14mb24a":  {"faz": 1, "marka": "Vestel", "islemci": "Intel i3-2330M / i3-2310M", "not": "14MB24A'nın farklı satıcı adlı kaydı", "guven": "veri"},
+    "vestel-14mb57":   {"faz": 2, "marka": "Vestel", "islemci": "Intel i3-4000M", "dokunmatik": "2621:4501", "not": "Gri çerçeve", "guven": "kaynakli"},
+    "vestel-14mb37a1": {"faz": 2, "marka": "Vestel", "islemci": "Intel i3-3120M", "dokunmatik": "2621:4501", "not": "Faz 2 ile aynı dokunmatik panel; satıcı kaydında Faz-2", "guven": "veri"},
+    "vestel-14mb37c1": {"faz": 2, "marka": "Vestel", "islemci": "AMD A10-5750M", "dokunmatik": "2621:4501", "not": "Faz 2'nin AMD varyantı (Faz 2 imajları Intel/AMD); Faz 2 ile aynı dokunmatik panel", "guven": "veri"},
+    "gigabyte-mh310bp-r6": {"faz": 3, "marka": "Arçelik?", "islemci": "Intel i3-8100T", "dokunmatik": "CVTouch (1FF7:0013)", "not": "OPS'lu; Aidata modelleri elendikten sonra kalan en büyük Faz 3 grubu", "guven": "cikarim"},
+    "gigabyte-mh310bp-r7": {"faz": 3, "marka": "Arçelik?", "islemci": "Intel i3-8100T", "not": "MH310BP-R6 varyantı", "guven": "cikarim"},
+    "gigabyte-mh410ap-r6": {"faz": 3, "marka": "Arçelik?", "islemci": "Intel i3-10100T", "dokunmatik": "TimeLink (2309:1005)", "not": "OPS'lu", "guven": "cikarim"},
+    "gigabyte-mh410bp-r6": {"faz": 3, "marka": "Arçelik?", "islemci": "Intel i3-10100T", "not": "MH410AP-R6 varyantı", "guven": "cikarim"},
+    "decenta-s21-rkls-opsc12": {"faz": 3, "marka": "Aidata", "islemci": "Intel i3-10100", "not": "Aidata Faz 3 OPS'u i3-10100; Decenta = Aidata OPS üreticisi (katalogda AIDATA eşi)", "guven": "veri"},
+    "mainbrd-ops63a-sha":      {"faz": 3, "marka": "Aidata", "islemci": "Intel i3-10100", "not": "Aidata Faz 3 OPS'u i3-10100; Decenta S21 ile aynı ses kartı (0D8C:0014)", "guven": "veri"},
+    "decenta-s22-tglu-opsc22": {"faz": 3, "marka": "Aidata", "islemci": "Intel i5-11300H", "dokunmatik": "CVT (1FF7:0F32)", "not": "2021+ alımlar (11. nesil)", "guven": "cikarim"},
+    "mainbrd-ops62a-shb":      {"faz": 3, "marka": "Aidata?", "islemci": "Intel i5-11300H / i7-11390H", "dokunmatik": "TimeLink (2309:1005)", "not": "2021+ alımlar (11. nesil, 2022 model modül)", "guven": "cikarim"},
+    "mainbrd-ops62a-sha":      {"faz": 3, "marka": "Aidata?", "islemci": "11. nesil Intel i5", "not": "OPS62A varyantı", "guven": "cikarim"},
+    "mainbrd-ops72a-shb":      {"faz": 3, "marka": "Aidata", "islemci": "Intel i5-12450H", "not": "Aidata 65\" tahta i5-12450H OPS'lu listeleniyor; 2021+ alımlar (12. nesil)", "guven": "veri"},
+    "mainbrd-ops72a-shc":      {"faz": 3, "marka": "Aidata", "islemci": "Intel i5-12450H", "not": "OPS72A varyantı", "guven": "veri"},
+    "decenta-s24-rplp-opsc28-c": {"faz": 3, "marka": "Aidata", "islemci": "Intel i5-12500H", "not": "Katalogda aynı model AIDATA adıyla da kayıtlı; 2021+ alımlar (12. nesil)", "guven": "veri"},
+    "aidata-s24-rplp-opsc28-c":  {"faz": 3, "marka": "Aidata", "islemci": "Intel i5-12600H", "not": "Decenta S24'ün AIDATA adlı kaydı", "guven": "veri"},
+    "default-string-default-string": {"faz": 3, "marka": "?", "islemci": "Intel i5-11320H", "dokunmatik": "TimeLink (2309:1005)", "not": "OPS kimliği boş (Default string); TimeLink dokunmatikli 2021+ modül", "guven": "cikarim"},
+    "vestel-18ops10": {"faz": null, "marka": "Vestel", "not": "Vestel OPS modülü (az sayıda); faz bilinmiyor", "guven": "cikarim"},
+    "vestel-17ops19": {"faz": null, "marka": "Vestel", "not": "Vestel OPS modülü (az sayıda); faz bilinmiyor", "guven": "cikarim"},
+    "vestel-17ops24": {"faz": null, "marka": "Vestel", "not": "Vestel OPS modülü (az sayıda); faz bilinmiyor", "guven": "cikarim"},
+    "vestel-17ops30": {"faz": null, "marka": "Vestel", "not": "Vestel OPS modülü (az sayıda); faz bilinmiyor", "guven": "cikarim"}
+  }
+}
