@@ -4,6 +4,10 @@
  * LoginSessionsApi, db/migrations/019_login_sessions.sql. Tahtalardaki kullanıcı oturumları (Tahtalar ▸
  * Oturumlar, page.Sessions) ile KARIŞTIRILMASIN. Görmek 'logins' yetkisi ister.
  * Satıra çift tıklama / sağ menü: o oturumun işlem dökümü (audit_log).
+ *
+ * Durum ve süre sunucuda belirlenir (göç 021): tarayıcı çıkış yapmadan kapatılınca belirteç geçerli kalsa
+ * da oturum "Bağlantı kesildi" olur ve süresi son isteğe kadardır; aynı tarayıcıdan yeniden giriş eski
+ * oturumu "Yeniden giriş yapıldı" ile kapatır. Kendiliğinden biten oturumlarda "Çıkış" son etkinliktir (≈).
  */
 qx.Class.define("tihamon.ui.users.LoginSessions", {
   extend: qx.ui.tabview.Page,
@@ -82,7 +86,12 @@ qx.Class.define("tihamon.ui.users.LoginSessions", {
   },
 
   statics: {
-    STATUS: { active: "Açık", logout: "Çıkış yaptı", expired: "Zaman aşımı", revoked: "Sonlandırıldı" },
+    STATUS: {
+      active: "Aktif (sekme odakta)", open: "Açık (arka planda)", gone: "Bağlantı kesildi (çıkış yapılmadan)",
+      logout: "Çıkış yaptı", replaced: "Yeniden giriş yapıldı", expired: "Zaman aşımı", revoked: "Sonlandırıldı"
+    },
+    /** Hâlâ bağlı olan durumlar (süre "sürüyor"). */
+    LIVE: ["active", "open"],
 
     /** User-Agent'tan kısa "Tarayıcı / işletim sistemi" (ör. "Chrome 141 / Windows"). */
     browser(ua) {
@@ -107,7 +116,6 @@ qx.Class.define("tihamon.ui.users.LoginSessions", {
     __rows: null,
     __shownRows: null,
     __count: null,
-    __idleMinutes: 5,
 
     async load() {
       const days = this.__days.getSelection()[0].getModel();
@@ -120,19 +128,20 @@ qx.Class.define("tihamon.ui.users.LoginSessions", {
       }
       const F = tihamon.util.Format;
       const S = tihamon.ui.users.LoginSessions;
-      this.__idleMinutes = res.idle_minutes || 5;
       const now = Date.now();
       this.__rows = res.sessions.map(s => {
-        const idle = s.status === "active" && s.last_seen_ts && now - s.last_seen_ts > this.__idleMinutes * 60000;
-        const end = s.ended_ts || (s.status === "active" ? now : s.last_seen_ts);
+        const live = S.LIVE.includes(s.status);
+        const end = live ? now : (s.ended_ts || s.last_seen_ts || s.started_ts);
+        // Çıkış/yeniden giriş anı kesindir; diğer bitişler son istek anıdır (yaklaşık).
+        const exact = s.status === "logout" || s.status === "replaced";
         return {
           session: s,
           cells: [
             s.id, s.username, s.full_name || "",
             F.dateTime(s.started_ts), F.dateTime(s.last_seen_ts),
-            s.ended_ts ? F.dateTime(s.ended_ts) : (s.status === "active" ? "—" : ""),
-            F.duration((end - s.started_ts) / 1000) + (s.status === "active" ? " (sürüyor)" : ""),
-            (S.STATUS[s.status] || s.status) + (idle ? " (boşta)" : ""),
+            live ? "—" : (exact ? "" : "≈ ") + F.dateTime(end),
+            F.duration(Math.max(0, end - s.started_ts) / 1000) + (live ? " (sürüyor)" : ""),
+            S.STATUS[s.status] || s.status,
             s.ip || "", S.browser(s.user_agent), Number(s.actions) || 0, s.action_names || ""
           ]
         };
@@ -151,8 +160,9 @@ qx.Class.define("tihamon.ui.users.LoginSessions", {
         filters.every(f => String(cells[f.index] ?? "").toLowerCase().includes(f.text)));
       this.__table.getTableModel().setData(shown.map(r => r.cells));
       this.__shownRows = shown;
-      const open = this.__rows.filter(r => r.session.status === "active").length;
-      this.__count.setValue(`${shown.length} / ${this.__rows.length} oturum · şu an açık: ${open}`);
+      const live = tihamon.ui.users.LoginSessions.LIVE;
+      const open = this.__rows.filter(r => live.includes(r.session.status)).length;
+      this.__count.setValue(`${shown.length} / ${this.__rows.length} oturum · şu an bağlı: ${open}`);
     },
 
     __selectedRow() {

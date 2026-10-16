@@ -64,6 +64,15 @@ final class Auth
 
     public static function start(int $userId, Request $request): void
     {
+        // Aynı tarayıcı çıkış yapmadan yeniden giriş yapıyorsa eski belirteç burada biter ('replaced', göç
+        // 021): çerez yenisiyle değişeceğinden eskisi bir daha kullanılamaz — yoksa 12 sa "açık" kalıp oturum
+        // geçmişinde aynı kişinin art arda açık kayıtları birikiyordu (kullanıcı bildirdi).
+        $old = $_COOKIE[self::COOKIE] ?? '';
+        if (is_string($old) && $old !== '') {
+            Db::exec("UPDATE login_sessions SET end_reason = 'replaced', ended_at = now() WHERE session_hash = ? AND ended_at IS NULL",
+                [hash('sha256', $old)]);
+            Db::exec('DELETE FROM sessions WHERE id = ?', [hash('sha256', $old)]);
+        }
         $token = bin2hex(random_bytes(32));
         Db::exec(
             'INSERT INTO sessions (id, user_id, expires_at, ip, user_agent)

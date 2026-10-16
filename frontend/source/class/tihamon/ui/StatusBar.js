@@ -158,13 +158,15 @@ qx.Class.define("tihamon.ui.StatusBar", {
       const esc = qx.bom.String.escape;
       this.__usersLabel.setValue(`👤 ${res.users}`);
       if (!res.sessions) {
-        this.__usersTip.setLabel(`Oturum açmış Tiha-Mon kullanıcısı: <b>${res.users}</b>`);
+        this.__usersTip.setLabel(`Bağlı Tiha-Mon kullanıcısı: <b>${res.users}</b>`);
         return;
       }
       // Satır = kullanıcı + IP (sunucu gruplar); aynı yerden birden çok açık oturum varsa sayısı yazılır.
       const rows = res.sessions.map(s => {
         const who = esc(s.username) + (s.full_name ? ` <span style="opacity:.7">(${esc(s.full_name)})</span>` : "");
-        const flags = [s.mine ? "siz" : "", s.idle && !s.active ? "boşta" : "", s.sessions > 1 ? `${s.sessions} oturum` : ""]
+        // Sunucu yalnız BAĞLI oturumları verir (çıkış yapmadan kapanmış tarayıcılar sayılmaz — bkz.
+        // LoginSessionsApi::PRESENCE_MINUTES); odakta olmayan bağlı oturum "arka planda".
+        const flags = [s.mine ? "siz" : "", s.active ? "" : "arka planda", s.sessions > 1 ? `${s.sessions} oturum` : ""]
           .filter(Boolean).join(", ");
         // Aktif = Tiha-Mon o kişinin tarayıcısında görünür sekmede ve pencere odakta (bkz. __isFocused).
         const state = s.active ? "<span style=\"color:#2e9d4a;font-weight:bold\">Aktif</span>" : "";
@@ -174,7 +176,7 @@ qx.Class.define("tihamon.ui.StatusBar", {
       });
       const th = "style=\"text-align:left;padding-right:14px\"";
       this.__usersTip.setLabel(
-        `<b>Oturum açmış Tiha-Mon kullanıcıları: ${res.users}</b> (${res.total} oturum)` +
+        `<b>Bağlı Tiha-Mon kullanıcıları: ${res.users}</b> (${res.total} oturum)` +
         `<table style="margin-top:4px;border-spacing:0 2px"><tr><th ${th}>Kullanıcı</th><th ${th}>Son giriş</th>` +
         `<th ${th}>IP adresi</th><th ${th}>Son etkinlik</th><th ${th}>Durum</th></tr>` +
         rows.join("").replace(/<td>/g, "<td style=\"padding-right:14px\">") + "</table>"
