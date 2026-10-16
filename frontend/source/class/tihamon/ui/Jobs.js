@@ -4,8 +4,13 @@
  * Görev başlar başlamaz açılır ve /api/jobs/{id}/events'i kısa aralıkla artımlı okur: her tahta için
  * "bağlanılıyor → bağlandı → çıktı satırları → çıkış kodu" akışı oluştukça görünür (bkz.
  * worker/tihamon/runner). Birden fazla tahta varsa solda tahta listesi (durum simgesiyle) + "Tümü"
- * vardır; seçilen tahtanın ayrıntısı sağdadır. Tek tahtada liste gizlenir. Tahtalar sırayla çalıştığından
- * (bkz. runner/__main__.py) "Tümü" görünümünde bir tahtadan ötekine geçerken aralarına boş satır konur.
+ * vardır; seçilen tahtanın ayrıntısı sağdadır. Tek tahtada liste gizlenir.
+ *
+ * Komut/hazır işlemde tahtalar PARALEL, kaynak yetmezse grup grup çalışır (bkz. runner/__main__.py):
+ * liste duruma göre gruplanır ve renklenir — önce çalışanlar (mavi ▶), sonra sırada bekleyenler
+ * (gri ⏳), en sonda bitenler (yeşil ✓ / kırmızı ✕ / turuncu ⚠); üst satırda sayıları. "Tümü"
+ * görünümünde her satır [tahta] önekli; bir tahta bitmeden araya başkası girebildiğinden boş satırlı
+ * ayraç yalnız önceki tahta bitmişse konur (sıralı görevlerde eskisi gibi tahta tahta okunur).
  */
 qx.Class.define("tihamon.ui.Jobs", {
   type: "static",
@@ -14,6 +19,9 @@ qx.Class.define("tihamon.ui.Jobs", {
     POLL_MS: 700,
 
     STATUS_ICON: { queued: "⏳", running: "▶", ok: "✓", failed: "✕", unreachable: "⚠" },
+    // Listede durum rengi ve grup sırası (çalışan → sırada → biten).
+    STATUS_COLOR: { queued: "#888", running: "#1a73e8", ok: "#2e7d32", failed: "#c5221f", unreachable: "#e37400" },
+    STATUS_RANK: { running: 0, queued: 1 },
 
     // İndirme kuyruğunda iki otomatik indirme arası en az bu kadar beklenir: tarayıcılar art arda hızlı
     // gelen indirmeleri "çoklu indirme" saldırısı sayıp engelleyebiliyor (kullanıcı bildirdi).
@@ -95,6 +103,7 @@ qx.Class.define("tihamon.ui.Jobs", {
       let after = 0;
       let names = new Map();
       let lastAllBoard; // "Tümü" görünümünde en son eklenen tahta — aralara boş satır koymak için
+      const finished = new Set();  // bitiş satırı ("ok"/"fail" olayı) gelmiş tahtalar — ayraç kararı için
       const percent = new Map();   // board_id → son "progress" yüzdesi
       const files = [];            // [{board, name, size, note, url, auto, started}]
       const queue = [];            // otomatik indirilecekler (sırayla, aralıklı)
@@ -198,7 +207,19 @@ qx.Class.define("tihamon.ui.Jobs", {
           }
           const code = t.exit_code === null || t.exit_code === undefined ? "" : ` (${t.exit_code})`;
           const pct = t.status === "running" && percent.has(t.board_id) ? ` — %${percent.get(t.board_id)}` : "";
-          item.setLabel(`${icon[t.status] || "•"} ${t.board}${code}${pct}`);
+          const color = tihamon.ui.Jobs.STATUS_COLOR[t.status] || "inherit";
+          item.setRich(true);
+          item.setLabel(`<span style="color:${color}${t.status === "running" ? ";font-weight:600" : ""}">` +
+            `${icon[t.status] || "•"} ${qx.bom.String.escape(t.board)}${code}${pct}</span>`);
+        });
+        // Grup sırası: çalışanlar üstte, sonra sıradakiler, en altta bitenler (her grupta ad sırası).
+        const rank = st => tihamon.ui.Jobs.STATUS_RANK[st] ?? 2;
+        const order = res.targets.slice().sort((a, b) => rank(a.status) - rank(b.status) || a.board.localeCompare(b.board, "tr"));
+        order.forEach((t, i) => {
+          const item = items.get(t.board_id);
+          if (list.indexOf(item) !== i + 1) {
+            list.addAt(item, i + 1); // 0: "Tümü"
+          }
         });
         // Tek tahtada liste gereksiz: doğrudan o tahtanın ayrıntısı gösterilir.
         const single = res.targets.length <= 1;
@@ -240,8 +261,11 @@ qx.Class.define("tihamon.ui.Jobs", {
           if (!lines.has("all")) {
             lines.set("all", []);
           }
-          if (key !== null && lastAllBoard !== undefined && key !== lastAllBoard) {
-            lines.get("all").push(""); // farklı bir tahtaya geçildi: ayraç boş satır
+          if (key !== null && lastAllBoard !== undefined && key !== lastAllBoard && finished.has(lastAllBoard)) {
+            lines.get("all").push(""); // önceki tahta bitti, sıradakine geçildi: ayraç boş satır
+          }
+          if (key !== null && (ev.kind === "ok" || ev.kind === "fail")) {
+            finished.add(key); // tahtanın son satırı (bkz. runner stream.run: "Bitti"/"Bağlanılamadı")
           }
           if (key !== null) {
             lastAllBoard = key;
@@ -270,9 +294,18 @@ qx.Class.define("tihamon.ui.Jobs", {
           barLabel.setValue(`Toplam: %${total}`);
         }
         const title = qx.bom.String.escape(res.job.title || "");
+        const count = st => res.targets.filter(t => t.status === st).length;
+        const C = tihamon.ui.Jobs.STATUS_COLOR;
+        const failed = count("failed") + count("unreachable");
+        const counts = res.targets.length > 1
+          ? ` — <span style="color:${C.running}">▶ ${count("running")} çalışıyor</span> · ` +
+            `<span style="color:${C.queued}">⏳ ${count("queued")} sırada</span> · ` +
+            `<span style="color:${C.ok}">✓ ${count("ok")} başarılı</span>` +
+            (failed ? ` · <span style="color:${C.failed}">✕ ${failed} başarısız</span>` : "")
+          : "";
         status.setValue(running
-          ? `<b>${title}</b> — ${F.jobStatus(res.job.status)}: ${done}/${res.targets.length} tahta bitti`
-          : `<b>${title}</b> — ${F.jobStatus(res.job.status)}. ${qx.bom.String.escape(res.job.summary || "")}`);
+          ? `<b>${title}</b> — ${F.jobStatus(res.job.status)}: ${done}/${res.targets.length} tahta bitti${counts}`
+          : `<b>${title}</b> — ${F.jobStatus(res.job.status)}. ${qx.bom.String.escape(res.job.summary || "")}${counts}`);
         // Görev bittikten sonra da son olaylar gelsin diye bir tur daha okunur.
         if (running || res.events.length) {
           qx.event.Timer.once(tick, this, tihamon.ui.Jobs.POLL_MS);

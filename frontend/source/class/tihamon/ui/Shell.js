@@ -86,7 +86,7 @@ qx.Class.define("tihamon.ui.Shell", {
     ICON: {
       dashboard: "◈", boards: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
-      info: "ℹ", backup: "⬇", copy: "⧉", cast: "⇪", logout: "⏏", lock: "🔒", diagnose: "⚠", system: "⚒",
+      info: "ℹ", backup: "⬇", copy: "⧉", cast: "⇪", logout: "⏏", lock: "🔒", diagnose: "⚠", system: "⚒", diskusage: "⛁",
       network: "⇆", subnet: "▫"
     },
 
@@ -115,6 +115,8 @@ qx.Class.define("tihamon.ui.Shell", {
       // Tiha-Mon'un kendi bakımı (servisler, zamanlanmış işler, veritabanı, yapılandırma) — yalnız yönetici.
       { id: "system", label: "Sistem", admin: true, retap: true, create: u => new tihamon.page.System(u) },
       // Kullanıcılar ve Ayarlar "Sistem"in altında (kullanıcı isteği).
+      // Disk kullanımı ve veri silme (eski açılır pencere — kullanıcı isteği: Sistem altında sayfa).
+      { id: "diskusage", label: "Disk kullanımı", feature: "logs.manage", parent: "system", retap: true, create: u => new tihamon.page.DiskUsage(u) },
       { id: "users", label: "Kullanıcılar", admin: true, parent: "system", create: u => new tihamon.page.Users(u) },
       // admin/feature yok: herkese açık (kendi tema tercihini herkes değiştirebilir); sayfa içinde
       // sistem ayarları (SSH/Samba/keşif) yalnız admin'e gösterilir — bkz. page.Settings. Sistem
@@ -134,7 +136,7 @@ qx.Class.define("tihamon.ui.Shell", {
     // bu mesajı yayınlar (payload: "system"|"command") — bkz. __openLogsMode.
     OPEN_LOGS_MODE: "tihamon.openLogsMode",
     // {page: "boards"|"metrics"|"system", ...} sayfayı açar, kalan alanları sayfanın openWith()'ine
-    // verir; {diskUsage: "metrics"|"queue"|"backups"|…} ise Disk kullanımı penceresini o sekmede açar.
+    // verir; {diskUsage: "metrics"|"queue"|"backups"|…} ise Disk kullanımı sayfasını o sekmede açar.
     OPEN_PAGE: "tihamon.openPage"
   },
 
@@ -448,12 +450,7 @@ qx.Class.define("tihamon.ui.Shell", {
     /** Bkz. OPEN_PAGE. Ağaçtaki vurgu da açılan sayfaya taşınır (sessizce — çift yenileme olmasın). */
     __openPage(data) {
       if (data.diskUsage) {
-        // Pencere Loglar sayfasının tablo yardımcılarını kullanır; sayfa görünmeden oluşturulur.
-        const logs = tihamon.ui.Shell.PAGES.find(p => p.id === "logs");
-        if (logs && this.__allowed(logs)) {
-          tihamon.ui.DiskUsage.open(this.__widget(logs), data.diskUsage);
-        }
-        return;
+        data = { page: "diskusage", tab: data.diskUsage }; // Disk kullanımı sayfası, o sekmede
       }
       if (data.page === "metrics") {
         data = { ...data, page: "diagnose", tab: "metrics" }; // Sensörler artık Bakım'ın sekmesi

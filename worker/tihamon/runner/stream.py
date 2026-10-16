@@ -25,11 +25,10 @@ _SSH_OPTS = [
 
 class Events:
     """Bir tahtanın (ya da görevin genelinin) olaylarını tamponlayıp topluca job_events'e yazar.
-    Bağlantı bir görevin tüm tahtalarınca paylaşılır — güvenlidir, çünkü tahtalar aynı iş parçacığında
-    SIRAYLA işlenir (bkz. runner/__main__.py), eşzamanlı kullanım hiç olmaz. (Önceden tahtalar
-    ThreadPoolExecutor ile paralel çalıştırılıp bu bağlantı iş parçacıkları arasında eşzamanlı
-    paylaşılıyordu; bu güvenli değildi ve pratikte birden fazla tahta seçilince yalnız biri gerçekten
-    tamamlanıyordu.)"""
+    Bir bağlantı aynı anda yalnız TEK iş parçacığınca kullanılmalıdır: paralel çalışan tahtalar
+    (komut/hazır işlem — bkz. runner/__main__.py) her biri kendi bağlantısıyla kendi Events'ini açar.
+    (Önceden tek bağlantı iş parçacıkları arasında eşzamanlı paylaşılıyordu; bu güvenli değildi ve
+    birden fazla tahta seçilince pratikte yalnız biri gerçekten tamamlanıyordu.)"""
 
     def __init__(self, conn, job_id: int, board_id: int | None):
         self.job_id = job_id

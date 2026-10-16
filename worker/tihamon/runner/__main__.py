@@ -74,7 +74,10 @@ def _run_job(job) -> None:
         general.add("info", f"Görev başladı: {job['title']} — {len(targets)} tahta")
         general.flush()
         activity.record(conn, f"Görev başladı: {job['title']} ({job['username'] or '—'})")
-        conn.execute("UPDATE job_targets SET status = 'running', started_at = now() WHERE job_id = %s", (job["id"],))
+        # Komut/hazır işlemde tahtalar grup grup çalışır: sıra gelene kadar "queued" kalır, her tahta
+        # kendi işi başlarken "running" olur (canlı pencerede çalışan/sırada/biten ayrımı — bkz. ui/Jobs.js).
+        if job["type"] not in ("command", "action"):
+            conn.execute("UPDATE job_targets SET status = 'running', started_at = now() WHERE job_id = %s", (job["id"],))
         results: dict[int, dict] = {}
 
         if job["type"] == "wol":
@@ -98,36 +101,58 @@ def _run_job(job) -> None:
             except tools.ToolError as e:
                 raise RuntimeError(str(e)) from e
 
-            # Tahtalar SIRAYLA işlenir (paralel değil): hepsi aynı `conn`'u (ve onun üzerinden
-            # stream.Events'i) paylaşıyor, eşzamanlı kullanım güvenli değildi — birden fazla tahta
-            # seçilince pratikte yalnız biri gerçekten tamamlanıyordu (kullanıcı bildirdi). Ayrıca
-            # kullanıcı çıktıyı tahta tahta okunaklı görmek istiyor (bkz. frontend ui/Jobs.js'teki
-            # tahtalar arası boş satır).
-            for t in targets:
-                ev = stream.Events(conn, job["id"], t["board_id"])
+            # Tahtalar PARALEL çalışır, aynı anda en çok `n` tahta (kullanıcı isteği): n konteynerin o anki
+            # CPU/RAM boşluğuna göre (whoami.dynamic_concurrency) — kaynak azsa tahtalar grup grup işlenir,
+            # biten tahtanın yerine sıradaki başlar. Her iş parçacığı KENDİ veritabanı bağlantısını açar:
+            # tek bağlantının iş parçacıkları arasında paylaşılması güvenli değildi (eskiden bu yüzden
+            # sıralıydı — birden fazla tahtada yalnız biri tamamlanıyordu). Çıktı tahta başına ayrı tutulur
+            # (job_events.board_id), pencerede tahta seçilerek okunur.
+            action = (job["params"] or {}).get("action") if job["type"] == "action" else None
+
+            def work(t):
+                wconn = db.connect()
                 try:
-                    if not t["ip"]:
-                        ev.add("fail", "Tahtanın IP adresi yok.")
-                        result = {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
-                    else:
-                        result = None
-                        for name, local in prepared.items():
-                            try:
-                                tools.upload(t, user, password, name, local, ev)
-                            except (tools.ToolError, OSError, subprocess.TimeoutExpired) as e:
-                                ev.add("fail", f"{tools.TOOLS[name]['title']} tahtaya kopyalanamadı: {e}")
-                                result = {"status": "unreachable", "rc": None, "output": f"Araç kopyalanamadı: {e}"}
-                                break
-                        if result is None:
-                            result = stream.run(t, user, password, body=body, env=env, timeout=timeout, events=ev)
+                    wconn.execute("UPDATE job_targets SET status = 'running', started_at = now() WHERE job_id = %s AND board_id = %s",
+                                  (job["id"], t["board_id"]))
+                    ev = stream.Events(wconn, job["id"], t["board_id"])
+                    try:
+                        if not t["ip"]:
+                            ev.add("fail", "Tahtanın IP adresi yok.")
+                            result = {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+                        else:
+                            result = None
+                            for name, local in prepared.items():
+                                try:
+                                    tools.upload(t, user, password, name, local, ev)
+                                except (tools.ToolError, OSError, subprocess.TimeoutExpired) as e:
+                                    ev.add("fail", f"{tools.TOOLS[name]['title']} tahtaya kopyalanamadı: {e}")
+                                    result = {"status": "unreachable", "rc": None, "output": f"Araç kopyalanamadı: {e}"}
+                                    break
+                            if result is None:
+                                result = stream.run(t, user, password, body=body, env=env, timeout=timeout, events=ev)
+                    except Exception as e:  # tek tahtanın beklenmedik hatası diğerlerini durdurmasın
+                        log.exception("görev #%s tahta %s", job["id"], t["board_id"])
+                        ev.add("fail", f"Beklenmeyen hata: {e}")
+                        result = {"status": "failed", "rc": None, "output": f"Beklenmeyen hata: {e}"}
+                    finally:
+                        ev.close()
+                    _write_one(wconn, job, t["board_id"], result, names.get(t["board_id"], ""))
+                    # Wi-Fi aç/kapat: grid'in "Wi-Fi" sütunu ve Bilgi kartı yeni durumu hemen göstersin.
+                    if action in hwfacts.WIFI_ACTIONS and result["status"] == "ok":
+                        hwfacts.mark_wifi_radio(wconn, t["board_id"], hwfacts.WIFI_ACTIONS[action])
+                    return result
                 finally:
-                    ev.close()
-                _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
-                results[t["board_id"]] = result
-                # Wi-Fi aç/kapat: grid'in "Wi-Fi" sütunu ve Bilgi kartı yeni durumu hemen göstersin.
-                action = (job["params"] or {}).get("action") if job["type"] == "action" else None
-                if action in hwfacts.WIFI_ACTIONS and result["status"] == "ok":
-                    hwfacts.mark_wifi_radio(conn, t["board_id"], hwfacts.WIFI_ACTIONS[action])
+                    wconn.close()
+
+            n = max(1, min(whoami.dynamic_concurrency(), len(targets)))
+            if len(targets) > 1:
+                general.add("info", f"{len(targets)} tahtada paralel çalışıyor — aynı anda en çok {n} tahta"
+                            + (" (sistem kaynaklarına göre; diğerleri sırada bekler)" if n < len(targets) else ""))
+                general.flush()
+            with ThreadPoolExecutor(max_workers=n) as pool:
+                futures = {pool.submit(work, t): t for t in targets}
+                for future in as_completed(futures):
+                    results[futures[future]["board_id"]] = future.result()
         elif job["type"] == "whoami":
             user, password = _board_access(conn)
             if not password:
@@ -355,7 +380,7 @@ def main() -> None:
             log.warning("%d yarım görev başarısız işaretlendi", n)
         # Eski görev olayları birikmesin (görevin kendisi ve tahta sonuçları kalır).
         conn.execute("DELETE FROM job_events WHERE job_id IN (SELECT id FROM jobs WHERE created_at < now() - interval '30 days')")
-    log.info("görev yürütücüsü hazır (LISTEN tihamon_jobs; %d görev eşzamanlı, görev içindeki tahtalar sırayla)", JOB_THREADS)
+    log.info("görev yürütücüsü hazır (LISTEN tihamon_jobs; %d görev eşzamanlı)", JOB_THREADS)
 
     pool = ThreadPoolExecutor(max_workers=JOB_THREADS)
     while True:

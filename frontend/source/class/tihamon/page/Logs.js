@@ -652,12 +652,11 @@ qx.Class.define("tihamon.page.Logs", {
     },
 
     /**
-     * "Disk kullanımı" penceresi: log türleri, sensör verileri ve görev kuyruğu ayrı sekmelerde;
-     * her birinde tekli/çoklu seçilen kapsamlar kalıcı silinir (bkz. ui.DiskUsage). Yalnız
-     * 'logs.manage' yetkisiyle görünen düğmeden açılır (bkz. __build()).
+     * Sistem ▸ Disk kullanımı sayfasını bu log türünün sekmesinde açar (bkz. page.DiskUsage). Yalnız
+     * 'logs.manage' yetkisiyle görünen düğmeden (bkz. __build()).
      */
     __openDiskUsage() {
-      tihamon.ui.DiskUsage.open(this, this.__mode);
+      qx.event.message.Bus.dispatchByName(tihamon.ui.Shell.OPEN_PAGE, { diskUsage: this.__mode });
     }
   }
 });
