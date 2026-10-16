@@ -62,7 +62,7 @@ RUN sed -i 's|https://|http://|' /etc/apk/repositories \
       python3 py3-psycopg py3-yaml ansible-core openssh-client sshpass fping \
       py3-pip py3-tornado py3-paramiko \
       sshfs openssl \
-      arp-scan nmap nmap-nselibs nmap-scripts \
+      arp-scan nmap nmap-nselibs nmap-scripts samba-client \
  && pip install --no-deps --break-system-packages --no-cache-dir webssh \
  && ln -sf /usr/bin/php84 /usr/bin/php \
  && cp /usr/share/zoneinfo/Europe/Istanbul /etc/localtime \

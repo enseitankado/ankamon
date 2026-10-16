@@ -75,8 +75,11 @@ qx.Class.define("tihamon.page.Network", {
     ];
     this.__model = new tihamon.ui.table.GroupModel(() => this.__apply());
     this.__table = this._createTable(this.__columns, { checkable: true, storageKey: "network.columns", model: this.__model });
-    // Servis (alt) satırları temaya uyumlu farklı zeminle (bkz. ui.table.GroupRowRenderer).
+    // Servis/paylaşım (alt) satırları temaya uyumlu farklı zeminle (bkz. ui.table.GroupRowRenderer).
     this.__table.setDataRowRenderer(new tihamon.ui.table.GroupRowRenderer(row => typeof row[0] !== "number"));
+    // "Durum" sütunu: çevrim içi cihazın soluna küçük yeşil yuvarlak (bkz. ui.table.StatusRenderer).
+    // Sütun indeksi: id + onay kutusu (2) + "exp" (0) + "status" (1) = 3.
+    this.__table.getTableColumnModel().setDataCellRenderer(3, new tihamon.ui.table.StatusRenderer());
     this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply);
     this.__model.addListener("dataChanged", this.__onDataChanged, this);
 
@@ -204,7 +207,7 @@ qx.Class.define("tihamon.page.Network", {
       this.__rows = data.devices.map(d => ({
         device: d,
         cells: [
-          d.id, wasChecked.has(d.id), d.services.length ? "▸" : "",
+          d.id, wasChecked.has(d.id), (d.services.length + (d.shares ? d.shares.length : 0)) ? "▸" : "",
           d.online ? "Çevrim içi" : "Çevrim dışı",
           Ops.deviceName(d), d.ip || "", d.mac, d.vendor || (d.mac && /^.[26ae]/i.test(d.mac) ? "(rastgele MAC)" : ""),
           d.device_type || "", d.model || "", d.hostname || "", d.os_guess || "",
@@ -262,10 +265,19 @@ qx.Class.define("tihamon.page.Network", {
       const blank = this.__columns.map(() => "");
       shown.forEach(row => {
         const d = row.device;
-        const open = this.__expanded.has(d.id) && d.services.length;
-        row.cells[2] = d.services.length ? (open ? "▾" : "▸") : "";
+        const subCount = d.services.length + (d.shares ? d.shares.length : 0);
+        const open = this.__expanded.has(d.id) && subCount;
+        row.cells[2] = subCount ? (open ? "▾" : "▸") : "";
         out.push(row.cells);
         if (open) {
+          // Önce ağ paylaşımları (klasör/yazıcı simgesiyle), sonra açık portlar/servisler.
+          (d.shares || []).forEach(sh => {
+            const cells = [`h:${d.id}:${sh.name}`, false].concat(blank);
+            cells[3] = "paylaşım";
+            cells[4] = `└ ${sh.stype === "printer" ? "🖨" : "📁"} ${sh.path || sh.name}`;
+            cells[9] = sh.comment || "";
+            out.push(cells);
+          });
           d.services.forEach(s => {
             const cells = [`s:${d.id}:${s.proto}/${s.port}`, false].concat(blank);
             cells[3] = "açık";
@@ -292,9 +304,10 @@ qx.Class.define("tihamon.page.Network", {
     },
 
     __toggleAll() {
-      const withServices = [...(this.__devices || new Map()).values()].filter(d => d.services.length);
-      const allOpen = withServices.length && withServices.every(d => this.__expanded.has(d.id));
-      this.__expanded = allOpen ? new Set() : new Set(withServices.map(d => d.id));
+      const withSub = [...(this.__devices || new Map()).values()]
+        .filter(d => d.services.length || (d.shares && d.shares.length));
+      const allOpen = withSub.length && withSub.every(d => this.__expanded.has(d.id));
+      this.__expanded = allOpen ? new Set() : new Set(withSub.map(d => d.id));
       this.__keepChecks(() => this.__apply());
     },
 
@@ -423,13 +436,24 @@ qx.Class.define("tihamon.page.Network", {
       this.__pollState();
     },
 
+    async __scanShares(devices) {
+      await tihamon.ui.network.Ops.scanShares(devices);
+      devices.forEach(d => this.__expanded.add(d.id));
+      this.__pollState();
+    },
+
     __rowMenu(device, devices) {
       const menu = new qx.ui.menu.Menu();
       const ICON = tihamon.ui.Shell.ICON;
       const add = (icon, label, handler) => menu.add(tihamon.ui.BoardOps.menuButton(icon, label, handler));
       const count = devices.length > 1 ? ` (${devices.length} cihaz)` : "";
-      if (device.services.length) {
-        add("▾", this.__expanded.has(device.id) ? "Servisleri gizle" : "Servisleri göster", () => this.__toggle(device.id));
+      if (device.services.length || (device.shares && device.shares.length)) {
+        add("▾", this.__expanded.has(device.id) ? "Ayrıntıları gizle" : "Ayrıntıları göster", () => this.__toggle(device.id));
+      }
+      // NetBIOS/SMB portu açıksa ağ paylaşımlarını tara (ayrı kanal).
+      const smb = device.services.some(s => [139, 445].includes(s.port));
+      if (smb && this._can("network.manage")) {
+        add("📁", "Ağ paylaşımlarını tara" + count, () => this.__scanShares(devices));
       }
       const web = device.services.find(s => s.proto === "tcp" && [80, 443, 8080, 8443].includes(s.port));
       if (web && device.ip) {
