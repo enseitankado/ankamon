@@ -55,6 +55,11 @@ frontend:
       graydient: { description: "Graydient (gri degrade)", css: "$THEMES/graydient.css" }
       darktheme: { description: "Dark (koyu degrade) — koyu kiple kullanın", css: "$THEMES/darktheme.css" }
       bernstein: { description: "Bernstein (koyu amber) — koyu kiple kullanın", css: "$THEMES/bernstein.css" }
+      macos-light: { description: "macOS Açık", css: "$THEMES/macos-light.css" }
+      macos-dark: { description: "macOS Koyu — koyu kiple kullanın", css: "$THEMES/macos-dark.css" }
+      gnome-light: { description: "GNOME Açık (Linux)", css: "$THEMES/gnome-light.css" }
+      gnome-dark: { description: "GNOME Koyu (Linux) — koyu kiple kullanın", css: "$THEMES/gnome-dark.css" }
+      ubuntu: { description: "Ubuntu (Yaru, Linux)", css: "$THEMES/ubuntu.css" }
       filebrowser: { description: "FileBrowser (özgün)", css: "$THEMES/filebrowser.css" }
 auth:
   methods:

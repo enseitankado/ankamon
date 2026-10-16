@@ -24,6 +24,12 @@ qx.Class.define("tihamon.theme.Registry", {
       // bilgisini taşır). Windows tarzı olanlar önce.
       "fluent-light": { theme: tihamon.theme.ThemeFluentLight, label: "Fluent Açık (Windows 11)", fluent: true },
       "fluent-dark": { theme: tihamon.theme.ThemeFluentDark, label: "Fluent Koyu (Windows 11)", fluent: true },
+      // macOS ve Linux görünümleri: hazır qooxdoo teması yok — Fluent'ten renk/yazı tipiyle türetildi (bkz. Derive).
+      "macos-light": { theme: tihamon.theme.ThemeMacLight, label: "macOS Açık", fluent: true },
+      "macos-dark": { theme: tihamon.theme.ThemeMacDark, label: "macOS Koyu", fluent: true },
+      "gnome-light": { theme: tihamon.theme.ThemeGnomeLight, label: "GNOME Açık (Linux)", fluent: true },
+      "gnome-dark": { theme: tihamon.theme.ThemeGnomeDark, label: "GNOME Koyu (Linux)", fluent: true },
+      "ubuntu": { theme: tihamon.theme.ThemeUbuntu, label: "Ubuntu (Yaru, Linux)", fluent: true },
       "silverblue": { theme: tihamon.theme.ThemeSilverBlue, label: "Gümüş Mavi (Windows 7 tarzı)" },
       "graydient": { theme: tihamon.theme.ThemeGraydient, label: "Graydient (gri degrade)" },
       "darktheme": { theme: tihamon.theme.ThemeDark, label: "Dark (koyu degrade)" },

@@ -19,6 +19,7 @@ final class AuthApi
         'qx-classic', 'qx-modern', 'qx-simple', 'qx-indigo', 'qx-indigo-dark',
         'qx-tangible-light', 'qx-tangible-dark',
         'fluent-light', 'fluent-dark', 'silverblue', 'graydient', 'darktheme', 'bernstein',
+        'macos-light', 'macos-dark', 'gnome-light', 'gnome-dark', 'ubuntu',
     ];
 
     public function login(Request $request): array
