@@ -521,7 +521,14 @@ qx.Class.define("tihamon.page.Base", {
     _addColumnFilters(table, columns, onChange) {
       const columnModel = table.getTableColumnModel();
       const offset = table.getUserData("offset") || 1;
+      // Kutular başlık hücresi ÇİZİLİNCE oluşur — gizli sütunun (bkz. sütun gizleme) başlığı hiç
+      // çizilmez. Çağıranlar her sütunun kutusunu okuduğundan (fields[id].getValue()) her sütun için
+      // baştan sayfaya eklenmemiş bir yedek kutu konur; gerçek kutu gelince (sütun gösterilince) yerini
+      // alır ve yedekteki değeri devralır. (Yedeksiz: gizli sütunlu grid'de "reading 'getValue'" hatası.)
       const fields = {};
+      columns.forEach(column => {
+        fields[column.id] = new qx.ui.form.TextField();
+      });
       const renderer = new tihamon.ui.table.FilterHeaderRenderer((col, field) => {
         const column = columns[col - offset];
         if (!column) {
@@ -530,8 +537,13 @@ qx.Class.define("tihamon.page.Base", {
         // İpucu sütun adını tekrarlamaz (etiket hemen üstte); kutunun ne işe yaradığını söyler.
         field.setPlaceholder("Süz…");
         field.setToolTipText((column.hint || column.label) + " sütununda süz");
+        const previous = fields[column.id];
         field.addListener("changeValue", onChange, this);
         fields[column.id] = field;
+        // Yedekte bekleyen değer (ör. Genel bakış kartından "Çevrimiçi") gerçek kutuya geçer ve süzer.
+        if (previous && previous !== field && previous.getValue() && !field.getValue()) {
+          field.setValue(previous.getValue());
+        }
       });
       columns.forEach((column, index) => columnModel.setHeaderCellRenderer(index + offset, renderer));
       // Varsayılan (16) yalnız etiket için; süzgeç kutusu (22 px, bkz. FilterHeaderCell) alt satıra
