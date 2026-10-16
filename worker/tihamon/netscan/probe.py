@@ -171,3 +171,74 @@ def reverse_dns(ip: str) -> str:
     except (OSError, UnicodeError, FutureTimeout):
         return ""
     return "" if name == ip else name  # musl, PTR kaydı yokken adresin kendisini döndürür
+
+
+# ---------------------------------------------------------------- SMB/NetBIOS paylaşımları
+# NT_STATUS_... metninden sonucu çıkarırız. ACCESS_DENIED/LOGON_FAILURE = kimlik gerekiyor,
+# diğerleri (HOST_UNREACHABLE, CONNECTION_REFUSED…) erişilemez.
+_SMB_DENIED = ("ACCESS_DENIED", "LOGON_FAILURE", "ACCOUNT_", "PASSWORD_")
+
+
+def _smb_list(ip, user, password):
+    """smbclient -L çıktısını ayrıştırır. (paylaşımlar, hata) — hata None ise başarılı.
+
+    Kimlik verilmezse anonim (guest). `-g` makine-okunur biçim: her satır 'Tur|Ad|Aciklama'
+    (Tur: Disk | Printer | IPC). IPC$ ve yonetimsel '$' sonlu paylasimlar atlanir (gezilemez).
+    """
+    cmd = ["smbclient", "-g", "-L", "//" + ip, "-t", "8"]
+    if user:
+        cmd += ["-U", user + "%" + (password or "")]
+    else:
+        cmd.append("-N")
+    # smbclient oturum/bağlantı hatalarını (NT_STATUS_...) stderr'e yazar; birleştirilir.
+    try:
+        proc = subprocess.run(_LOW + cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                              text=True, timeout=25)
+        out = proc.stdout
+    except subprocess.TimeoutExpired:
+        return [], "unreachable"
+    except OSError as exc:
+        log.error("smbclient çalıştırılamadı: %s", exc)
+        return [], "error"
+    shares = []
+    error = None
+    for line in out.splitlines():
+        up = line.upper()
+        if "NT_STATUS_" in up:
+            token = up.split("NT_STATUS_", 1)[1].split()[0].rstrip(".")
+            error = "denied" if any(token.startswith(d) for d in _SMB_DENIED) else "unreachable"
+            continue
+        parts = line.split("|")
+        if len(parts) < 2 or parts[0] not in ("Disk", "Printer"):
+            continue
+        name = parts[1].strip()
+        if not name or name.endswith("$"):  # IPC$, ADMIN$, C$ … (yonetimsel/gizli)
+            continue
+        shares.append({"name": name, "stype": "printer" if parts[0] == "Printer" else "disk",
+                       "comment": parts[2].strip() if len(parts) > 2 else ""})
+    if shares:
+        return shares, None
+    return [], error or ("empty" if out else "unreachable")
+
+
+def smb_shares(ip, hostname, creds):
+    """Bir cihazin gezilebilir paylasimlarini bulur. Once anonim; reddedilirse kayitli Samba kimligi.
+
+    creds: (user, password) ya da None. Donus: {shares:[{name, stype, comment, path}], auth}.
+    auth: guest | creds | denied | unreachable | empty | error. path = \\\\<ad>\\<paylasim>.
+    """
+    host = hostname or ip
+    try:
+        shares, error = _smb_list(ip, None, None)
+        auth = "guest"
+        if not shares and error == "denied" and creds and creds[1]:
+            shares, error2 = _smb_list(ip, creds[0], creds[1])
+            auth = "creds" if shares else (error2 or error)
+        elif not shares:
+            auth = error
+    except Exception:
+        log.exception("smbclient hatasi: %s", ip)
+        return {"shares": [], "auth": "error"}
+    for s in shares:
+        s["path"] = "\\\\" + host + "\\" + s["name"]
+    return {"shares": shares, "auth": auth}

@@ -65,10 +65,15 @@ final class NetworkApi
                     extract(epoch FROM d.state_changed_at)::bigint AS state_changed_at,
                     extract(epoch FROM d.services_scanned_at)::bigint AS services_scanned_at,
                     d.services_requested_at IS NOT NULL AS services_requested,
+                    extract(epoch FROM d.shares_scanned_at)::bigint AS shares_scanned_at,
+                    d.shares_requested_at IS NOT NULL AS shares_requested, d.shares_auth,
                     b.id AS board_id, COALESCE(NULLIF(b.label, ''), b.hostname) AS board_name,
                     COALESCE((SELECT json_agg(json_build_object('proto', s.proto, 'port', s.port, 'service', s.service,
                                   'product', s.product, 'version', s.version, 'extra', s.extra) ORDER BY s.port, s.proto)
-                              FROM net_services s WHERE s.device_id = d.id), '[]') AS services
+                              FROM net_services s WHERE s.device_id = d.id), '[]') AS services,
+                    COALESCE((SELECT json_agg(json_build_object('name', sh.name, 'stype', sh.stype,
+                                  'comment', sh.comment, 'path', sh.path) ORDER BY sh.stype, sh.name)
+                              FROM net_shares sh WHERE sh.device_id = d.id), '[]') AS shares
              FROM net_devices d
              JOIN net_networks n ON n.id = d.network_id
              LEFT JOIN boards b ON b.mac = d.mac
@@ -78,6 +83,7 @@ final class NetworkApi
         );
         foreach ($devices as &$device) {
             $device['services'] = json_decode((string) $device['services'], true) ?: [];
+            $device['shares'] = json_decode((string) $device['shares'], true) ?: [];
         }
         unset($device);
         // ETAP faz bilgisi (bkz. migration 018, worker netscan/etap_phase.py); yoksa null.
@@ -175,8 +181,8 @@ final class NetworkApi
     }
 
     /**
-     * Gövde: {} → bütün ağları hemen tara; {services: [cihaz id…]} → bu cihazların servislerini
-     * sıranın başında tara (makine orta yükteyken de; çok yoğunsa yine ertelenir).
+     * Gövde: {} → bütün ağları hemen tara; {services: [id…]} → servisleri; {shares: [id…]} →
+     * ağ paylaşımlarını sıranın başında tara (ayrı kanal). Hepsinde makine çok yoğunsa yine ertelenir.
      */
     public function scan(Request $request, array $user): array
     {
@@ -186,6 +192,12 @@ final class NetworkApi
             Db::exec("SELECT pg_notify('tihamon_netscan', 'services')");
             self::changed();
             Audit::log($user, $request, 'network.scan.services', implode(',', $ids));
+        } elseif ($request->has('shares')) {
+            $ids = self::ids($request->input('shares'));
+            Db::exec('UPDATE net_devices SET shares_requested_at = now() WHERE id = ANY(?::int[])', ['{' . implode(',', $ids) . '}']);
+            Db::exec("SELECT pg_notify('tihamon_netscan', 'shares')");
+            self::changed();
+            Audit::log($user, $request, 'network.scan.shares', implode(',', $ids));
         } else {
             Db::exec("SELECT pg_notify('tihamon_netscan', 'sweep')");
         }

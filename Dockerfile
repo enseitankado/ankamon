@@ -62,7 +62,7 @@ RUN sed -i 's|https://|http://|' /etc/apk/repositories \
       python3 py3-psycopg py3-yaml ansible-core openssh-client sshpass fping \
       py3-pip py3-tornado py3-paramiko \
       sshfs openssl \
-      arp-scan nmap nmap-nselibs nmap-scripts \
+      arp-scan nmap nmap-nselibs nmap-scripts samba-client \
  && pip install --no-deps --break-system-packages --no-cache-dir webssh \
  && ln -sf /usr/bin/php84 /usr/bin/php \
  && cp /usr/share/zoneinfo/Europe/Istanbul /etc/localtime \
@@ -72,6 +72,9 @@ RUN sed -i 's|https://|http://|' /etc/apk/repositories \
 # aynı anda birden çok terminal açması bu olmadan arada bir "Websocket authentication failed" veriyordu.
 COPY docker/rootfs/webssh-race-fix.py /tmp/webssh-race-fix.py
 RUN python3 /tmp/webssh-race-fix.py && rm /tmp/webssh-race-fix.py
+# Web terminal penceresindeki A−/A+ için canlı yazı boyutu (oturumu koparmadan) — bkz. dosyanın açıklaması.
+COPY docker/rootfs/webssh-fontsize-patch.py /tmp/webssh-fontsize-patch.py
+RUN python3 /tmp/webssh-fontsize-patch.py && rm /tmp/webssh-fontsize-patch.py
 # Web terminal oturumlarının açılış/kapanışını webshell_sessions tablosuna yazan kanca (Oturumlar sayfası).
 COPY docker/rootfs/webssh-hook.py /usr/lib/python3.12/site-packages/webssh/tihamon_hook.py
 COPY docker/rootfs/webssh-hook-patch.py /tmp/webssh-hook-patch.py

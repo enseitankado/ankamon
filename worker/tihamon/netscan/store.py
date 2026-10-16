@@ -294,3 +294,67 @@ def service_queue(conn, rescan_hours: int) -> tuple[int, int]:
         (rescan_hours,),
     ).fetchone()
     return row["pending"], row["total"]
+
+
+# ---------------------------------------------------------------- SMB/NetBIOS paylaşımları (ayrı kanal)
+# Aday cihaz: çevrim içi, taranabilir ağda, net_services'te 139 ya da 445 portu AÇIK (NetBIOS/SMB) olan.
+_SHARE_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached"
+               " AND EXISTS (SELECT 1 FROM net_services s WHERE s.device_id = d.id AND s.port IN (139, 445))")
+
+
+def samba_access(conn) -> tuple[str, str]:
+    """Kayıtlı Samba erişimi (settings.samba_access) — guest reddedilen cihazlarda denenir."""
+    row = conn.execute("SELECT value FROM settings WHERE key = 'samba_access'").fetchone()
+    access = (row["value"] if row else None) or {}
+    return access.get("user") or "", access.get("password") or ""
+
+
+def next_shares_target(conn, rescan_hours: int, requested_only: bool) -> dict | None:
+    cond = "d.shares_requested_at IS NOT NULL" if requested_only else (
+        "(d.shares_requested_at IS NOT NULL OR d.shares_scanned_at IS NULL"
+        " OR d.shares_scanned_at < now() - make_interval(hours => %s))")
+    return conn.execute(
+        f"""SELECT d.id, host(d.ip) AS ip, d.mac::text AS mac, d.hostname
+           FROM net_devices d JOIN net_networks n ON n.id = d.network_id
+           WHERE {_SHARE_CAND} AND {cond}
+           ORDER BY d.shares_requested_at DESC NULLS LAST, d.shares_scanned_at NULLS FIRST, d.id
+           LIMIT 1""",
+        () if requested_only else (rescan_hours,),
+    ).fetchone()
+
+
+def shares_queue(conn, rescan_hours: int) -> tuple[int, int]:
+    """(bekleyen, toplam): paylaşım taraması gereken / NetBIOS portu açık tüm çevrim içi cihazlar."""
+    row = conn.execute(
+        f"""SELECT count(*) FILTER (WHERE d.shares_requested_at IS NOT NULL OR d.shares_scanned_at IS NULL
+                                    OR d.shares_scanned_at < now() - make_interval(hours => %s)) AS pending,
+                   count(*) AS total
+            FROM net_devices d JOIN net_networks n ON n.id = d.network_id
+            WHERE {_SHARE_CAND}""",
+        (rescan_hours,),
+    ).fetchone()
+    return row["pending"], row["total"]
+
+
+def apply_shares(conn, dev: dict, result: dict) -> None:
+    """smb_shares() sonucunu yazar: artık görülmeyen paylaşım satırları silinir, auth kaydedilir."""
+    shares = result["shares"]
+    with conn.transaction():
+        conn.execute(
+            "DELETE FROM net_shares WHERE device_id = %s AND NOT (name = ANY(%s))",
+            (dev["id"], [s["name"] for s in shares]),
+        )
+        for s in shares:
+            conn.execute(
+                """INSERT INTO net_shares (device_id, name, stype, comment, path, last_seen_at)
+                   VALUES (%s, %s, %s, %s, %s, now())
+                   ON CONFLICT (device_id, name) DO UPDATE SET stype = EXCLUDED.stype,
+                       comment = EXCLUDED.comment, path = EXCLUDED.path, last_seen_at = now()""",
+                (dev["id"], s["name"], s["stype"], s["comment"], s["path"]),
+            )
+        conn.execute(
+            "UPDATE net_devices SET shares_scanned_at = now(), shares_requested_at = NULL, shares_auth = %s"
+            " WHERE id = %s",
+            (result["auth"], dev["id"]),
+        )
+    bump(conn)

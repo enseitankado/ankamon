@@ -136,6 +136,11 @@ o an kapalı olanlar "Çevrim dışı" olarak kalır. Cihaz kimliği MAC adresid
   okul bilgisi yok) → anakart modeli; `etap_models.json` model → faz/marka/işlemci ve güven düzeyi (kaynaklı /
   veri / çıkarım — elle düzeltilebilir). Önekler ülke çapı ETAP envanterinden `scripts/build-etap-phases.py`
   ile üretilir (envanter depoda değildir); dışarıda bırakılan %20 üzerinde kapsama %99,6, doğruluk %99,9.
+- **Ağ paylaşımları**: NetBIOS/SMB portu (139/445) açık cihazlarda, varlık/servis taramasıyla EŞ ZAMANLI
+  AYRI bir kanal (`_shares_loop`) `smbclient` ile paylaşımları bulur — önce anonim (guest), reddedilirse
+  kayıtlı Samba kimliğiyle (Ayarlar → Samba erişimi). Gezilemeyen `$` sonlu (IPC$, ADMIN$, C$) paylaşımlar
+  atlanır. Cihazın alt ağacında portların yanında klasör/🖨 simgesiyle, `\\ad\paylaşım` yoluyla gösterilir;
+  sağ menü "Ağ paylaşımlarını tara" ile hemen taranır. Ayar: `NETSCAN_SHARES_RESCAN_HOURS` (vars. 24).
 - Yetkiler: `network` (görüntüleme), `network.manage` (ekle/düzenle/sil, ağ adı, tarama).
 - Not: nmap port taraması ağdaki saldırı tespit sistemlerinde uyarı üretebilir; gerekirse ağın sağ tık
   menüsünden taraması kapatılabilir.

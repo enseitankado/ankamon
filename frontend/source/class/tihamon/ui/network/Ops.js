@@ -54,11 +54,23 @@ qx.Class.define("tihamon.ui.network.Ops", {
       }
       const svc = st.service || {};
       const done = svc.total ? svc.total - svc.pending : 0;
+      const segments = [];
       if (svc.phase === "scanning") {
         out.service = `servis taraması: <b>${esc(svc.target)}</b> — ${done}/${svc.total}`;
         out.servicePct = svc.total ? Math.round(100 * done / svc.total) : 0;
       } else if (svc.phase === "deferred" && svc.pending) {
         out.service = `servis taraması bekliyor (${done}/${svc.total}) — ${esc(svc.reason)}`;
+      }
+      // Paylaşım (SMB) kanalı: ayrı çubuk değil, servis metninin yanında.
+      const sh = st.shares || {};
+      const shDone = sh.total ? sh.total - sh.pending : 0;
+      if (sh.phase === "scanning") {
+        segments.push(`paylaşım taraması: <b>${esc(sh.target)}</b> — ${shDone}/${sh.total}`);
+      } else if (sh.phase === "deferred" && sh.pending) {
+        segments.push(`paylaşım taraması bekliyor (${shDone}/${sh.total})`);
+      }
+      if (segments.length) {
+        out.service = [out.service, ...segments].filter(Boolean).join(" · ");
       }
       return out;
     },
@@ -148,6 +160,14 @@ qx.Class.define("tihamon.ui.network.Ops", {
     async scanServices(devices) {
       try {
         await tihamon.io.Api.post("/network/scan", { services: devices.map(d => d.id) });
+      } catch (e) {
+        tihamon.ui.Dialog.error(e);
+      }
+    },
+
+    async scanShares(devices) {
+      try {
+        await tihamon.io.Api.post("/network/scan", { shares: devices.map(d => d.id) });
       } catch (e) {
         tihamon.ui.Dialog.error(e);
       }

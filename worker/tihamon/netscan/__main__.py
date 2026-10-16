@@ -30,10 +30,14 @@ SERVICE_RESCAN_HOURS = int(os.environ.get("NETSCAN_SERVICE_RESCAN_HOURS", "24"))
 TOP_PORTS = int(os.environ.get("NETSCAN_TOP_PORTS", "100"))
 # Servis taramaları arasında makineye nefes aldırılır.
 SERVICE_PAUSE = 5
+# Paylaşım (SMB) taraması servis taramasından hafiftir ama yine kendi aralığıyla yenilenir.
+SHARES_RESCAN_HOURS = int(os.environ.get("NETSCAN_SHARES_RESCAN_HOURS", "24"))
+SHARES_PAUSE = 2
 
 _state_lock = threading.Lock()
 _state: dict = {"phase": "starting"}
 _wake_services = threading.Event()
+_wake_shares = threading.Event()
 # Ana döngünün son yük kararı (load.sample() iki okuma arasındaki farkı ölçtüğünden tek yerden çağrılır).
 _decision: dict = {"busy": True, "reason": "başlıyor", "interval": load.DEFER_SECONDS, "services_ok": False}
 
@@ -83,6 +87,46 @@ def _service_loop() -> None:
             time.sleep(30)
 
 
+def _shares_loop() -> None:
+    """Ayrı kanal: NetBIOS/SMB portu açık cihazların ağ paylaşımlarını (klasör/yazıcı) tek tek bulur.
+
+    Varlık ve servis taramalarıyla EŞ ZAMANLI (kendi iş parçacığı). smbclient ucuz olduğundan yalnız
+    makine çok yoğunken (decision.busy) ertelenir; orta yükte kullanıcının istediği cihazlar, boşta
+    sıradaki herhangi bir aday taranır.
+    """
+    while True:
+        try:
+            with db.connect() as conn:
+                creds = store.samba_access(conn)
+                while True:
+                    decision = _decision
+                    dev = None
+                    if not decision["busy"]:
+                        dev = store.next_shares_target(conn, SHARES_RESCAN_HOURS,
+                                                       requested_only=not decision["services_ok"])
+                    pending, total = store.shares_queue(conn, SHARES_RESCAN_HOURS)
+                    if dev is None:
+                        waiting = pending > 0
+                        _set(conn, shares={"phase": "deferred" if waiting else "idle", "pending": pending,
+                                           "total": total, "target": None,
+                                           "reason": (decision["reason"] or "makine yeterince boş değil") if waiting else ""})
+                        _wake_shares.wait(60)
+                        _wake_shares.clear()
+                        creds = store.samba_access(conn)  # Ayarlar değişmiş olabilir
+                        continue
+                    _set(conn, shares={"phase": "scanning", "pending": pending, "total": total, "target": dev["ip"]})
+                    log.info("paylaşım taraması: %s (%s)", dev["ip"], dev["mac"])
+                    result = probe.smb_shares(dev["ip"], dev["hostname"], creds)
+                    store.apply_shares(conn, dev, result)
+                    log.info("paylaşım taraması bitti: %s — %d paylaşım (%s)", dev["ip"],
+                             len(result["shares"]), result["auth"])
+                    _wake_shares.wait(SHARES_PAUSE)
+                    _wake_shares.clear()
+        except Exception:
+            log.exception("paylaşım tarama döngüsü hatası")
+            time.sleep(30)
+
+
 def _sweep(conn) -> None:
     nets = store.sync_networks(conn, ifaces.networks())
     _set(conn, networks=len(nets))
@@ -122,12 +166,15 @@ def main() -> None:
     log.info("ağ tarayıcısı başladı (aralık %d–%d sn, servis taraması %d saatte bir, ilk %d port)",
              load.MIN_INTERVAL, load.MAX_INTERVAL, SERVICE_RESCAN_HOURS, TOP_PORTS)
     threading.Thread(target=_service_loop, name="services", daemon=True).start()
+    threading.Thread(target=_shares_loop, name="shares", daemon=True).start()
 
     next_sweep = 0.0
     while True:
         forced = "sweep" in requests
         if "services" in requests:
             _wake_services.set()
+        if "shares" in requests:
+            _wake_shares.set()
         requests.clear()
         try:
             with db.connect() as conn:
@@ -135,6 +182,7 @@ def main() -> None:
                 decision = _decision = load.decide(sample)
                 if decision["services_ok"]:
                     _wake_services.set()
+                    _wake_shares.set()
                 now = time.monotonic()
                 if decision["busy"]:
                     next_sweep = max(next_sweep, now + decision["interval"])
