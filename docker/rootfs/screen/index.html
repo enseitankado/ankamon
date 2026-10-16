@@ -149,8 +149,11 @@ const MESSAGES = {
   4001: "Tahta kaydı ya da IP adresi bulunamadı.",
   4002: "Tahtaya SSH ile ulaşılamadı (kapalı ya da ağda değil). Yeniden deneniyor…",
   4003: "SSH girişi reddedildi — Ayarlar'daki SSH kullanıcı/parolasını denetleyin.",
-  4004: "Tahtada x11vnc kurulu değil. Tahtada: apt install x11vnc",
+  4004: "Tahtada ekran istemcisi (x11vnc) kurulu değil. Hazır işlemlerden \"Ekran istemcisini (x11vnc) kur\"u çalıştırın ya da Ayarlar → Tahta erişimi'nde otomatik kurulumu açın.",
   4005: "Ekran paylaşımı başlatılamadı",
+  // Köprü x11vnc yokken kurulumu arka planda başlattı (ayar: "Ekran istemcisini otomatik kur").
+  4006: "İstemci yükleniyor…",
+  4007: "Ekran istemcisi (x11vnc) otomatik kurulamadı — ayrıntı Arka plan işlemleri'nde. Bir süre sonra yeniden denenecek.",
   4029: "Eşzamanlı izleme sınırına ulaşıldı.",
   4030: "Fare/klavye ile müdahale yetkiniz yok (yönetici \"Tahta ekranını uzaktan yönetme\" yetkisini verebilir).",
   4900: "Bağlantı zaman aşımına uğradı. Yeniden deneniyor…"   // istemci tarafı (bkz. Tile.CONNECT_TIMEOUT_MS)
@@ -472,6 +475,19 @@ class Tile {
     if (code === 4030) this.setControl(false, true);   // yetki yok: salt izlemeye dön (yeniden bağlanmadan)
     if (!this.wanted) return;                       // bilerek kapatıldı (görünmüyor / sekme gizli)
     if (code === 4010) { this.connect(); return; }  // tahtada oturum değişti: yeni ekrana hemen bağlan
+    if (code === 4006) {
+      // x11vnc arka planda kuruluyor: hata değil — kısa aralıkla yeniden bağlanılır, kurulum bitince açılır.
+      this.setState("connecting", MESSAGES[4006]);
+      this.timer = setTimeout(() => this.connect(), Tile.INSTALL_POLL_MS);
+      return;
+    }
+    if (code === 4007) {
+      // Son kurulum başarısız: köprü bir süre yeniden kurmaz; seyrek denenir (ağ/depo düzelince kurar).
+      const job = /job (\d+)/.exec(reason || "");
+      this.setState("error", MESSAGES[4007] + (job ? ` (görev #${job[1]})` : ""));
+      this.timer = setTimeout(() => this.connect(), Tile.INSTALL_FAILED_RETRY_MS);
+      return;
+    }
     let text = MESSAGES[code] || "Bağlantı kesildi. Yeniden deneniyor…";
     if (code === 4005 && reason) text += ": " + reason.replace(/[<>&]/g, "");
     if (code === 1006 && !this.el.classList.contains("live")) text = "Bağlantı kurulamadı (yetki ya da sunucu). Yeniden deneniyor…";
@@ -578,6 +594,10 @@ Tile.SWAP_MS = 700;
 // Köprü x11vnc'yi ~2 sn'de başlatır (ssh ConnectTimeout 8 sn, başlatma en çok 30 sn bekler) — bu
 // süre içinde "connect" gelmezse akış takılmış sayılır.
 Tile.CONNECT_TIMEOUT_MS = 40000;
+// x11vnc otomatik kurulurken (4006) yeniden bağlanma aralığı; kurulum bitince önizleme kendiliğinden açılır.
+Tile.INSTALL_POLL_MS = 5000;
+// Otomatik kurulum başarısızsa (4007) seyrek deneme — köprü zaten 10 dk boyunca yeniden kurmaz.
+Tile.INSTALL_FAILED_RETRY_MS = 60000;
 
 function toggleFullscreen(el) {
   if (document.fullscreenElement) document.exitFullscreen();

@@ -1,6 +1,6 @@
 /**
  * Ayarlar: herkese açık "Görünüm" (tema) sekmesi + yalnız yöneticiye görünen "Tahta erişimi"
- * (SSH + Samba) sekmesi. Sayfa herkese açıktır (bkz. ui.Shell.PAGES); admin
+ * (SSH + Samba + ekran istemcisinin otomatik kurulumu) sekmesi. Sayfa herkese açıktır (bkz. ui.Shell.PAGES); admin
  * olmayan kullanıcı yalnız kendi tema tercihini görür (sekme yok, tek bölüm doğrudan), `/settings`
  * admin uç noktasına hiç istek atılmaz. Admin'de bölümler dikey uzamak yerine kategori başına bir
  * sekmede toplanır; "Kaydet" tüm sekmelerdeki formları (hangisi görünür olursa olsun, hepsi DOM'da
@@ -44,6 +44,15 @@ qx.Class.define("tihamon.page.Settings", {
       samba.password("password", "Parola", settings.samba_access.password_set ? "kayıtlı — değiştirmek için yazın" : "henüz girilmedi");
       this.__section(access, "Samba erişimi",
         "TiHA'nın \"Dosya sunucusu\" adımıyla açtığı paylaşımın hesabı. SSH'tan bağımsız olarak saklanır.", samba);
+      // Ekranlar: tahtada x11vnc yoksa "Ekran istemcisini kur" arka planda kendiliğinden çalışsın mı
+      // (bkz. worker/tihamon/screen/__main__.py; kutucukta "İstemci yükleniyor…" görünür).
+      const vncAuto = new qx.ui.form.CheckBox("Ekran istemcisini otomatik kur").set({
+        value: settings.screen_vnc_autoinstall !== false
+      });
+      this.__section(access, "Ekran izleme",
+        "Ekranlar sekmesinde önizleme ve fare/klavye ile müdahale için tahtada x11vnc gerekir. Bu seçenek " +
+        "açıkken, ağda olan ama x11vnc'si kurulu olmayan tahtaya hazır işlemlerdeki \"Ekran istemcisini (x11vnc) " +
+        "kur\" arka planda kendiliğinden uygulanır; kurulum sürerken önizlemede \"İstemci yükleniyor…\" yazar.", vncAuto);
       access.add(new qx.ui.basic.Label(
         `Tahtalar loglarını bu sunucunun <b>${settings.syslog_port}</b> numaralı portuna (TCP ya da UDP) gönderir. ` +
         `Sensör verisi tahtalardan <b>${settings.scrape_interval}</b> aralıkla okunur.`
@@ -57,7 +66,8 @@ qx.Class.define("tihamon.page.Settings", {
         try {
           await tihamon.io.Api.put("/settings", {
             ssh_access: ssh.values(),
-            samba_access: samba.values()
+            samba_access: samba.values(),
+            screen_vnc_autoinstall: vncAuto.getValue()
           });
           tihamon.ui.Dialog.alert("Ayarlar kaydedildi.");
           this.refresh();

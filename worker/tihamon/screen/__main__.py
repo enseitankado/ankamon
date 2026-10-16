@@ -9,7 +9,8 @@ Tek tahta izleme ve müdahale oturumları komut loglarına (source=screen) ve et
 
 Kapanış kodları (tarayıcıdaki /screen/ sayfası bunları Türkçe iletiye çevirir):
   4001 tahta yok/IP'si yok · 4002 SSH ile ulaşılamadı · 4003 SSH girişi reddedildi
-  4004 tahtada x11vnc kurulu değil · 4005 x11vnc hatası
+  4004 tahtada x11vnc kurulu değil (otomatik kurulum kapalı) · 4005 x11vnc hatası
+  4006 x11vnc otomatik kuruluyor ("job <id>") · 4007 otomatik kurulum yakın zamanda başarısız oldu
   4029 eşzamanlı izleme sınırı aşıldı · 4030 müdahale yetkisi yok
 """
 
@@ -21,6 +22,7 @@ import os
 
 import tornado.web
 import tornado.websocket
+from psycopg.types.json import Jsonb
 
 from .. import activity, db
 from ..executor.jobs import _board_access
@@ -70,6 +72,48 @@ def _record(board_id: int, name: str, user: str, control: bool) -> None:
                         "warn" if control else "info")
 
 
+VNC_ACTION = "vnc-install"          # actions/vnc-install — "Ekran istemcisini (x11vnc) kur"
+VNC_RETRY_AFTER_FAIL_MIN = 10       # başarısız otomatik kurulum bu kadar dakika yeniden denenmez
+
+
+def _autoinstall(board_id: int, name: str, username: str) -> tuple[int, str]:
+    """Tahtada x11vnc yok (4004): ayar açıksa kurulumu arka plan görevi olarak başlatır.
+
+    Döner: (4006, "job <id>") kurulum sürüyor/başlatıldı · (4007, "job <id>") son
+    VNC_RETRY_AFTER_FAIL_MIN dakikada başarısız olmuş (sonsuz döngüye girmesin) · (4004, ...) ayar kapalı.
+    Aynı tahtanın onlarca kutucuğu aynı anda buraya gelebilir: görev tahta başına danışma kilidi
+    altında, tek transaction'da açılır — yinelenen kurulum olmaz. Görev olağan "action" görevidir
+    (runner çalıştırır; Görevler/komut loglarında görünür) ama arayüzde çıktı penceresi açılmaz.
+    """
+    with db.connect() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key = 'screen_vnc_autoinstall'").fetchone()
+        if row is not None and row["value"] is False:
+            return 4004, "x11vnc"
+        with conn.transaction():
+            conn.execute("SELECT pg_advisory_xact_lock(hashtext('screen.vnc-install'), %s)", (board_id,))
+            last = conn.execute(
+                """SELECT j.id, t.status, j.finished_at > now() - make_interval(mins => %s) AS recent
+                   FROM jobs j JOIN job_targets t ON t.job_id = j.id
+                   WHERE j.type = 'action' AND j.params->>'action' = %s AND t.board_id = %s
+                   ORDER BY j.id DESC LIMIT 1""",
+                (VNC_RETRY_AFTER_FAIL_MIN, VNC_ACTION, board_id)).fetchone()
+            if last and last["status"] in ("queued", "running"):
+                return 4006, f"job {last['id']}"
+            if last and last["status"] in ("failed", "unreachable") and last["recent"]:
+                return 4007, f"job {last['id']}"
+            user = conn.execute("SELECT id FROM users WHERE username = %s", (username,)).fetchone()
+            job_id = conn.execute(
+                """INSERT INTO jobs (type, title, params, created_by)
+                   VALUES ('action', 'Ekran istemcisini (x11vnc) kur — otomatik', %s, %s) RETURNING id""",
+                (Jsonb({"action": VNC_ACTION, "values": {}, "auto": True}), user["id"] if user else None),
+            ).fetchone()["id"]
+            conn.execute("INSERT INTO job_targets (job_id, board_id) VALUES (%s, %s)", (job_id, board_id))
+            conn.execute("SELECT pg_notify('tihamon_jobs', %s)", (str(job_id),))
+            activity.record(conn, f"Ekranlar: {name} tahtasında x11vnc yok — ekran istemcisi otomatik kuruluyor")
+    log.info("%s: x11vnc yok, otomatik kurulum görevi #%s başlatıldı", name, job_id)
+    return 4006, f"job {job_id}"
+
+
 class ScreenSocket(tornado.websocket.WebSocketHandler):
     proc: asyncio.subprocess.Process | None = None
     counted = False
@@ -117,7 +161,11 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
         if start.returncode != 0 or port is None:
             err_text = err.decode(errors="replace").strip()
             code, reason = self._close_reason(start.returncode or 4, err_text)
-            log.info("%s: ekran paylaşımı başlatılamadı (çıkış %s): %s", board["name"], start.returncode, err_text[-200:])
+            if code == 4004:
+                # Tahta ağda ve SSH çalışıyor ama x11vnc yok: ayara göre arka planda kur (bkz. _autoinstall).
+                code, reason = await asyncio.to_thread(_autoinstall, int(board_id), board["name"], user)
+            else:
+                log.info("%s: ekran paylaşımı başlatılamadı (çıkış %s): %s", board["name"], start.returncode, err_text[-200:])
             self.close(code, reason)
             return
         if self.ws_connection is None:  # tarayıcı bu arada kapattı; x11vnc -timeout ile kendisi biter
