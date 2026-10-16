@@ -220,7 +220,7 @@ final class BoardsApi
     private static function decode(array $board): array
     {
         $board['facts'] = json_decode((string) $board['facts'], true) ?: new \stdClass();
-        // ETAP faz bilgisi (bkz. migration 017, worker netscan/etap_phase.py); yoksa null.
+        // ETAP faz bilgisi (bkz. migration 018, worker netscan/etap_phase.py); yoksa null.
         $board['etap'] = isset($board['etap']) ? json_decode((string) $board['etap'], true) : null;
         return $board;
     }

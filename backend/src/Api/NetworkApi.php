@@ -80,7 +80,7 @@ final class NetworkApi
             $device['services'] = json_decode((string) $device['services'], true) ?: [];
         }
         unset($device);
-        // ETAP faz bilgisi (bkz. migration 017, worker netscan/etap_phase.py); yoksa null.
+        // ETAP faz bilgisi (bkz. migration 018, worker netscan/etap_phase.py); yoksa null.
         $devices = array_map(static fn(array $d) => ['etap' => $d['etap'] === null ? null : json_decode((string) $d['etap'], true)] + $d, $devices);
         return ['devices' => $devices] + $state;
     }
