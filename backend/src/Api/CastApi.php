@@ -32,7 +32,8 @@ final class CastApi
 
         $byIp = [];
         foreach ($sessions as $s) {
-            if (($s['path'] ?? '') !== $stream) {
+            // Yalnız OKUYUCULAR (tahtalar); yayıncının kendi oturumu ("publish", 127.0.0.1) sayılmaz.
+            if (($s['path'] ?? '') !== $stream || ($s['state'] ?? '') !== 'read') {
                 continue;
             }
             // remoteAddr: "192.168.23.160:51234" ya da "[fe80::1]:51234"
