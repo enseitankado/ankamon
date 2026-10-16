@@ -68,6 +68,11 @@
   #usage td.na { color: #667; }
   #usage td.hot { color: #f6a; }
   .usage-title { display: none; font-size: 12px; color: #99a; margin-bottom: -6px; }
+  /* Yayın sırasında tahta ses düzeyi kaydırıcısı (yalnız sesli yansıtmada). */
+  #volrow { display: none; }
+  body.live.sound #volrow { display: flex; }
+  #volslider { flex: 1; max-width: 320px; accent-color: #0067c0; }
+  #volval { min-width: 3.5em; font-variant-numeric: tabular-nums; }
   body.live .usage-title { display: block; }
 </style>
 </head>
@@ -87,12 +92,26 @@
       </select>
     </label>
     <label><input type="checkbox" id="audio"> Ses</label>
+    <label title="Tahtadaki ses çıkışının yansıtma süresince düzeyi; yansıtma bitince her tahta eski düzeyine döner. Sessizdeki tahta da açılır.">Tahta ses düzeyi
+      <select id="volume">
+        <option value="keep">Değiştirme</option>
+        <option value="50">%50</option>
+        <option value="75" selected>%75</option>
+        <option value="100">%100</option>
+      </select>
+    </label>
   </div>
   <div class="row">
     <button id="start">Paylaşmayı başlat</button>
     <button id="switch" class="ghost" disabled>Kaynağı değiştir</button>
     <button id="stop" class="stop" disabled>Durdur</button>
     <span class="stats" id="stats"></span>
+  </div>
+  <div class="row" id="volrow" title="Yansıtılan bütün tahtaların ses düzeyi; bırakınca uygulanır. Yansıtma bitince her tahta eski düzeyine döner.">
+    <label for="volslider">Tahta ses düzeyi</label>
+    <input type="range" id="volslider" min="0" max="100" step="5" value="75">
+    <span id="volval">%75</span>
+    <span class="stats" id="volstate"></span>
   </div>
   <video id="preview" muted playsinline autoplay></video>
   <ul id="boards"></ul>
@@ -183,6 +202,8 @@ function render() {
   $("switch").disabled = !live;
   $("quality").disabled = live;
   $("audio").disabled = live;
+  $("volume").disabled = live || !$("audio").checked;
+  document.body.classList.toggle("sound", live && !!media && media.getAudioTracks().length > 0);
   document.body.classList.toggle("live", live);
 }
 
@@ -324,6 +345,7 @@ async function castTo(targets) {
   try {
     const { id } = await api("POST", "/jobs", {
       type: "cast_start", board_ids: targets.map(b => b.id), stream, audio: media.getAudioTracks().length > 0,
+      volume: startVolume(),
     });
     await pollJob(id, targets, lines =>
       lines.some(l => /koruyucu/.test(l)) ? "Yansıtılıyor (ekran koruyucu kapatıldı)" : "Yansıtılıyor");
@@ -332,6 +354,43 @@ async function castTo(targets) {
     render();
   }
 }
+
+// ---- Tahta ses düzeyi (kullanıcı isteği) ------------------------------------------------------------------
+// Başlarken seçilen düzey (cast_start volume) her tahtanın çıkışına uygulanır; eski düzey tahtada saklanır ve
+// yansıtma bitince geri yüklenir (bkz. worker executor/cast.py). Yayında kaydırıcı → cast_volume görevi.
+function startVolume() {
+  const v = $("volume").value;
+  return v === "keep" ? null : Number(v);
+}
+
+let volJob = 0;
+async function applyVolume(level) {
+  const targets = boards.filter(b => b.state === "ok");
+  if (!targets.length) return;
+  const mine = ++volJob;
+  $("volstate").textContent = "uygulanıyor…";
+  try {
+    const { id } = await api("POST", "/jobs", { type: "cast_volume", board_ids: targets.map(b => b.id), volume: level });
+    for (let i = 0; i < 30 && mine === volJob; i++) {
+      await new Promise(r => setTimeout(r, 700));
+      const { job } = await api("GET", "/jobs/" + id).catch(() => ({ job: null }));
+      if (!job || ["queued", "running"].includes(job.status)) continue;
+      const ok = (job.targets || []).filter(t => t.status === "ok").length;
+      const total = (job.targets || []).length;
+      if (mine === volJob) {
+        $("volstate").textContent = ok === total ? `${total} tahtaya uygulandı` : `${ok}/${total} tahtaya uygulandı`;
+        $("volstate").title = (job.targets || []).filter(t => t.status !== "ok")
+          .map(t => `${boards.find(b => b.id === t.board_id)?.name || t.board_id}: ${String(t.output || "").trim().split("\n").pop()}`).join("\n");
+      }
+      return;
+    }
+  } catch (e) {
+    if (mine === volJob) $("volstate").textContent = "uygulanamadı: " + e.message;
+  }
+}
+$("volslider").addEventListener("input", () => { $("volval").textContent = "%" + $("volslider").value; });
+$("volslider").addEventListener("change", () => applyVolume(Number($("volslider").value)));
+$("audio").addEventListener("change", render);
 
 async function start() {
   showError("");
@@ -359,6 +418,10 @@ async function start() {
     return;
   }
   live = true;
+  // Kaydırıcı başlangıçta seçilen düzeyden başlar ("Değiştirme" seçildiyse %75 — oynatınca uygulanır).
+  $("volslider").value = String(startVolume() ?? 75);
+  $("volval").textContent = "%" + $("volslider").value;
+  $("volstate").textContent = startVolume() === null ? "tahtaların kendi düzeyi" : "";
   setState("● YAYINDA", true);
   startStats();
   startUsage();
@@ -558,15 +621,17 @@ const preset = Object.hasOwn(QUALITY, spec.quality || "");
 if (preset) {
   // Başvurular ÖNCE alınır: replaceChildren kontrolleri (#options içindeki <label>'larla birlikte) DOM'dan
   // çıkarır, sonra $("quality") null dönüyordu → capture() "Cannot read properties of null (reading 'value')".
-  const quality = $("quality"), audio = $("audio");
+  const quality = $("quality"), audio = $("audio"), volume = $("volume");
   quality.value = spec.quality;
   audio.checked = spec.audio !== false;
   const label = quality.selectedOptions[0].textContent;
   $("options").replaceChildren(Object.assign(document.createElement("span"), {
-    className: "note", textContent: `Kalite: ${label} · Ses: ${audio.checked ? "açık" : "kapalı"}`,
+    className: "note",
+    textContent: `Kalite: ${label} · Ses: ${audio.checked ? `açık (tahta ses düzeyi ${volume.selectedOptions[0].textContent})` : "kapalı"}`,
   }));
   // Kontroller gizli olarak sayfaya geri eklenir: capture()/publish()/render() onları okumaya devam eder.
-  document.body.append(Object.assign(quality, { hidden: true }), Object.assign(audio, { hidden: true }));
+  document.body.append(Object.assign(quality, { hidden: true }), Object.assign(audio, { hidden: true }),
+    Object.assign(volume, { hidden: true }));
 }
 render();
 if (preset && boards.some(b => b.state !== "off")) {

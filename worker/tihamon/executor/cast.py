@@ -13,6 +13,12 @@ services/mediamtx.sh); bu modül her tahtada SSH ile etkin X ekranında bir sarm
      sarmalayıcı yeniden bağlanır, art arda 3 kısa denemede vazgeçer ve ekranı eski hâline getirir.
 Tahtada kurulum gerekmez: ETAP 23'te mpv hazır gelir. Ses isteğe bağlıdır (oturum kullanıcısının
 pipewire-pulse soketi üzerinden).
+
+Ses düzeyi (kullanıcı isteği): mpv'nin sesi tahtadaki oturumun varsayılan çıkışının (sink) düzeyiyle
+sınırlıdır ve her tahta farklı düzeyde/sessizde olabilir. Sesli yansıtmada `volume` verilirse çıkışın o
+anki düzeyi + sessiz durumu $DIR/audio'ya kaydedilir (yalnız dosya yoksa — yeniden başlatmada asıl değer
+korunur), çıkış sessizden çıkarılıp o düzeye getirilir; yansıtma bitince (sarmalayıcının restore'u ya da
+cast_stop) kayıtlı değerler geri yüklenir. Yayın sırasında `volume()` (cast_volume görevi) düzeyi değiştirir.
 """
 
 from __future__ import annotations
@@ -25,6 +31,61 @@ import subprocess
 
 RTSP_PORT = int(os.environ.get("CAST_RTSP_PORT", "8554"))
 STREAM_RE = re.compile(r"^c-[A-Za-z0-9]{24,64}$")
+
+VOLUME_MAX = 100
+
+# Kayıtlı ses düzeyini geri yükler ($DIR/audio: soket, çıkış, düzey %, sessiz yes/no). Sarmalayıcının
+# restore()'u ve _STOP kullanır; dosya yoksa hiçbir şey yapmaz.
+_AUDIO_RESTORE = r"""
+if [ -s "$DIR/audio" ]; then
+  { read -r AP; read -r AS; read -r AV; read -r AM; } < "$DIR/audio"
+  if [ -S "$AP" ]; then
+    PULSE_SERVER="unix:$AP" pactl set-sink-volume "$AS" "$AV%" 2>/dev/null
+    [ "$AM" = yes ] && am=1 || am=0
+    PULSE_SERVER="unix:$AP" pactl set-sink-mute "$AS" "$am" 2>/dev/null
+    echo "tahta ses düzeyi geri yüklendi: %$AV$([ "$AM" = yes ] && echo ' (sessiz)')"
+  fi
+  rm -f "$DIR/audio"
+fi
+"""
+
+# Sesli yansıtma başlarken: oturumun varsayılan çıkışını kaydeder (yoksa) ve $VOL'e getirir.
+_AUDIO_SET = r"""
+P="/run/user/$UI/pulse/native"
+if [ "$AUDIO" = 1 ] && [ -n "$VOL" ] && [ -n "$UI" ] && [ -S "$P" ] && command -v pactl >/dev/null 2>&1; then
+  # Ekran kapalıyken (DPMS) HDMI ses çıkışı yok olur, varsayılan sahte "auto_null" kalır (Arge 2'de ölçüldü):
+  # önce ekran uyandırılır, gerçek çıkış gelene dek (en çok ~5 sn) beklenir.
+  DISPLAY="$D" XAUTHORITY="$A" xset dpms force on 2>/dev/null
+  i=0
+  while :; do
+    S=$(PULSE_SERVER="unix:$P" pactl get-default-sink 2>/dev/null)
+    case "$S" in ''|auto_null) ;; *) break ;; esac
+    [ $i -ge 10 ] && break
+    sleep 0.5; i=$((i + 1))
+  done
+  case "$S" in ''|auto_null) echo "Tahtada ses çıkışı bulunamadı — ses düzeyi değiştirilmedi."; S= ;; esac
+  if [ -n "$S" ]; then
+    if [ ! -s "$DIR/audio" ]; then
+      v=$(PULSE_SERVER="unix:$P" pactl get-sink-volume "$S" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d %)
+      m=$(PULSE_SERVER="unix:$P" pactl get-sink-mute "$S" 2>/dev/null | awk '{print $2}')
+      printf '%s\n%s\n%s\n%s\n' "$P" "$S" "${v:-100}" "${m:-no}" > "$DIR/audio"
+    fi
+    { read -r AP; read -r AS; read -r AV; read -r AM; } < "$DIR/audio"
+    PULSE_SERVER="unix:$P" pactl set-sink-mute "$S" 0 2>/dev/null
+    PULSE_SERVER="unix:$P" pactl set-sink-volume "$S" "$VOL%" 2>/dev/null \
+      && echo "Tahta ses düzeyi: %$VOL (önceki: %$AV$([ "$AM" = yes ] && echo ', sessizdeydi'); bitince geri yüklenecek)"
+  fi
+fi
+"""
+
+_VOLUME = r"""
+DIR=/run/tihamon-cast
+[ -s "$DIR/audio" ] || { echo "Bu tahtada sesli yansıtma yok — ses düzeyi değiştirilmedi."; exit 0; }
+{ read -r AP; read -r AS; read -r AV; read -r AM; } < "$DIR/audio"
+[ -S "$AP" ] || { echo "Tahtanın ses sunucusu kapanmış (oturum değişti)." >&2; exit 3; }
+PULSE_SERVER="unix:$AP" pactl set-sink-mute "$AS" 0 2>/dev/null
+PULSE_SERVER="unix:$AP" pactl set-sink-volume "$AS" "$VOL%" && echo "Tahta ses düzeyi: %$VOL"
+"""
 
 _SSH_OPTS = [
     "-T",
@@ -76,6 +137,7 @@ fi
 xset dpms force on 2>/dev/null
 restore() {
   [ "$ss" = 1 ] && as_user cinnamon-screensaver-command -a >/dev/null 2>&1
+__AUDIO_RESTORE__
   rm -f "$DIR/pid"
 }
 snd=--no-audio
@@ -165,6 +227,8 @@ cat > "$DIR/cover.py" <<'TIHAMON_EOF'
 __COVER__
 TIHAMON_EOF
 rm -f "$DIR/pid"
+AUDIO=__AUDIO__; VOL=__VOL__
+__AUDIO_SET__
 sed -i -e "s|__D__|'$D'|" -e "s|__A__|'$A'|" -e "s|__U__|'$U'|" -e "s|__UI__|'$UI'|" "$DIR/run.sh"
 setsid sh "$DIR/run.sh" >"$DIR/log" 2>&1 </dev/null &
 echo "Ekran $D (oturum: ${U:-yok}) — yayın açılıyor…"
@@ -198,6 +262,7 @@ fi
 pkill -f "^sh $DIR/run.sh" 2>/dev/null && stopped=1
 pkill -f "^python3 $DIR/cover.py" 2>/dev/null && stopped=1
 pkill -f "^mpv .*--x11-name=tihamon-cast" 2>/dev/null && stopped=1
+__AUDIO_RESTORE__
 if [ -n "$stopped" ]; then echo "Yansıtma durduruldu."; else echo "Tahtada yansıtma yoktu."; fi
 """
 
@@ -234,18 +299,28 @@ def _ssh(board: dict, user: str, password: str, script: str, timeout: int) -> di
     return {"status": "failed", "rc": proc.returncode, "output": "\n".join(x for x in (out, err) if x)}
 
 
-def start(board: dict, user: str, password: str, stream: str, audio: bool) -> dict:
-    """Tahtada yansıtmayı başlatır; görüntü gerçekten gelene dek (en çok ~12 sn) bekler."""
+def start(board: dict, user: str, password: str, stream: str, audio: bool, volume: int | None = None) -> dict:
+    """Tahtada yansıtmayı başlatır; görüntü gerçekten gelene dek (en çok ~12 sn) bekler.
+    volume: sesli yansıtmada tahta çıkışının geçici düzeyi (0-100); None = tahtanın düzeyine dokunma."""
     if not STREAM_RE.match(stream):
         return {"status": "failed", "rc": None, "output": "Geçersiz yayın adı."}
     if not board.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+    vol = "" if volume is None else str(max(0, min(VOLUME_MAX, int(volume))))
     wrapper = (_WRAPPER.replace("__URL__", shlex.quote(stream_url(board["ip"], stream)))
-               .replace("__AUDIO__", "1" if audio else "0"))
+               .replace("__AUDIO__", "1" if audio else "0")
+               .replace("__AUDIO_RESTORE__", _AUDIO_RESTORE))
     script = (_START.replace("__FIND__", _FIND_DISPLAY).replace("__WRAPPER__", wrapper)
-              .replace("__COVER__", _COVER))
+              .replace("__COVER__", _COVER).replace("__AUDIO_SET__", _AUDIO_SET)
+              .replace("__AUDIO__", "1" if audio else "0").replace("__VOL__", shlex.quote(vol)))
     return _ssh(board, user, password, script, timeout=40)
 
 
 def stop(board: dict, user: str, password: str) -> dict:
-    return _ssh(board, user, password, _STOP, timeout=20)
+    return _ssh(board, user, password, _STOP.replace("__AUDIO_RESTORE__", _AUDIO_RESTORE), timeout=20)
+
+
+def volume(board: dict, user: str, password: str, level: int) -> dict:
+    """Sesli yansıtma sürerken tahta çıkışının düzeyini değiştirir (kayıtlı asıl düzey korunur)."""
+    vol = str(max(0, min(VOLUME_MAX, int(level))))
+    return _ssh(board, user, password, "VOL=" + vol + "\n" + _VOLUME, timeout=15)

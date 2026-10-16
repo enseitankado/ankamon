@@ -294,7 +294,7 @@ def _run_job(job) -> None:
                     ev.close()
                 _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
                 results[t["board_id"]] = result
-        elif job["type"] in ("cast_start", "cast_stop"):
+        elif job["type"] in ("cast_start", "cast_stop", "cast_volume"):
             # "Ekranımı yansıt" (bkz. executor/cast.py): tahtalar bağımsız, PARALEL (login deseni) —
             # yayın bütün sınıflarda aynı anda başlasın. conn yalnız bu iş parçacığında kullanılır.
             params = job["params"] or {}
@@ -303,7 +303,11 @@ def _run_job(job) -> None:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
             if job["type"] == "cast_start":
                 def work(t):
-                    return cast.start(t, user, password, params.get("stream", ""), bool(params.get("audio")))
+                    return cast.start(t, user, password, params.get("stream", ""), bool(params.get("audio")),
+                                      params.get("volume"))
+            elif job["type"] == "cast_volume":
+                def work(t):
+                    return cast.volume(t, user, password, int(params.get("volume", 100)))
             else:
                 def work(t):
                     return cast.stop(t, user, password)

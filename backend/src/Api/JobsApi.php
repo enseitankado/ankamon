@@ -123,6 +123,9 @@ final class JobsApi
             // ekranı MediaMTX'e yollar, sonra seçili tahtalarda oynatıcıyı başlatır / durdurur.
             'cast_start' => $this->castJob($request),
             'cast_stop' => ['cast', 'Yansıtmayı durdur', [], true],
+            // Yansıtma penceresindeki "Tahta ses düzeyi" kaydırıcısı: sesli yansıtma sürerken tahta çıkışının
+            // düzeyi (asıl düzey cast_start'ta kaydedildi, cast_stop geri yükler — bkz. executor/cast.py).
+            'cast_volume' => $this->castVolumeJob($request),
             default => throw ApiError::badRequest('Bilinmeyen görev türü.'),
         };
         if ($type === 'facts') {
@@ -222,7 +225,21 @@ final class JobsApi
             throw ApiError::badRequest('Geçersiz yayın adı.');
         }
         $audio = (bool) $request->input('audio', false);
-        return ['cast', 'Ekranı yansıt' . ($audio ? ' (sesli)' : ''), ['stream' => $stream, 'audio' => $audio], true];
+        // Sesli yansıtmada tahta çıkışının geçici düzeyi (0-100); boş/null = tahtanın düzeyine dokunma.
+        $volume = $request->input('volume');
+        $volume = $audio && $volume !== null && $volume !== '' ? max(0, min(100, (int) $volume)) : null;
+        $title = 'Ekranı yansıt' . ($audio ? ' (sesli' . ($volume !== null ? ", ses %$volume" : '') . ')' : '');
+        return ['cast', $title, ['stream' => $stream, 'audio' => $audio, 'volume' => $volume], true];
+    }
+
+    private function castVolumeJob(Request $request): array
+    {
+        $volume = $request->input('volume');
+        if (!is_numeric($volume)) {
+            throw ApiError::badRequest('Ses düzeyi verilmedi.');
+        }
+        $volume = max(0, min(100, (int) $volume));
+        return ['cast', "Yansıtma ses düzeyi: %$volume", ['volume' => $volume], true];
     }
 
     /** Kullanıcı adı tahtada betiğe gömülür: loginJob ve worker accounts.USERNAME_RE ile AYNI kural. */
