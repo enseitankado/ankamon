@@ -12,6 +12,9 @@ final class Settings
         'ssh_access' => ['user' => 'root', 'password' => ''],
         // Samba: şu an yalnız saklanır; TiHA'nın "Dosya sunucusu" adımıyla aynı hesabı tutmak içindir.
         'samba_access' => ['user' => 'root', 'password' => ''],
+        // Ekranlar: tahtada x11vnc yoksa "Ekran istemcisini kur" (actions/vnc-install) arka planda
+        // kendiliğinden çalıştırılsın mı (bkz. worker/tihamon/screen/__main__.py). Varsayılan: evet.
+        'screen_vnc_autoinstall' => true,
     ];
 
     public static function get(string $key): mixed
