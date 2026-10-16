@@ -17,6 +17,8 @@ final class LoginSessionsApi
 {
     /** Son etkinliği bundan eski oturum "boşta" sayılır (açık sekme alt çubukla saniyede bir istek atar). */
     private const IDLE_MINUTES = 5;
+    /** "Aktif" (sekme görünür + pencere odakta) bildirimi bundan eskiyse sayılmaz (tarayıcı 15 sn'de bir yeniler). */
+    private const FOCUS_STALE_SECONDS = 40;
 
     /** Oturum durumu: active (geçerli), logout / revoked / expired (bitti). */
     private const STATUS = "CASE WHEN ls.ended_at IS NOT NULL THEN ls.end_reason
@@ -63,22 +65,32 @@ final class LoginSessionsApi
      * Alt çubuk: şu an geçerli oturumu olan kullanıcı sayısı (her oturum sahibi görür) + 'logins' yetkisi
      * olana liste. Liste kullanıcı+IP başına TEK satır (aynı tarayıcıdan çıkış yapmadan tekrar tekrar girilince
      * ipucu yüzlerce satıra uzamasın): son giriş, oturum sayısı, son etkinlik; şu an etkin olanlar üstte.
+     *
+     * `?focused=0|1` (alt çubuk gönderir; göç 020): çağıran oturumun Tiha-Mon sekmesi görünür VE tarayıcı
+     * penceresi odakta mı. `active` = gruptaki bir oturum odakta ve bildirimi FOCUS_STALE_SECONDS'tan taze
+     * (sekme kapanınca/ağ gidince bildirim kesilir, kendiliğinden düşer) → ipucunda yeşil "Aktif".
      */
     public function active(Request $request, array $user): array
     {
+        $focused = $request->query('focused');
+        if ($focused !== null && $focused !== '' && !empty($user['login_session_id'])) {
+            Db::exec('UPDATE login_sessions SET focused = ?, focus_at = now() WHERE id = ?',
+                [$focused === '1' ? 't' : 'f', $user['login_session_id']]);
+        }
         $rows = Db::all(
             "SELECT ls.username, max(u.full_name) AS full_name, ls.ip, count(*) AS sessions,
                     (extract(epoch FROM max(ls.started_at)) * 1000)::bigint AS started_ts,
                     (extract(epoch FROM max(ls.last_seen_at)) * 1000)::bigint AS last_seen_ts,
                     max(ls.last_seen_at) < now() - make_interval(mins => ?) AS idle,
+                    bool_or(ls.focused AND ls.focus_at > now() - make_interval(secs => ?)) AS active,
                     bool_or(ls.id = ?) AS mine
              FROM sessions s
              JOIN login_sessions ls ON ls.session_hash = s.id
              LEFT JOIN users u ON u.id = ls.user_id
              WHERE s.expires_at > now()
              GROUP BY ls.username, ls.ip
-             ORDER BY idle, max(ls.last_seen_at) DESC",
-            [self::IDLE_MINUTES, $user['login_session_id'] ?? 0]
+             ORDER BY active DESC, idle, max(ls.last_seen_at) DESC",
+            [self::IDLE_MINUTES, self::FOCUS_STALE_SECONDS, $user['login_session_id'] ?? 0]
         );
         $users = count(array_unique(array_column($rows, 'username')));
         if (!Auth::can($user, 'logins')) {

@@ -103,7 +103,9 @@ qx.Class.define("tihamon.page.Users", {
 
     __edit(target) {
       const isNew = !target;
-      target = target || { is_active: true, features: ["dashboard", "boards", "logs", "metrics"] };
+      // Yeni kullanıcının varsayılan yetkileri (kullanıcı isteği): açma/kapatma/yeniden başlatma ve ekran
+      // yansıtma işaretli; Sensörler (metrics) işaretsiz.
+      target = target || { is_active: true, features: ["dashboard", "boards", "logs", "power", "cast"] };
       // Geniş: özellik etiketleri uzun (bkz. backend/config/features.php); liste aşağıda boyuna göre büyür.
       const rootBounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
       const win = tihamon.ui.Dialog.window(isNew ? "Kullanıcı ekle" : "Kullanıcıyı düzenle: " + target.username,

@@ -90,6 +90,18 @@ qx.Class.define("tihamon.ui.StatusBar", {
     this.__usersTimer.addListener("interval", this.__pollUsers, this);
     this.__pollUsers();
     this.__usersTimer.start();
+
+    // "Aktif" (kullanıcı isteği): sekme görünür + pencere odakta. Olaylar yalnız tetikleyici; durum kısa bir
+    // gecikmeyle document.hasFocus() ile okunur — odak iframe'e (Ekranlar, terminal) geçince pencere "blur"
+    // alır ama hasFocus() iç çerçeveleri de sayar, yanlışlıkla "pasif" bildirilmez. Değişince hemen gönderilir.
+    this.__onFocusChange = () => qx.event.Timer.once(() => {
+      if (!this.isDisposed() && this.__isFocused() !== this.__sentFocused) {
+        this.__pollUsers();
+      }
+    }, this, 50);
+    window.addEventListener("focus", this.__onFocusChange);
+    window.addEventListener("blur", this.__onFocusChange);
+    document.addEventListener("visibilitychange", this.__onFocusChange);
   },
 
   destruct() {
@@ -105,6 +117,11 @@ qx.Class.define("tihamon.ui.StatusBar", {
       this.__usersTimer.stop();
       this.__usersTimer.dispose();
     }
+    if (this.__onFocusChange) {
+      window.removeEventListener("focus", this.__onFocusChange);
+      window.removeEventListener("blur", this.__onFocusChange);
+      document.removeEventListener("visibilitychange", this.__onFocusChange);
+    }
   },
 
   members: {
@@ -115,6 +132,13 @@ qx.Class.define("tihamon.ui.StatusBar", {
     __usersTimer: null,
     __usersLabel: null,
     __usersTip: null,
+    __onFocusChange: null,
+    __sentFocused: null,
+
+    /** Tiha-Mon sekmesi görünür VE tarayıcı penceresi odakta mı (iç çerçevelerdeki odak dahil). */
+    __isFocused() {
+      return document.visibilityState === "visible" && document.hasFocus();
+    },
 
     /**
      * Oturum açmış Tiha-Mon kullanıcıları (/api/login-sessions/active): sayı her oturum sahibine; ipucundaki
@@ -122,8 +146,11 @@ qx.Class.define("tihamon.ui.StatusBar", {
      */
     async __pollUsers() {
       let res;
+      // Her yoklama bu oturumun "görünür + odakta" durumunu da bildirir (bkz. LoginSessionsApi::active).
+      const focused = this.__isFocused();
+      this.__sentFocused = focused;
       try {
-        res = await tihamon.io.Api.get("/login-sessions/active");
+        res = await tihamon.io.Api.get("/login-sessions/active", { focused: focused ? 1 : 0 });
       } catch (e) {
         return; // bir sonraki turda yeniden denenir
       }
@@ -137,17 +164,19 @@ qx.Class.define("tihamon.ui.StatusBar", {
       // Satır = kullanıcı + IP (sunucu gruplar); aynı yerden birden çok açık oturum varsa sayısı yazılır.
       const rows = res.sessions.map(s => {
         const who = esc(s.username) + (s.full_name ? ` <span style="opacity:.7">(${esc(s.full_name)})</span>` : "");
-        const flags = [s.mine ? "siz" : "", s.idle ? "boşta" : "", s.sessions > 1 ? `${s.sessions} oturum` : ""]
+        const flags = [s.mine ? "siz" : "", s.idle && !s.active ? "boşta" : "", s.sessions > 1 ? `${s.sessions} oturum` : ""]
           .filter(Boolean).join(", ");
+        // Aktif = Tiha-Mon o kişinin tarayıcısında görünür sekmede ve pencere odakta (bkz. __isFocused).
+        const state = s.active ? "<span style=\"color:#2e9d4a;font-weight:bold\">Aktif</span>" : "";
         return `<tr><td><b>${who}</b>${flags ? ` <i>${flags}</i>` : ""}</td>` +
           `<td>${F.dateTime(s.started_ts)}</td><td>${esc(s.ip || "")}</td>` +
-          `<td>${s.last_seen_ts ? F.ago(Math.round(s.last_seen_ts / 1000)) : "—"}</td></tr>`;
+          `<td>${s.last_seen_ts ? F.ago(Math.round(s.last_seen_ts / 1000)) : "—"}</td><td>${state}</td></tr>`;
       });
       const th = "style=\"text-align:left;padding-right:14px\"";
       this.__usersTip.setLabel(
         `<b>Oturum açmış Tiha-Mon kullanıcıları: ${res.users}</b> (${res.total} oturum)` +
         `<table style="margin-top:4px;border-spacing:0 2px"><tr><th ${th}>Kullanıcı</th><th ${th}>Son giriş</th>` +
-        `<th ${th}>IP adresi</th><th ${th}>Son etkinlik</th></tr>` +
+        `<th ${th}>IP adresi</th><th ${th}>Son etkinlik</th><th ${th}>Durum</th></tr>` +
         rows.join("").replace(/<td>/g, "<td style=\"padding-right:14px\">") + "</table>"
       );
     },
