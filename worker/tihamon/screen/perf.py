@@ -10,7 +10,10 @@ SSH süreci öldürülür; tahtadaki döngü ilk yazışında SIGPIPE ile kendil
 Mesaj: {"cpus": [[user, nice, sys, other], ...] (yüzde), "cpu": toplam yüzde,
         "mem": {"total", "used", "buffers", "cache"} (KiB), "swap": {"total", "used"} (KiB),
         "load": [1, 5, 15], "tasks": süreç sayısı, "threads": iş parçacığı, "running": çalışan,
-        "uptime": saniye}
+        "uptime": saniye,
+        "cast": {"cpu": makinenin yüzdesi (tüm çekirdekler = 100), "rss": KiB} | null — ekran yansıtma
+                oynatıcısı (mpv --x11-name=tihamon-cast, bkz. executor/cast.py) çalışıyorsa; yansıtma
+                penceresi tahta başına tüketimi göstermek için kullanır (nginx /cast/ws/perf/, yetki "cast")}
 """
 
 from __future__ import annotations
@@ -37,6 +40,8 @@ while :; do
   echo "U $(cat /proc/uptime)"
   set -- /proc/[0-9]*
   echo "P $#"
+  m=$(pgrep -o -f '^mpv .*x11-name=tihamon-cast' 2>/dev/null)
+  [ -n "$m" ] && [ -r /proc/$m/stat ] && echo "M $(cut -d' ' -f14,15,24 /proc/$m/stat)"
   sleep 1
 done
 """
@@ -64,6 +69,9 @@ def _parse(lines: list[str]) -> dict:
             frame["uptime"] = int(float(parts[1]))
         elif key == "P" and len(parts) >= 2:
             frame["tasks"] = int(parts[1])
+        elif key == "M" and len(parts) >= 4:
+            # yansıtma oynatıcısı: utime+stime (tik), rss (sayfa)
+            frame["mpv"] = [int(parts[1]) + int(parts[2]), int(parts[3])]
     return frame
 
 
@@ -100,7 +108,21 @@ def _message(prev: dict, cur: dict) -> dict:
         "threads": cur.get("threads", 0),
         "running": cur.get("running", 0),
         "uptime": cur.get("uptime", 0),
+        "cast": _cast_usage(prev, cur),
     }
+
+
+def _cast_usage(prev: dict, cur: dict) -> dict | None:
+    """Yansıtma oynatıcısının CPU payı (süreç tiki farkı / tüm çekirdeklerin tik farkı) ve RSS'i (KiB)."""
+    if "mpv" not in cur:
+        return None
+    ticks, pages = cur["mpv"]
+    cpu = None
+    if "mpv" in prev and "cpu" in prev["cpu"] and "cpu" in cur["cpu"]:
+        total = sum(cur["cpu"]["cpu"]) - sum(prev["cpu"]["cpu"])
+        if total > 0:
+            cpu = round(100 * max(0, ticks - prev["mpv"][0]) / total, 1)
+    return {"cpu": cpu, "rss": pages * (os.sysconf("SC_PAGE_SIZE") // 1024)}
 
 
 class PerfSocket(tornado.websocket.WebSocketHandler):

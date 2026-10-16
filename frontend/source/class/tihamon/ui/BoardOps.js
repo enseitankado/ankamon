@@ -353,7 +353,7 @@ qx.Class.define("tihamon.ui.BoardOps", {
       // preset {quality, audio}: sağ menüden seçilen ayarlar — sayfa ayar sormaz (bkz. cast/index.html).
       const hash = btoa(unescape(encodeURIComponent(JSON.stringify(Object.assign({ boards: list }, preset || {})))));
       // Göreli adres: HTTP'deysek nginx HTTPS'e yönlendirir, tarayıcı fragmanı (#…) korur.
-      const w = window.open("/cast/#" + hash, "tihamon-cast", "popup,width=560,height=720");
+      const w = window.open("/cast/#" + hash, "tihamon-cast", "popup,width=820,height=760");
       if (!w) {
         tihamon.ui.Dialog.alert("Tarayıcı açılır pencereyi engelledi. Bu site için açılır pencerelere izin verip yeniden deneyin.");
         return;

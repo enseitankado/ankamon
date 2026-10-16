@@ -21,6 +21,8 @@ return [
     ['GET',    '/api/auth/shell',        [Api\AuthApi::class, 'shell'],        'public'],
     ['GET',    '/api/auth/screen',       [Api\AuthApi::class, 'screen'],       'public'],
     ['GET',    '/api/auth/cast',         [Api\AuthApi::class, 'cast'],         'public'],
+    // Yansıtma penceresinin tüketim tablosu: yayını okuyan tahtaların aldığı veri (MediaMTX API'si).
+    ['GET',    '/api/cast/stats',        [Api\CastApi::class, 'stats'],        'cast'],
     ['GET',    '/api/auth/filemanager',  [Api\AuthApi::class, 'filemanager'],  'public'],
 
     ['GET',    '/api/dashboard',         [Api\DashboardApi::class, 'summary'], 'dashboard'],

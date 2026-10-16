@@ -58,6 +58,17 @@
   li.fail .dot { background: #e44; }
   li.off .dot { background: #444; }
   .stats { font-size: 12px; color: #889; }
+  /* Canlı tüketim tablosu (yalnız yayındayken): tahta başına bant genişliği + oynatıcı/tahta CPU-RAM. */
+  #usage { display: none; width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+  body.live #usage { display: table; }
+  #usage th, #usage td { padding: 4px 6px; border-top: 1px solid #222a33; text-align: right; white-space: nowrap; }
+  #usage th { color: #99a; font-weight: 600; border-top: 0; background: #1a212a; }
+  #usage th:first-child, #usage td:first-child { text-align: left; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+  #usage tfoot td { font-weight: 600; border-top: 1px solid #3a4553; }
+  #usage td.na { color: #667; }
+  #usage td.hot { color: #f6a; }
+  .usage-title { display: none; font-size: 12px; color: #99a; margin-bottom: -6px; }
+  body.live .usage-title { display: block; }
 </style>
 </head>
 <body>
@@ -85,6 +96,17 @@
   </div>
   <video id="preview" muted playsinline autoplay></video>
   <ul id="boards"></ul>
+  <div class="usage-title" title="Bant genişliği: sunucunun o tahtaya gönderdiği yayın (MediaMTX). Oynatıcı: tahtadaki mpv sürecinin payı (tahtanın tüm çekirdekleri = %100). Saniyelik.">
+    Canlı tüketim (tahta başına)</div>
+  <table id="usage">
+    <thead><tr>
+      <th>Tahta</th><th title="Sunucunun bu tahtaya gönderdiği yayın hızı">Bant genişliği</th><th title="Yansıtma başından beri">Aktarılan</th>
+      <th title="Tahtadaki oynatıcı (mpv) — tahtanın tüm çekirdeklerine göre">Oynatıcı CPU</th><th>Oynatıcı RAM</th>
+      <th title="Tahtanın toplam işlemci kullanımı">Tahta CPU</th><th title="Tahtada kullanılan / toplam bellek">Tahta RAM</th>
+    </tr></thead>
+    <tbody id="usage-rows"></tbody>
+    <tfoot><tr id="usage-total"></tr></tfoot>
+  </table>
   <div class="note">
     Tahtada görüntü tam ekran açılır, gerekirse ekran uyandırılır ve ekran koruyucu kapatılır; yansıtma bitince
     eski hâline döner. Bu pencereyi kapatmak ya da tarayıcının “Paylaşımı durdur” düğmesi yansıtmayı bitirir.
@@ -111,6 +133,8 @@ let whipUrl = null;     // WHIP oturum adresi (DELETE ile kapatılır)
 let stream = null;      // yayın adı (c-…)
 let live = false;
 let statsTimer = null;
+let usageTimer = null;
+const usage = new Map();   // tahta id → {rx: {bytes, ts, mbps}, perf: son başarım mesajı, ws}
 
 function api(method, path, body) {
   return fetch("/api" + path, {
@@ -337,6 +361,7 @@ async function start() {
   live = true;
   setState("● YAYINDA", true);
   startStats();
+  startUsage();
   await castTo(boards);
 }
 
@@ -371,8 +396,110 @@ function startStats() {
   }, 2000);
 }
 
+// ---- Canlı tüketim tablosu (kullanıcı isteği) -------------------------------------------------------------
+// Bant genişliği: /api/cast/stats (MediaMTX'in tahta başına RTSP oturumu, gönderilen bayt) → iki örnek farkı.
+// CPU/RAM: yansıtılan her tahtaya bir başarım akışı (/cast/ws/perf/<id>, saniyelik; bkz. screen/perf.py "cast").
+const fmt = {
+  mbps: v => v == null ? "—" : `${v.toFixed(v < 10 ? 2 : 1)} Mbit/sn`,
+  bytes: v => v == null ? "—" : v >= 1e9 ? `${(v / 1e9).toFixed(2)} GB` : `${(v / 1e6).toFixed(1)} MB`,
+  pct: v => v == null ? "—" : `%${v.toFixed(1)}`,
+  kib: v => v == null ? "—" : v >= 1048576 ? `${(v / 1048576).toFixed(2)} GB` : `${Math.round(v / 1024)} MB`,
+};
+
+function usageOf(id) {
+  if (!usage.has(id)) usage.set(id, { rx: null, perf: null, ws: null });
+  return usage.get(id);
+}
+
+function openPerf(b) {
+  const u = usageOf(b.id);
+  if (u.ws) return;
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/cast/ws/perf/${b.id}`);
+  u.ws = ws;
+  ws.onmessage = e => { try { u.perf = JSON.parse(e.data); } catch { /* yok say */ } };
+  // Kopunca (tahta yeniden başladı, ağ) bir sonraki turda yeniden açılır.
+  ws.onclose = () => { if (u.ws === ws) { u.ws = null; u.perf = null; } };
+}
+
+function closePerf(id) {
+  const u = usage.get(id);
+  if (u?.ws) { const ws = u.ws; u.ws = null; ws.close(); }
+}
+
+async function pollUsage() {
+  const casting = boards.filter(b => b.state === "ok" || b.state === "busy");
+  boards.forEach(b => (casting.includes(b) ? openPerf(b) : closePerf(b.id)));
+  try {
+    const data = await api("GET", `/cast/stats?stream=${encodeURIComponent(stream)}`);
+    const seen = new Set();
+    for (const r of data.readers || []) {
+      if (r.board_id == null) continue;
+      seen.add(r.board_id);
+      const u = usageOf(r.board_id);
+      const prev = u.rx;
+      const mbps = prev && data.ts > prev.ts && r.bytes_sent >= prev.bytes
+        ? ((r.bytes_sent - prev.bytes) * 8) / ((data.ts - prev.ts) * 1000) : prev?.mbps ?? null;
+      u.rx = { bytes: r.bytes_sent, ts: data.ts, mbps };
+    }
+    usage.forEach((u, id) => { if (!seen.has(id) && u.rx) u.rx = { ...u.rx, mbps: 0 }; });
+  } catch { /* MediaMTX'e ulaşılamadı: bant genişliği sütunu eski değerde kalır */ }
+  renderUsage(casting);
+}
+
+function renderUsage(casting) {
+  const cell = (text, cls = "") => Object.assign(document.createElement("td"), { textContent: text, className: cls });
+  const sum = { mbps: 0, bytes: 0, rss: 0, mpvCpu: [], cpu: [], memUsed: 0, memTotal: 0 };
+  const rows = casting.map(b => {
+    const u = usageOf(b.id);
+    const p = u.perf, c = p?.cast;
+    if (u.rx?.mbps != null) sum.mbps += u.rx.mbps;
+    if (u.rx) sum.bytes += u.rx.bytes;
+    if (c?.rss != null) sum.rss += c.rss;
+    if (c?.cpu != null) sum.mpvCpu.push(c.cpu);
+    if (p) { sum.cpu.push(p.cpu); sum.memUsed += p.mem.used; sum.memTotal += p.mem.total; }
+    const tr = document.createElement("tr");
+    tr.append(
+      Object.assign(cell(b.name), { title: b.name }),
+      cell(fmt.mbps(u.rx?.mbps), u.rx ? "" : "na"),
+      cell(fmt.bytes(u.rx?.bytes), u.rx ? "" : "na"),
+      // Akış var ama oynatıcı yok: tahtada mpv çalışmıyor (henüz başlamadı ya da kapandı).
+      cell(p ? (c ? fmt.pct(c.cpu) : "oynatıcı yok") : "—", c ? (c.cpu > 50 ? "hot" : "") : "na"),
+      cell(c ? fmt.kib(c.rss) : "—", c ? "" : "na"),
+      cell(p ? fmt.pct(p.cpu) : "—", p ? (p.cpu > 85 ? "hot" : "") : "na"),
+      cell(p ? `${Math.round(100 * p.mem.used / (p.mem.total || 1))}% (${fmt.kib(p.mem.used)} / ${fmt.kib(p.mem.total)})` : "—", p ? "" : "na"),
+    );
+    return tr;
+  });
+  $("usage-rows").replaceChildren(...rows);
+  const avg = a => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+  $("usage-total").replaceChildren(
+    cell(`Toplam (${casting.length} tahta)`),
+    cell(fmt.mbps(sum.mbps)), cell(fmt.bytes(sum.bytes)),
+    Object.assign(cell(avg(sum.mpvCpu) == null ? "—" : "ort. " + fmt.pct(avg(sum.mpvCpu))), { title: "Tahtaların ortalaması" }),
+    cell(sum.rss ? fmt.kib(sum.rss) : "—"),
+    Object.assign(cell(avg(sum.cpu) == null ? "—" : "ort. " + fmt.pct(avg(sum.cpu))), { title: "Tahtaların ortalaması" }),
+    cell(sum.memTotal ? `${fmt.kib(sum.memUsed)} / ${fmt.kib(sum.memTotal)}` : "—"),
+  );
+}
+
+function startUsage() {
+  usage.clear();
+  pollUsage();
+  usageTimer = setInterval(pollUsage, 2000);
+}
+
+function stopUsage() {
+  clearInterval(usageTimer);
+  usageTimer = null;
+  usage.forEach((u, id) => closePerf(id));
+  usage.clear();
+  $("usage-rows").replaceChildren();
+  $("usage-total").replaceChildren();
+}
+
 async function teardown() {
   clearInterval(statsTimer);
+  stopUsage();
   $("stats").textContent = "";
   // Önce WHIP oturumu silinir, sonra bağlantı kapanır (tersi olunca MediaMTX oturumu zaten kapatmış
   // oluyor, DELETE 404 dönüyordu). Yanıt beklenmez: en çok 1,5 sn.
