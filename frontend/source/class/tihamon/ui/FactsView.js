@@ -33,6 +33,29 @@ qx.Class.define("tihamon.ui.FactsView", {
     },
 
     /**
+     * RAM metni (Bilgi kartı, Tahtalar grid'i, Ekranlar donanım satırı ortak): TAKILI bellek (SMBIOS,
+     * mem_installed_bytes — "8 GB DDR3"); henüz toplanmamışsa işletim sisteminin gördüğü MemTotal
+     * (~7.2 GB). Takılı değer GiB tam sayıysa ondalıksız yazılır. Tümleşik (paylaşımlı) grafik
+     * RAM'den pay ayırıyorsa (gpu_shared_bytes — bkz. worker executor/hwfacts.py) o da eklenir.
+     * @param withType {Boolean?} bellek türü (DDR3…) ve paylaşımlı ekran belleği — varsayılan evet
+     *   (Tahtalar grid'inin dar RAM sütunu yalnız boyutu ister)
+     */
+    ramText(f, withType = true) {
+      if (f.mem_installed_bytes) {
+        const gib = f.mem_installed_bytes / 1073741824;
+        const size = (Number.isInteger(gib) ? gib : gib.toFixed(1)) + " GB";
+        if (!withType) {
+          return size;
+        }
+        const shared = f.gpu_shared_bytes
+          ? ` (${f.gpu_shared_bytes >= 1073741824 ? (f.gpu_shared_bytes / 1073741824).toFixed(1).replace(/\.0$/, "") + " GB"
+            : Math.round(f.gpu_shared_bytes / 1048576) + " MB"} ekran belleği)` : "";
+        return (f.mem_type ? `${size} ${f.mem_type}` : size) + shared;
+      }
+      return f.mem_total_bytes ? tihamon.util.Format.bytes(f.mem_total_bytes) : "";
+    },
+
+    /**
      * Wi-Fi kartının etkin olup olmadığı — Bilgi kartı ve Tahtalar grid'inin "Wi-Fi" sütunu aynı
      * kuralı kullanır. Etkin = kart var + NetworkManager radyosu açık + rfkill engeli yok (actions/
      * wifi-on, wifi-off radyoyu değiştirir; runner işlemden sonra facts'i günceller).
@@ -159,8 +182,12 @@ qx.Class.define("tihamon.ui.FactsView", {
       }
 
       section("Bellek");
-      row("RAM", f.mem_total_bytes
-        ? join(bytes(f.mem_total_bytes), f.mem_available_bytes ? `kullanılabilir ${bytes(f.mem_available_bytes)}` : null)
+      row("RAM", f.mem_installed_bytes || f.mem_total_bytes
+        ? join(tihamon.ui.FactsView.ramText(f, false) + (f.mem_type ? ` ${f.mem_type}` : "") +
+            (f.mem_speed ? ` ${f.mem_speed}` : "") + (f.mem_modules > 1 ? ` (${f.mem_modules} modül)` : ""),
+          f.gpu_shared_bytes ? `ekran belleği ${bytes(f.gpu_shared_bytes)}` : null,
+          f.mem_installed_bytes && f.mem_total_bytes ? `sistemde ${bytes(f.mem_total_bytes)}` : null,
+          f.mem_available_bytes ? `kullanılabilir ${bytes(f.mem_available_bytes)}` : null)
         : null);
       row("Takas (swap)", f.swap_total_bytes === 0 ? "yok" : bytes(f.swap_total_bytes));
 

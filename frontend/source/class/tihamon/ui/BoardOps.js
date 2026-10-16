@@ -19,12 +19,57 @@ qx.Class.define("tihamon.ui.BoardOps", {
         modal: true,
         showMinimize: false,
         contentPadding: 0,
-        layout: new qx.ui.layout.Grow(),
+        layout: new qx.ui.layout.VBox(),
         width: Math.min(1024, bounds.width - 40),
         height: Math.min(640, bounds.height - 40)
       });
+      // Yazı boyutu (kullanıcı isteği): seçim tarayıcıda kalıcı, açılışta URL'yle (webssh ?fontsize=;
+      // çoklu terminal bölmeleri localStorage'dan okur — bkz. multishell/index.html) uygulanır, sonra
+      // A−/A+ ile CANLI değişir (oturum kopmaz — bkz. docker/rootfs/webssh-fontsize-patch.py).
+      let size = this.__terminalFontSize();
+      if (url.startsWith("/webshell/")) {
+        url += "&fontsize=" + size;
+      }
       const frame = new qx.ui.embed.Iframe(url);
-      win.add(frame);
+      const sizeLabel = new qx.ui.basic.Label(size + " px").set({ alignY: "middle", minWidth: 40, textAlign: "center" });
+      const apply = w => {
+        try {
+          if (w.wssh && w.wssh.set_fontsize) {
+            w.wssh.set_fontsize(size);
+          }
+          for (let i = 0; i < w.frames.length; i++) {
+            apply(w.frames[i]); // çoklu terminal: her bölme ayrı bir webssh iframe'i
+          }
+        } catch (e) {
+          // erişilemeyen çerçeve — atla
+        }
+      };
+      const step = delta => {
+        size = Math.max(8, Math.min(32, size + delta));
+        sizeLabel.setValue(size + " px");
+        try {
+          localStorage.setItem("tihamon.webshell.fontSize", String(size));
+        } catch (e) {
+          // sorun değil — yalnız kalıcılık kaybolur.
+        }
+        const el = frame.getContentElement().getDomElement();
+        if (el && el.contentWindow) {
+          apply(el.contentWindow);
+        }
+      };
+      const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(4).set({ alignY: "middle" })).set({ padding: [3, 8] });
+      bar.add(new qx.ui.basic.Label("Yazı boyutu:").set({ alignY: "middle" }));
+      [["A−", -1, "Yazıyı küçült"], [null], ["A+", 1, "Yazıyı büyüt"]].forEach(([text, delta, tip]) => {
+        if (!text) {
+          bar.add(sizeLabel);
+          return;
+        }
+        const btn = new qx.ui.form.Button(text).set({ padding: [1, 8], toolTipText: tip });
+        btn.addListener("execute", () => step(delta));
+        bar.add(btn);
+      });
+      win.add(bar);
+      win.add(frame, { flex: 1 });
       win.addListener("close", () => {
         frame.setSource("about:blank");
         win.destroy();
@@ -32,6 +77,19 @@ qx.Class.define("tihamon.ui.BoardOps", {
       win.addListenerOnce("appear", () => win.center());
       root.add(win);
       win.open();
+    },
+
+    /** Web terminal yazı boyutu (px): kayıtlı seçim ya da xterm varsayılanı 15. */
+    __terminalFontSize() {
+      try {
+        const v = parseInt(localStorage.getItem("tihamon.webshell.fontSize"), 10);
+        if (v >= 8 && v <= 32) {
+          return v;
+        }
+      } catch (e) {
+        // localStorage erişilemiyor — varsayılana düş.
+      }
+      return 15;
     },
 
     /** @param board {Map} en az {id, label|hostname|ip} */

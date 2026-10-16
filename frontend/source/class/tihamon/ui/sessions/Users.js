@@ -6,7 +6,7 @@
  * süzme ve özetleme tamamen istemcide yapılır.
  *  - Süzgeçler: kullanıcı, tahta, tür (tahta oturumu / web terminal), "yalnız düzgün kapanmayanlar".
  *  - Gruplama: satırlar tahtalar (çubukta kullanıcı adı) ya da kullanıcılar (çubukta tahta).
- *  - Aralık: hazır düğmeler + çizelgede tekerlek/sürükleme; alttaki özet ve tablo HER ZAMAN görünen
+ *  - Aralık: hazır düğmeler + çizelgede tekerlek/sürükleme; özet ve (üstteki) tablo HER ZAMAN görünen
  *    aralığa göre hesaplanır (aralığı taşan oturumların yalnız aralık içindeki süresi sayılır).
  *  - "Satırlar: Tahtalar" görünümünde tahtanın KAPALI olduğu aralıklar satırda gri taralı arka plan
  *    olarak görünür (kurum kapalıyken boşluk ile "kimse oturum açmadı"yı ayırır — bkz. __loadUptime).
@@ -27,7 +27,11 @@ qx.Class.define("tihamon.ui.sessions.Users", {
     this.setLayout(new qx.ui.layout.VBox(6));
     this.setPadding(8);
 
-    const filters = new qx.ui.container.Composite(new qx.ui.layout.Flow(8, 6).set({ alignY: "middle" }));
+    // Süzgeçler ayrı bir bar (kullanıcı isteği): temanın araç çubuğu görünümü — Ekranlar sekmesinin
+    // araç çubuğuyla aynı zemin/kenar; Flow yerleşimi dar pencerede satır kırar.
+    const filters = new qx.ui.container.Composite(new qx.ui.layout.Flow(8, 6).set({ alignY: "middle" })).set({
+      appearance: "toolbar", padding: [6, 10]
+    });
     const labeled = (text, widget) => {
       filters.add(new qx.ui.basic.Label(text).set({ alignY: "middle" }));
       filters.add(widget);
@@ -66,16 +70,20 @@ qx.Class.define("tihamon.ui.sessions.Users", {
       "box-sizing:border-box;border:1px solid;border-radius:2px;vertical-align:-2px;margin:0 4px 0 10px\"></span>";
     const legend = Object.keys(S).map(k => chip("tm-s-" + k) + S[k]).join("") + chip("tm-off") + "Tahta kapalı";
     ranges.add(new qx.ui.basic.Label(legend).set({ rich: true, alignY: "middle", textColor: "app-muted" }));
-    this.add(ranges);
 
     this.__summary = new qx.ui.basic.Label("").set({ rich: true });
-    this.add(this.__summary);
 
+    // Yerleşim (kullanıcı isteği): süzgeç barı → tahta grid'i → aralık düğmeleri + özet + zaman
+    // çizelgesi (aralık düğmeleri çizelgeyi yönettiği için onunla aynı bölümde). Grid ile alt bölüm
+    // arasındaki ayraç sürüklenebilir.
     const split = new qx.ui.splitpane.Pane("vertical");
     this.__timeline = new tihamon.ui.sessions.Timeline();
     this.__timeline.addListener("changeRange", e => this.__summarize(e.getData()));
     this.__timeline.addListener("itemContextmenu", e => this.__itemMenu(e.getData()));
-    split.add(this.__timeline, 3);
+    const lower = new qx.ui.container.Composite(new qx.ui.layout.VBox(6)).set({ paddingTop: 6 });
+    lower.add(ranges);
+    lower.add(this.__summary);
+    lower.add(this.__timeline, { flex: 1 });
 
     this.__columns = [
       { id: "name", label: "Tahta" },
@@ -93,7 +101,9 @@ qx.Class.define("tihamon.ui.sessions.Users", {
       model.setSortMethods(col, (a, b) => (a[raw] - b[raw]) || 0));
     this.__table.addListener("cellDbltap", e => this.__pickRow(e.getRow()));
     this.__table.setToolTipText("Çift tıklayınca o satır süzgece alınır");
+    // SplitPane.add() ÇIPLAK SAYI flex bekler (genel Widget.add'in aksine — bkz. tiha-mon-architecture notu).
     split.add(this.__table, 2);
+    split.add(lower, 3);
     this.add(split, { flex: 1 });
   },
 

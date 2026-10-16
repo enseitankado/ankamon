@@ -152,6 +152,7 @@ qx.Class.define("tihamon.page.Boards", {
     if (this._can("screen")) {
       tabs.add(this.__createScreensPage());
     }
+    this._rememberTab(tabs, "boards"); // son seçili sekme (Liste / Ekranlar — bkz. Base._rememberTab)
     this.add(tabs, { flex: 1 });
 
     // Sayfa açık kalsa bile kendiliğinden tazelenir (bkz. sınıf başı not — worker zinciriyle birlikte).
@@ -275,7 +276,7 @@ qx.Class.define("tihamon.page.Boards", {
             tihamon.page.Boards.sessionText(board),
             (tihamon.ui.FactsView.wifiStatus(board.facts) || { text: "" }).text,
             board.facts.disk_total_bytes ? F.bytes(board.facts.disk_total_bytes) : "",
-            board.facts.mem_total_bytes ? F.bytes(board.facts.mem_total_bytes) : "",
+            board.facts.mem_installed_bytes || board.facts.mem_total_bytes ? tihamon.ui.FactsView.ramText(board.facts, false) : "",
             board.facts.bios_version || "", board.facts.kernel_version || "", board.facts.motherboard_model || "",
             board.facts.cpu_model || "", board.facts.cpu_phys_cores || "",
             F.percent(m.cpu_percent), F.percent(m.mem_percent), F.percent(m.disk_percent),
@@ -364,6 +365,12 @@ qx.Class.define("tihamon.page.Boards", {
           qx.ui.menu.Manager.getInstance().hideAll();
         } else if (e.data.type === "tm-menu") {
           this.__openPreviewMenu(e.data.id, e.data.x, e.data.y, e.data.ids);
+        } else if (e.data.type === "tm-show") {
+          // Kutucuğun ekran alanına çift tıklama = sağ menüdeki "Ekranı göster" (yalnız o tahta).
+          const board = this.__boards.get(e.data.id);
+          if (board && board.online && this._can("screen")) {
+            tihamon.ui.BoardOps.screen([board], this._user);
+          }
         } else if (e.data.type === "tm-reorder") {
           this.__saveScreenOrder(e.data.order || []);
         } else if (e.data.type === "tm-live") {
@@ -593,12 +600,48 @@ qx.Class.define("tihamon.page.Boards", {
         return {
           id: b.id, name: b.label || b.hostname || b.ip || ("#" + b.id), online: !!b.online,
           whoami: whoami.get(b.id) || null,
+          hw: this.__hwSummary(b.facts),
           stats: m ? {
             cpu: m.cpu_percent ?? null, mem: m.mem_percent ?? null, temp: m.cpu_temp ?? m.temp_max ?? null,
             disk_temp: m.disk_temp ?? null, fan: m.fan_rpm ?? null, battery: m.battery_v ?? null
           } : null
         };
       });
+    },
+
+    /**
+     * Ekranlar "Başarım" görünümünün üstündeki donanım satırı: işlemci modeli (çekirdek/iş parçacığı,
+     * en yüksek hız), RAM ve sistem diski — Bilgi kartının topladığı facts'ten (bkz. worker
+     * executor/hwfacts.py); henüz toplanmamışsa null. Örn. "Intel Core i3-4000M · 2 çekirdek / 4 iş
+     * parçacığı @ 2.40 GHz · RAM 7.2 GB · Disk 238.5 GB SSD (SAMSUNG MZ7TE256HMHP-000FH)".
+     */
+    __hwSummary(f) {
+      if (!f || !f.cpu_model) {
+        return null;
+      }
+      const gb = bytes => (bytes / 1073741824).toFixed(1) + " GB";
+      const model = String(f.cpu_model).replace(/\((R|TM|tm)\)/g, "").replace(/\s+@.*$/, "")
+        .replace(/\s+(CPU|APU)\b.*$/, "").replace(/\s+/g, " ").trim();
+      const phys = f.cpu_phys_cores, threads = f.cpu_cores;
+      let cpu = model;
+      if (phys && threads && phys !== threads) {
+        cpu += ` · ${phys} çekirdek / ${threads} iş parçacığı`;
+      } else if (threads || phys) {
+        cpu += ` · ${threads || phys} çekirdek`;
+      }
+      if (f.cpu_max_mhz) {
+        cpu += ` @ ${(f.cpu_max_mhz / 1000).toFixed(2)} GHz`;
+      }
+      const parts = [cpu];
+      // Takılı bellek (SMBIOS) — MemTotal değil: 8 GB modül işletim sisteminde ~7.2 GB görünür.
+      if (f.mem_installed_bytes || f.mem_total_bytes) {
+        parts.push("RAM " + tihamon.ui.FactsView.ramText(f));
+      }
+      if (f.disk_total_bytes) {
+        const kind = f.disk_rotational === 0 ? " SSD" : f.disk_rotational === 1 ? " HDD" : "";
+        parts.push(`Disk ${gb(f.disk_total_bytes)}${kind}` + (f.disk_model ? ` (${f.disk_model})` : ""));
+      }
+      return parts.join(" · ");
     },
 
     __startPreview() {

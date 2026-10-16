@@ -59,9 +59,23 @@ qx.Class.define("tihamon.ui.Shell", {
 
     this.add(new tihamon.ui.StatusBar(), { edge: "south" });
 
-    const first = this.__nodes[0];
-    if (first) {
-      this.__tree.setSelection([first]);
+    // Bilerek yapılan yeniden yüklemeden (ör. Ayarlar'da tema değişimi) sonra aynı sayfaya dönülür
+    // (kullanıcı isteği) — tek seferlik kayıt, okununca silinir; yoksa/izinsizse ağaçtaki ilk sayfa.
+    let reopen = null;
+    try {
+      reopen = sessionStorage.getItem(tihamon.ui.Shell.REOPEN_KEY);
+      sessionStorage.removeItem(tihamon.ui.Shell.REOPEN_KEY);
+    } catch (e) {
+      // sessionStorage erişilemiyor — ilk sayfaya düş.
+    }
+    const reopenPage = reopen && tihamon.ui.Shell.PAGES.find(p => p.id === reopen);
+    if (reopenPage && this.__allowed(reopenPage)) {
+      this.__openPage({ page: reopen });
+    } else {
+      const first = this.__nodes[0];
+      if (first) {
+        this.__tree.setSelection([first]);
+      }
     }
 
     // Tahtalar grid'inin satır menüsündeki "Logları göster" buradan tetiklenir (bkz. page.Boards
@@ -75,6 +89,9 @@ qx.Class.define("tihamon.ui.Shell", {
   },
 
   statics: {
+    /** sessionStorage anahtarı: yeniden yüklemeden sonra açılacak sayfanın kimliği (bkz. construct). */
+    REOPEN_KEY: "tihamon.reopenPage",
+
     // Sol menü genişliği (piksel): varsayılan ve kayıtlı değerin uygulanacağı sınırlar.
     NAV_DEFAULT: 250,
     NAV_MIN: 150,
@@ -102,12 +119,12 @@ qx.Class.define("tihamon.ui.Shell", {
       { id: "boards", label: "Tahtalar", feature: "boards", create: u => new tihamon.page.Boards(u) },
       // parent: ağaçta o sayfanın düğümünün ALTINDA (kullanıcı isteği: tahtalarla ilgili sayfalar
       // "Tahtalar"ın altında). Üst sayfa kullanıcıya kapalıysa kökte gösterilir — bkz. __createTree.
+      { id: "sessions", label: "Oturumlar", feature: "logs", parent: "boards", create: u => new tihamon.page.Sessions(u) },
       // Bakım: "Bakım" (sorun tespiti) + "Sensörler" (Grafana) sekmeleri — bkz. page.Maintenance. features:
       // herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı
       // isteği); eski {page: "metrics"} bağlantıları __openPage'de buraya yönlenir. id "diagnose" kalır
-      // (nav_order / nav.open kayıtları).
+      // (nav_order / nav.open kayıtları). Oturumlar'ın altında (kullanıcı isteği).
       { id: "diagnose", label: "Bakım", features: ["diagnose", "metrics"], parent: "boards", create: u => new tihamon.page.Maintenance(u) },
-      { id: "sessions", label: "Oturumlar", feature: "logs", parent: "boards", create: u => new tihamon.page.Sessions(u) },
       // Loglar Tahtalar'ın altında EN SONDA (kullanıcı isteği).
       { id: "logs", label: "Loglar", feature: "logs", parent: "boards", create: u => new tihamon.page.Logs(u) },
       // Ağ envanteri: altında sunucunun bağlı olduğu fiziksel ağlar (dinamik, bkz. __fillNetworks).

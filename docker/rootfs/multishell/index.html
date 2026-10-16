@@ -62,6 +62,11 @@
     p.set("username", c.username);
     p.set("password", c.password);
     p.set("title", c.title || c.hostname);
+    // Yazı boyutu: web terminal penceresinin A−/A+ seçimi (bkz. ui/BoardOps.js __terminalWindow).
+    try {
+      var fs = parseInt(localStorage.getItem("tihamon.webshell.fontSize"), 10);
+      if (fs) p.set("fontsize", fs);
+    } catch (e) { /* localStorage yok: webssh varsayılanı */ }
     return "/webshell/?" + p.toString();
   }
 

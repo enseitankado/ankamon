@@ -104,7 +104,10 @@ qx.Class.define("tihamon.page.Users", {
     __edit(target) {
       const isNew = !target;
       target = target || { is_active: true, features: ["dashboard", "boards", "logs", "metrics"] };
-      const win = tihamon.ui.Dialog.window(isNew ? "Kullanıcı ekle" : "Kullanıcıyı düzenle: " + target.username, 480);
+      // Geniş: özellik etiketleri uzun (bkz. backend/config/features.php); liste aşağıda boyuna göre büyür.
+      const rootBounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
+      const win = tihamon.ui.Dialog.window(isNew ? "Kullanıcı ekle" : "Kullanıcıyı düzenle: " + target.username,
+        Math.min(900, rootBounds.width - 40));
       const form = new tihamon.ui.Form();
       if (isNew) {
         form.text("username", "Kullanıcı adı");
@@ -155,8 +158,19 @@ qx.Class.define("tihamon.page.Users", {
         });
         boxes.forEach(box => box.addListener("changeValue", sync));
         sync();
-        const scroll = new qx.ui.container.Scroll(list).set({ maxHeight: 360 });
-        win.add(scroll);
+        // Liste tamamı görünecek yükseklikte (kullanıcı isteği); pencere ekrana sığmazsa — kalan yer kadar —
+        // kaydırılır. Scroll kendiliğinden içeriği kadar büyümez ve uzun etiketler satır kaydırdığından boyut
+        // ipucu gerçek boyu vermez: pencere göründükten sonra listenin GERÇEK yüksekliği ölçülüp uygulanır.
+        const scroll = new qx.ui.container.Scroll(list).set({ height: 200 });
+        win.addListenerOnce("appear", () => qx.event.Timer.once(() => {
+          const listHeight = (list.getBounds() || {}).height || 0;
+          const winHeight = (win.getBounds() || {}).height || 0;
+          const rest = winHeight - ((scroll.getBounds() || {}).height || 0); // form + düğmeler + çerçeve
+          scroll.setHeight(Math.max(160, Math.min(listHeight + 4, rootBounds.height - 24 - rest)));
+          qx.ui.core.queue.Manager.flush();
+          win.center();
+        }, this, 0));
+        win.add(scroll, { flex: 1 });
       }
 
       const cancel = new qx.ui.form.Button("Vazgeç");

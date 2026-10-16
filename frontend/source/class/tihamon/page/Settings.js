@@ -49,6 +49,7 @@ qx.Class.define("tihamon.page.Settings", {
         `Sensör verisi tahtalardan <b>${settings.scrape_interval}</b> aralıkla okunur.`
       ).set({ rich: true, wrap: true, textColor: "app-muted" }));
       tabs.add(access);
+      this._rememberTab(tabs, "settings"); // sekmeler her yüklemede yeniden kurulur; son seçili geri gelir
 
       this.__body.add(tabs, { flex: 1 });
 
@@ -98,7 +99,13 @@ qx.Class.define("tihamon.page.Settings", {
         // widget'ları) canlı tema değişiminde boyanmıyor — eski temanın renginde TAKILI kalıyor
         // (çerçevenin kendi bir eksiği/hatası; ölçüldü: iki ayrı tahta/loglar gibi tüm grid'lerde aynı).
         // Açılışta (Application.js tema sayfa oluşturulmadan ÖNCE uygulanıyor) sorun yok — bu yüzden
-        // en güvenilir düzeltme, canlı DOM güncellemesi yerine sayfayı yeniden yüklemek.
+        // en güvenilir düzeltme, canlı DOM güncellemesi yerine sayfayı yeniden yüklemek. Yüklenince
+        // Genel bakış'a değil yine Ayarlar'a dönülür (kullanıcı isteği; bkz. Shell.REOPEN_KEY).
+        try {
+          sessionStorage.setItem(tihamon.ui.Shell.REOPEN_KEY, "settings");
+        } catch (storageErr) {
+          // sessionStorage yoksa yalnız ilk sayfa açılır — tema yine uygulanır.
+        }
         window.location.reload();
       });
       form.add(box);

@@ -127,6 +127,10 @@
   .tile .perf .k { color: #58a6ff; }
   .tile .perf .hi { color: #f85149; font-weight: 600; }
   .tile .perf .wait { grid-column: 1 / -1; opacity: .7; }
+  /* Donanım satırı (işlemci/RAM/disk — Boards.js __hwSummary): göstergelerin üstünde, en çok 2 satır. */
+  /* Alt iç boşluk YOK: overflow iç boşluğu kırpmaz, 3. satırın üst kenarı orada görünürdü. */
+  .tile .perf .hw { grid-column: 1 / -1; margin-bottom: .45em; border-bottom: 1px solid #3a4250;
+    color: #d2a8ff; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
   #empty { margin: 40px; color: #888; }
   .tile .title button.ctl.on { color: #fff; background: #c62828; border-radius: 3px; }
 </style>
@@ -211,9 +215,27 @@ class Tile {
     const ctl = this.el.querySelector("button.ctl");
     if (ctl) ctl.addEventListener("click", () => this.setControl(!this.control));
     // Müdahale kipinde çift tıklama tahtaya gider; tam ekran yalnız ⛶ düğmesiyle.
-    this.el.addEventListener("dblclick", () => {
-      if (!this.control) toggleFullscreen(single ? document.documentElement : this.el);
+    // Gömülü kipte (Ekranlar sekmesi) ekran alanına çift tıklama sağ menüdeki "Ekranı göster" ile aynı
+    // işi yapar (kullanıcı isteği; üst sayfa açar — bkz. Boards.js "tm-show"); başlık çubuğuna çift
+    // tıklama ve tam ekrandayken çift tıklama tam ekranı aç/kapatır. Ekran alanındaki çift tıklama
+    // tarayıcının "dblclick"i ile YAKALANAMAZ: noVNC tuvalde basılınca bütün sayfayı kaplayan bir
+    // yakalama katmanı açıyor, "dblclick" kutucuğa değil BODY'ye düşüyor (ölçüldü) — bu yüzden aşağıdaki
+    // yakalama aşamasındaki pointerdown'dan (400 ms içinde iki basış) algılanır.
+    const viewDouble = e => embed && !document.fullscreenElement && e.target.closest(".view");
+    this.el.addEventListener("dblclick", e => {
+      if (this.control || viewDouble(e)) return;
+      toggleFullscreen(single ? document.documentElement : this.el);
     });
+    this.el.addEventListener("pointerdown", e => {
+      if (e.button !== 0 || this.control || !viewDouble(e) || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const now = Date.now();
+      if (now - (this.viewDownAt || 0) < 400) {
+        this.viewDownAt = 0;
+        window.parent.postMessage({ type: "tm-show", id: this.board.id }, location.origin);
+      } else {
+        this.viewDownAt = now;
+      }
+    }, true);
     // Gömülü kipte sağ tık, Tahtalar grid'inin satır menüsüyle AYNI menüyü açar: menü üst sayfada
     // (qooxdoo, Boards.__rowMenu) kurulur — burada yalnız tahta kimliği, o anki çoklu seçim ve konum
     // iletilir (bkz. Boards.__openPreviewMenu). Müdahale kipinde sağ tık tahtaya gider.
@@ -528,7 +550,7 @@ class Tile {
 
   /** htop'un üst panelleri (bkz. perf.py mesajı); sayılar KiB, yüzde ve saniye. */
   renderPerf(p) {
-    const esc = s => String(s).replace(/[<>&]/g, "");
+    const esc = s => String(s).replace(/[<>&"]/g, "");
     const size = kib => kib >= 1048576 ? (kib / 1048576).toFixed(2) + "G" : Math.round(kib / 1024) + "M";
     const seg = (cls, pct) => pct > 0 ? `<i class="${cls}" style="width:${Math.min(100, pct)}%"></i>` : "";
     const row = (lbl, bar, v) => `<div class="row"><span class="lbl">${lbl}</span><span class="bar">${bar}</span><span class="v">${v}</span></div>`;
@@ -548,8 +570,9 @@ class Tile {
       `<div class="row"><span class="k">Çalışan:</span> ${esc(p.running)}</div>` +
       `<div class="row"><span class="k">Yük ort.:</span> ${p.load.map(v => Number(v).toFixed(2)).join(" ")}</div>` +
       `<div class="row"><span class="k">Çalışma:</span> ${d ? d + " gün, " : ""}${hms}</div>`;
-    this.perfIn.style.setProperty("--rows", Math.max(p.cpus.length + 2, 4));
-    this.perfIn.innerHTML = `<div class="l">${cpus}${mem}${swp}</div><div class="r">${right}</div>`;
+    const hw = this.board.hw ? `<div class="hw" title="${esc(this.board.hw)}">${esc(this.board.hw)}</div>` : "";
+    this.perfIn.style.setProperty("--rows", Math.max(p.cpus.length + 2, 4) + (hw ? 2 : 0));
+    this.perfIn.innerHTML = `${hw}<div class="l">${cpus}${mem}${swp}</div><div class="r">${right}</div>`;
   }
 
   /**

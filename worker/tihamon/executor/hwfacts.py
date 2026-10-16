@@ -35,6 +35,37 @@ lsblk -d -n -o NAME,ROTA,TRAN,MODEL -e 1,2,7,11 2>/dev/null | awk '$1 !~ /^zram/
 df -B1 -P / 2>/dev/null | awk 'NR==2{printf "ROOT_TOTAL=%.0f\nROOT_USED=%.0f\nROOT_FREE=%.0f\n", $2, $3, $4}'
 awk '/^MemTotal/{printf "MEM_TOTAL=%.0f\n", $2*1024} /^MemAvailable/{printf "MEM_AVAILABLE=%.0f\n", $2*1024}
      /^SwapTotal/{printf "SWAP_TOTAL=%.0f\n", $2*1024}' /proc/meminfo
+# Takılı bellek (SMBIOS tür 17): MemTotal, çekirdek/firmware/tümleşik grafiğin ayırdığı kısım düşülmüş
+# hâlidir (8 GB modülde ~7.2 GB) — kullanıcıya "8 GB" görünmeli. Boş yuvalar ("No Module Installed")
+# sayılmaz; eski dmidecode "8192 MB", yenisi "8 GB" yazar.
+dmidecode -t 17 2>/dev/null | awk -F': ' '
+    /^\tSize: [0-9]+ (MB|GB|TB)/ { split($2, a, " "); s += (a[2] == "TB" ? a[1] * 1048576 : a[2] == "GB" ? a[1] * 1024 : a[1]); n++ }
+    /^\tType: / && $2 != "Unknown" && $2 != "Other" && t == "" { t = $2 }
+    /^\tConfigured (Memory|Clock) Speed: [0-9]/ && cs == "" { cs = $2 }
+    /^\tSpeed: [0-9]/ && sp == "" { sp = $2 }
+    END { if (s) { printf "MEM_INSTALLED=%.0f\nMEM_MODULES=%d\n", s * 1048576, n
+                   if (t != "") print "MEM_TYPE=" t
+                   if (cs != "" || sp != "") print "MEM_SPEED=" (cs != "" ? cs : sp) } }'
+# Paylaşımlı ekran belleği: yalnız TÜMLEŞİK grafikte (PCI veriyolu 00 — ayrı kart 01+ ve kendi belleği
+# var) takılı RAM'den ayrılan kısım. Intel (i915): /proc/iomem "Graphics Stolen Memory" aralığı;
+# AMD amdgpu: sysfs mem_info_vram_total; radeon: açılış iletisi "radeon: 512M of VRAM memory ready".
+gpu_slot=$(lspci -D 2>/dev/null | awk '/VGA|Display|3D controller/ {print $1; exit}')
+case "$gpu_slot" in
+0000:00:*)
+    r=$(grep -m1 "Graphics Stolen Memory" /proc/iomem 2>/dev/null | awk '{print $1}')
+    v=""
+    if [ -n "$r" ]; then
+        v=$((0x${r#*-} - 0x${r%-*} + 1))
+    else
+        v=$(cat /sys/class/drm/card[0-9]/device/mem_info_vram_total 2>/dev/null | head -1)
+        if [ -z "$v" ]; then
+            m=$( { dmesg 2>/dev/null; journalctl -k -b -o cat 2>/dev/null; } | sed -n 's/.*\(radeon\|amdgpu\): \([0-9][0-9]*\)M of VRAM memory ready.*/\2/p' | head -1)
+            [ -n "$m" ] && v=$((m * 1048576))
+        fi
+    fi
+    [ -n "$v" ] && [ "$v" -gt 0 ] && echo "GPU_SHARED_MEM=$v"
+    ;;
+esac
 echo "BIOS_VERSION=$(cat /sys/class/dmi/id/bios_version 2>/dev/null)"
 echo "BIOS_DATE=$(cat /sys/class/dmi/id/bios_date 2>/dev/null)"
 echo "KERNEL_VERSION=$(uname -r)"
@@ -112,6 +143,11 @@ _FIELDS = {
     "ROOT_FREE": "root_free_bytes",
     "MEM_TOTAL": "mem_total_bytes",
     "MEM_AVAILABLE": "mem_available_bytes",
+    "MEM_INSTALLED": "mem_installed_bytes",
+    "MEM_MODULES": "mem_modules",
+    "MEM_TYPE": "mem_type",
+    "MEM_SPEED": "mem_speed",
+    "GPU_SHARED_MEM": "gpu_shared_bytes",
     "SWAP_TOTAL": "swap_total_bytes",
     "BIOS_VERSION": "bios_version",
     "BIOS_DATE": "bios_date",
@@ -156,6 +192,7 @@ _FIELDS = {
 # _ZERO_OK'takiler için 0 geçerli bir değerdir, diğerlerinde 0 "okunamadı" (None) sayılır.
 _NUMERIC_FIELDS = {
     "disk_total_bytes", "root_total_bytes", "root_used_bytes", "root_free_bytes", "mem_total_bytes",
+    "mem_installed_bytes", "mem_modules", "gpu_shared_bytes",
     "mem_available_bytes", "swap_total_bytes", "uptime_seconds", "cpu_cores", "cpu_phys_cores",
     "cpu_max_mhz", "cpu_temp_c", "eth_speed_mbps", "wifi_signal", "wifi_visible", "disk_rotational",
 }
