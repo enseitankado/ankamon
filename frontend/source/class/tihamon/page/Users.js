@@ -1,39 +1,81 @@
-/** Kullanıcı yönetimi (yalnız yönetici): hesaplar ve hangi özellikleri kullanabilecekleri. */
+/**
+ * Kullanıcılar (Sistem altında), iki sekme (kullanıcı isteği):
+ *  - "Kullanıcılar" (yalnız yönetici): hesaplar ve hangi özellikleri kullanabilecekleri.
+ *  - "Oturumlar" ('logins' yetkisi): Tiha-Mon oturum geçmişi — bkz. ui.users.LoginSessions.
+ * Sayfa 'logins' yetkisi olan yönetici olmayan kullanıcıya da açıktır (yalnız Oturumlar sekmesiyle; bkz. Shell.PAGES).
+ */
 qx.Class.define("tihamon.page.Users", {
   extend: tihamon.page.Base,
 
   construct(user) {
-    super(user, "Kullanıcılar");
-    this._addButton("Yenile", this.refresh);
-    this._addButton("Ekle", () => this.__edit(null));
-    this._addButton("Düzenle", () => this.__withSelected(target => this.__edit(target)));
-    this._addButton("Sil", () => this.__withSelected(target => this.__delete(target)));
+    // Başlık yok: sekme adları yeterli (bkz. page.Sessions).
+    super(user, null);
+    this._actions.exclude();
+    this.__tabs = new qx.ui.tabview.TabView();
 
-    this.__table = this._createTable([
-      { id: "username", label: "Kullanıcı adı", width: 160 },
-      { id: "full_name", label: "Ad soyad", width: 200 },
-      { id: "role", label: "Rol", width: 100 },
-      { id: "active", label: "Durum", width: 90 },
-      { id: "features", label: "Yetkiler" },
-      { id: "login", label: "Son giriş", width: 130 }
-    ]);
-    // Satıra çift tıklama = Düzenle (Tahtalar'daki gibi).
-    this.__table.addListener("cellDbltap", e => {
-      const row = e.getRow();
-      const target = row === null ? null : this.__users && this.__users.get(this.__table.getTableModel().getValue(0, row));
-      if (target) {
-        this.__edit(target);
-      }
-    });
-    this.add(this.__table, { flex: 1 });
+    if (user.is_admin) {
+      const tab = new qx.ui.tabview.Page("Kullanıcılar").set({ layout: new qx.ui.layout.VBox(8), padding: 8 });
+      tab.setUserData("key", "users");
+      const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8));
+      [["Yenile", () => this.__loadUsers()],
+        ["Ekle", () => this.__edit(null)],
+        ["Düzenle", () => this.__withSelected(target => this.__edit(target))],
+        ["Sil", () => this.__withSelected(target => this.__delete(target))]].forEach(([label, handler]) => {
+        const button = new qx.ui.form.Button(label);
+        button.addListener("execute", handler);
+        bar.add(button);
+      });
+      tab.add(bar);
+      this.__createUsersTable();
+      tab.add(this.__table, { flex: 1 });
+      this.__tabs.add(tab);
+    }
+    if (this._can("logins")) {
+      this.__logins = new tihamon.ui.users.LoginSessions(this);
+      this.__tabs.add(this.__logins);
+    }
+    this._rememberTab(this.__tabs, "users"); // son seçili sekme (bkz. Base._rememberTab)
+    this.__tabs.addListener("changeSelection", () => this.refresh());
+    this.add(this.__tabs, { flex: 1 });
   },
 
   members: {
+    __tabs: null,
+    __logins: null,
     __table: null,
     __users: null,
     __features: null,
 
+    /** Yalnız görünen sekmenin verisi okunur. */
     async _refresh() {
+      const tab = this.__tabs.getSelection()[0];
+      if (tab && tab === this.__logins) {
+        await this.__logins.load();
+      } else if (this.__table) {
+        await this.__loadUsers();
+      }
+    },
+
+    __createUsersTable() {
+      this.__table = this._createTable([
+        { id: "username", label: "Kullanıcı adı", width: 160 },
+        { id: "full_name", label: "Ad soyad", width: 200 },
+        { id: "role", label: "Rol", width: 100 },
+        { id: "active", label: "Durum", width: 90 },
+        { id: "features", label: "Yetkiler" },
+        { id: "login", label: "Son giriş", width: 130 }
+      ], { prefsKey: "users.columns" });
+      // Satıra çift tıklama = Düzenle (Tahtalar'daki gibi).
+      this.__table.addListener("cellDbltap", e => {
+        const row = e.getRow();
+        const target = row === null ? null : this.__users && this.__users.get(this.__table.getTableModel().getValue(0, row));
+        if (target) {
+          this.__edit(target);
+        }
+      });
+    },
+
+    async __loadUsers() {
       const [users, features] = await Promise.all([
         tihamon.io.Api.get("/users"),
         this.__features ? { features: this.__features } : tihamon.io.Api.get("/features")

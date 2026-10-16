@@ -247,6 +247,7 @@ qx.Class.define("tihamon.page.Boards", {
     __shownBoards: null,
     __checkAllButton: null,
     __whoamiState: null,
+    __liveQueue: null,
     __applyingPreview: false,
     __metrics: null,
 
@@ -365,6 +366,8 @@ qx.Class.define("tihamon.page.Boards", {
           this.__openPreviewMenu(e.data.id, e.data.x, e.data.y, e.data.ids);
         } else if (e.data.type === "tm-reorder") {
           this.__saveScreenOrder(e.data.order || []);
+        } else if (e.data.type === "tm-live") {
+          this.__queueLiveWhoami(e.data.id);
         }
       };
       window.addEventListener("message", this.__onMessage);
@@ -672,9 +675,31 @@ qx.Class.define("tihamon.page.Boards", {
 
     /** "Oturumları sorgula": seçili tahtalarda o an oturum açmış kullanıcıyı paralel sorgular;
      * eşzamanlılık worker'da yüke göre dinamik (bkz. whoami.dynamic_concurrency). */
-    __startWhoamiQuery(boardIds) {
+    __startWhoamiQuery(boardIds, quiet = false) {
       this.__sessionJob(boardIds, { type: "whoami" }, () => "Oturum sorgulanıyor…",
-        t => (t.status === "ok" ? { status: "ok", text: t.output } : { status: "error", text: "Sorgulanamadı" }));
+        t => (t.status === "ok" ? { status: "ok", text: t.output } : { status: "error", text: "Sorgulanamadı" }), quiet);
+    },
+
+    /**
+     * Ekranlar kutucuğu "Bağlanıyor…"dan canlıya geçti ("tm-live", bkz. screen/index.html connect): o tahtanın
+     * oturumu kendiliğinden sorgulanır. Aynı anda bağlanan kutucuklar 1,5 sn içinde TEK işte toplanır; zaten
+     * sorgulanan/işlem süren tahta atlanır; hata penceresi açılmaz (kutucukta "Başlatılamadı" görünür).
+     */
+    __queueLiveWhoami(id) {
+      const board = this.__boards.get(id);
+      const st = this.__whoamiState && this.__whoamiState.get(id);
+      if (!board || !board.online || !this._can("screen") || (st && st.status === "querying")) {
+        return;
+      }
+      if (!this.__liveQueue) {
+        this.__liveQueue = new Set();
+        qx.event.Timer.once(() => {
+          const ids = [...this.__liveQueue];
+          this.__liveQueue = null;
+          this.__startWhoamiQuery(ids, true);
+        }, this, 1500);
+      }
+      this.__liveQueue.add(id);
     },
 
     /**
@@ -710,7 +735,7 @@ qx.Class.define("tihamon.page.Boards", {
      * hemen `pendingText(id)` durumuna geçer, sonuçlar __pollSession ile bitirdikçe `resultOf(target)`
      * ile kutucuklara yansır (bkz. __whoamiState, __previewList).
      */
-    async __sessionJob(boardIds, body, pendingText, resultOf) {
+    async __sessionJob(boardIds, body, pendingText, resultOf, quiet = false) {
       if (!boardIds.length) {
         return;
       }
@@ -725,7 +750,9 @@ qx.Class.define("tihamon.page.Boards", {
       } catch (e) {
         boardIds.forEach(id => this.__whoamiState.set(id, { status: "error", text: "Başlatılamadı" }));
         this.__pushPreview();
-        tihamon.ui.Dialog.error(e);
+        if (!quiet) {
+          tihamon.ui.Dialog.error(e);
+        }
         return;
       }
       this.__pollSession(res.id, new Set(boardIds), resultOf);

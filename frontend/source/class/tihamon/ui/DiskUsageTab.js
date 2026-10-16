@@ -37,7 +37,7 @@ qx.Class.define("tihamon.ui.DiskUsageTab", {
     this.add(bar);
 
     const columns = spec.columns;
-    this.__table = page._createTable(columns);
+    this.__table = page._createTable(columns, { prefsKey: "disk." + (spec.mode || "tab") + ".columns" });
     // Explorer tarzı seçim: düz tıklama YALNIZ o satırı seçer (öncekileri bırakır); Ctrl ile satır
     // eklenir/çıkarılır, Shift ile aralık seçilir. (_TOGGLE kipi her düz tıklamayı seçime ekleyip
     // çıkarıyordu — kullanıcı istemedi.)

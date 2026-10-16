@@ -9,6 +9,123 @@ qx.Class.define("tihamon.page.Base", {
   statics: {
     _canvas: null,
 
+    /**
+     * Sütun sırası ve gizlenen sütunlar (kullanıcı isteği: tüm grid'lerde) kullanıcı başına sunucuda
+     * (users.ui_prefs["<key>.order"/"<key>.hidden"], bkz. AuthApi::prefs) saklanır; tablo kurulurken
+     * oradan okunup uygulanır. Sıra: başlık sürüklenerek değiştirilir (qx yerleşik). Kullanıcı sütunları
+     * dışındakiler (baştaki kimlik/işaret = `offset` kadar, sondaki iç sütunlar) yerinde tutulur ve
+     * sütun menüsünde görünmez. Kayıtta olmayan (sonradan eklenen) sütunlar sona, varsayılan sırayla eklenir.
+     * Sayfa dışından da kullanılır (ör. ui.files.Pane).
+     * @param columns {Array} kullanıcı sütunları [{id}] — tablo modelinde `offset`'ten itibaren bu sırayla
+     * @param user {Map} oturum sahibi (ui_prefs okunur/yazılır)
+     * @param withWidths {Boolean} storageKey'li tablo: menünün baş kısmını __setupColumnPrefs düzenler
+     */
+    setupColumnLayout(table, columns, offset, key, user, withWidths = false) {
+      const self = tihamon.page.Base;
+      const columnModel = table.getTableColumnModel();
+      const prefs = user.ui_prefs || (user.ui_prefs = {});
+      const orderKey = key + ".order";
+      const hiddenKey = key + ".hidden";
+      const total = table.getTableModel().getColumnCount();
+      const userCol = col => col >= offset && col < offset + columns.length;
+      const fixed = Array.from({ length: total }, (_, i) => i).filter(col => !userCol(col));
+      const lead = fixed.filter(col => col < offset);
+      const tail = fixed.filter(col => col >= offset);
+      const build = userCols => lead.concat(userCols, tail);
+
+      if (!withWidths) {
+        // storageKey'li tablolarda gizleme __setupColumnPrefs'te uygulanır (localStorage geçişiyle birlikte).
+        const hidden = prefs[hiddenKey] || [];
+        columns.forEach((column, index) => {
+          if (hidden.includes(column.id)) {
+            columnModel.setColumnVisible(index + offset, false);
+          }
+        });
+        columnModel.addListener("visibilityChanged", () => {
+          self.savePref(user, hiddenKey, columns
+            .filter((column, index) => !columnModel.isColumnVisible(index + offset))
+            .map(column => column.id));
+        });
+      }
+
+      let applying = false;
+      const apply = order => {
+        applying = true;
+        try {
+          columnModel.setColumnsOrder(order);
+        } finally {
+          applying = false;
+        }
+      };
+      const defaultUserCols = columns.map((column, index) => index + offset);
+      const saved = prefs[orderKey];
+      if (Array.isArray(saved) && saved.length) {
+        const byId = new Map(columns.map((column, index) => [column.id, index + offset]));
+        const cols = [];
+        saved.forEach(id => {
+          if (byId.has(id) && !cols.includes(byId.get(id))) {
+            cols.push(byId.get(id));
+          }
+        });
+        defaultUserCols.forEach(col => {
+          if (!cols.includes(col)) {
+            cols.push(col);
+          }
+        });
+        apply(build(cols));
+      }
+
+      columnModel.addListener("orderChanged", () => {
+        if (applying) {
+          return;
+        }
+        const now = Array.from({ length: total }, (_, x) => columnModel.getOverallColumnAtX(x));
+        const cols = now.filter(userCol);
+        const order = build(cols);
+        // İşaret/iç sütun sürüklenip başka yere bırakıldıysa yerine geri alınır.
+        if (order.some((col, x) => now[x] !== col)) {
+          apply(order);
+        }
+        const isDefault = cols.every((col, i) => col === defaultUserCols[i]);
+        self.savePref(user, orderKey, isDefault ? null : cols.map(col => columns[col - offset].id));
+      });
+
+      table.addListener("columnVisibilityMenuCreateEnd", e => {
+        const menu = e.getData().menu;
+        if (!withWidths) {
+          // Menü sırası = Table'ın x sırası (i. düğme = getOverallColumnAtX(i)); kullanıcı sütunu
+          // olmayanlar (kimlik/işaret/iç) gizlenemez → menüden çıkarılır.
+          const children = menu.getChildren().slice();
+          children.forEach((button, i) => {
+            if (i < total && !userCol(columnModel.getOverallColumnAtX(i))) {
+              menu.remove(button);
+            }
+          });
+          menu.add(new qx.ui.menu.Separator());
+        }
+        const reset = new qx.ui.menu.Button("Sütun sırasını sıfırla");
+        reset.setToolTipText("Sütun başlıklarını sürükleyerek sıralayabilirsiniz; bu seçenek varsayılan sıraya döndürür.");
+        reset.addListener("execute", () => {
+          apply(build(defaultUserCols));
+          self.savePref(user, orderKey, null);
+        });
+        menu.add(reset);
+      });
+    },
+
+    /** Tek bir arayüz tercihini sunucuya yazar (bkz. AuthApi::prefs); null anahtarı siler. */
+    savePref(user, name, value) {
+      const prefs = user.ui_prefs || (user.ui_prefs = {});
+      if (value === null) {
+        delete prefs[name];
+      } else {
+        prefs[name] = value;
+      }
+      tihamon.io.Api.put("/auth/prefs", { key: name, value }).catch(() => {
+        // Kalıcılık kaybı önemsiz: bir sonraki değişiklikte yeniden gönderilir.
+      });
+    },
+
     /** Metnin tablo yazı tipiyle piksel genişliği (otomatik sütun genişliği için; canvas ile hızlı). */
     _textWidth(text) {
       const self = tihamon.page.Base;
@@ -107,8 +224,11 @@ qx.Class.define("tihamon.page.Base", {
      *   {storageKey: "ör. boards.columns"} verilirse: genişlikler içeriğe göre otomatik ayarlanır,
      *   kullanıcının elle ayarladığı genişlikler ve gizlenen sütunlar sunucuda saklanır, tablonun
      *   yerleşik sütun menüsü (sağ üstte) açılır — bkz. __setupColumnPrefs.
+     *   {prefsKey: "ör. logs.columns"}: genişlikler OLDUĞU gibi (width/esnek) kalır; yalnız sütun sırası
+     *   (başlığı sürükleyerek) ve gizlenen sütunlar kullanıcı başına sunucuda saklanır (storageKey de bunları yapar).
      */
     _createTable(columns, opts = {}) {
+      const prefsKey = opts.storageKey || opts.prefsKey;
       const leadLabels = opts.checkable ? ["id", ""] : ["id"];
       const leadIds = opts.checkable ? ["id", "__checked"] : ["id"];
       const model = opts.model || new qx.ui.table.model.Simple();
@@ -117,7 +237,7 @@ qx.Class.define("tihamon.page.Base", {
         tableColumnModel: obj => new qx.ui.table.columnmodel.Resize(obj)
       }).set({
         statusBarVisible: false,
-        columnVisibilityButtonVisible: !!opts.storageKey,
+        columnVisibilityButtonVisible: !!prefsKey,
         rowHeight: 28
       });
       const columnModel = table.getTableColumnModel();
@@ -227,6 +347,9 @@ qx.Class.define("tihamon.page.Base", {
         columns.forEach((column, index) => {
           behavior.setWidth(index + offset, column.width || "1*"); // width yoksa esner
         });
+      }
+      if (prefsKey) {
+        tihamon.page.Base.setupColumnLayout(table, columns, offset, prefsKey, this._user, !!opts.storageKey);
       }
       return table;
     },
@@ -343,17 +466,9 @@ qx.Class.define("tihamon.page.Base", {
       });
     },
 
-    /** Tek bir arayüz tercihini sunucuya yazar (bkz. AuthApi::prefs); null anahtarı siler. */
+    /** Tek bir arayüz tercihini sunucuya yazar (bkz. Base.savePref). */
     __savePref(name, value) {
-      const prefs = this._user.ui_prefs || (this._user.ui_prefs = {});
-      if (value === null) {
-        delete prefs[name];
-      } else {
-        prefs[name] = value;
-      }
-      tihamon.io.Api.put("/auth/prefs", { key: name, value }).catch(() => {
-        // Kalıcılık kaybı önemsiz: bir sonraki değişiklikte yeniden gönderilir.
-      });
+      tihamon.page.Base.savePref(this._user, name, value);
     },
 
     __loadJson(key) {

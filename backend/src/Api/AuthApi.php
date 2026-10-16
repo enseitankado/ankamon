@@ -47,8 +47,12 @@ final class AuthApi
         return ['ok' => true];
     }
 
-    public function logout(): array
+    public function logout(Request $request): array
     {
+        $user = Auth::user();
+        if ($user !== null) {
+            Audit::log($user, $request, 'logout');
+        }
         Auth::end();
         return ['ok' => true];
     }

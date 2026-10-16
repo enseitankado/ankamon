@@ -99,4 +99,8 @@ return [
     ['GET',    '/api/settings',          [Api\SettingsApi::class, 'show'],     'admin'],
     ['PUT',    '/api/settings',          [Api\SettingsApi::class, 'update'],   'admin'],
     ['GET',    '/api/audit',             [Api\AuditApi::class, 'index'],       'admin'],
+    // Tiha-Mon oturum geçmişi (Kullanıcılar ▸ Oturumlar); /active alt çubuk içindir (sayı herkese, liste 'logins'e).
+    ['GET',    '/api/login-sessions',    [Api\LoginSessionsApi::class, 'index'],   'logins'],
+    ['GET',    '/api/login-sessions/active', [Api\LoginSessionsApi::class, 'active'], 'user'],
+    ['GET',    '/api/login-sessions/{id}/actions', [Api\LoginSessionsApi::class, 'actions'], 'logins'],
 ];

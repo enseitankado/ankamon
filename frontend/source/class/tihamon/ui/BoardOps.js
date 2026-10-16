@@ -496,14 +496,14 @@ qx.Class.define("tihamon.ui.BoardOps", {
       };
       if (board.online) {
         const online = boards.filter(b => b.online);
-        // Komut çalıştır ▸ Web terminal, Serbest/hazır komut çalıştır (kullanıcı isteği: ikisi bir arada).
+        // Komut çalıştır ▸ Hazır / Serbest komut çalıştır, Web terminal (kullanıcı isteği: sıra ve etiket bu).
         const commands = sub();
+        if (can("actions") || can("shell")) {
+          subAdd(commands, ICON.run, "Hazır / Serbest komut çalıştır" + count, () => this.run(boards, user));
+        }
         if (can("shell")) {
           subAdd(commands, ICON.webshell, "Web terminal" + count, () =>
             boards.length > 1 ? this.webshellMulti(boards) : this.webshell(board));
-        }
-        if (can("actions") || can("shell")) {
-          subAdd(commands, ICON.run, "Serbest/hazır komut çalıştır" + count, () => this.run(boards, user));
         }
         group(ICON.run, "Komut çalıştır" + count, commands);
 
@@ -547,7 +547,7 @@ qx.Class.define("tihamon.ui.BoardOps", {
         if (can("filemanager")) {
           subAdd(files, ICON.filemanager, "Dosya yöneticisi", () => this.filemanager(board));
           // İki panelli gezgin: bu tahtanın kullanıcı dizinlerinden başka bir tahtaya kopyalama.
-          subAdd(files, ICON.copy, "Dosyaları kopyala", () => tihamon.ui.files.CopyWindow.open(board));
+          subAdd(files, ICON.copy, "Dosyaları kopyala", () => tihamon.ui.files.CopyWindow.open(board, user));
         }
         if (can("boards.backup")) {
           files.add(this.menuButton(ICON.backup, "Yedekle" + count, null,

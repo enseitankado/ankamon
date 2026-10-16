@@ -34,7 +34,7 @@ qx.Class.define("tihamon.ui.system.Services", {
       { id: "pid", label: "PID", width: 70 },
       { id: "uptime", label: "Çalışma süresi", width: 120 },
       { id: "note", label: "Not", width: 260 }
-    ]);
+    ], { prefsKey: "system.services.columns" });
     this.__table.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.MULTIPLE_INTERVAL_SELECTION);
     this.__table.getSelectionModel().addListener("changeSelection", () => this.__updateButtons());
     this.add(this.__table, { flex: 1 });

@@ -23,5 +23,6 @@ return [
     'boards.login' =>'Tahtada seçilen hesapla parolasız oturum açma (sağ menü "Oturum aç" — açık oturum kapanır)',
     'network' => 'Ağ envanteri: bağlı ağlardaki çevrim içi/dışı cihazları ve açık servislerini görüntüleme',
     'network.manage' => 'Ağ envanterinde cihaz ekleme, düzenleme, silme; ağ adı/tarama ayarı; taramayı hemen başlatma',
+    'logins' => 'Tiha-Mon oturumlarını görme (Kullanıcılar ▸ Oturumlar): kim, ne zaman, hangi IP\'den giriş/çıkış yaptı, hangi işlemleri yaptı; alt çubukta oturum açmış kullanıcıların ayrıntısı',
     'sessions.manage' => 'Kullanıcı oturum kayıtlarını silme (Kullanıcı oturumları sayfasında, süzgece göre)',
 ];

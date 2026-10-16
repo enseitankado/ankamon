@@ -30,7 +30,7 @@ qx.Class.define("tihamon.page.Dashboard", {
       { id: "severity", label: "Önem", width: 90 },
       { id: "program", label: "Program", width: 140 },
       { id: "message", label: "Mesaj" }
-    ]);
+    ], { prefsKey: "dashboard.errors.columns" });
     this.add(this.__errors, { flex: 2 });
     this.__addLogsMenu(this.__errors, id => {
       const row = this.__errorRows && this.__errorRows[id];
@@ -43,7 +43,7 @@ qx.Class.define("tihamon.page.Dashboard", {
       { id: "title", label: "Görev" },
       { id: "status", label: "Durum", width: 120 },
       { id: "summary", label: "Özet" }
-    ]);
+    ], { prefsKey: "dashboard.jobs.columns" });
     this.add(this.__jobs, { flex: 1 });
     this.__addLogsMenu(this.__jobs, id => {
       const job = (this.__jobRows || []).find(j => j.id === id);

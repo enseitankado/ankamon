@@ -412,9 +412,12 @@ class Tile {
     rfb.qualityLevel = p.quality;
     rfb.compressionLevel = p.compression;
     rfb.background = "#000";
+    const fresh = !prev;                // kalite değişimi (kesintisiz geçiş) yeni bağlantı sayılmaz
     rfb.addEventListener("connect", () => {
       this.setState("live");
       if (this.control) rfb.focus();
+      // "Bağlanıyor…" bitti: ana sayfa bu tahtanın oturumunu sorgulasın (bkz. Boards.__onMessage "tm-live").
+      if (fresh) window.parent.postMessage({ type: "tm-live", id: this.board.id }, location.origin);
       if (prev) {
         // "connect" ilk kareden hemen önce gelir; yeni akış ilk görüntüsünü çizene dek eskisi kalsın.
         const old = prev;

@@ -117,7 +117,9 @@ qx.Class.define("tihamon.ui.Shell", {
       // Kullanıcılar ve Ayarlar "Sistem"in altında (kullanıcı isteği).
       // Disk kullanımı ve veri silme (eski açılır pencere — kullanıcı isteği: Sistem altında sayfa).
       { id: "diskusage", label: "Disk kullanımı", feature: "logs.manage", parent: "system", retap: true, create: u => new tihamon.page.DiskUsage(u) },
-      { id: "users", label: "Kullanıcılar", admin: true, parent: "system", create: u => new tihamon.page.Users(u) },
+      // Kullanıcılar ▸ Kullanıcılar (yalnız yönetici) + Oturumlar ('logins'): features yöneticide her zaman
+      // sağlanır; 'logins' yetkili kullanıcı sayfayı yalnız Oturumlar sekmesiyle görür (bkz. page.Users).
+      { id: "users", label: "Kullanıcılar", features: ["logins"], parent: "system", create: u => new tihamon.page.Users(u) },
       // admin/feature yok: herkese açık (kendi tema tercihini herkes değiştirebilir); sayfa içinde
       // sistem ayarları (SSH/Samba/keşif) yalnız admin'e gösterilir — bkz. page.Settings. Sistem
       // yalnız yöneticiye açık olduğundan diğer kullanıcılarda kökte görünür (bkz. __createTree).

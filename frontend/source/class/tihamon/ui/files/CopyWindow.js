@@ -14,8 +14,9 @@ qx.Class.define("tihamon.ui.files.CopyWindow", {
   statics: {
     /**
      * @param board {Map} sağ tıklanan tahta {id, label|hostname|ip}
+     * @param user {Map?} oturum sahibi (tablo sütun sırası/gizleme tercihleri için)
      */
-    async open(board) {
+    async open(board, user) {
       const name = b => b.label || b.hostname || b.ip || "#" + b.id;
       let boards = [{ id: board.id, name: name(board), online: true }];
       try {
@@ -24,13 +25,13 @@ qx.Class.define("tihamon.ui.files.CopyWindow", {
       } catch (e) {
         // Tahta listesi okunamadı (ör. "boards" yetkisi yok): yalnız bu tahta arasında kopyalanır.
       }
-      const win = new tihamon.ui.files.CopyWindow(boards, board.id);
+      const win = new tihamon.ui.files.CopyWindow(boards, board.id, user);
       qx.core.Init.getApplication().getRoot().add(win);
       win.open();
     }
   },
 
-  construct(boards, sourceId) {
+  construct(boards, sourceId, user) {
     super("Dosyaları kopyala");
     const root = qx.core.Init.getApplication().getRoot();
     const bounds = root.getBounds() || { width: 1280, height: 760 };
@@ -43,8 +44,8 @@ qx.Class.define("tihamon.ui.files.CopyWindow", {
     });
     // Hedef: kaynaktan farklı ilk tahta (yoksa aynı tahta — tahta içinde dizinler arası kopyalama).
     const other = boards.find(b => b.id !== sourceId) || boards[0];
-    this.__left = new tihamon.ui.files.Pane("Kaynak", boards, sourceId, "/home");
-    this.__right = new tihamon.ui.files.Pane("Hedef", boards, other.id, "/home");
+    this.__left = new tihamon.ui.files.Pane("Kaynak", boards, sourceId, "/home", user);
+    this.__right = new tihamon.ui.files.Pane("Hedef", boards, other.id, "/home", user);
 
     const middle = new qx.ui.container.Composite(new qx.ui.layout.VBox(8).set({ alignY: "middle" }));
     this.__toRight = new qx.ui.form.Button("Kopyala →").set({ toolTipText: "Soldaki seçili öğeleri sağdaki dizine kopyalar" });

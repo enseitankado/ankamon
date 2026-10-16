@@ -17,10 +17,12 @@ qx.Class.define("tihamon.ui.files.Pane", {
    * @param boards {Array} seçilebilecek tahtalar [{id, name}]
    * @param boardId {Number} başlangıç tahtası
    * @param path {String} başlangıç dizini
+   * @param user {Map?} oturum sahibi: verilirse sütun sırası/gizleme kullanıcı başına sunucuda saklanır
    */
-  construct(caption, boards, boardId, path) {
+  construct(caption, boards, boardId, path, user) {
     super(new qx.ui.layout.VBox(6));
     this.__path = path || "/home";
+    this.__user = user || null;
     this.__items = [];
 
     const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(6).set({ alignY: "middle" }));
@@ -78,6 +80,7 @@ qx.Class.define("tihamon.ui.files.Pane", {
 
   members: {
     __path: null,
+    __user: null,
     __items: null,
     __info: null,
     __boardBox: null,
@@ -166,7 +169,7 @@ qx.Class.define("tihamon.ui.files.Pane", {
 
       const table = new qx.ui.table.Table(model, {
         tableColumnModel: obj => new qx.ui.table.columnmodel.Resize(obj)
-      }).set({ statusBarVisible: false, showCellFocusIndicator: false, columnVisibilityButtonVisible: false });
+      }).set({ statusBarVisible: false, showCellFocusIndicator: false, columnVisibilityButtonVisible: !!this.__user });
       table.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.MULTIPLE_INTERVAL_SELECTION);
       const tcm = table.getTableColumnModel();
       tcm.setColumnVisible(6, false);
@@ -185,6 +188,11 @@ qx.Class.define("tihamon.ui.files.Pane", {
       resize.setWidth(3, 90);
       resize.setWidth(4, 110);
       resize.setWidth(5, 130);
+      if (this.__user) {
+        // Sütun sırası/gizleme kullanıcı başına sunucuda (iki panel aynı ayarı paylaşır); "tür" iç sütundur.
+        const ids = ["name", "size", "user", "group", "mode", "mtime"];
+        tihamon.page.Base.setupColumnLayout(table, ids.map(id => ({ id })), 0, "files.columns", this.__user);
+      }
 
       table.addListener("cellDbltap", e => {
         const row = model.getRowData(e.getRow());

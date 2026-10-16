@@ -86,7 +86,7 @@ qx.Class.define("tihamon.ui.sessions.Users", {
       { id: "first", label: "İlk oturum", width: 150 },
       { id: "last", label: "Son oturum", width: 150 }
     ];
-    this.__table = page._createTable(this.__columns);
+    this.__table = page._createTable(this.__columns, { prefsKey: "board-users.columns" });
     // Süre/tarih sütunları ekranda metin; sıralama satır sonundaki ham sayılarla yapılır (bkz. __summarize).
     const model = this.__table.getTableModel();
     [[3, 8], [4, 9], [6, 10], [7, 11]].forEach(([col, raw]) =>

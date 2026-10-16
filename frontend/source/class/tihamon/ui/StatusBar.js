@@ -18,6 +18,7 @@ qx.Class.define("tihamon.ui.StatusBar", {
     MIN_HEIGHT: 80,
     MAX_HEIGHT: 500,
     STATS_INTERVAL_MS: 1000,
+    USERS_INTERVAL_MS: 15000,
     // CPU/RAM bu yüzdeyi bu kadar (ms) sürekli AŞARSA kırmızı + ⚠ ile vurgulanır (kullanıcı isteği).
     WARN_PERCENT: 85,
     WARN_SUSTAIN_MS: 10000
@@ -41,11 +42,20 @@ qx.Class.define("tihamon.ui.StatusBar", {
     const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(6).set({ alignY: "middle" })).set({
       padding: [4, 8], cursor: "pointer"
     });
-    this.__foldButton = new qx.ui.form.Button("▸").set({ width: 24, padding: [0, 4], toolTipText: "Aç/kapat" });
+    // Küçük ok (kullanıcı isteği); yazı sağdaki CPU/RAM ile aynı biçimde (app-mono, app-muted).
+    this.__foldButton = new qx.ui.form.Button("▸").set({
+      width: 18, height: 18, minWidth: 18, minHeight: 18, allowGrowY: false, padding: 0, toolTipText: "Aç/kapat"
+    });
     this.__foldButton.addListener("execute", () => this.__setFolded(!this.__folded));
     head.add(this.__foldButton);
-    head.add(new qx.ui.basic.Label("Arka plan işlemleri"));
+    head.add(new qx.ui.basic.Label("Arka plan işlemleri").set({ font: "app-mono", textColor: "app-muted" }));
     head.add(new qx.ui.core.Spacer(), { flex: 1 });
+    // Oturum açmış Tiha-Mon kullanıcıları (kullanıcı isteği): sayı + üzerine gelince ayrıntı (bkz. __pollUsers).
+    this.__usersTip = new qx.ui.tooltip.ToolTip("").set({ rich: true, showTimeout: 300, hideTimeout: 30000 });
+    this.__usersLabel = new qx.ui.basic.Label("").set({
+      font: "app-mono", textColor: "app-muted", rich: true, toolTip: this.__usersTip, marginRight: 12
+    });
+    head.add(this.__usersLabel);
     // Sunucu durumu: CPU/RAM/disk/ağ, sağa hizalı, 1 sn'de bir güncellenir (bkz. __pollStats).
     this.__stats = new qx.ui.basic.Label("").set({ font: "app-mono", textColor: "app-muted", rich: true });
     head.add(this.__stats);
@@ -53,7 +63,7 @@ qx.Class.define("tihamon.ui.StatusBar", {
     // Çubuğun herhangi bir yerine tıklamak da aç/kapat yapar; ok düğmesinin kendi execute'ü zaten
     // çalışır, burada yalnız onun DIŞINDAKİ alana tıklanınca tetiklenir.
     head.addListener("tap", e => {
-      if (e.getTarget() !== this.__foldButton) {
+      if (e.getTarget() !== this.__foldButton && e.getTarget() !== this.__usersLabel) {
         this.__setFolded(!this.__folded);
       }
     });
@@ -75,6 +85,11 @@ qx.Class.define("tihamon.ui.StatusBar", {
     this.__statsTimer.addListener("interval", this.__pollStats, this);
     this.__pollStats();
     this.__statsTimer.start();
+
+    this.__usersTimer = new qx.event.Timer(tihamon.ui.StatusBar.USERS_INTERVAL_MS);
+    this.__usersTimer.addListener("interval", this.__pollUsers, this);
+    this.__pollUsers();
+    this.__usersTimer.start();
   },
 
   destruct() {
@@ -86,6 +101,10 @@ qx.Class.define("tihamon.ui.StatusBar", {
       this.__statsTimer.stop();
       this.__statsTimer.dispose();
     }
+    if (this.__usersTimer) {
+      this.__usersTimer.stop();
+      this.__usersTimer.dispose();
+    }
   },
 
   members: {
@@ -93,6 +112,45 @@ qx.Class.define("tihamon.ui.StatusBar", {
     __stats: null,
     __timer: null,
     __statsTimer: null,
+    __usersTimer: null,
+    __usersLabel: null,
+    __usersTip: null,
+
+    /**
+     * Oturum açmış Tiha-Mon kullanıcıları (/api/login-sessions/active): sayı her oturum sahibine; ipucundaki
+     * ayrıntı (kullanıcı, giriş zamanı, IP, son etkinlik) yalnız 'logins' yetkisine (sunucu süzer).
+     */
+    async __pollUsers() {
+      let res;
+      try {
+        res = await tihamon.io.Api.get("/login-sessions/active");
+      } catch (e) {
+        return; // bir sonraki turda yeniden denenir
+      }
+      const F = tihamon.util.Format;
+      const esc = qx.bom.String.escape;
+      this.__usersLabel.setValue(`👤 ${res.users}`);
+      if (!res.sessions) {
+        this.__usersTip.setLabel(`Oturum açmış Tiha-Mon kullanıcısı: <b>${res.users}</b>`);
+        return;
+      }
+      // Satır = kullanıcı + IP (sunucu gruplar); aynı yerden birden çok açık oturum varsa sayısı yazılır.
+      const rows = res.sessions.map(s => {
+        const who = esc(s.username) + (s.full_name ? ` <span style="opacity:.7">(${esc(s.full_name)})</span>` : "");
+        const flags = [s.mine ? "siz" : "", s.idle ? "boşta" : "", s.sessions > 1 ? `${s.sessions} oturum` : ""]
+          .filter(Boolean).join(", ");
+        return `<tr><td><b>${who}</b>${flags ? ` <i>${flags}</i>` : ""}</td>` +
+          `<td>${F.dateTime(s.started_ts)}</td><td>${esc(s.ip || "")}</td>` +
+          `<td>${s.last_seen_ts ? F.ago(Math.round(s.last_seen_ts / 1000)) : "—"}</td></tr>`;
+      });
+      const th = "style=\"text-align:left;padding-right:14px\"";
+      this.__usersTip.setLabel(
+        `<b>Oturum açmış Tiha-Mon kullanıcıları: ${res.users}</b> (${res.total} oturum)` +
+        `<table style="margin-top:4px;border-spacing:0 2px"><tr><th ${th}>Kullanıcı</th><th ${th}>Son giriş</th>` +
+        `<th ${th}>IP adresi</th><th ${th}>Son etkinlik</th></tr>` +
+        rows.join("").replace(/<td>/g, "<td style=\"padding-right:14px\">") + "</table>"
+      );
+    },
     __lastId: null,
     __folded: true,
     __height: null,
