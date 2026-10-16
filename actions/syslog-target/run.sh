@@ -48,7 +48,6 @@ ruleset(name="tiha_remote"
            $REBIND
            action.resumeretrycount="-1"
            action.resumeinterval="30"
-           action.resumeintervalmultiplier="2"
            action.resumeintervalmax="600")
 }
 
@@ -61,6 +60,8 @@ CONF_EOF
 chmod 644 "$CONF"
 
 # Bozuk yapılandırma rsyslog'u (ve yerel kayıtları) durdurur: doğrula, olmadıysa eskiye dön.
+# (TiHA'nın yazdığı action.resumeintervalmultiplier ETAP'taki rsyslog 8.2302'de yok → burada yazılmaz;
+# yazılırsa -N1 her seferinde hata verir ve bu işlem hep geri dönerdi.)
 if ! rsyslogd -N1 >/dev/null 2>&1; then
     if [ -n "$BACKUP" ]; then cp -p "$BACKUP" "$CONF"; else rm -f "$CONF"; fi
     echo "Yeni yapılandırma doğrulanamadı; önceki duruma dönüldü." >&2
