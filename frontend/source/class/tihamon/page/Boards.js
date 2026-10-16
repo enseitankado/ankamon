@@ -66,6 +66,8 @@ qx.Class.define("tihamon.page.Boards", {
       { id: "hostname", label: "Bilgisayar adı", width: 150 },
       { id: "ip", label: "IP", width: 120 },
       { id: "mac", label: "MAC", width: 140 },
+      // FATİH fazı (bkz. util.Format.etap — anakart modelinden, yoksa maskelenmiş MAC önekinden).
+      { id: "faz", label: "Faz", hint: "FATİH fazı ve tahta markası", width: 130 },
       // Anlık oturum (bkz. worker executor/session_probe.py — 30 sn'de bir SSH ile yoklanır; Oturum aç/
       // kapat/sorgula sonuçları da hemen yazar): kullanıcı adı, "(kilitli)" ya da "Oturum kapalı".
       { id: "session", label: "Oturum", width: 140 },
@@ -268,7 +270,7 @@ qx.Class.define("tihamon.page.Boards", {
             board.id, wasChecked.has(board.id),
             board.online ? "Çevrimiçi" : "Kapalı",
             board.label || board.hostname || board.ip,
-            board.hostname, board.ip, board.mac,
+            board.hostname, board.ip, board.mac, F.etap(board.etap),
             tihamon.page.Boards.sessionText(board),
             (tihamon.ui.FactsView.wifiStatus(board.facts) || { text: "" }).text,
             board.facts.disk_total_bytes ? F.bytes(board.facts.disk_total_bytes) : "",

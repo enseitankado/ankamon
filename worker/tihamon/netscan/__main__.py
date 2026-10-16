@@ -107,6 +107,10 @@ def _sweep(conn) -> None:
     filled = store.fill_labels(conn)
     if filled:
         log.info("takma ad dolduruldu: %d kayıt", filled)
+    # ETAP faz bilgisi (Tahtalar + Ağ grid'leri "Faz" sütunu; bkz. etap_phase.py).
+    updated = store.update_etap(conn)
+    if updated:
+        log.info("ETAP faz bilgisi güncellendi: %d kayıt", updated)
 
 
 def main() -> None:

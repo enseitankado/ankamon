@@ -37,6 +37,23 @@ qx.Class.define("tihamon.util.Format", {
       return reason ? (this.SESSION_END_REASON[reason] || reason) : "Açık";
     },
 
+    /**
+     * ETAP faz bilgisinin grid metni (bkz. worker netscan/etap_phase.py, migration 017): "Faz 2 · Vestel",
+     * "Faz 3 · Arçelik? (tahmin)", ETAP'a kayıtlı ama tahta olduğu bilinmeyen cihazda "ETAP cihazı".
+     * "(tahmin)": faz eşlemesi çıkarım (doğrulanmadı) ya da yalnız MAC önekinden (donanım okunmadı).
+     */
+    etap(info) {
+      if (!info) {
+        return "";
+      }
+      if (!info.tahta) {
+        return "ETAP cihazı";
+      }
+      const faz = info.faz ? `Faz ${info.faz}` : "Faz ?";
+      const text = info.marka ? `${faz} · ${info.marka}` : faz;
+      return text + (info.guven === "cikarim" ? " (tahmin)" : "");
+    },
+
     /** @param seconds {Number} süre (saniye); "2 sa 14 dk" / "37 dk" / "12 sn" biçiminde döner */
     duration(seconds) {
       seconds = Math.max(0, Math.round(seconds));

@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from psycopg.types.json import Jsonb
 
 from .. import activity
-from . import classify, oui, probe
+from . import classify, etap_phase, oui, probe
 
 log = logging.getLogger("tihamon.netscan")
 
@@ -86,7 +86,7 @@ def apply_sweep(conn, net: dict, found: dict[str, str]) -> int:
         ip = found[mac]
         board = boards.get(mac)
         vendor = oui.vendor(mac)
-        kind = classify.guess_type(vendor=vendor, mac_random=oui.is_random(mac), is_board=bool(board),
+        kind = classify.guess_type(vendor=vendor, mac_random=oui.is_random(mac), is_board=bool(board) or _etap_board(mac),
                                    is_gateway=ip == net.get("gateway"), is_self=mac in self_macs, scan=None)
         hostname = names.get(mac) or (board["hostname"] if board else "") or ""
         conn.execute(
@@ -176,6 +176,57 @@ def fill_labels(conn) -> int:
     return len(rows)
 
 
+def _etap_board(mac: str) -> bool:
+    """MAC, ETAP faz veritabanında bilinen bir akıllı tahta modeline mi düşüyor (bkz. etap_phase)."""
+    info = etap_phase.lookup(mac)
+    return bool(info and info["tahta"])
+
+
+def _etap_value(info: dict | None) -> dict | None:
+    """etap sütununa yazılan kararlı alt küme (önek ayrıntısı yazılmaz — her turda gereksiz değişmesin)."""
+    if not info:
+        return None
+    return {k: info[k] for k in ("model", "ad", "faz", "marka", "guven", "tahta", "kaynak")}
+
+
+def update_etap(conn) -> int:
+    """Tahtalar ve ağ cihazları için ETAP faz bilgisini (etap sütunu) günceller; her tarama sonunda.
+
+    Kaynak önceliği: Tahtalar'daki SSH ile okunmuş anakart modeli (kesin), yoksa maskelenmiş MAC öneki.
+    Akıllı tahta olarak tanınan ağ cihazının otomatik türü "Akıllı tahta" olur, otomatik modeli boşsa
+    doldurulur (elle girilen tür/model ayrı sütunlardadır, ezilmez). Değişen kayıt sayısını döner.
+    """
+    changed = 0
+    for row in conn.execute(
+            "SELECT id, mac::text AS mac, facts->>'motherboard_model' AS mb, etap FROM boards").fetchall():
+        value = _etap_value(etap_phase.resolve(row["mac"], row["mb"]))
+        if value != row["etap"]:
+            conn.execute("UPDATE boards SET etap = %s WHERE id = %s", (Jsonb(value) if value else None, row["id"]))
+            changed += 1
+    for dev in conn.execute(
+            """SELECT d.id, d.mac::text AS mac, d.etap, d.type_auto, d.model_auto,
+                      b.facts->>'motherboard_model' AS mb
+               FROM net_devices d LEFT JOIN boards b ON b.mac = d.mac""").fetchall():
+        value = _etap_value(etap_phase.resolve(dev["mac"], dev["mb"]))
+        sets, args = [], []
+        if value != dev["etap"]:
+            sets.append("etap = %s")
+            args.append(Jsonb(value) if value else None)
+        if value and value["tahta"]:
+            if dev["type_auto"] != classify.BOARD:
+                sets.append("type_auto = %s")
+                args.append(classify.BOARD)
+            if not dev["model_auto"]:
+                sets.append("model_auto = %s")
+                args.append(value["ad"])
+        if sets:
+            conn.execute(f"UPDATE net_devices SET {', '.join(sets)} WHERE id = %s", (*args, dev["id"]))
+            changed += 1
+    if changed:
+        bump(conn)
+    return changed
+
+
 def next_service_target(conn, rescan_hours: int, requested_only: bool) -> dict | None:
     """Servis taraması sıradaki cihaz: önce kullanıcının istedikleri, sonra hiç taranmamışlar, sonra eskiler."""
     cond = "d.services_requested_at IS NOT NULL" if requested_only else (
@@ -201,7 +252,8 @@ def apply_services(conn, dev: dict, scan: dict | None) -> None:
         bump(conn)
         return
     board = _boards(conn).get(dev["mac"])
-    kind = classify.guess_type(vendor=dev["vendor"], mac_random=oui.is_random(dev["mac"]), is_board=bool(board),
+    kind = classify.guess_type(vendor=dev["vendor"], mac_random=oui.is_random(dev["mac"]),
+                               is_board=bool(board) or _etap_board(dev["mac"]),
                                is_gateway=dev["ip"] == dev.get("gateway"), is_self=False, scan=scan)
     model = classify.guess_model(scan, board["model"] if board else "")
     with conn.transaction():

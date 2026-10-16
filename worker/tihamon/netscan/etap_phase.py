@@ -7,7 +7,8 @@ Veri (depoda, bu dizinde):
   etap_models.json  — anakart modeli → faz, marka, işlemci, güven (elle bakılır).
 
 En uzun önek kazanır. Dönen kayıt:
-  {"model", "faz", "marka", "islemci", "guven", "tahta", "onek", "onek_tahta"}
+  {"model", "ad", "faz", "marka", "islemci", "guven", "tahta", "kaynak", "onek", "onek_tahta"}
+kaynak: "mac" (önek tahmini) ya da "donanım" (SSH ile okunan anakart modeli — bkz. resolve; kesin).
 "tahta": model etap_models.json'daki bilinen tahta modellerinden biri mi (değilse: ETAP'a kayıtlı ama
 akıllı tahta olduğu bilinmeyen cihaz bloğu — ör. ETAP kurulu laboratuvar PC'si).
 Doğruluk (envanterin %20'si dışarıda bırakılarak ölçüldü): kapsama %99,6, model doğruluğu %99,9.
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
 _DIR = os.path.dirname(__file__)
 _prefixes: dict[str, tuple[str, int]] | None = None
@@ -51,18 +53,42 @@ def lookup(mac: str) -> dict | None:
         hit = _prefixes.get(hexs[:depth])
         if hit:
             model, count = hit
-            info = _models.get(model, {})
-            return {
-                "model": model,
-                "faz": info.get("faz"),
-                "marka": info.get("marka"),
-                "islemci": info.get("islemci"),
-                "guven": info.get("guven"),
-                "tahta": model in _models,
-                "onek": hexs[:depth],
-                "onek_tahta": count,
-            }
+            return _record(model, "mac", onek=hexs[:depth], onek_tahta=count)
     return None
+
+
+def model_key(text: str) -> str:
+    """Anakart adı ("VESTEL 14MB57" — hwfacts motherboard_model) → model anahtarı ("vestel-14mb57").
+    scripts/build-etap-phases.py model_key ile AYNI kural."""
+    return re.sub(r"[^a-z0-9]+", "-", (text or "").strip().lower()).strip("-")
+
+
+def by_model(motherboard: str) -> dict | None:
+    """SSH ile okunan anakart modelinden (kesin) faz kaydı; tabloda bilinen bir tahta modeli değilse None."""
+    if _prefixes is None:
+        _load()
+    key = model_key(motherboard)
+    return _record(key, "donanım") if key in _models else None
+
+
+def resolve(mac: str | None, motherboard: str | None = None) -> dict | None:
+    """Anakart modeli biliniyorsa ondan (kesin), bilinmiyorsa MAC önekinden faz kaydı."""
+    return (by_model(motherboard) if motherboard else None) or (lookup(mac) if mac else None)
+
+
+def _record(model: str, source: str, **extra) -> dict:
+    info = _models.get(model, {})
+    return {
+        "model": model,
+        "ad": info.get("ad") or model,
+        "faz": info.get("faz"),
+        "marka": info.get("marka"),
+        "islemci": info.get("islemci"),
+        "guven": info.get("guven"),
+        "tahta": model in _models,
+        "kaynak": source,
+        **extra,
+    }
 
 
 def label(info: dict | None) -> str:

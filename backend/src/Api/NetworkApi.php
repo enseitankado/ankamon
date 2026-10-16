@@ -59,7 +59,7 @@ final class NetworkApi
                     d.label, d.vendor, COALESCE(NULLIF(d.device_type, ''), d.type_auto) AS device_type,
                     d.device_type AS device_type_manual, d.type_auto,
                     COALESCE(NULLIF(d.model, ''), d.model_auto) AS model, d.model AS model_manual, d.model_auto,
-                    d.os_guess, d.notes, d.source, d.online,
+                    d.os_guess, d.notes, d.source, d.online, d.etap,
                     extract(epoch FROM d.first_seen_at)::bigint AS first_seen_at,
                     extract(epoch FROM d.last_seen_at)::bigint AS last_seen_at,
                     extract(epoch FROM d.state_changed_at)::bigint AS state_changed_at,
@@ -80,6 +80,8 @@ final class NetworkApi
             $device['services'] = json_decode((string) $device['services'], true) ?: [];
         }
         unset($device);
+        // ETAP faz bilgisi (bkz. migration 017, worker netscan/etap_phase.py); yoksa null.
+        $devices = array_map(static fn(array $d) => ['etap' => $d['etap'] === null ? null : json_decode((string) $d['etap'], true)] + $d, $devices);
         return ['devices' => $devices] + $state;
     }
 
