@@ -109,6 +109,11 @@ qx.Class.define("tihamon.util.Format", {
         index++;
       }
       return value.toFixed(index ? 1 : 0) + " " + units[index];
+    },
+
+    /** Ağ trafiği hızı: saniyedeki bayt (bkz. backend MetricsApi net_rx/net_tx). Değer yoksa boş. */
+    bps(value) {
+      return value === null || value === undefined ? "" : this.bytes(value) + "/sn";
     }
   }
 });

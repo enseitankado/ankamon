@@ -37,6 +37,24 @@ final class MetricsApi
              GROUP BY board_id"
         );
         $cpuByBoard = array_column($cpu, 'cpu', 'board_id');
+        // Ağ trafiği hızı sayaçtan türetilir (CPU ile aynı yöntem): her fiziksel arabirimin pencere
+        // içi bayt artış hızı, tahta başına toplanır (B/sn). lo/veth/docker reshape.star'da elenir.
+        $net = Db::all(
+            "SELECT board_id,
+                    sum(rate) FILTER (WHERE name = 'node_network_receive_bytes_total')  AS rx,
+                    sum(rate) FILTER (WHERE name = 'node_network_transmit_bytes_total') AS tx
+             FROM (SELECT board_id, name, device,
+                          (max(value) - min(value)) / NULLIF(extract(epoch FROM max(time) - min(time)), 0) AS rate
+                   FROM v_metrics
+                   WHERE time > now() - interval '5 minutes'
+                     AND name IN ('node_network_receive_bytes_total', 'node_network_transmit_bytes_total')
+                   GROUP BY board_id, name, device) per_dev
+             GROUP BY board_id"
+        );
+        $netByBoard = [];
+        foreach ($net as $n) {
+            $netByBoard[(int) $n['board_id']] = $n;
+        }
         $sensors = BoardSensors::latestAll();
 
         $latest = [];
@@ -55,6 +73,9 @@ final class MetricsApi
                 'disk_temp' => self::num($sensors[$id]['disk_temp'] ?? null, 0),
                 'fan_rpm' => self::num($sensors[$id]['fan_rpm'] ?? null, 0),
                 'battery_v' => self::num($sensors[$id]['battery_v'] ?? null, 2),
+                // Ağ trafiği (B/sn); sayaç sıfırlanması (yeniden başlatma) negatif üretmesin diye max(0).
+                'net_rx' => isset($netByBoard[$id]) ? self::num(max(0, (float) $netByBoard[$id]['rx']), 0) : null,
+                'net_tx' => isset($netByBoard[$id]) ? self::num(max(0, (float) $netByBoard[$id]['tx']), 0) : null,
                 'uptime_seconds' => $row['boot_time'] ? max(0, time() - (int) $row['boot_time']) : null,
             ];
         }

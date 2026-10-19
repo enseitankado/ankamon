@@ -90,6 +90,10 @@ qx.Class.define("tihamon.page.Boards", {
       { id: "cpu", label: "İşlemci", width: 80 },
       { id: "mem", label: "Bellek", width: 80 },
       { id: "disk", label: "Disk", hint: "Disk doluluğu", width: 70 },
+      // Ağ trafiği anlık hızı (bkz. backend MetricsApi net_rx/net_tx — node_exporter sayaçlarından
+      // türetilir). İndirme = tahtaya gelen (RX), Yükleme = tahtadan giden (TX).
+      { id: "net_rx", label: "İndirme", hint: "Ağ trafiği — indirme hızı (RX)", width: 100 },
+      { id: "net_tx", label: "Yükleme", hint: "Ağ trafiği — yükleme hızı (TX)", width: 100 },
       // Sensörler (bkz. backend Core/BoardSensors.php). Fan/pil/anakart, tahtada Super I/O sürücüsü
       // yüklüyse gelir ("Fan/pil/anakart sensörlerini etkinleştir" işlemi); Kasa yoksa ACPI bölgesidir.
       { id: "temp", label: "CPU sıcaklığı", width: 100 },
@@ -278,6 +282,7 @@ qx.Class.define("tihamon.page.Boards", {
             board.facts.bios_version || "", board.facts.kernel_version || "", board.facts.motherboard_model || "",
             board.facts.cpu_model || "", board.facts.cpu_phys_cores || "",
             F.percent(m.cpu_percent), F.percent(m.mem_percent), F.percent(m.disk_percent),
+            F.bps(m.net_rx), F.bps(m.net_tx),
             unit(m.cpu_temp, " °C"), unit(m.case_temp, " °C"), unit(m.disk_temp, " °C"),
             unit(m.fan_rpm, " RPM"), m.battery_v === null || m.battery_v === undefined ? "" : m.battery_v.toFixed(2) + " V",
             F.ago(board.last_seen_at), F.ago(board.last_log_at)
