@@ -1,7 +1,7 @@
 /**
  * "Disk kullanımı" sayfasının (bkz. page.DiskUsage — Sistem altında, 'logs.manage' yetkisiyle)
  * veri sekmeleri: log türleri (sistem, komut), rsyslog log kuyruğu, sensör
- * verileri, görev kuyruğu, sorun tespiti raporları ve yedekler (/data/backups).
+ * verileri, görev kuyruğu, bakım raporları ve yedekler (/data/backups).
  * Her sekme bir ui.DiskUsageTab'dır; burada yalnız türlere özgü sütunlar, yükleme ve silme istekleri
  * tanımlanır (backend: LogStatsApi, LogQueueStatsApi, MetricStatsApi, JobStatsApi, BackupStatsApi).
  */
@@ -176,7 +176,7 @@ qx.Class.define("tihamon.ui.DiskUsage", {
             rows,
             info: this.__info(spec, data,
               `${data.total.n} görev (${data.finished.n} bitmiş), ~${F.bytes(data.total.bytes)} — bekleyen/çalışan görevler silinemez; ` +
-              "sorun tespiti taramaları kendi sekmesinde")
+              "bakım raporları kendi sekmesinde")
           };
         },
         remove: async row => {
@@ -188,7 +188,7 @@ qx.Class.define("tihamon.ui.DiskUsage", {
     },
 
     /**
-     * Sorun tespiti raporları: tarama ("diagnose" görevi) başına, /api/storage/diagnose. Görev kuyruğu
+     * Bakım raporları (eski adı "Sorun tespiti"): tarama ("diagnose" görevi) başına, /api/storage/diagnose. Görev kuyruğu
      * sekmesi bunları saymaz. Yalnız bitmiş taramalar silinir; silinen tahtalar otomatik zamanlayıcıca
      * (bkz. worker tasks/diagnose_schedule.py) bir sonraki uygun anda yeniden taranır.
      */
@@ -196,8 +196,8 @@ qx.Class.define("tihamon.ui.DiskUsage", {
       const F = tihamon.util.Format;
       const status = tihamon.ui.DiskUsage.JOB_STATUS;
       const spec = this.__withDisk({
-        mode: "diagnose", size: this.__sizer("/storage/diagnose"), label: "Sorun tespiti",
-        noun: "sorun tespiti raporu (tahta sonuçlarıyla birlikte; silinen tahtalar otomatik taramada yeniden denetlenir)",
+        mode: "diagnose", size: this.__sizer("/storage/diagnose"), label: "Bakım raporları",
+        noun: "bakım raporu (tahta sonuçlarıyla birlikte; silinen tahtalar otomatik taramada yeniden denetlenir)",
         columns: [
           { id: "name", label: "Tarama" },
           { id: "kind", label: "Başlatan", width: 120 },
@@ -217,7 +217,7 @@ qx.Class.define("tihamon.ui.DiskUsage", {
           data.jobs.forEach(j => {
             const names = j.target_names.join(", ");
             const targets = j.targets > j.target_names.length ? `${j.targets} tahta (${names}…)` : names;
-            const name = `#${j.id} Sorun tespiti`;
+            const name = `#${j.id} Bakım raporu`;
             rows.push({
               scope: { ids: String(j.id) }, name, n: 1, bytes: j.est_bytes, estimated: true, deletable: j.deletable,
               cells: [name, j.auto ? "Otomatik" : (j.created_by || "Elle"), status[j.status] || j.status, targets,
