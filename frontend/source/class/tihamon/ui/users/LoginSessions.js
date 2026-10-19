@@ -56,6 +56,8 @@ qx.Class.define("tihamon.ui.users.LoginSessions", {
       { id: "duration", label: "Süre", width: 100 },
       { id: "status", label: "Durum", width: 140 },
       { id: "ip", label: "IP adresi", width: 120 },
+      // IP → MAC → takma ad (tahtalar/ağ listesi); takma ad yoksa MAC (bkz. LoginSessionsApi::COMPUTER_JOIN).
+      { id: "computer", label: "Bilgisayar", hint: "Bilgisayar (IP → MAC → tahta/ağ listesindeki takma ad; yoksa MAC)", width: 170 },
       { id: "browser", label: "Tarayıcı", width: 160 },
       { id: "actions", label: "İşlem", hint: "İşlem sayısı (giriş/çıkış dahil)", width: 60 },
       { id: "action_names", label: "Kullandığı işlevler", width: 300 }
@@ -142,7 +144,7 @@ qx.Class.define("tihamon.ui.users.LoginSessions", {
             live ? "—" : (exact ? "" : "≈ ") + F.dateTime(end),
             F.duration(Math.max(0, end - s.started_ts) / 1000) + (live ? " (sürüyor)" : ""),
             S.STATUS[s.status] || s.status,
-            s.ip || "", S.browser(s.user_agent), Number(s.actions) || 0, s.action_names || ""
+            s.ip || "", s.computer || "", S.browser(s.user_agent), Number(s.actions) || 0, s.action_names || ""
           ]
         };
       });

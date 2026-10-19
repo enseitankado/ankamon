@@ -62,6 +62,10 @@ for h in /sys/class/hwmon/hwmon*; do
 done
 # O anki en çok işlemci kullanan süreçler (1 sn'lik örnek — top'un 2. turu): "DGP %cpu komut".
 top -b -n 2 -d 1 -o %CPU -w 200 2>/dev/null | awk '/^top -/{n++} n==2 && /^ *PID/{p=1; next} n==2 && p && c<3 {c++; print "DGP", $9, $12}'
+# Saat sapması için: açılıştan beri geçen süre ve tahtanın saati — EN SONDA (yukarıdaki komutlar birkaç sn
+# sürer; sunucu saati SSH döner dönmez alınır, bkz. _ssh DG_SERVER_EPOCH) ki fark gerçek sapmayı versin.
+echo "DG_UPTIME=$(cut -d. -f1 /proc/uptime)"
+echo "DG_EPOCH=$(date +%s)"
 """.replace("__IO__", _IO_RE)
 
 SCRIPT = hwfacts.SCRIPT + CHECK_SCRIPT
@@ -81,6 +85,9 @@ CMOS_WARN_V = 2.5
 CASE_WARN_C = 50
 # Paket listesi (apt update) bu kadar gün yenilenmemişse "bekleyen güncelleme" sayısı eksik olabilir.
 APT_LISTS_STALE_DAYS = 7
+# "Saat eşitlenmemiş" yalnız tahta açılalı bu kadar saniye geçtiyse: açılışta NTP sunucusuna bağlanıp
+# eşitlenmek zaman alır (kullanıcı isteği: en az 3 dk).
+NTP_GRACE_S = 180
 # Son 15 dakikanın ortalama işlemci kullanımı bu yüzdeyi aşarsa bilgi verilir.
 CPU_INFO_PCT = 80
 GIB = 1024 ** 3
@@ -101,7 +108,23 @@ def _ssh(board: dict, user: str, password: str, timeout: int = 60) -> dict:
     if proc.returncode != 0:
         err = proc.stderr.decode("utf-8", "replace").strip()
         return {"status": "unreachable", "rc": proc.returncode, "output": err or f"ssh çıkış kodu {proc.returncode}"}
-    return {"status": "ok", "rc": 0, "output": proc.stdout.decode("utf-8", "replace")}
+    # Sunucunun saati SSH döner dönmez (tahtanın DG_EPOCH'u betiğin son satırı): fark = saat sapması.
+    return {"status": "ok", "rc": 0,
+            "output": proc.stdout.decode("utf-8", "replace") + f"\nDG_SERVER_EPOCH={int(time.time())}\n"}
+
+
+def _drift_text(seconds: int) -> str:
+    """Saat sapması: "4 dk 12 sn ileri", "3 sa 5 dk geri", "12 gün ileri"."""
+    a = abs(seconds)
+    if a < 90:
+        amount = f"{a} sn"
+    elif a < 90 * 60:
+        amount = f"{a // 60} dk {a % 60} sn"
+    elif a < 48 * 3600:
+        amount = f"{a // 3600} sa {a % 3600 // 60} dk"
+    else:
+        amount = f"{a // 86400} gün {a % 86400 // 3600} sa"
+    return amount + (" ileri" if seconds > 0 else " geri")
 
 
 def _extra(output: str) -> dict:
@@ -121,6 +144,9 @@ def _extra(output: str) -> dict:
         "root_ro": num("DG_ROOT_RO"),
         "inode_pct": num("DG_INODE_PCT"),
         "ntp_sync": values.get("DG_NTP_SYNC", "").strip() or None,
+        "uptime": num("DG_UPTIME"),
+        "epoch": num("DG_EPOCH"),
+        "server_epoch": num("DG_SERVER_EPOCH"),
         "reboot_required": num("DG_REBOOT_REQUIRED"),
         "load15": load15,
         "dpkg_broken": num("DG_DPKG_BROKEN"),
@@ -454,8 +480,16 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
     if extra.get("dpkg_broken"):
         add(g, "Yarım kalmış paket kurulumu", "warn", f"{extra['dpkg_broken']} paket yarım kalmış — güncellemeler çalışmaz.",
             "Tahtada \"dpkg --configure -a\" çalıştırın.")
-    if extra.get("ntp_sync") == "no":
-        add(g, "Saat eşitlenmemiş", "warn", "Sistem saati internetten eşitlenmiyor.",
+    # Açılıştan hemen sonra NTP henüz eşitlememiş olabilir: en az NTP_GRACE_S geçmeden anomali sayılmaz.
+    uptime = extra.get("uptime")
+    if extra.get("ntp_sync") == "no" and (uptime is None or uptime >= NTP_GRACE_S):
+        detail = "Sistem saati internetten eşitlenmiyor."
+        if extra.get("epoch") and extra.get("server_epoch"):
+            drift = extra["epoch"] - extra["server_epoch"]
+            board_time = time.strftime("%d.%m.%Y %H:%M:%S", time.localtime(extra["epoch"]))
+            detail += (f" Tahtanın saati {board_time}; Tiha-Mon sunucusuna göre "
+                       + (f"{_drift_text(drift)}." if abs(drift) >= 2 else "şimdilik doğru (sapma 2 sn'den az)."))
+        add(g, "Saat eşitlenmemiş", "warn", detail,
             "Yanlış saat HTTPS/sertifika hatalarına ve yanlış log zamanlarına yol açar; NTP erişimini (UDP 123) kontrol edin.")
     cores = facts.get("cpu_cores")
     if extra.get("load15") is not None and cores and extra["load15"] > cores:
