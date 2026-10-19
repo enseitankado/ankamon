@@ -97,10 +97,11 @@ qx.Class.define("tihamon.page.Network", {
         this.__toggle(id);
       }
     });
+    // Çift tıklama = Bilgisayar ayrıntıları (kullanıcı isteği; düzenleme sağ menüde ve ayrıntılar penceresinde).
     this.__table.addListener("cellDbltap", e => {
       const id = this.__model.getValue(0, e.getRow());
-      if (typeof id === "number" && e.getColumn() !== 2 && this._can("network.manage")) {
-        this.__edit(this.__devices.get(id));
+      if (typeof id === "number" && e.getColumn() !== 2) {
+        this.__showDetails(this.__devices.get(id));
       }
     });
     this.__table.addListener("cellContextmenu", e => {
@@ -442,11 +443,100 @@ qx.Class.define("tihamon.page.Network", {
       this.__pollState();
     },
 
+    /**
+     * Bilgisayar ayrıntıları (modal; çift tıklama ve sağ menü — kullanıcı isteği): grid'in TÜM sütunlarının
+     * (gizlenmiş olanlar dahil) değerleri iki sütunlu tabloda; ardından varsa açık portlar/servisler ve ağ
+     * paylaşımları. Satır sağ menüsü: değeri kopyala. "Düzenle" yalnız network.manage yetkisiyle.
+     */
+    __showDetails(device) {
+      if (!device) {
+        return;
+      }
+      const F = tihamon.util.Format;
+      const row = (this.__rows || []).find(r => r.device.id === device.id);
+      const cells = row ? row.cells : [];
+      const strip = v => String(v ?? "").replace(/<[^>]+>/g, "").trim();
+      const when = (secs, rel) => (secs ? `${rel} (${F.dateTime(secs * 1000)})` : rel || "");
+      const fields = this.__columns.filter(c => c.id !== "exp").map(c => {
+        const i = this.__columns.indexOf(c) + 2;
+        let value = strip(cells[i]);
+        if (c.id === "first") {
+          value = when(device.first_seen_at, value);
+        } else if (c.id === "seen") {
+          value = device.online ? "şimdi (çevrim içi)" : when(device.last_seen_at, value);
+        } else if (c.id === "ports" && !value) {
+          value = device.services_scanned_at ? "0" : "taranmadı";
+        }
+        return [c.label, value || "—"];
+      });
+      const name = tihamon.ui.network.Ops.deviceName(device) || device.ip || device.mac;
+      const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
+      const win = tihamon.ui.Dialog.window("Bilgisayar ayrıntıları — " + name, Math.min(720, root.width - 40), { maximizable: true });
+      win.set({ height: Math.min(720, root.height - 40) });
+
+      const table = (title, columns, rows, widths) => {
+        const model = new qx.ui.table.model.Simple();
+        model.setColumns(columns);
+        model.setData(rows);
+        const t = new qx.ui.table.Table(model, { tableColumnModel: obj => new qx.ui.table.columnmodel.Resize(obj) })
+          .set({ statusBarVisible: false, columnVisibilityButtonVisible: false, rowHeight: 26, showCellFocusIndicator: false,
+            height: Math.min(26 * rows.length + 34, title ? 220 : 520) });
+        const b = t.getTableColumnModel().getBehavior();
+        widths.forEach((w, i) => b.setWidth(i, w));
+        t.addListener("cellContextmenu", e => {
+          const r = e.getRow();
+          if (r === null || r === undefined) {
+            return;
+          }
+          const menu = new qx.ui.menu.Menu();
+          const value = String(model.getValue(columns.length - 1, r) ?? "");
+          const copy = new qx.ui.menu.Button("Değeri kopyala");
+          copy.addListener("execute", () => tihamon.util.Clipboard.copy(value));
+          menu.add(copy);
+          const copyRow = new qx.ui.menu.Button("Satırı kopyala");
+          copyRow.addListener("execute", () => tihamon.util.Clipboard.copy(model.getRowData(r).join("\t")));
+          menu.add(copyRow);
+          t.setContextMenu(menu);
+        });
+        if (title) {
+          win.add(new qx.ui.basic.Label(title).set({ font: "bold", marginTop: 4 }));
+        }
+        win.add(t, { flex: title ? 0 : 1 });
+      };
+      table(null, ["Alan", "Değer"], fields, [180, "1*"]);
+      if (device.services.length) {
+        table(`Açık portlar / servisler (${device.services.length})`, ["Port", "Servis", "Ürün / sürüm", "Ek bilgi"],
+          device.services.map(s => [`${s.port}/${s.proto}`, s.service || "", [s.product, s.version].filter(Boolean).join(" "), s.extra || ""]),
+          [90, 130, 200, "1*"]);
+      }
+      if (device.shares && device.shares.length) {
+        table(`Ağ paylaşımları (${device.shares.length})`, ["Tür", "Paylaşım", "Açıklama"],
+          device.shares.map(sh => [sh.stype === "printer" ? "🖨 yazıcı" : "📁 klasör", sh.path || sh.name, sh.comment || ""]),
+          [100, 240, "1*"]);
+      }
+      const buttons = [];
+      if (this._can("network.manage")) {
+        const edit = new qx.ui.form.Button("Düzenle");
+        edit.addListener("execute", () => {
+          win.close();
+          this.__edit(device);
+        });
+        buttons.push(edit);
+      }
+      const close = new qx.ui.form.Button("Kapat");
+      close.addListener("execute", () => win.close());
+      buttons.push(close);
+      tihamon.ui.Dialog.buttons(win, buttons);
+      win.open();
+    },
+
     __rowMenu(device, devices) {
       const menu = new qx.ui.menu.Menu();
       const ICON = tihamon.ui.Shell.ICON;
       const add = (icon, label, handler) => menu.add(tihamon.ui.BoardOps.menuButton(icon, label, handler));
       const count = devices.length > 1 ? ` (${devices.length} cihaz)` : "";
+      add(ICON.info, "Bilgisayar ayrıntıları", () => this.__showDetails(device));
+      menu.add(new qx.ui.menu.Separator());
       if (device.services.length || (device.shares && device.shares.length)) {
         add("▾", this.__expanded.has(device.id) ? "Ayrıntıları gizle" : "Ayrıntıları göster", () => this.__toggle(device.id));
       }
