@@ -93,8 +93,11 @@ qx.Class.define("tihamon.ui.taskmgr.Window", {
     // --- sekmeler (solda, Windows 11 gezinti çubuğu gibi) --------------------------------------------------
     this.__tabs = new qx.ui.tabview.TabView("left");
     this.__tabMap = new Map();
-    const T = tihamon.ui.taskmgr;
-    [T.ProcessesTab, T.PerformanceTab, T.AppHistoryTab, T.StartupTab, T.UsersTab, T.DetailsTab, T.ServicesTab, T.SettingsTab]
+    // Tam adlarla: qooxdoo derleyicisi bağımlılığı yalnız tam sınıf adından görür — kısaltma değişkeniyle
+    // (T.ProcessesTab) yazılınca sınıflar build paketine girmiyor, pencere "e is not a constructor" ile açılmıyordu.
+    [tihamon.ui.taskmgr.ProcessesTab, tihamon.ui.taskmgr.PerformanceTab, tihamon.ui.taskmgr.AppHistoryTab,
+      tihamon.ui.taskmgr.StartupTab, tihamon.ui.taskmgr.UsersTab, tihamon.ui.taskmgr.DetailsTab,
+      tihamon.ui.taskmgr.ServicesTab, tihamon.ui.taskmgr.SettingsTab]
       .forEach(Cls => {
         const tab = new Cls(this);
         this.__tabMap.set(tab.getUserData("key"), tab);
