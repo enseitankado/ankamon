@@ -90,6 +90,9 @@ qx.Class.define("tihamon.page.Boards", {
       { id: "cpu", label: "İşlemci", width: 80 },
       { id: "mem", label: "Bellek", width: 80 },
       { id: "disk", label: "Disk", hint: "Disk doluluğu", width: 70 },
+      // Ağ trafiği, Mbit/sn (bkz. backend MetricsApi::latest — node_exporter sayaçlarının son tarama aralığı).
+      { id: "net_rx", label: "Gelen", hint: "Gelen ağ trafiği (Mbit/sn)", width: 90 },
+      { id: "net_tx", label: "Giden", hint: "Giden ağ trafiği (Mbit/sn)", width: 90 },
       // Sensörler (bkz. backend Core/BoardSensors.php). Fan/pil/anakart, tahtada Super I/O sürücüsü
       // yüklüyse gelir ("Fan/pil/anakart sensörlerini etkinleştir" işlemi); Kasa yoksa ACPI bölgesidir.
       { id: "temp", label: "CPU sıcaklığı", width: 100 },
@@ -266,6 +269,7 @@ qx.Class.define("tihamon.page.Boards", {
       this.__boards = new Map(boards.boards.map(b => [b.id, b]));
       this.__metrics = metrics.latest || {};
       const unit = (v, suffix) => v === null || v === undefined ? "" : v + suffix;
+      const mbit = v => v === null || v === undefined ? "" : v.toFixed(v < 10 ? 2 : 1) + " Mbit/sn";
       // cells[0]=kimlik, cells[1]=onay kutusu, cells[2..]=sütunlar.
       this.__rows = boards.boards.map(board => {
         const m = metrics.latest[board.id] || {};
@@ -283,6 +287,7 @@ qx.Class.define("tihamon.page.Boards", {
             board.facts.bios_version || "", board.facts.kernel_version || "", board.facts.motherboard_model || "",
             board.facts.cpu_model || "", board.facts.cpu_phys_cores || "",
             F.percent(m.cpu_percent), F.percent(m.mem_percent), F.percent(m.disk_percent),
+            mbit(m.net_rx_mbit), mbit(m.net_tx_mbit),
             unit(m.cpu_temp, " °C"), unit(m.case_temp, " °C"), unit(m.disk_temp, " °C"),
             unit(m.fan_rpm, " RPM"), m.battery_v === null || m.battery_v === undefined ? "" : m.battery_v.toFixed(2) + " V",
             F.ago(board.last_seen_at), F.ago(board.last_log_at)
@@ -301,7 +306,9 @@ qx.Class.define("tihamon.page.Boards", {
       }
       // cells[0] kimlik, cells[1] onay kutusu; sütun i'nin değeri cells[i + 2]'dedir.
       const colFilters = this.__columns
-        .map((column, index) => ({ index: index + 2, text: (this.__filterFields[column.id].getValue() || "").toLowerCase().trim() }))
+        // Süzgeç kutusu başlık hücresi ilk çizildiğinde oluşur (bkz. Base._addColumnFilters); henüz
+        // çizilmemiş (ekran dışı/gizli) sütunda yoktur — süzgeçsiz sayılır.
+        .map((column, index) => ({ index: index + 2, text: ((this.__filterFields[column.id] || { getValue: () => "" }).getValue() || "").toLowerCase().trim() }))
         .filter(f => f.text);
 
       const shown = this.__rows.filter(({ cells }) =>
