@@ -27,7 +27,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("tihamon.netscan")
 
 SERVICE_RESCAN_HOURS = int(os.environ.get("NETSCAN_SERVICE_RESCAN_HOURS", "24"))
-TOP_PORTS = int(os.environ.get("NETSCAN_TOP_PORTS", "100"))
+TOP_PORTS = int(os.environ.get("NETSCAN_TOP_PORTS", "1000"))
 # Servis taramaları arasında makineye nefes aldırılır.
 SERVICE_PAUSE = 5
 # Paylaşım (SMB) taraması servis taramasından hafiftir ama yine kendi aralığıyla yenilenir.
