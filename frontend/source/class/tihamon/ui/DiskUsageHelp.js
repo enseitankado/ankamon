@@ -38,6 +38,9 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
       });
     },
 
+    /** "Şu an" satırındaki sayının birimi (tanımlı değilse "kayıt"). */
+    UNIT: { queue: "dosya", backups: "dosya", jobs: "görev", diagnose: "tarama" },
+
     CSS: `<style>
       .dh{font:13px/1.55 sans-serif;padding:4px 14px 14px}
       .dh h3{font-size:14px;margin:16px 0 6px;padding-bottom:3px;border-bottom:1px solid rgba(128,128,128,.35)}
@@ -47,7 +50,7 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
       .dh code{font-family:monospace;font-size:12px;background:rgba(128,128,128,.15);padding:0 3px;border-radius:3px}
       .dh .muted{opacity:.7}
       .dh .v{border-left:5px solid;padding:8px 12px;margin:10px 0 4px;border-radius:3px}
-      .dh .v b{display:block;font-size:14px;margin-bottom:2px}
+      .dh .v > b{display:block;font-size:14px;margin-bottom:2px}
       .dh .v.ok{border-color:#2e8b2e;background:rgba(46,139,46,.12)}
       .dh .v.mid{border-color:#e0a020;background:rgba(224,160,32,.13)}
       .dh .v.bad{border-color:#d9534f;background:rgba(217,83,79,.12)}
@@ -77,7 +80,7 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
         ? `/data diski: toplam ${F.bytes(p.disk.total)}, <b>boş ${F.bytes(p.disk.free)}</b>` : "";
       const now = all && all.bytes != null
         ? `Şu an (${esc(String(all.name).replace(/^—\s*|\s*—$/g, ""))}): <b>${F.bytes(all.bytes)}</b>` +
-          `${all.n != null ? ` (${Number(all.n).toLocaleString("tr-TR")} kayıt)` : ""}` +
+          `${all.n != null ? ` (${Number(all.n).toLocaleString("tr-TR")} ${this.UNIT[mode] || "kayıt"})` : ""}` +
           `${all.first ? `, en eski kayıt ${F.dateTime(all.first)}` : ""}.` : "";
 
       const T = this.__topics(mode, { env, pol, run, drop, compress, F, esc, p });
@@ -141,7 +144,9 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
             todo: ["Eski kayıtları tahta satırlarından silin (silinen kayıtlar denetim izinden de gider)."]
           };
         case "queue": {
-          const q = p.queue || {};
+          const q = Object.assign({}, p.queue);
+          // rsyslog boyut yazımı ("4g", "512m") → "4 GB"
+          q.maxDiskSpace = String(q.maxDiskSpace || "4g").replace(/^(\d+)\s*([kmgt])b?$/i, (m, n, u) => `${n} ${u.toUpperCase()}B`);
           return {
             verdict: ["mid", "Canlı kuyruk sınırlı; bozuk kuyruk klasörleri birikebilir.",
               `Canlı kuyruk en çok <b>${esc(q.maxDiskSpace || "4g")}</b> yer kaplayabilir ve loglar veritabanına yazıldıkça kendiliğinden boşalır (normalde boştur). ` +
@@ -242,7 +247,9 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
       const s = String(text || "").trim();
       let m = /^(\d+) (day|days|mon|mons|year|years|hour|hours)$/.exec(s);
       if (m) {
-        return `${m[1]} ${{ day: "gün", days: "gün", mon: "ay", mons: "ay", year: "yıl", years: "yıl", hour: "saat", hours: "saat" }[m[2]]}`;
+        const n = Number(m[1]);
+        const unit = { day: "gün", days: "gün", mon: "ay", mons: "ay", year: "yıl", years: "yıl", hour: "saat", hours: "saat" }[m[2]];
+        return `${n} ${unit}` + (unit === "gün" && n >= 365 && n % 365 === 0 ? ` (≈${n / 365} yıl)` : "");
       }
       m = /^(\d+):(\d\d):(\d\d)$/.exec(s);
       if (m) {
