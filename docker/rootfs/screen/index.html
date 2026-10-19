@@ -59,6 +59,8 @@
      Sınıf <html>'e eklenir (bkz. baştaki senkron betik), body'ye değil: <body> ayrıştırılmadan önce
      de erişilebilsin diye — aksi halde ilk boyama bu kurallar uygulanmadan, FOUC ile olurdu. */
   html.embed #toolbar { display: none; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 15px; color: #888; pointer-events: none; z-index: 5; }
   html.embed #grid { grid-template-columns: repeat(auto-fill, minmax(var(--tile-min, 300px), 1fr)); grid-auto-rows: auto;
     align-content: start; gap: 6px; padding: 6px; background: #f3f3f3; }
   html.embed .tile { min-height: 0; border-radius: 4px; overflow: hidden; }
@@ -141,6 +143,8 @@
     <button id="full" title="Bütün sayfayı tam ekran yapar">⛶ Tam ekran</button>
   </div>
   <div id="grid"></div>
+  <!-- Kutucuklar kurulana dek (noVNC modülleri + üst sayfadan tahta listesi) ortada görünür; bkz. markLoaded. -->
+  <div id="loading">Yükleniyor…</div>
 
 <script type="module">
 import RFB from "./novnc/core/rfb.js";
@@ -877,7 +881,7 @@ if (embed) {
   // Üst sayfa (Tahtalar) grid'deki tahta listesini her değiştiğinde gönderir.
   window.addEventListener("message", e => {
     if (e.source !== window.parent || e.origin !== location.origin || !e.data) return;
-    if (e.data.type === "tm-boards") setBoards(e.data.boards || []);
+    if (e.data.type === "tm-boards") { setBoards(e.data.boards || []); markLoaded(); }
     else if (e.data.type === "tm-selection") setSelected((e.data.ids || []).filter(id => tiles.has(id)), true);
     else if (e.data.type === "tm-size") document.documentElement.style.setProperty("--tile-min", e.data.px + "px");
     else if (e.data.type === "tm-view") {
@@ -893,7 +897,18 @@ if (embed) {
   // Hazırım: üst sayfa güncel listeyi göndersin (yükleme sırasında gelen güncelleme kaybolmasın).
   window.parent.postMessage({ type: "tm-ready" }, location.origin);
 }
-setBoards(spec.boards);
+
+/** "Yükleniyor…" yazısını kaldırır — ilk tahta listesi kutucuklara dönüşünce (kullanıcı isteği). */
+function markLoaded() {
+  document.getElementById("loading")?.remove();
+}
+
+// Gömülü kipte liste üst sayfadan ("tm-boards") gelir: o gelene dek boş liste çizilmez (yoksa yükleme
+// sırasında yanlışlıkla "Gösterilecek tahta yok." görünüyordu). Tek pencere kipinde liste adresle gelir.
+if (!embed) {
+  setBoards(spec.boards);
+  markLoaded();
+}
 </script>
 </body>
 </html>
