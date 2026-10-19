@@ -74,6 +74,10 @@ qx.Class.define("tihamon.ui.taskmgr.UsersTab", {
         return;
       }
       const F = tihamon.ui.taskmgr.Fmt;
+      if (s.self) {
+        tihamon.ui.Dialog.alert("Bu, görev yöneticisinin tahtaya kendi bağlantısı. Kapatmak için pencereyi kapatın.");
+        return;
+      }
       const text = op === "logout"
         ? `<b>${F.esc(s.user)}</b> kullanıcısının oturumu kapatılsın mı?<br><br>Kaydedilmemiş veriler kaybolabilir.`
         : `<b>${F.esc(s.user)}</b> kullanıcısının bağlantısı kesilsin (ekran kilitlensin) mi?<br>Oturum açık kalır; tahtada parola ile açılır.`;
@@ -109,7 +113,8 @@ qx.Class.define("tihamon.ui.taskmgr.UsersTab", {
         const open = this.__expanded.has(key);
         const label = `<span style="display:inline-block;width:16px;opacity:.7">${list.length ? (open ? "▾" : "▸") : ""}</span>👤 ` +
           `<b>${F.esc(u.user)}</b> <span style="opacity:.6">(${list.length})</span>`;
-        const where = [u.type === "x11" ? "Masaüstü" : u.type, u.display || u.tty, u.remote ? "uzak: " + u.host : ""].filter(Boolean).join(" · ");
+        const where = u.self ? "Tiha-Mon bağlantısı (bu pencere)"
+          : [u.type === "x11" ? "Masaüstü" : u.type, u.display || u.tty, u.remote ? "uzak: " + u.host : ""].filter(Boolean).join(" · ");
         rows.push([key, label, STATE[u.state] || u.state, `#${u.id} ${where}`, Math.round(sum(list, "cpu") * 10) / 10,
           sum(list, "mem"), sum(list, "disk"), sum(list, "net")]);
         if (open) {

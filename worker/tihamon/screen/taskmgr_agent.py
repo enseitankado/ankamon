@@ -27,6 +27,8 @@ HZ = os.sysconf("SC_CLK_TCK")
 PAGE_KB = os.sysconf("SC_PAGE_SIZE") // 1024
 NCPU = os.cpu_count() or 1
 SELF = os.getpid()
+# Ajanın kendi oturumu (Tiha-Mon'un SSH bağlantısı): Kullanıcılar'da işaretlenir, kapatılamaz/kilitlenemez.
+SELF_SID = (open("/proc/self/sessionid").read().strip() if os.path.exists("/proc/self/sessionid") else "")
 PF_KTHREAD = 0x00200000
 DISK_RE = re.compile(r"^(sd[a-z]+|nvme\d+n\d+|mmcblk\d+|vd[a-z]+|hd[a-z]+|xvd[a-z]+)$")
 UNIT_RE = re.compile(r"^[A-Za-z0-9@._:\\-]+\.service$")
@@ -474,7 +476,7 @@ def sessions():
         items.append({"id": p[0], "user": kv.get("Name", ""), "uid": int(kv.get("User") or 0), "state": kv.get("State", ""),
                       "type": kv.get("Type", ""), "class": kv.get("Class", ""), "remote": kv.get("Remote") == "yes",
                       "host": kv.get("RemoteHost", ""), "display": kv.get("Display", ""), "tty": kv.get("TTY", ""),
-                      "since": kv.get("Timestamp", ""), "seat": kv.get("Seat", "")})
+                      "since": kv.get("Timestamp", ""), "seat": kv.get("Seat", ""), "self": p[0] == SELF_SID})
     return items
 
 
@@ -610,6 +612,8 @@ def command(cmd, sampler):
         sid = str(cmd.get("session", ""))
         if not re.match(r"^[A-Za-z0-9]+$", sid):
             raise ValueError("Geçersiz oturum.")
+        if sid == SELF_SID:
+            raise ValueError("Bu, görev yöneticisinin kendi bağlantısı; kapatılamaz (pencereyi kapatın).")
         if op == "logout":
             rc, out, err = run(["loginctl", "terminate-session", sid])
         else:
