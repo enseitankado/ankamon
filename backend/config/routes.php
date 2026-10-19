@@ -68,6 +68,7 @@ return [
     ['DELETE', '/api/storage/diagnose',  [Api\JobStatsApi::class, 'diagnoseDelete'], 'logs.manage'],
     ['GET',    '/api/storage/backups',   [Api\BackupStatsApi::class, 'stats'], 'logs.manage'],
     ['DELETE', '/api/storage/backups',   [Api\BackupStatsApi::class, 'delete'], 'logs.manage'],
+    ['GET',    '/api/storage/policy',    [Api\StoragePolicyApi::class, 'policy'], 'logs.manage'],
     ['GET',    '/api/storage/logqueue',  [Api\LogQueueStatsApi::class, 'stats'], 'logs.manage'],
     ['DELETE', '/api/storage/logqueue',  [Api\LogQueueStatsApi::class, 'delete'], 'logs.manage'],
     ['GET',    '/api/activity',          [Api\ActivityApi::class, 'index'],    'user'],

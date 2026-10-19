@@ -26,6 +26,13 @@ qx.Class.define("tihamon.ui.DiskUsageTab", {
     this.setPadding(8);
 
     const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
+    // Yardım: bu verinin ne olduğu, nerede/ne kadar saklandığı, kendiliğinden temizlenip temizlenmediği (bkz. ui.DiskUsageHelp).
+    const help = new qx.ui.form.Button("?").set({
+      width: 30, minWidth: 30, padding: [3, 0], font: "bold",
+      toolTipText: "Bu kayıtlar nedir, nerede ve ne kadar saklanır, kendiliğinden silinir mi — diski doldurabilir mi?"
+    });
+    help.addListener("execute", () => tihamon.ui.DiskUsageHelp.open(spec, this.__rows));
+    bar.add(help);
     const refresh = new qx.ui.form.Button("Tazele");
     refresh.addListener("execute", () => this.load());
     bar.add(refresh);
