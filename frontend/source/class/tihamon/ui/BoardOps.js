@@ -604,6 +604,11 @@ qx.Class.define("tihamon.ui.BoardOps", {
             boards.length > 1 ? this.webshellMulti(boards) : this.webshell(board));
         }
         group(ICON.run, "Komut çalıştır" + count, commands);
+        // Görev yöneticisi (Windows'taki gibi; canlı SSH, pencere kapanınca biter — bkz. ui.taskmgr.Window).
+        // Tek tahta: çoklu seçimde sağ tıklanan tahta için açılır.
+        if (can("taskmgr")) {
+          add(ICON.taskmgr, "Görev yöneticisi", () => tihamon.ui.taskmgr.Window.open(board, user));
+        }
 
         // Ekran ▸ Ekranı göster, Ekranımı yansıt ▸ <kalite> + Ses (ayar penceresi sorulmaz — bkz. cast()).
         const screens = sub();

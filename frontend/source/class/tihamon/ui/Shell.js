@@ -104,7 +104,7 @@ qx.Class.define("tihamon.ui.Shell", {
       dashboard: "◈", boards: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
       info: "ℹ", backup: "⬇", copy: "⧉", cast: "⇪", logout: "⏏", lock: "🔒", diagnose: "⚠", system: "⚒", diskusage: "⛁",
-      network: "⇆", subnet: "▫"
+      network: "⇆", subnet: "▫", taskmgr: "☷"
     },
 
     // Uzaktan işlemler kaldırıldı; işlevi Tahtalar sayfasına ve ağaç sağ menülerine taşındı.

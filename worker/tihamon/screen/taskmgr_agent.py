@@ -162,6 +162,14 @@ def static_info():
                       "size": int(sectors) * 512 if sectors.isdigit() else None,
                       "ssd": read("/sys/block/%s/queue/rotational" % name).strip() == "0"})
     info["disks"] = disks
+    info["hz"] = HZ
+    # Sistem diski: kök (/) dosya sisteminin aygıtının bağlı olduğu disk (sda2 → sda, nvme0n1p2 → nvme0n1).
+    root_dev = ""
+    for line in read("/proc/mounts").splitlines():
+        p = line.split()
+        if len(p) > 1 and p[1] == "/" and p[0].startswith("/dev/"):
+            root_dev = os.path.basename(os.path.realpath(p[0]))
+    info["root_disk"] = next((d["name"] for d in disks if root_dev.startswith(d["name"])), None)
     nets = []
     for name in sorted(os.listdir("/sys/class/net")):
         if name == "lo" or not os.path.exists("/sys/class/net/%s/device" % name):
