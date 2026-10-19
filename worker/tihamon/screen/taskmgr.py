@@ -106,7 +106,7 @@ class TaskMgrSocket(tornado.websocket.WebSocketHandler):
                 line = raw.decode("utf-8", "replace").strip()
                 if not line:
                     continue
-                if line.startswith('{"t":"res"'):
+                if '"t":"res"' in line[:40]:
                     try:
                         res = json.loads(line)
                     except ValueError:

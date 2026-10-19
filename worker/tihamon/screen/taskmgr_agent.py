@@ -698,8 +698,8 @@ def main():
                     res = command(cmd, sampler)
                 except Exception as e:  # noqa: BLE001 — her hata kullanıcıya iletilir
                     res = {"ok": False, "msg": str(e)}
-                res.update({"t": "res", "id": cmd.get("id"), "op": cmd.get("op")})
-                emit(res)
+                # "t" önde: köprü (taskmgr.py) yanıtları buradan tanır ve değişiklikleri audit_log'a yazar.
+                emit(dict({"t": "res", "id": cmd.get("id"), "op": cmd.get("op")}, **res))
                 if cmd.get("op") == "want":
                     slow_at = {k: 0 for k in slow_at}
                     next_at = time.time()
