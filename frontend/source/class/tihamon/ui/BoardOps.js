@@ -157,6 +157,10 @@ qx.Class.define("tihamon.ui.BoardOps", {
      * @param user {Map?} oturum sahibi
      * @param manage {Boolean?} "Ekranı yönet" kipi (tek tahta)
      * @param opts {Map?} {modal: true} — pencere kipli açılır (ör. Oturumlar ▸ Kullanıcılar çizelgesinden)
+     * Tek tahtalık pencere tahta başına BİR tane açılır (kullanıcı isteği): aynı tahtanın penceresi zaten
+     * açıksa yenisi açılmaz, o öne getirilir ("Ekranı yönet" istenmişse izleme penceresi yönetim kipiyle
+     * değiştirilir). Açık pencereler SCREEN_WINDOWS iletisiyle duyurulur — Ekranlar sekmesi o tahtanın
+     * önizlemesini durdurup "Ayrı pencerede izleniyor" yazar (bkz. Boards.js, screen/index.html "tm-popped").
      */
     screen(boards, user, manage = false, opts = {}) {
       const list = boards.map(b => ({ id: b.id, name: b.label || b.hostname || b.ip || "#" + b.id }));
@@ -166,6 +170,16 @@ qx.Class.define("tihamon.ui.BoardOps", {
       const control = !!user && (user.is_admin || user.features.includes("screen.control"));
       // manage ("Ekranı yönet"): tek tahta, sayfa doğrudan müdahale (fare/klavye) kipinde açılır.
       manage = manage && control && list.length === 1;
+      const single = list.length === 1 ? list[0].id : null;
+      const open = single !== null && this.__screenWins.get(single);
+      if (open) {
+        if (!manage || open.manage) {
+          open.win.open(); // görünür + öne
+          open.win.focus();
+          return;
+        }
+        open.win.close(); // izleme → yönetim: aynı tahtaya iki akış açık kalmasın
+      }
       const spec = { boards: list, q: list.length > 1 ? "thumb" : "view", control, manage };
       const hash = btoa(unescape(encodeURIComponent(JSON.stringify(spec))));
       const caption = list.length > 1 ? `Ekranlar (${list.length} tahta)`
@@ -188,11 +202,34 @@ qx.Class.define("tihamon.ui.BoardOps", {
       win.add(frame);
       win.addListener("close", () => {
         frame.setSource("about:blank"); // WebSocket'ler hemen kapansın (tahtadaki x11vnc de biter)
+        if (single !== null && this.__screenWins.get(single)?.win === win) {
+          this.__screenWins.delete(single);
+          this.__announceScreenWindows();
+        }
         win.destroy();
       });
       win.addListenerOnce("appear", () => win.center());
       root.add(win);
       win.open();
+      if (single !== null) {
+        this.__screenWins.set(single, { win, manage });
+        this.__announceScreenWindows();
+      }
+    },
+
+    /** Tahta kimliği → {win, manage}: açık tek tahtalık ekran pencereleri (bkz. screen). */
+    __screenWins: new Map(),
+
+    /** Message Bus konusu: açık ekran pencerelerinin tahta kimlikleri (veri: Array). */
+    SCREEN_WINDOWS: "tihamon.screenWindows",
+
+    /** Ekran penceresi şu an açık olan tahtaların kimlikleri. */
+    screenWindowIds() {
+      return [...this.__screenWins.keys()];
+    },
+
+    __announceScreenWindows() {
+      qx.event.message.Bus.dispatchByName(this.SCREEN_WINDOWS, this.screenWindowIds());
     },
 
     /** İşaretlenmiş görev sonucu ("facts" görevinin output'u — JSON metin) için ayrıştırılmış

@@ -82,6 +82,8 @@
   .tile:fullscreen { background: #000; }
   .tile:fullscreen .view { flex: 1; aspect-ratio: auto; }
   .tile.offline .msg { color: #888; }
+  /* Ekranı ayrı pencerede açık tahta (Boards.js "tm-popped"): önizleme akışı durur, yerine bu not. */
+  .tile.popped .msg { color: #8cf; font-size: 14px; font-weight: 600; }
   /* Önizlemede (q=thumb) oturum durumu — "Oturumları sorgula" sonucu ve "Oturum aç"/"Oturumu kapat"
      ilerlemesi; sol alt köşe, siyah zemin beyaz yazı. Bkz. Tile.setWhoami / Boards.js __whoamiState. */
   /* Birden fazla oturum varsa adlar oturum açma sırasıyla virgülle gelir ("ali, veli" — bkz. worker
@@ -397,6 +399,16 @@ class Tile {
       this.setState("offline", "Tahta kapalı");
       return;
     }
+    // Ekranı ayrı pencerede açık (bkz. "tm-popped"): aynı tahtaya ikinci akış açılmaz; pencere kapanınca döner.
+    const wasPopped = this.el.classList.contains("popped");
+    const isPopped = popped.has(this.board.id);
+    this.el.classList.toggle("popped", isPopped);
+    if (isPopped) {
+      this.setWanted(false);
+      this.setState("popped", "🗗 Ayrı pencerede izleniyor");
+      return;
+    }
+    if (wasPopped) this.setState("connecting", "Bağlanıyor…");
     this.setWanted(!document.hidden && this.inView);
   }
 
@@ -615,6 +627,7 @@ function toggleFullscreen(el) {
 }
 
 const tiles = new Map();   // tahta id → Tile
+let popped = new Set();     // ekranı ayrı pencerede açık tahtalar (üst sayfadan "tm-popped")
 
 // Kutucuk seçimi (yalnız gömülü kip — Tahtalar sayfasının Ekranlar sekmesi): Tile.click/contextmenu
 // ve aşağıdaki dikdörtgen (fare ile sürükleyerek) seçim bunları kullanır. `selected` DOM sırasıyla
@@ -884,6 +897,10 @@ if (embed) {
     if (e.data.type === "tm-boards") { setBoards(e.data.boards || []); markLoaded(); }
     else if (e.data.type === "tm-selection") setSelected((e.data.ids || []).filter(id => tiles.has(id)), true);
     else if (e.data.type === "tm-size") document.documentElement.style.setProperty("--tile-min", e.data.px + "px");
+    else if (e.data.type === "tm-popped") {
+      popped = new Set(e.data.ids || []);
+      tiles.forEach(t => t.refreshWanted());
+    }
     else if (e.data.type === "tm-view") {
       view.stats = e.data.stats !== false;
       view.perf = !!e.data.perf;

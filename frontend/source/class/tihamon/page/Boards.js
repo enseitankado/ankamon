@@ -198,6 +198,9 @@ qx.Class.define("tihamon.page.Boards", {
     if (this.__onMessage) {
       window.removeEventListener("message", this.__onMessage);
     }
+    if (this.__onScreenWindows) {
+      qx.event.message.Bus.unsubscribe(tihamon.ui.BoardOps.SCREEN_WINDOWS, this.__onScreenWindows, this);
+    }
   },
 
   members: {
@@ -359,6 +362,7 @@ qx.Class.define("tihamon.page.Boards", {
           this.__pushSize();
           this.__pushView();
           this.__pushSelection();
+          this.__pushPopped();
         } else if (e.data.type === "tm-select") {
           this.__checkFromPreview(e.data.ids || []);
         } else if (e.data.type === "tm-click") {
@@ -378,6 +382,9 @@ qx.Class.define("tihamon.page.Boards", {
         }
       };
       window.addEventListener("message", this.__onMessage);
+      // Ayrı pencerede açık ekranlar (BoardOps.screen): o tahtaların önizlemesi durur, yerine not yazar.
+      this.__onScreenWindows = () => this.__pushPopped();
+      qx.event.message.Bus.subscribe(tihamon.ui.BoardOps.SCREEN_WINDOWS, this.__onScreenWindows, this);
 
       // Görünürlük yoklaması: hem sekme değişimini hem Shell'deki sayfa değişimini yakalar.
       this.__screensTimer = new qx.event.Timer(1000);
@@ -514,6 +521,15 @@ qx.Class.define("tihamon.page.Boards", {
       const el = this.__iframeEl();
       if (el && el.contentWindow) {
         el.contentWindow.postMessage({ type: "tm-selection", ids: this._checkedIds(this.__table) },
+          window.location.origin);
+      }
+    },
+
+    /** Ekran penceresi açık tahtaları iframe'e bildirir (kutucuk akışı keser, "Ayrı pencerede izleniyor"). */
+    __pushPopped() {
+      const el = this.__iframeEl();
+      if (el && el.contentWindow) {
+        el.contentWindow.postMessage({ type: "tm-popped", ids: tihamon.ui.BoardOps.screenWindowIds() },
           window.location.origin);
       }
     },
