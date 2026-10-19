@@ -405,7 +405,7 @@ class Tile {
     this.el.classList.toggle("popped", isPopped);
     if (isPopped) {
       this.setWanted(false);
-      this.setState("popped", "🗗 Ayrı pencerede izleniyor");
+      this.setState("popped", "Ayrı pencerede izleniyor");
       return;
     }
     if (wasPopped) this.setState("connecting", "Bağlanıyor…");
