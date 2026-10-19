@@ -50,7 +50,7 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
       .dh code{font-family:monospace;font-size:12px;background:rgba(128,128,128,.15);padding:0 3px;border-radius:3px}
       .dh .muted{opacity:.7}
       .dh .v{border-left:5px solid;padding:8px 12px;margin:10px 0 4px;border-radius:3px}
-      .dh .v > b{display:block;font-size:14px;margin-bottom:2px}
+      .dh .v .t{display:block;font-size:14px;font-weight:700;margin-bottom:2px}
       .dh .v.ok{border-color:#2e8b2e;background:rgba(46,139,46,.12)}
       .dh .v.mid{border-color:#e0a020;background:rgba(224,160,32,.13)}
       .dh .v.bad{border-color:#d9534f;background:rgba(217,83,79,.12)}
@@ -88,7 +88,7 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
         return "<div class='dh'>Bu sekme için yardım yok.</div>";
       }
       let h = `<div class="dh">${this.CSS}`;
-      h += `<div class="v ${T.verdict[0]}"><b>Kontrolsüz büyüyüp diski doldurur mu? ${T.verdict[1]}</b>${T.verdict[2]}</div>`;
+      h += `<div class="v ${T.verdict[0]}"><span class="t">Kontrolsüz büyüyüp diski doldurur mu? ${T.verdict[1]}</span>${T.verdict[2]}</div>`;
       if (now || disk) {
         h += `<div class="muted">${[now, disk].filter(Boolean).join(" · ")}</div>`;
       }
@@ -118,7 +118,7 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
               ["Ne?", "Tahtaların rsyslog ile gönderdiği sistem günlükleri (TiHA'nın merkezi log sunucusu ayarı). Her satır bir log mesajı."],
               ["Nerede?", `${pg}, <code>logs</code> tablosu (1 günlük parçalara bölünmüş hypertable).`],
               ["Saklama", `${drop("logs", "90 days")} (<code>LOG_DAYS=${esc(env("LOG_DAYS", "90"))}</code>) — daha eski gün parçaları bütün olarak silinir ${run(pol("logs", "retention"))}`],
-              ["Sıkıştırma", compress("logs")],
+              ["Sıkıştırma", compress("logs").replace(/^ü/, "Ü")],
               ["Özetleme", "Yok — loglar özetlenmez, süre dolunca silinir."],
               ["Dışlanan mesajlar", "Loglar sayfasında \"dışla\" denen mesajlar yalnız grid'de gizlenir; kaydedilmeye devam eder, yer açmaz."]
             ],
