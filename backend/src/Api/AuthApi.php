@@ -223,6 +223,23 @@ final class AuthApi
     }
 
     /**
+     * nginx auth_request ucu: /screen/ws/taskmgr/ (Görev yöneticisi — canlı SSH + tahta ajanı) için oturum +
+     * "taskmgr" yetkisi. Kullanıcı adı X-Auth-User ile ekran köprüsüne geçer (değişiklikler audit_log'a yazılır).
+     */
+    public function taskmgr(): array
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            throw new ApiError(401, 'Oturum açmanız gerekiyor.');
+        }
+        if (!Auth::can($user, 'taskmgr')) {
+            throw ApiError::forbidden();
+        }
+        header('X-Auth-User: ' . $user['username']);
+        return ['ok' => true];
+    }
+
+    /**
      * nginx auth_request ucu: /cast/ (ekran yansıtma sayfası) ve /cast/mtx/ (WHIP → MediaMTX) için
      * oturum + "cast" yetkisi denetimi. Tahtalarda oynatıcıyı başlatmak ayrıca cast_start görevidir.
      */

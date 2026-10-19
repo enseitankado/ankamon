@@ -24,7 +24,7 @@ import tornado.websocket
 
 from .. import activity, db
 from ..executor.jobs import _board_access
-from . import perf, remote
+from . import perf, remote, taskmgr
 
 log = logging.getLogger("tihamon.screen")
 
@@ -198,7 +198,9 @@ async def main():
     app = tornado.web.Application(
         [(r"/screen/ws/(\d+)", ScreenSocket),
          # Ekranlar sekmesinin "Başarım" görünümü (htop üst panelleri, saniyelik) — bkz. perf.py.
-         (r"/screen/ws/perf/(\d+)", perf.PerfSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS})],
+         (r"/screen/ws/perf/(\d+)", perf.PerfSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),
+         # Tahtalar/Ekranlar sağ menüsü "Görev yöneticisi" (canlı SSH + tahtada ajan) — bkz. taskmgr.py.
+         (r"/screen/ws/taskmgr/(\d+)", taskmgr.TaskMgrSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS})],
         # Ölü tarayıcı bağlantıları (sekme çökmesi, ağ kopması) ssh süreçlerini sonsuza dek tutmasın.
         websocket_ping_interval=30,
         websocket_ping_timeout=60,

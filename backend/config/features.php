@@ -17,6 +17,7 @@ return [
     'screen' => 'Tahta ekranlarını canlı izleme',
     'screen.control' => 'Tahta ekranını uzaktan yönetme (fare/klavye ile müdahale)',
     'cast' => 'Kendi ekranını seçili tahtalara yansıtma (tahtada tam ekran gösterilir)',
+    'taskmgr' => 'Görev yöneticisi: tahtadaki işlemleri, performansı, hizmetleri, başlangıç uygulamalarını ve oturumları canlı görme; işlem sonlandırma, öncelik, hizmet başlatma/durdurma, yeni görev çalıştırma (tahtada root yetkisiyle)',
     'filemanager' => 'Tahtanın tüm dosya sistemine (root) web üzerinden erişim — gezinme, indirme, yükleme',
     'boards.backup' => 'Tahtadaki bir hesabın ev dizinini (kişisel dosyalar dahil) yedekleyip indirme (sağ menü "Yedekle")',
     'diagnose' => 'Bakım (sorun tespiti): seçili tahtalarda donanım, disk sağlığı (SMART), sıcaklık ve sistem denetimi çalıştırma',

@@ -14,6 +14,7 @@ return [
     'screen.control' => 'screen',
     'cast' => 'boards',
     'filemanager' => 'boards',
+    'taskmgr' => 'boards',
     'boards.backup' => 'boards',
     'boards.login' => 'boards',
     'logs.manage' => 'logs',
