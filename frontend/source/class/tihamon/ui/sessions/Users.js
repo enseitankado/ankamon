@@ -156,6 +156,7 @@ qx.Class.define("tihamon.ui.sessions.Users", {
     __uptime: null,
     __uptimeLoading: false,
     __updatingOptions: false,
+    __framed: false,
 
     /** @param sessions {Array} /board-sessions yanıtındaki satırlar */
     setData(sessions) {
@@ -295,7 +296,28 @@ qx.Class.define("tihamon.ui.sessions.Users", {
         this.__columns[0].label = nameLabel;
         this.__table.getTableModel().setColumnNamesById({ name: nameLabel });
       }
+      if (!this.__framed) {
+        this.__framed = true;
+        this.__frameToday();
+      }
       this.__summarize(this.__timeline.getWindow());
+    },
+
+    /**
+     * Varsayılan aralık (kullanıcı isteği): 24 saat, bugün ilk oturumu açan en solda. Bugün henüz
+     * oturum yoksa son 24 saat. Yalnız ilk veriyle uygulanır — sonraki tazelemeler kullanıcının
+     * kaydırdığı/yakınlaştırdığı aralığı bozmaz.
+     */
+    __frameToday() {
+      const day = 24 * 3600 * 1000;
+      const midnight = new Date().setHours(0, 0, 0, 0) / 1000;
+      const first = Math.min(...this.__shown.map(s => s.started_at).filter(t => t >= midnight));
+      if (Number.isFinite(first)) {
+        const start = first * 1000 - 10 * 60 * 1000; // çubuğun başı kenara yapışmasın
+        this.__timeline.setWindow(new Date(start), new Date(start + day));
+      } else {
+        this.__timeline.setWindow(new Date(Date.now() - day), new Date(Date.now() + day / 50));
+      }
     },
 
     /**

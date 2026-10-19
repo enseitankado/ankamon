@@ -5,7 +5,8 @@ ama bu tek etiket çok farklı durumları topluyordu (kullanıcı isteği). Taht
 SSH ile kendi açılış günlüğüne (journalctl, kalıcı) bakılır; oturumun açık olduğu açılışın nasıl bittiği:
 
   - systemd kapanış izi ("Journal stopped", systemd-shutdown, "System is powering down/rebooting") varsa:
-    düzenli kapatma ('shutdown') ya da yeniden başlatma ('reboot') — menüden/komutla.
+    düzenli kapatma ('shutdown') ya da yeniden başlatma ('reboot') — menüden/komutla. Kapatmada kim:
+    Tiha-Mon "Kapat" işi mi, tahtanın başındaki kullanıcı mı (bkz. attribute_shutdowns).
   - İz yoksa açılış ANİDEN bitmiştir. Pardus eta-shutdown (/etc/pardus/eta-shutdown.conf) da kapatmayı
     `poweroff -f` ile yapar (iz bırakmaz — elektrik kesintisiyle aynı görünür); ayrım ayarına göre yapılır:
       * [AUTO_SHUTDOWN] enabled ve kapanış o saatte (10 dk önce "1 saat ertele" uyarısı; ertelenirse saat
@@ -52,6 +53,34 @@ echo "T $(date +%z)"
 
 
 def run(conn) -> None:
+    _check_offline(conn)
+    attribute_shutdowns(conn)
+
+
+# Düzenli kapatmayı ('shutdown') kimin yaptığı: kapanıştan önceki bu süre içinde o tahtayı kapsayan bir
+# Tiha-Mon "Kapat" işi (audit_log job.create {action: shutdown}) varsa Tiha-Mon'dan, yoksa tahtanın
+# başındaki kullanıcı (menü / güç düğmesine kısa basma). eta-shutdown'ın otomatik kapatması buraya düşmez
+# (`poweroff -f` iz bırakmaz — bkz. üst not); tahtaya elle SSH ile verilen komut ayırt edilemez.
+_REMOTE_WINDOW = "10 minutes"
+_DETAIL_GENERIC = ("Tahta kapatıldı (menüden ya da komutla)",)   # eski kayıtlar da yeniden etiketlensin
+
+
+def attribute_shutdowns(conn) -> None:
+    conn.execute(f"""
+        UPDATE board_sessions s SET end_detail = COALESCE(
+            'Tahta Tiha-Mon''dan kapatıldı (' || (
+                SELECT a.username FROM audit_log a
+                WHERE a.action = 'job.create' AND a.detail->>'action' = 'shutdown'
+                  AND a.detail->'boards' @> to_jsonb(s.board_id)
+                  AND a.time BETWEEN s.ended_at - interval '{_REMOTE_WINDOW}' AND s.ended_at + interval '1 minute'
+                ORDER BY a.time DESC LIMIT 1) || ')',
+            'Tahta kullanıcı tarafından kapatıldı')
+        WHERE s.end_reason = 'shutdown' AND s.ended_at IS NOT NULL
+          AND (s.end_detail IS NULL OR s.end_detail = ANY(%s))
+    """, (list(_DETAIL_GENERIC),))
+
+
+def _check_offline(conn) -> None:
     rows = conn.execute(f"""
         SELECT s.id, s.board_id, extract(epoch FROM s.started_at)::bigint AS started, host(b.ip) AS ip
         FROM board_sessions s JOIN boards b ON b.id = s.board_id
