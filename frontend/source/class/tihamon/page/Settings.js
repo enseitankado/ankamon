@@ -1,6 +1,6 @@
 /**
  * Ayarlar: herkese açık "Görünüm" (tema) sekmesi + yalnız yöneticiye görünen "Tahta erişimi"
- * (SSH + Samba) sekmesi. Sayfa herkese açıktır (bkz. ui.Shell.PAGES); admin
+ * (SSH + Samba) ve "Ders saatleri" (ui.LessonTimesEditor, /api/lesson-times) sekmeleri. Sayfa herkese açıktır (bkz. ui.Shell.PAGES); admin
  * olmayan kullanıcı yalnız kendi tema tercihini görür (sekme yok, tek bölüm doğrudan), `/settings`
  * admin uç noktasına hiç istek atılmaz. Admin'de bölümler dikey uzamak yerine kategori başına bir
  * sekmede toplanır; "Kaydet" tüm sekmelerdeki formları (hangisi görünür olursa olsun, hepsi DOM'da
@@ -49,6 +49,14 @@ qx.Class.define("tihamon.page.Settings", {
         `Sensör verisi tahtalardan <b>${settings.scrape_interval}</b> aralıkla okunur.`
       ).set({ rich: true, wrap: true, textColor: "app-muted" }));
       tabs.add(access);
+
+      const lessonsPage = this.__page("Ders saatleri");
+      const lessons = new tihamon.ui.LessonTimesEditor(await tihamon.io.Api.get("/lesson-times"));
+      this.__section(lessonsPage, "Okulun ders saatleri",
+        "Her dersin başlangıç ve bitiş saati (teneffüs ve öğle arası, dersler arasındaki boşluktur). " +
+        "Oturumlar ▸ Kullanıcılar çizelgesinde bir oturumun üzerine gelince hangi derslere denk geldiği " +
+        "(ör. \"1. ders: 5 dk sonra açıldı, bitimden 2 dk önce kapandı\") bu saatlere göre yazılır.", lessons);
+      tabs.add(lessonsPage);
       this._rememberTab(tabs, "settings"); // sekmeler her yüklemede yeniden kurulur; son seçili geri gelir
 
       this.__body.add(tabs, { flex: 1 });
@@ -60,6 +68,7 @@ qx.Class.define("tihamon.page.Settings", {
             ssh_access: ssh.values(),
             samba_access: samba.values()
           });
+          await tihamon.io.Api.put("/lesson-times", lessons.getValue());
           tihamon.ui.Dialog.alert("Ayarlar kaydedildi.");
           this.refresh();
         } catch (e) {

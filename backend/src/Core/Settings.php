@@ -12,6 +12,9 @@ final class Settings
         'ssh_access' => ['user' => 'root', 'password' => ''],
         // Samba: şu an yalnız saklanır; TiHA'nın "Dosya sunucusu" adımıyla aynı hesabı tutmak içindir.
         'samba_access' => ['user' => 'root', 'password' => ''],
+        // Okulun ders saatleri (bkz. Api\LessonTimesApi): hangi günler ders var (1=Pzt … 7=Paz) ve
+        // [{name, start: "HH:MM", end: "HH:MM"}] — Oturumlar çizelgesi oturumu derslere eşler.
+        'lesson_times' => ['days' => [1, 2, 3, 4, 5], 'lessons' => []],
     ];
 
     public static function get(string $key): mixed

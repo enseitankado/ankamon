@@ -394,30 +394,29 @@ qx.Class.define("tihamon.page.Boards", {
     },
 
     /**
-     * "Ekranlar" sekmesinin üstündeki araç çubuğu — aç/kapa düğmeleri (Başarım seçimi tarayıcıda kalıcı):
-     *  - Donanım (her açılışta basılı): kutucukların altındaki CPU/RAM/HDD/voltaj barı.
-     *  - Başarım: kutucuğun ekran alanında htop'un üst panelleri, saniyelik (bkz. screen/index.html
+     * "Ekranlar" sekmesinin üstündeki görünüm seçimleri — "Göster:" + onay kutuları (Başarım seçimi tarayıcıda kalıcı):
+     *  - Donanım bilgisi (her açılışta işaretli): kutucukların altındaki CPU/RAM/HDD/fan/pil barı.
+     *  - Başarım göstergeleri: kutucuğun ekran alanında htop'un üst panelleri, saniyelik (bkz. screen/index.html
      *    Tile.syncPerf, worker/tihamon/screen/perf.py — yalnız açıkken ve görünen tahtalar için SSH açılır).
+     * Eskiden toolbar CheckBox'tı: basılı hali temaların çoğunda belirgin değildi, saydamlıkla ayırt
+     * ediliyordu ve kötü görünüyordu (kullanıcı bildirimi) — düz onay kutusu her temada açık seçik.
      */
     __createScreensToolbar() {
-      const bar = new qx.ui.toolbar.ToolBar();
-      const part = new qx.ui.toolbar.Part();
-      bar.add(part);
+      const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(16).set({ alignY: "middle" })).set({ padding: [2, 4, 6, 4] });
+      bar.add(new qx.ui.basic.Label("Göster:").set({ textColor: "app-muted", alignY: "middle" }));
       const saved = this.__loadScreenView();
       const make = (label, tip, key) => {
-        // Basılı olmayan düğme soluk: bazı temalarda toolbar CheckBox'ın "checked" görünümü belirgin değil.
-        const btn = new qx.ui.toolbar.CheckBox(label).set({ value: saved[key], toolTipText: tip, opacity: saved[key] ? 1 : 0.5 });
-        btn.addListener("changeValue", e => {
-          btn.setOpacity(e.getData() ? 1 : 0.5);
+        const box = new qx.ui.form.CheckBox(label).set({ value: saved[key], toolTipText: tip, alignY: "middle" });
+        box.addListener("changeValue", e => {
           this.__screenView[key] = e.getData();
           this.__saveScreenView();
           this.__pushView();
         });
-        part.add(btn);
+        bar.add(box);
       };
       this.__screenView = saved;
-      make("🖥 Donanım", "Kutucukların altında işlemci, bellek, disk sıcaklığı ve pil voltajı barı", "stats");
-      make("📈 Başarım", "Ekran alanında tahtanın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)", "perf");
+      make("Donanım bilgisi", "Kutucukların altında işlemci, bellek, disk sıcaklığı, fan ve pil voltajı barı", "stats");
+      make("Başarım göstergeleri", "Ekran alanında tahtanın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)", "perf");
       return bar;
     },
 

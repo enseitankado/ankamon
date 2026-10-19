@@ -157,12 +157,85 @@ qx.Class.define("tihamon.ui.sessions.Users", {
     __uptimeLoading: false,
     __updatingOptions: false,
     __framed: false,
+    __lessons: null,
+    __lessonsAt: 0,
 
     /** @param sessions {Array} /board-sessions yanıtındaki satırlar */
     setData(sessions) {
       this.__sessions = sessions;
       this.__fillOptions();
       this.__render();
+      this.__loadLessons();
+    },
+
+    /** Ders saatleri (Ayarlar ▸ Ders saatleri): en çok dakikada bir yeniden okunur; değişince çizelge yeniden kurulur. */
+    async __loadLessons() {
+      if (this.__lessonsAt && Date.now() - this.__lessonsAt < 60000) {
+        return;
+      }
+      this.__lessonsAt = Date.now();
+      try {
+        const value = await tihamon.io.Api.get("/lesson-times");
+        if (JSON.stringify(value) !== JSON.stringify(this.__lessons)) {
+          this.__lessons = value;
+          this.__render();
+        }
+      } catch (e) {
+        // ders saatleri okunamazsa ipucu yalnız ders satırları olmadan gösterilir
+      }
+    },
+
+    /**
+     * Oturumun denk geldiği ders saatleri, ipucunda alt alta (kullanıcı isteği): "1. ders (08:30–09:10):
+     * 5 dk sonra açıldı, bitimden 2 dk önce kapandı". Yalnız ders günlerinde; birden çok güne yayılan
+     * oturumda satır başına tarih eklenir, çok uzun listeler kısaltılır.
+     * @param s {Map} oturum  @param end {Number} bitiş (sn; açık oturumda şimdi)
+     * @return {String} HTML ("" — ders tanımlı değilse)
+     */
+    __lessonLines(s, end) {
+      const L = this.__lessons;
+      if (!L || !L.lessons || !L.lessons.length) {
+        return "";
+      }
+      const F = tihamon.util.Format;
+      const esc = qx.bom.String.escape;
+      const min = tihamon.ui.LessonTimesEditor.minutes;
+      const dur = sec => F.duration(sec);
+      const lines = [];
+      const day = new Date(s.started_at * 1000);
+      day.setHours(0, 0, 0, 0);
+      const multiDay = new Date(end * 1000).toDateString() !== day.toDateString();
+      for (let d = 0; d < 14 && day.getTime() / 1000 < end; d++, day.setDate(day.getDate() + 1)) {
+        const weekday = day.getDay() || 7; // 1=Pzt … 7=Paz
+        if (!(L.days || []).includes(weekday)) {
+          continue;
+        }
+        const base = day.getTime() / 1000;
+        L.lessons.forEach(l => {
+          const ls = base + min(l.start) * 60;
+          const le = base + min(l.end) * 60;
+          if (s.started_at >= le || end <= ls) {
+            return;
+          }
+          const open = s.started_at > ls ? `${dur(s.started_at - ls)} sonra açıldı` : "başında açıktı";
+          let close;
+          if (!s.ended_at && end < le) {
+            close = "hâlâ açık";
+          } else if (end < le) {
+            close = `bitimden ${dur(le - end)} önce kapandı`;
+          } else {
+            close = "sonuna kadar açık kaldı";
+          }
+          const date = multiDay ? `${day.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })} · ` : "";
+          lines.push(`${date}<b>${esc(l.name)}</b> <span style="opacity:.7">(${l.start}–${l.end})</span>: ${open}, ${close}`);
+        });
+      }
+      if (!lines.length) {
+        return "<br><i>Ders saati dışında</i>";
+      }
+      const MAX = 12;
+      const extra = lines.length > MAX ? `<br>… ${lines.length - MAX} ders daha` : "";
+      return "<br>" + lines.slice(0, MAX).join("<br>") + extra;
     },
 
     /**
@@ -284,7 +357,8 @@ qx.Class.define("tihamon.ui.sessions.Users", {
           title: `<b>${esc(s.username)}</b> · ${esc(boardName)}<br>` +
             `${F.dateTime(s.started_at * 1000)} → ${s.ended_at ? F.dateTime(s.ended_at * 1000) : "devam ediyor"}<br>` +
             `Süre: ${F.duration(end - s.started_at)}<br>` +
-            `${s.kind === "webshell" ? "Web terminal · " : ""}${s.locked ? "Açık (kilitli)" : (s.end_detail || F.sessionEndReason(s.end_reason))}`
+            `${s.kind === "webshell" ? "Web terminal · " : ""}${s.locked ? "Açık (kilitli)" : (s.end_detail || F.sessionEndReason(s.end_reason))}` +
+            (s.kind === "webshell" ? "" : this.__lessonLines(s, end))
         };
       });
       if (byBoard) {
