@@ -68,6 +68,7 @@ final class NetworkApi
                     extract(epoch FROM d.shares_scanned_at)::bigint AS shares_scanned_at,
                     d.shares_requested_at IS NOT NULL AS shares_requested, d.shares_auth,
                     b.id AS board_id, COALESCE(NULLIF(b.label, ''), b.hostname) AS board_name,
+                    k.label AS known_alias,
                     COALESCE((SELECT json_agg(json_build_object('proto', s.proto, 'port', s.port, 'service', s.service,
                                   'product', s.product, 'version', s.version, 'extra', s.extra) ORDER BY s.port, s.proto)
                               FROM net_services s WHERE s.device_id = d.id), '[]') AS services,
@@ -77,6 +78,8 @@ final class NetworkApi
              FROM net_devices d
              JOIN net_networks n ON n.id = d.network_id
              LEFT JOIN boards b ON b.mac = d.mac
+             -- MAC ↔ takma ad kaydı (göç 016; okul envanterinden): grid'in Takma ad sütunu.
+             LEFT JOIN net_known_aliases k ON k.mac = d.mac
              WHERE (? = 0 OR d.network_id = ?)
              ORDER BY d.ip NULLS LAST, d.mac",
             [$network, $network]

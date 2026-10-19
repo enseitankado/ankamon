@@ -28,7 +28,7 @@ qx.Class.define("tihamon.ui.taskmgr.Tab", {
     },
 
     /**
-     * @param columns {Array} [{id, label, width?, hidden?, renderer?, hint?}] — kimlik sütunu (0) eklenir, gizlidir
+     * @param columns {Array} [{id, label, width?, renderer?, hint?}] — kimlik sütunu (0) eklenir, gizlidir
      * @param key {String} tercih anahtarı ("taskmgr.<sekme>")
      * @param model {qx.ui.table.model.Simple?}
      */
@@ -41,19 +41,16 @@ qx.Class.define("tihamon.ui.taskmgr.Tab", {
       const cm = table.getTableColumnModel();
       cm.setColumnVisible(0, false);
       const behavior = cm.getBehavior();
-      const user = this._win.getUser();
-      const prefs = user.ui_prefs || {};
       columns.forEach((c, i) => {
         behavior.setWidth(i + 1, c.width || "1*");
         if (c.renderer) {
           cm.setDataCellRenderer(i + 1, c.renderer);
         }
-        // Varsayılan gizli sütunlar (Windows'ta sağ tıkla açılanlar): kullanıcının kayıtlı tercihi yoksa.
-        if (c.hidden && !prefs[`${key}.columns.hidden`]) {
-          cm.setColumnVisible(i + 1, false);
-        }
       });
-      tihamon.page.Base.setupColumnLayout(table, columns, 1, `${key}.columns`, user);
+      // Varsayılan: TÜM sütunlar görünür (kullanıcı isteği). Kullanıcının gizlediği sütunlar ve sütun sırası
+      // (başlık sürükleme) kullanıcı başına sunucuda saklanır, pencere her açıldığında uygulanır
+      // (users.ui_prefs["taskmgr.<sekme>.columns.hidden/.order"], bkz. page.Base.setupColumnLayout).
+      tihamon.page.Base.setupColumnLayout(table, columns, 1, `${key}.columns`, this._win.getUser());
       return table;
     },
 

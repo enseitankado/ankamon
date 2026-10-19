@@ -27,13 +27,13 @@ qx.Class.define("tihamon.ui.taskmgr.DetailsTab", {
       { id: "cpu", label: "CPU", width: 60, renderer: right(v => F.num(v, 0).padStart(2, "0")) },
       { id: "mem", label: "Bellek (etkin özel çalışma kümesi)", hint: "Bellek", width: 130, renderer: right(v => F.num(v, 0) + " K") },
       { id: "desc", label: "Açıklama", width: 380 },
-      { id: "prio", label: "Öncelik", width: 120, hidden: true },
-      { id: "threads", label: "İş parçacıkları", width: 90, hidden: true, renderer: num },
-      { id: "disk", label: "Disk", width: 100, hidden: true, renderer: right(v => F.bytesRate(v)) },
-      { id: "net", label: "Ağ", width: 90, hidden: true, renderer: right(v => F.bits(v)) },
-      { id: "ppid", label: "Üst PID", width: 70, hidden: true, renderer: num },
-      { id: "cputime", label: "CPU süresi", width: 90, hidden: true },
-      { id: "path", label: "Görüntü yolu adı", width: 260, hidden: true }
+      { id: "prio", label: "Öncelik", width: 120 },
+      { id: "threads", label: "İş parçacıkları", width: 90, renderer: num },
+      { id: "disk", label: "Disk", width: 100, renderer: right(v => F.bytesRate(v)) },
+      { id: "net", label: "Ağ", width: 90, renderer: right(v => F.bits(v)) },
+      { id: "ppid", label: "Üst PID", width: 70, renderer: num },
+      { id: "cputime", label: "CPU süresi", width: 90 },
+      { id: "path", label: "Görüntü yolu adı", width: 260 }
     ], "taskmgr.details");
     this.__table.addListener("keypress", e => {
       if (e.getKeyIdentifier() === "Delete") {

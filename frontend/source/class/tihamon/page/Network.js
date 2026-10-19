@@ -71,7 +71,9 @@ qx.Class.define("tihamon.page.Network", {
       { id: "seen", label: "Son görülme", width: 110 },
       { id: "notes", label: "Not", width: 150 },
       // FATİH fazı (bkz. util.Format.etap). Sona eklendi: servis alt satırları sabit sütun sırası kullanır.
-      { id: "faz", label: "Faz", width: 130 }
+      { id: "faz", label: "Faz", width: 130 },
+      // MAC ↔ takma ad kaydı (net_known_aliases; kullanıcı isteği). Sona eklendi (alt satırların sabit sırası).
+      { id: "alias", label: "Takma ad", hint: "Takma ad (MAC kaydı)", width: 170 }
     ];
     this.__model = new tihamon.ui.table.GroupModel(() => this.__apply());
     this.__table = this._createTable(this.__columns, { checkable: true, storageKey: "network.columns", model: this.__model });
@@ -215,7 +217,7 @@ qx.Class.define("tihamon.page.Network", {
           d.services_scanned_at ? String(d.services.length) : "",
           netName.get(d.network_id) || d.network,
           F.ago(d.first_seen_at), d.online ? "şimdi" : F.ago(d.last_seen_at), d.notes || "",
-          F.etap(d.etap)
+          F.etap(d.etap), d.known_alias || ""
         ]
       }));
       this.__apply();

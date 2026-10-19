@@ -21,9 +21,9 @@ qx.Class.define("tihamon.ui.network.Ops", {
       return net.name || `${net.cidr}${net.ifaces && net.ifaces.length ? " (" + net.ifaces.join(", ") + ")" : ""}`;
     },
 
-    /** Cihazın görünen adı: takma ad → bilgisayar adı → tahta adı → IP → MAC. */
+    /** Cihazın görünen adı: etiket → MAC ↔ takma ad kaydı → bilgisayar adı → tahta adı → IP → MAC. */
     deviceName(d) {
-      return d.label || d.hostname || d.board_name || d.ip || d.mac;
+      return d.label || d.known_alias || d.hostname || d.board_name || d.ip || d.mac;
     },
 
     /**

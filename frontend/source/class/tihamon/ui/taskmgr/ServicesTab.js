@@ -26,7 +26,7 @@ qx.Class.define("tihamon.ui.taskmgr.ServicesTab", {
       { id: "desc", label: "Açıklama", width: 320 },
       { id: "state", label: "Durum", width: 110 },
       { id: "start", label: "Başlangıç türü", width: 170 },
-      { id: "sub", label: "Alt durum", width: 100, hidden: true }
+      { id: "sub", label: "Alt durum", width: 100 }
     ], "taskmgr.services");
     this._rowMenu(this.__table, name => {
       const s = (this._win.getModel().services || []).find(x => x.name === name);

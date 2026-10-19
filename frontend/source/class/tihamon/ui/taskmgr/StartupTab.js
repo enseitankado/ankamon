@@ -22,8 +22,8 @@ qx.Class.define("tihamon.ui.taskmgr.StartupTab", {
       { id: "publisher", label: "Yayımcı", width: 200 },
       { id: "status", label: "Durum", width: 100 },
       { id: "impact", label: "Başlangıç etkisi", width: 120 },
-      { id: "exec", label: "Komut satırı", width: 300, hidden: true },
-      { id: "comment", label: "Açıklama", width: 300, hidden: true }
+      { id: "exec", label: "Komut satırı", width: 300 },
+      { id: "comment", label: "Açıklama", width: 300 }
     ], "taskmgr.startup");
     this._rowMenu(this.__table, id => {
       const it = this.__item(id);

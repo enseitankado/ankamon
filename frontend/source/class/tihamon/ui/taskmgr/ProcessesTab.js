@@ -29,10 +29,10 @@ qx.Class.define("tihamon.ui.taskmgr.ProcessesTab", {
       { id: "disk", label: "Disk", width: 100, renderer: new tihamon.ui.taskmgr.HeatRenderer(v => F.diskRate(v), 5 * 1048576) },
       { id: "net", label: "Ağ", width: 90, renderer: new tihamon.ui.taskmgr.HeatRenderer(v => F.netRate(v), 250000) },
       { id: "power", label: "Güç kullanımı", width: 110 },
-      { id: "pid", label: "PID", width: 70, hidden: true },
-      { id: "proc", label: "İşlem adı", width: 140, hidden: true },
-      { id: "user", label: "Kullanıcı", width: 120, hidden: true },
-      { id: "cmd", label: "Komut satırı", width: 400, hidden: true }
+      { id: "pid", label: "PID", width: 70 },
+      { id: "proc", label: "İşlem adı", width: 140 },
+      { id: "user", label: "Kullanıcı", width: 120 },
+      { id: "cmd", label: "Komut satırı", width: 400 }
     ];
     this.__tm = new tihamon.ui.table.GroupModel((col, asc) => {
       this.__sort = { col, asc };
