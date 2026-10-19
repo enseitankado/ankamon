@@ -362,8 +362,8 @@ def _run_job(job) -> None:
         log.exception("görev #%s hatası", job["id"])
         conn.execute("UPDATE jobs SET status = 'failed', finished_at = now(), summary = %s WHERE id = %s",
                      (f"Hata: {exc}"[:200], job["id"]))
-        conn.execute("UPDATE job_targets SET status = 'failed' WHERE job_id = %s AND status IN ('queued', 'running')",
-                     (job["id"],))
+        conn.execute("UPDATE job_targets SET status = 'failed', finished_at = now() WHERE job_id = %s"
+                     " AND status IN ('queued', 'running')", (job["id"],))
         general.add("fail", f"Görev hatası: {exc}")
         activity.record(conn, f"Görev hatası: {job['title']} — {exc}"[:200], "error")
     finally:
@@ -382,6 +382,16 @@ def main() -> None:
             " WHERE status = 'running'").rowcount
         if n:
             log.warning("%d yarım görev başarısız işaretlendi", n)
+        # Tahta satırları da kapatılır: yoksa görev "başarısız" olsa da satır sonsuza dek "running" kalıyor,
+        # Bakım raporu tahtayı "Denetleniyor…" gösteriyordu (2026-10-16, yeniden build sırasında yaşandı).
+        # Yürütücü yeni açıldı: biten (kuyrukta olmayan) görevlerin queued/running satırları kesinlikle yarımdır.
+        n = conn.execute(
+            "UPDATE job_targets t SET status = 'failed', finished_at = coalesce(t.finished_at, now()),"
+            " output = coalesce(nullif(t.output, ''), 'Yürütücü yeniden başladı; bu tahtada görev yarıda kaldı.')"
+            " FROM jobs j WHERE j.id = t.job_id AND j.status NOT IN ('queued', 'running')"
+            " AND t.status IN ('queued', 'running')").rowcount
+        if n:
+            log.warning("%d yarım tahta sonucu başarısız işaretlendi", n)
         # Eski görev olayları birikmesin (görevin kendisi ve tahta sonuçları kalır).
         conn.execute("DELETE FROM job_events WHERE job_id IN (SELECT id FROM jobs WHERE created_at < now() - interval '30 days')")
     log.info("görev yürütücüsü hazır (LISTEN tihamon_jobs; %d görev eşzamanlı)", JOB_THREADS)

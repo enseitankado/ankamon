@@ -275,7 +275,11 @@ qx.Class.define("tihamon.page.Diagnose", {
       const ORDER = tihamon.page.Diagnose.ORDER;
       const badge = level => `<span style="display:inline-block;min-width:68px;padding:1px 8px;border-radius:10px;` +
         `background:${L[level].color};color:#fff;font-weight:600;text-align:center">${L[level].text}</span>`;
-      const pending = t => ["queued", "running"].includes(t.status);
+      // Yalnız görev SÜRERKEN "Denetleniyor/Sırada": görev bittiyse (ör. yürütücü yeniden başladı) hâlâ
+      // queued/running duran satır yarıda kalmıştır — sonsuza dek "Denetleniyor…" görünmesin.
+      const jobRunning = !!this.__job && ["queued", "running"].includes(this.__job.status);
+      const halted = t => !jobRunning && ["queued", "running"].includes(t.status);
+      const pending = t => jobRunning && ["queued", "running"].includes(t.status);
       const rank = t => {
         if (pending(t)) {
           return 9;
@@ -349,6 +353,9 @@ qx.Class.define("tihamon.page.Diagnose", {
         let state, counts = ["", "", ""], top = "";
         if (pending(t)) {
           state = `<i style="opacity:.7">${t.status === "running" ? "Denetleniyor…" : "Sırada"}</i>`;
+        } else if (halted(t)) {
+          state = badge("warn") + " <span style=\"opacity:.8\">yarıda kaldı</span>";
+          top = "Görev bu tahtada tamamlanamadan kesildi (ör. Tiha-Mon yeniden başlatıldı); denetimi yeniden çalıştırın.";
         } else if (!r) {
           state = badge("bad") + " <span style=\"opacity:.8\">bağlanılamadı</span>";
           top = esc(t.output || "");
