@@ -604,11 +604,6 @@ qx.Class.define("tihamon.ui.BoardOps", {
             boards.length > 1 ? this.webshellMulti(boards) : this.webshell(board));
         }
         group(ICON.run, "Komut çalıştır" + count, commands);
-        // Görev yöneticisi (Windows'taki gibi; canlı SSH, pencere kapanınca biter — bkz. ui.taskmgr.Window).
-        // Tek tahta: çoklu seçimde sağ tıklanan tahta için açılır.
-        if (can("taskmgr")) {
-          add(ICON.taskmgr, "Görev yöneticisi", () => tihamon.ui.taskmgr.Window.open(board, user));
-        }
 
         // Ekran ▸ Ekranı göster, Ekranımı yansıt ▸ <kalite> + Ses (ayar penceresi sorulmaz — bkz. cast()).
         const screens = sub();
@@ -657,6 +652,11 @@ qx.Class.define("tihamon.ui.BoardOps", {
             this.__accountMenu(online, "yedeklenir", (acc, label) => this.__backup(online, acc, label))));
         }
         group(ICON.filemanager, "Dosyalar", files);
+        // Görev yöneticisi (Windows'taki gibi; canlı SSH, pencere kapanınca biter — bkz. ui.taskmgr.Window):
+        // "Dosyalar"ın hemen altında (kullanıcı isteği). Tek tahta: çoklu seçimde sağ tıklanan tahta için açılır.
+        if (can("taskmgr")) {
+          add(ICON.taskmgr, "Görev yöneticisi", () => tihamon.ui.taskmgr.Window.open(board, user));
+        }
       }
       power();
       return menu.getChildren().length ? menu : null;
