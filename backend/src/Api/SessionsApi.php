@@ -27,7 +27,7 @@ final class SessionsApi
         s.username, s.uid,
         extract(epoch FROM s.started_at)::bigint AS started_at,
         extract(epoch FROM s.ended_at)::bigint AS ended_at,
-        s.end_reason,
+        s.end_reason, s.end_detail,
         (s.ended_at IS NULL AND b.session_locked AND b.session_username = s.username
          AND b.session_checked_at > now() - interval '5 minutes') AS locked";
 
@@ -45,7 +45,7 @@ final class SessionsApi
                     w.username, NULL::integer AS uid,
                     extract(epoch FROM w.started_at)::bigint AS started_at,
                     extract(epoch FROM w.ended_at)::bigint AS ended_at,
-                    w.end_reason, false AS locked
+                    w.end_reason, NULL::text AS end_detail, false AS locked
              FROM webshell_sessions w LEFT JOIN boards b ON b.id = w.board_id
              WHERE w.started_at IS NOT NULL
              ORDER BY w.started_at DESC LIMIT ?",

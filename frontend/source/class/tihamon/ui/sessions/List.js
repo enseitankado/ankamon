@@ -87,7 +87,7 @@ qx.Class.define("tihamon.ui.sessions.List", {
             s.ended_at ? F.dateTime(s.ended_at * 1000) : "—",
             F.duration(durationSeconds) + (s.ended_at ? "" : " (devam ediyor)"),
             // Kilitli = tahtadaki oturum açık ama ekran kilidinde (Tahtalar grid'indeki "(kilitli)" ile aynı kaynak).
-            s.locked ? "Açık (kilitli)" : F.sessionEndReason(s.end_reason)
+            s.locked ? "Açık (kilitli)" : (s.end_detail || F.sessionEndReason(s.end_reason))
           ]
         };
       });

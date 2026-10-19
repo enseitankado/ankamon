@@ -18,6 +18,14 @@ qx.Class.define("tihamon.util.Format", {
     SESSION_END_REASON: {
       logout: "Çıkış yapıldı",
       offline: "Bağlantı kesildi (tahta çevrimdışı oldu)",
+      // Tahta yeniden erişilebilir olunca açılış günlüğünden netleşenler (bkz. worker tasks/session_end.py, göç 023);
+      // grid ayrıntılı metni (end_detail, ör. "20 dk işlem yapılmadı") varsa onu gösterir.
+      shutdown: "Tahta kapatıldı",
+      reboot: "Tahta yeniden başlatıldı",
+      auto_idle: "Otomatik kapandı (işlem yapılmadı)",
+      auto_timed: "Otomatik kapandı (zamanlı)",
+      power_loss: "Elektrik kesintisi / zorla kapatma",
+      network: "Ağ bağlantısı kesildi (tahta kapanmadı)",
       superseded: "Kapanmadan yeni oturum açıldı",
       // Web terminal oturumları (bkz. db/migrations/011_webshell_sessions.sql)
       closed: "Kapatıldı",

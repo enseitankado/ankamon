@@ -120,14 +120,15 @@ qx.Class.define("tihamon.ui.sessions.Users", {
 
     /** Düzgün kapanmayan oturum mu (bkz. sınıf başı not). */
     isBad(s) {
-      return ["offline", "superseded", "restart"].includes(s.end_reason);
+      // power_loss/network: kontrolsüz kapanış; otomatik kapanma, kapatma, yeniden başlatma düzgün sayılır (bkz. tasks/session_end.py).
+      return ["offline", "superseded", "restart", "power_loss", "network"].includes(s.end_reason);
     },
 
     state(s) {
       if (!s.ended_at) {
         return s.locked ? "locked" : "open";
       }
-      if (s.end_reason === "offline" || s.end_reason === "restart") {
+      if (["offline", "restart", "power_loss", "network"].includes(s.end_reason)) {
         return "offline";
       }
       if (s.end_reason === "superseded") {
@@ -282,7 +283,7 @@ qx.Class.define("tihamon.ui.sessions.Users", {
           title: `<b>${esc(s.username)}</b> · ${esc(boardName)}<br>` +
             `${F.dateTime(s.started_at * 1000)} → ${s.ended_at ? F.dateTime(s.ended_at * 1000) : "devam ediyor"}<br>` +
             `Süre: ${F.duration(end - s.started_at)}<br>` +
-            `${s.kind === "webshell" ? "Web terminal · " : ""}${s.locked ? "Açık (kilitli)" : F.sessionEndReason(s.end_reason)}`
+            `${s.kind === "webshell" ? "Web terminal · " : ""}${s.locked ? "Açık (kilitli)" : (s.end_detail || F.sessionEndReason(s.end_reason))}`
         };
       });
       if (byBoard) {
