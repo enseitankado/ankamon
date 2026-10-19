@@ -114,13 +114,21 @@ def neighbors(iface_names: list[str]) -> dict[str, str]:
 def service_scan(ip: str, top_ports: int) -> dict | None:
     """nmap -sV -O ile tek cihazı tarar. Hata/zaman aşımında None.
 
+    top_ports: taranacak en yaygın port sayısı (bkz. NETSCAN_TOP_PORTS, vars. 1000). 1000, bilgisayar
+    servislerinin (uzaktan masaüstü, NetSupport/sınıf yönetimi 5405, WinRM 5985/5986, MSSQL 1433,
+    PostgreSQL 5432, alt-HTTP 8080/8443, VNC…) neredeyse tamamını kapsar; eski 100 bunların çoğunu
+    kaçırıyordu. Çok yüksek portlardaki geçici (ephemeral) RPC portları yalnız gürültü olduğundan tüm
+    portlar (-p-) taranmaz.
+    --version-light kaldırıldı: varsayılan yoğunluk (7) servisleri belirgin biçimde daha iyi tanır.
+    Elenen (Windows güvenlik duvarı) hostlarda açık portları kaçırmamak için 2 deneme.
+
     Dönüş: {hostname, os, os_type, os_vendor, ports:[{proto, port, service, product, version, extra, devicetype}]}
     """
     out = _run([
-        "nmap", "-sS", "-sV", "--version-light", "-O", "--osscan-limit", "-Pn", "-T3",
-        "--top-ports", str(top_ports), "--max-retries", "1", "--host-timeout", "180s",
+        "nmap", "-sS", "-sV", "-O", "--osscan-limit", "-Pn", "-T3",
+        "--top-ports", str(top_ports), "--max-retries", "2", "--host-timeout", "240s",
         "-oX", "-", ip,
-    ], timeout=240)
+    ], timeout=300)
     if not out:
         return None
     try:

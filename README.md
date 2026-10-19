@@ -123,6 +123,8 @@ o an kapalı olanlar "Çevrim dışı" olarak kalır. Cihaz kimliği MAC adresid
 
 - Tarayıcı: supervisord `netscan` (`worker/tihamon/netscan/`). Varlık ARP ile (`arp-scan`, /21 ≈ 10 sn),
   açık port/servis/OS tahmini `nmap -sV -O` ile cihaz cihaz (24 saatte bir; "Servisleri tara" ile hemen).
+  En yaygın 1000 port taranır (`NETSCAN_TOP_PORTS`): bilgisayarların uzaktan masaüstü / sınıf yönetimi
+  (NetSupport 5405, WinRM, VNC), veritabanı (MSSQL/PostgreSQL) ve alt-HTTP gibi servislerini yakalar.
 - Sıklık yüke göre: boşta 30 sn, yük arttıkça 300 sn'ye kadar; CPU ≥ %85, CPU baskısı (PSI) ≥ %40 ya da
   boş bellek < %10 ise ertelenir. Servis taraması yalnız CPU < %50 iken. Araçlar `nice 19` + `ionice idle`.
   Ayarlar: `NETSCAN_MIN_INTERVAL`, `NETSCAN_MAX_INTERVAL`, `NETSCAN_SERVICE_RESCAN_HOURS`, `NETSCAN_TOP_PORTS`.
