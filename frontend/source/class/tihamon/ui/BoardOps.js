@@ -155,8 +155,10 @@ qx.Class.define("tihamon.ui.BoardOps", {
      * yönetim); sunucu (ekran köprüsü) bu yetkiyi ayrıca oturumdan denetler.
      * @param boards {Array} [{id, label|hostname|ip}]
      * @param user {Map?} oturum sahibi
+     * @param manage {Boolean?} "Ekranı yönet" kipi (tek tahta)
+     * @param opts {Map?} {modal: true} — pencere kipli açılır (ör. Oturumlar ▸ Kullanıcılar çizelgesinden)
      */
-    screen(boards, user, manage = false) {
+    screen(boards, user, manage = false, opts = {}) {
       const list = boards.map(b => ({ id: b.id, name: b.label || b.hostname || b.ip || "#" + b.id }));
       if (!list.length) {
         return;
@@ -172,6 +174,7 @@ qx.Class.define("tihamon.ui.BoardOps", {
       const root = qx.core.Init.getApplication().getRoot();
       const bounds = root.getBounds() || { width: 1024, height: 700 };
       const win = new qx.ui.window.Window(caption).set({
+        modal: !!opts.modal,
         showMinimize: false,
         contentPadding: 0,
         layout: new qx.ui.layout.Grow(),
