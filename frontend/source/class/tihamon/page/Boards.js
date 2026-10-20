@@ -408,8 +408,8 @@ qx.Class.define("tihamon.page.Boards", {
 
     /**
      * "Ekranlar" sekmesinin üstündeki görünüm seçimleri — "Göster:" + onay kutuları (Başarım seçimi tarayıcıda kalıcı):
-     *  - Donanım bilgisi (her açılışta işaretli): kutucukların altındaki CPU/RAM/HDD/fan/pil barı.
-     *  - Başarım göstergeleri: kutucuğun ekran alanında htop'un üst panelleri, saniyelik (bkz. screen/index.html
+     *  - Sensörler (her açılışta işaretli): kutucukların altındaki CPU/RAM/HDD/fan/pil barı.
+     *  - Başarım: kutucuğun ekran alanında htop'un üst panelleri, saniyelik (bkz. screen/index.html
      *    Tile.syncPerf, worker/tihamon/screen/perf.py — yalnız açıkken ve görünen tahtalar için SSH açılır).
      * Eskiden toolbar CheckBox'tı: basılı hali temaların çoğunda belirgin değildi, saydamlıkla ayırt
      * ediliyordu ve kötü görünüyordu (kullanıcı bildirimi) — düz onay kutusu her temada açık seçik.
@@ -428,8 +428,8 @@ qx.Class.define("tihamon.page.Boards", {
         bar.add(box);
       };
       this.__screenView = saved;
-      make("Donanım bilgisi", "Kutucukların altında işlemci, bellek, disk sıcaklığı, fan ve pil voltajı barı", "stats");
-      make("Başarım göstergeleri", "Ekran alanında tahtanın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)", "perf");
+      make("Sensörler", "Kutucukların altında işlemci, bellek, disk sıcaklığı, fan ve pil voltajı barı", "stats");
+      make("Başarım", "Ekran alanında tahtanın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)", "perf");
       return bar;
     },
 
