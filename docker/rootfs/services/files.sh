@@ -1,5 +1,5 @@
 #!/bin/sh
-# Dosya gezgini ("Dosyaları kopyala"): tahtalarda listeleme/silme/ad değiştirme ve tahtadan tahtaya
+# Dosya gezgini ("Bilgisayarlar arasında kopyala"): tahtalarda listeleme/silme/ad değiştirme ve tahtadan tahtaya
 # ilerlemeli kopyalama (bkz. worker/tihamon/files). Yalnız 127.0.0.1:8895 dinler; nginx /files-api/ ile
 # oturum + "filemanager" yetkisiyle vekiller.
 set -eu

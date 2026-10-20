@@ -35,7 +35,13 @@ IDLE_MINUTES = int(os.environ.get("FILEMANAGER_IDLE_MINUTES", "15"))
 # allow_other gerekmez: bağlayan (bu süreç) ve okuyan (FileBrowser Quantum) ikisi de root.
 _SSHFS_OPTS = (
     "password_stdin,StrictHostKeyChecking=no,UserKnownHostsFile=/dev/null,LogLevel=ERROR,"
-    "reconnect,ServerAliveInterval=15,ServerAliveCountMax=3"
+    "reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,"
+    # Sembolik bağlar tahtada çözülür ve hedefleri gibi görünür. sshfs 3.7.6'nın varsayılanı
+    # (contain_symlinks) mutlak ya da ".." içeren bağları EPERM ile reddediyor; ör. ETAP'ın her ev
+    # dizinindeki "ortak-alan" (/ortak-alan'a bağ) okunamayan bir dosya gibi görünüyor, kopyalama
+    # "could not resolve source path" ile düşüyordu. no_contain_symlinks KULLANILMAZ: bağ bu makinede
+    # çözülürdü ve "../../.." ile başlayan bir bağ konteynerin kendi dosya sistemini açardı.
+    "follow_symlinks"
 )
 
 # board_id -> son erişim (time.monotonic) / bağlama noktası. Yalnız bu süreçte tutulur; süreç yeniden

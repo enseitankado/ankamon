@@ -182,12 +182,13 @@ qx.Class.define("tihamon.ui.files.Pane", {
         { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
       tcm.setDataCellRenderer(5, new Renderer(v => (v ? date.format(new Date(v * 1000)) : "")));
       const resize = tcm.getBehavior();
-      resize.setWidth(0, "3*");
-      resize.setWidth(1, 80);
-      resize.setWidth(2, 90);
-      resize.setWidth(3, 90);
+      // Ad, Sahip, Grup panel genişliğiyle büyür (geniş pencerede adlar kesilmesin); diğerleri sabit.
+      resize.set(0, { width: "3*", minWidth: 140 });
+      resize.setWidth(1, 75);
+      resize.set(2, { width: "1*", minWidth: 70 });
+      resize.set(3, { width: "1*", minWidth: 70 });
       resize.setWidth(4, 110);
-      resize.setWidth(5, 130);
+      resize.setWidth(5, 125);
       if (this.__user) {
         // Sütun sırası/gizleme kullanıcı başına sunucuda (iki panel aynı ayarı paylaşır); "tür" iç sütundur.
         const ids = ["name", "size", "user", "group", "mode", "mtime"];

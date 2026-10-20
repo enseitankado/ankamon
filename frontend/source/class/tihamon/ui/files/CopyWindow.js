@@ -1,5 +1,5 @@
 /**
- * "Dosyaları kopyala" (sağ menü → Dosyalar): iki panelli dosya gezgini. Sol panel sağ tıklanan
+ * "Bilgisayarlar arasında kopyala" (sağ menü → Dosyalar): iki panelli dosya gezgini. Sol panel sağ tıklanan
  * tahtanın /home'u (kullanıcıların dizinleri), sağ panel hedef tahta + dizin. Soldaki seçili öğeler
  * "Kopyala →" ile sağdaki dizine (dolayısıyla hedef tahtaya) kopyalanır; ters yön de var. Her iki
  * panelde silme, ad değiştirme, klasör oluşturma; sahip/grup/izin/boyut sütunları (bkz. ui.files.Pane).
@@ -32,7 +32,7 @@ qx.Class.define("tihamon.ui.files.CopyWindow", {
   },
 
   construct(boards, sourceId, user) {
-    super("Dosyaları kopyala");
+    super("Bilgisayarlar arasında kopyala");
     const root = qx.core.Init.getApplication().getRoot();
     const bounds = root.getBounds() || { width: 1280, height: 760 };
     this.set({
@@ -55,6 +55,10 @@ qx.Class.define("tihamon.ui.files.CopyWindow", {
     middle.add(this.__toRight);
     middle.add(this.__toLeft);
 
+    // İki panel her zaman eşit genişlikte: HBox flex yalnız ARTAN alanı paylaştırır, tercih edilen genişlik
+    // ise içerikten (durum satırındaki yol, tahta adı) gelir ve her dizin yüklenişinde değişir — paneller
+    // eşit olmuyor, ayırma noktası kayıyordu. Aynı sabit tercih genişliğiyle kalan alan yarı yarıya bölünür.
+    [this.__left, this.__right].forEach(p => p.set({ width: 300, minWidth: 300 }));
     const panes = new qx.ui.container.Composite(new qx.ui.layout.HBox(10));
     panes.add(this.__left, { flex: 1 });
     panes.add(middle);
@@ -76,6 +80,9 @@ qx.Class.define("tihamon.ui.files.CopyWindow", {
     [this.__left, this.__right].forEach(p => p.addListener("changeState", this.__updateButtons, this));
     this.addListenerOnce("appear", () => {
       this.center();
+      // Ekranın tamamını kullanır (kullanıcı isteği; ekran boyutu değişince de izler). Başlık çubuğundaki
+      // düğmeyle küçültülüp taşınabilir, çift tıklamayla yeniden büyür.
+      this.maximize();
       this.__left.reload();
       this.__right.reload();
     });
