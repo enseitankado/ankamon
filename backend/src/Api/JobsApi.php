@@ -116,6 +116,9 @@ final class JobsApi
             // oturum açmayla aynı yetki. username isteğe bağlı: Oturumlar grid'i belirli kullanıcıyı hedefler.
             'logout' => $this->sessionJob($request, 'Oturumu kapat'),
             'lock' => $this->sessionJob($request, 'Oturumu kilitle'),
+            // Sağ menü Ekran ▸ "Uyandır" (bkz. worker executor/display.py): güç tasarrufuna girmiş (siyah)
+            // ekranı uyandırır — kilitli oturumun kilidini açmaz; ekran izleme yetkisiyle.
+            'wake' => ['screen', 'Ekranı uyandır', [], true],
             // Sağ menü "Yedekle" (bkz. frontend ui/BoardOps.js, worker executor/backup.py): seçilen
             // hesabın ev dizini izin/sahiplik bilgisiyle tar.gz; indirme HomeBackupApi'den.
             'backup_home' => $this->backupJob($request),

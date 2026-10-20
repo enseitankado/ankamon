@@ -791,6 +791,14 @@ qx.Class.define("tihamon.page.Boards", {
         logout: boards => this.__sessionJob(boards.map(b => b.id), { type: "logout" },
           id => (known(id) ? `${known(id)} oturumu kapatılıyor…` : "Oturum kapatılıyor…"),
           t => (t.status === "ok" ? { status: "ok", text: "" } : { status: "error", text: "Oturum kapatılamadı" })),
+        // Ekran ▸ Uyandır: kutucukta geçici "Ekran uyandırılıyor…"; bitince önceki oturum bilgisi geri gelir
+        // (uyandırma oturumu değiştirmez), hata olursa "Uyandırılamadı".
+        wake: boards => {
+          const before = new Map(boards.map(b => [b.id, this.__whoamiState && this.__whoamiState.get(b.id)]));
+          this.__sessionJob(boards.map(b => b.id), { type: "wake" }, () => "Ekran uyandırılıyor…",
+            t => (t.status === "ok" ? before.get(t.board_id) || { status: "ok", text: known(t.board_id) }
+              : { status: "error", text: "Uyandırılamadı" }));
+        },
         // Kilitte oturum açık kalır: kutucukta kullanıcı adı "(kilitli)" ile görünür (çıktının ilk satırı).
         lock: boards => this.__sessionJob(boards.map(b => b.id), { type: "lock" },
           id => (known(id) ? `${known(id)} oturumu kilitleniyor…` : "Oturum kilitleniyor…"),

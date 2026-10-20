@@ -614,7 +614,7 @@ qx.Class.define("tihamon.ui.BoardOps", {
         }
         group(ICON.run, "Komut çalıştır" + count, commands);
 
-        // Ekran ▸ Ekranı göster, Ekranımı yansıt ▸ <kalite> + Ses (ayar penceresi sorulmaz — bkz. cast()).
+        // Ekran ▸ Ekranı göster, Ekranı yönet, Uyandır, Ekranımı yansıt ▸ <kalite> + Ses (ayar penceresi sorulmaz — bkz. cast()).
         const screens = sub();
         if (can("screen")) {
           subAdd(screens, ICON.screen, "Ekranı göster" + count, () => this.screen(boards, user));
@@ -622,6 +622,13 @@ qx.Class.define("tihamon.ui.BoardOps", {
         if (can("screen") && can("screen.control")) {
           // Fare/klavye ile müdahale tek tahtada anlamlı: çoklu seçimde de yalnız sağ tıklanan tahta.
           subAdd(screens, ICON.screenControl, "Ekranı yönet", () => this.screen([board], user, true));
+        }
+        // Uyandır: güç tasarrufuna girmiş (önizlemede siyah) ekranı uyandırır — çoklu seçimde tüm açık
+        // tahtalar (bkz. worker executor/display.py). Ekranlar önizlemesinde iş penceresi açılmaz.
+        if (can("screen")) {
+          subAdd(screens, ICON.wakeScreen, "Uyandır" + count, () => (sessionOps && sessionOps.wake
+            ? sessionOps.wake(online)
+            : this.__job({ type: "wake", board_ids: online.map(b => b.id) }, "Ekranı uyandır")));
         }
         if (can("cast")) {
           screens.add(this.menuButton(ICON.cast, "Ekranımı yansıt" + count, null, this.__castMenu(online)));

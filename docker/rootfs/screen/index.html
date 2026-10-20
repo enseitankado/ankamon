@@ -54,6 +54,11 @@
   .tile .msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; font-size: 13px; color: #bbb; pointer-events: none; }
   .tile .msg a { pointer-events: auto; color: #6af; }
   .tile.live .msg { display: none; }
+  /* Bağlı tahtanın görüntüsü tümüyle siyahsa (ekran güç tasarrufu / X ekran koruyucusu karartmış —
+     bkz. Tile.checkBlank) ortasında açıklama; uyandırmak için sağ menü Ekran ▸ Uyandır. */
+  .tile .sleep { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    text-align: center; padding: 12px; font-size: 13px; color: #9aa4b0; pointer-events: none; }
+  .tile.live.blank .sleep { display: flex; }
   html.single #toolbar { display: none; }
   /* Gömülü kip (Tahtalar sayfasının "Ekranlar" sekmesi): sabit oranlı küçük kutucuklar, aşağı kaydırılır.
      Sınıf <html>'e eklenir (bkz. baştaki senkron betik), body'ye değil: <body> ayrıştırılmadan önce
@@ -207,7 +212,7 @@ class Tile {
     this.control = false;     // fare/klavye ile müdahale (yalnız "screen.control" yetkisiyle; sunucu da denetler)
     this.el.innerHTML = `<div class="title"><span class="dot"></span><span class="name"></span>
       ${spec.control ? '<button class="ctl" title="Fare ve klavye ile tahtayı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
-      <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div>
+      <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div><div class="sleep">Ekran güç tasarrufu kipinde</div>
       <div class="whoami" hidden></div></div><div class="stats"></div>`;
     this.el.querySelector(".name").textContent = board.name || ("#" + board.id);
     this.view = this.el.querySelector(".view");
@@ -478,6 +483,30 @@ class Tile {
       if (prev) Tile.dropLayer(prev);
       this.onClose(4900, "");
     }, Tile.CONNECT_TIMEOUT_MS);
+  }
+
+  /**
+   * Görüntü tümüyle siyah mı: tuval küçük bir örnek tuvale indirgenip piksellere bakılır (ucuz; 2 sn'de
+   * bir — bkz. aşağıdaki setInterval). Arka arkaya iki ölçüm siyahsa "blank" sınıfı verilir (geçişte
+   * anlık siyah kare yanlış uyarı vermesin); yalnız bağlı (live) kutucukta anlamlı.
+   */
+  checkBlank() {
+    let blank = false;
+    const c = this.el.classList.contains("live") && this.wrap && this.wrap.querySelector("canvas");
+    if (c && c.width && c.height) {
+      if (!Tile.probe) {
+        const pc = Object.assign(document.createElement("canvas"), { width: 48, height: 27 });
+        Tile.probe = pc.getContext("2d", { willReadFrequently: true });
+      }
+      Tile.probe.drawImage(c, 0, 0, 48, 27);
+      const d = Tile.probe.getImageData(0, 0, 48, 27).data;
+      blank = true;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i] > 12 || d[i + 1] > 12 || d[i + 2] > 12) { blank = false; break; }
+      }
+    }
+    this.blankHits = blank ? (this.blankHits || 0) + 1 : 0;
+    this.el.classList.toggle("blank", this.blankHits >= 2);
   }
 
   disconnect() {
@@ -851,6 +880,9 @@ if (io) {
     });
   }, 3000);
 }
+
+// Siyah (güç tasarrufundaki) ekran algısı — bkz. Tile.checkBlank.
+setInterval(() => { if (!document.hidden) tiles.forEach(t => t.checkBlank()); }, 2000);
 
 /** Kutucukları verilen listeye eşitler: yenileri ekler, gidenleri kaldırır, kalanları günceller (yeniden bağlanmadan). */
 function setBoards(list) {
