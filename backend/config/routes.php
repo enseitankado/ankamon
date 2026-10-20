@@ -52,6 +52,7 @@ return [
     ['GET',    '/api/board-sessions',    [Api\SessionsApi::class, 'index'],    'logs'],
     ['GET',    '/api/board-uptime',      [Api\UptimeApi::class, 'index'],      'logs'],
     ['DELETE', '/api/board-sessions',    [Api\SessionsApi::class, 'delete'],   'sessions.manage'],
+    ['DELETE', '/api/board-hosts',       [Api\SessionsApi::class, 'deleteHost'], 'sessions.hosts'],
     ['GET',    '/api/logs/stats',        [Api\LogStatsApi::class, 'stats'],    'logs'],
     ['DELETE', '/api/logs',              [Api\LogStatsApi::class, 'delete'],   'logs.manage'],
     // Loglar grid'inden dışlanan (önemsiz) mesajlar — kayıt silinmez, grid'de herkes için gizlenir.

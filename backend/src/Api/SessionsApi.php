@@ -7,6 +7,7 @@ use Tihamon\Core\ApiError;
 use Tihamon\Core\Audit;
 use Tihamon\Core\Db;
 use Tihamon\Core\Request;
+use Tihamon\Core\Storage;
 
 /**
  * Oturumlar — iki tür, tek listede (her satırda `kind`):
@@ -85,5 +86,41 @@ final class SessionsApi
         }
         Audit::log($user, $request, 'sessions.delete', '', ['count' => $deleted, 'ids' => $ids, 'webshell_ids' => $shellIds]);
         return ['ok' => true, 'deleted' => $deleted];
+    }
+
+    /**
+     * Tahtalar'a kayıtlı OLMAYAN bir bilgisayarın (log gönderen ama eklenmemiş, ya da yeniden kurulup
+     * adı değişmiş eski tahta) kayıtlarını siler: tahtaya bağlanmamış oturumları (board_sessions,
+     * board_id NULL) ve açık/kapalı aralıklarını (board_uptime); `logs` verilirse ham loglarını da.
+     * Oturum/aralık çıkarıcıları loglarda kaldıkları yerden ilerlediği için silinenler geri gelmez —
+     * bilgisayar log göndermeyi sürdürürse yalnız yeni kayıtlar oluşur.
+     * Ad kayıtlı bir tahtanın bilgisayar adıysa (eski, tahtaya bağlanmamış oturum satırları) yalnız o
+     * satırlar silinir; açık/kapalı aralıkları ve loglar tahtanındır, dokunulmaz.
+     */
+    public function deleteHost(Request $request, array $user): array
+    {
+        $host = trim((string) $request->input('host', ''));
+        if ($host === '') {
+            throw ApiError::badRequest('Bilgisayar seçilmedi.');
+        }
+        $registered = Db::value('SELECT count(*) FROM boards WHERE lower(hostname) = lower(?)', [$host]) > 0;
+        $withLogs = !$registered && (bool) $request->input('logs', false);
+        $statements = [['DELETE FROM board_sessions WHERE host = ? AND board_id IS NULL', [$host]]];
+        if (!$registered) {
+            $statements[] = ['DELETE FROM board_uptime WHERE host = ?', [$host]];
+        }
+        if ($withLogs) {
+            // logs sıkıştırılmış chunk'larda durur: düz DELETE açma sınırına takılır (bkz. Storage).
+            $statements[] = ['DELETE FROM logs WHERE lower(host) = lower(?)', [$host]];
+        }
+        $counts = Storage::delete($statements);
+        $result = [
+            'sessions' => $counts[0],
+            'uptime' => $registered ? 0 : $counts[1],
+            'logs' => $withLogs ? $counts[2] : 0,
+            'registered' => $registered,
+        ];
+        Audit::log($user, $request, 'sessions.delete_host', $host, $result);
+        return ['ok' => true] + $result;
     }
 }

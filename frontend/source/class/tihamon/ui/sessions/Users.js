@@ -12,6 +12,8 @@
  *    olarak görünür (kurum kapalıyken boşluk ile "kimse oturum açmadı"yı ayırır — bkz. __loadUptime).
  *  - Tablo satırına çift tıklama o tahtayı/kullanıcıyı süzgece alır; çubuğa sağ tıklama süzme
  *    ve (açık tahta oturumunda, "boards.login" yetkisiyle) oturumu kapat/kilitle menüsü açar.
+ *  - Satır (tablo satırı ya da çizelgedeki satır adı) sağ menüsü: süzgece alma; Tahtalar'a kayıtlı olmayan
+ *    bilgisayarda ("sessions.hosts" yetkisiyle) onaylı "Bu bilgisayarın kayıtlarını sil".
  *
  * "Düzgün kapanmadı": kapanış mesajı gelmeden tahta çevrimdışı oldu (offline — elektrik kesintisi,
  * güç düğmesiyle kapatma) ya da kapanmadan yeni oturum açıldı (superseded) ya da web terminal
@@ -68,8 +70,13 @@ qx.Class.define("tihamon.ui.sessions.Users", {
     // ölçülür ve son maddeler kırpılırdı (renkler sınıftan gelir, ölçüyü etkilemez).
     const chip = cls => `<span class="tm-legend ${cls}" style="display:inline-block;width:12px;height:12px;` +
       "box-sizing:border-box;border:1px solid;border-radius:2px;vertical-align:-2px;margin:0 4px 0 10px\"></span>";
-    const legend = Object.keys(S).map(k => chip("tm-s-" + k) + S[k]).join("") + chip("tm-off") + "Tahta kapalı";
-    ranges.add(new qx.ui.basic.Label(legend).set({ rich: true, alignY: "middle", textColor: "app-muted" }));
+    // Renk açıklamaları satırda çok yer kaplıyordu (kullanıcı bildirimi): üzerine gelince ipucunda, alt alta.
+    const legend = Object.keys(S).map(k => chip("tm-s-" + k) + S[k]).concat(chip("tm-off") + "Tahta kapalı")
+      .map(line => `<div style="margin:2px 0">${line}</div>`).join("");
+    const legendTip = new qx.ui.tooltip.ToolTip(legend).set({ rich: true, showTimeout: 100 });
+    ranges.add(new qx.ui.basic.Label("ⓘ Renkler").set({
+      alignY: "middle", textColor: "app-muted", marginLeft: 10, toolTip: legendTip, cursor: "help"
+    }));
 
     this.__summary = new qx.ui.basic.Label("").set({ rich: true });
 
@@ -80,6 +87,10 @@ qx.Class.define("tihamon.ui.sessions.Users", {
     this.__timeline = new tihamon.ui.sessions.Timeline();
     this.__timeline.addListener("changeRange", e => this.__summarize(e.getData()));
     this.__timeline.addListener("itemContextmenu", e => this.__itemMenu(e.getData()));
+    this.__timeline.addListener("groupContextmenu", e => {
+      const data = e.getData();
+      this.__openMenu(this.__groupMenu(data.group), data.event);
+    });
     const lower = new qx.ui.container.Composite(new qx.ui.layout.VBox(6)).set({ paddingTop: 6 });
     lower.add(ranges);
     lower.add(this.__summary);
@@ -100,6 +111,10 @@ qx.Class.define("tihamon.ui.sessions.Users", {
     [[3, 8], [4, 9], [6, 10], [7, 11]].forEach(([col, raw]) =>
       model.setSortMethods(col, (a, b) => (a[raw] - b[raw]) || 0));
     this.__table.addListener("cellDbltap", e => this.__pickRow(e.getRow()));
+    this.__table.addListener("cellContextmenu", e => {
+      const key = e.getRow() === null ? null : this.__table.getTableModel().getValue(0, e.getRow());
+      this.__table.setContextMenu(key ? this.__groupMenu(key) : null);
+    });
     this.__table.setToolTipText("Çift tıklayınca o satır süzgece alınır");
     // SplitPane.add() ÇIPLAK SAYI flex bekler (genel Widget.add'in aksine — bkz. tiha-mon-architecture notu).
     split.add(this.__table, 2);
@@ -565,7 +580,11 @@ qx.Class.define("tihamon.ui.sessions.Users", {
 
     /** Tablo satırına çift tıklama: o tahtayı/kullanıcıyı süzgece al. */
     __pickRow(rowIndex) {
-      const key = this.__table.getTableModel().getValue(0, rowIndex);
+      this.__pickKey(this.__table.getTableModel().getValue(0, rowIndex));
+    },
+
+    /** Satır anahtarını (bkz. __groupMenu) süzgece alır. */
+    __pickKey(key) {
       if (!key) {
         return;
       }
@@ -609,8 +628,86 @@ qx.Class.define("tihamon.ui.sessions.Users", {
         menu.add(ops.menuButton(icon.lock, `Oturumu kilitle (${s.username})`,
           () => ops.sessionAction("lock", [board], null, s.username)));
       }
+      this.__openMenu(menu, data.event);
+    },
+
+    __openMenu(menu, event) {
+      if (!menu) {
+        return;
+      }
       menu.addListenerOnce("disappear", () => qx.event.Timer.once(() => menu.destroy(), null, 0));
-      menu.openAtPoint({ left: data.event.pageX, top: data.event.pageY });
+      menu.openAtPoint({ left: event.pageX, top: event.pageY });
+    },
+
+    /**
+     * Satır (zaman çizelgesindeki satır adı ya da üstteki tablonun satırı) sağ menüsü: süzgece alma ve —
+     * Tahtalar'a kayıtlı olmayan bilgisayarda (anahtar "h<ad>"), "sessions.hosts" yetkisiyle — kayıtlarını
+     * silme. @param key {String} satır anahtarı (tahta satırlarında "b<id>"/"h<ad>", kullanıcıda "<tür>:<ad>")
+     * @return {qx.ui.menu.Menu|null}
+     */
+    __groupMenu(key) {
+      const byBoard = this.__value(this.__groupBy) === "board";
+      const ops = tihamon.ui.BoardOps;
+      const icon = tihamon.ui.Shell.ICON;
+      const menu = new qx.ui.menu.Menu();
+      if (byBoard) {
+        const s = (this.__shown || []).find(x => this.__boardKey(x) === key);
+        const name = s ? s.board || s.host : key.slice(1);
+        menu.add(ops.menuButton(icon.boards, `Yalnız bu bilgisayar (${name})`, () => this.__selectValue(this.__board, key)));
+        if (key.startsWith("h") && this.__page._can("sessions.hosts")) {
+          menu.add(new qx.ui.menu.Separator());
+          menu.add(ops.menuButton(icon.delete, `Bu bilgisayarın kayıtlarını sil (${key.slice(1)})…`,
+            () => this.__deleteHost(key.slice(1))));
+        }
+      } else {
+        const i = key.indexOf(":");
+        menu.add(ops.menuButton(icon.sessions, `Yalnız bu kullanıcı (${key.slice(i + 1)})`, () => this.__pickKey(key)));
+      }
+      return menu;
+    },
+
+    /**
+     * Kayıtlı olmayan bilgisayarın oturum ve açık/kapalı kayıtlarını (isteğe bağlı ham loglarını) onay
+     * aldıktan sonra siler (DELETE /api/board-hosts — bkz. SessionsApi::deleteHost).
+     */
+    async __deleteHost(host) {
+      const esc = qx.bom.String.escape;
+      const count = (this.__sessions || []).filter(s => !s.board_id && s.host === host).length;
+      const win = tihamon.ui.Dialog.window("Bilgisayarın kayıtlarını sil", 480);
+      win.add(new qx.ui.basic.Label(
+        `<b>${esc(host)}</b> Tahtalar'a kayıtlı değil. Bu bilgisayarın <b>${count} oturum kaydı</b> ve açık/kapalı ` +
+        "aralıkları kalıcı olarak silinecek; geri alınamaz.<br><br>Bilgisayar hâlâ log gönderiyorsa yalnız bundan " +
+        "sonraki oturumları yeniden görünür.").set({ rich: true, wrap: true }));
+      const logs = new qx.ui.form.CheckBox("Ham sistem loglarını da sil (Loglar ▸ Sistem logları)");
+      win.add(logs);
+      const cancel = new qx.ui.form.Button("Vazgeç");
+      const ok = new qx.ui.form.Button("Sil");
+      let confirmed = false;
+      cancel.addListener("execute", () => win.close());
+      ok.addListener("execute", () => {
+        confirmed = true;
+        win.close();
+      });
+      tihamon.ui.Dialog.buttons(win, [cancel, ok]);
+      await new Promise(resolve => {
+        win.addListener("close", resolve);
+        win.open();
+      });
+      if (!confirmed) {
+        return;
+      }
+      try {
+        const res = await tihamon.io.Api.del("/board-hosts", { host, logs: logs.getValue() });
+        this.__uptime = null;   // açık/kapalı aralıkları yeniden çekilsin
+        if (this.__value(this.__board) === "h" + host) {
+          this.__selectValue(this.__board, "");
+        }
+        await this.__page.refresh();
+        tihamon.ui.Dialog.alert(`<b>${esc(host)}</b>: ${res.sessions} oturum kaydı, ${res.uptime} açık/kapalı aralığı` +
+          (logs.getValue() ? `, ${res.logs} log satırı` : "") + " silindi.", "Silindi");
+      } catch (e) {
+        tihamon.ui.Dialog.error(e);
+      }
     }
   }
 });

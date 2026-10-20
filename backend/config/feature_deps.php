@@ -20,5 +20,6 @@ return [
     'logs.manage' => 'logs',
     'logs.exclude' => 'logs',
     'sessions.manage' => 'logs',
+    'sessions.hosts' => 'logs',
     'network.manage' => 'network',
 ];

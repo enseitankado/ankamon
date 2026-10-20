@@ -7,7 +7,8 @@
  * yalnız bu bileşen ilk kez ekrana geldiğinde yüklenir — diğer sayfaların açılışını ağırlaştırmaz.
  *
  * Olaylar: "changeRange" {start, end: Date} (kullanıcı kaydırma/yakınlaştırmayı bitirince ya da
- * setWindow/fit ile), "itemContextmenu" {item: öğe kimliği, event: DOM olayı}.
+ * setWindow/fit ile), "itemContextmenu" {item: öğe kimliği, event: DOM olayı}, "groupContextmenu"
+ * {group: satır kimliği, event: DOM olayı} (soldaki satır adına sağ tıklama).
  *
  * @asset(tihamon/vis/*)
  */
@@ -16,7 +17,8 @@ qx.Class.define("tihamon.ui.sessions.Timeline", {
 
   events: {
     changeRange: "qx.event.type.Data",
-    itemContextmenu: "qx.event.type.Data"
+    itemContextmenu: "qx.event.type.Data",
+    groupContextmenu: "qx.event.type.Data"
   },
 
   construct() {
@@ -249,6 +251,9 @@ qx.Class.define("tihamon.ui.sessions.Timeline", {
         if (props.item !== null && props.item !== undefined) {
           props.event.preventDefault();
           this.fireDataEvent("itemContextmenu", { item: props.item, event: props.event });
+        } else if (props.what === "group-label" && props.group !== null && props.group !== undefined) {
+          props.event.preventDefault();
+          this.fireDataEvent("groupContextmenu", { group: props.group, event: props.event });
         }
       });
       // vis ilk çiziminde aralığı kendisi belirler (veriye sığdırır) ve ondan önce verilen aralığı
