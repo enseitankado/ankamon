@@ -142,6 +142,8 @@ qx.Class.define("tihamon.ui.sessions.Users", {
     __page: null,
     __user: null,
     __board: null,
+    __pinnedBoard: null,
+    __pendingBoard: false,
     __kind: null,
     __groupBy: null,
     __badOnly: null,
@@ -163,8 +165,12 @@ qx.Class.define("tihamon.ui.sessions.Users", {
     /** @param sessions {Array} /board-sessions yanıtındaki satırlar */
     setData(sessions) {
       this.__sessions = sessions;
-      this.__fillOptions();
-      this.__render();
+      if (this.__pendingBoard) {
+        this.__applyBoard();
+      } else {
+        this.__fillOptions();
+        this.__render();
+      }
       this.__loadLessons();
     },
 
@@ -258,6 +264,38 @@ qx.Class.define("tihamon.ui.sessions.Users", {
       this.__timeline.fit();
     },
 
+    /**
+     * Tahtalar/Ekranlar sağ menüsü "Oturum geçmişi" (bkz. page.Sessions.openWith): yalnız o tahta — Tür "Tümü"
+     * (web terminal dahil), satırlar kullanıcılara göre, aralık tahtanın bütün oturumlarını kapsar. Veri henüz
+     * gelmediyse (sayfa ilk açılıyor) setData'da uygulanır. Tahtanın hiç oturumu yoksa da seçenek listede kalır
+     * (bkz. __fillOptions __pinnedBoard) — yoksa seçim düşer ve "Tüm tahtalar" görünürdü.
+     * @param board {Map} {id, name}
+     */
+    showBoard(board) {
+      this.__pinnedBoard = { key: "b" + board.id, name: board.name };
+      this.__pendingBoard = true;
+      if (this.__sessions) {
+        this.__applyBoard();
+      }
+    },
+
+    __applyBoard() {
+      this.__pendingBoard = false;
+      this.__updatingOptions = true;
+      try {
+        this.__selectValue(this.__kind, "");
+        this.__fillOptions();
+        this.__selectValue(this.__user, "");
+        this.__selectValue(this.__board, this.__pinnedBoard.key);
+        this.__selectValue(this.__groupBy, "user");
+        this.__badOnly.setValue(false);
+      } finally {
+        this.__updatingOptions = false;
+      }
+      this.__render();
+      this.__timeline.fit();
+    },
+
     __select(pairs) {
       const box = new qx.ui.form.SelectBox();
       pairs.forEach(([value, label]) => box.add(new qx.ui.form.ListItem(label, null, value)));
@@ -293,6 +331,9 @@ qx.Class.define("tihamon.ui.sessions.Users", {
         users.set(s.username, (users.get(s.username) || 0) + 1);
         boards.set(this.__boardKey(s), s.board || s.host || "?");
       });
+      if (this.__pinnedBoard && !boards.has(this.__pinnedBoard.key)) {
+        boards.set(this.__pinnedBoard.key, this.__pinnedBoard.name);
+      }
       const fill = (box, entries, allLabel) => {
         const keep = this.__value(box);
         box.removeAll().forEach(item => item.dispose());

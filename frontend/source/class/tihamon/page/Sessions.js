@@ -63,12 +63,12 @@ qx.Class.define("tihamon.page.Sessions", {
 
     /**
      * Shell.OPEN_PAGE {page: "sessions", board: {id, name}} — Tahtalar/Ekranlar sağ menüsü "Oturum geçmişi":
-     * Oturumlar sekmesi o tahtaya süzülmüş açılır.
+     * Kullanıcılar sekmesi (zaman çizelgesi) o tahtaya süzülmüş açılır (kullanıcı isteği).
      */
     openWith(data) {
       if (data && data.board) {
-        this.__tabs.setSelection([this.__list]);
-        this.__list.showBoard(data.board);
+        this.__tabs.setSelection([this.__users]);
+        this.__users.showBoard(data.board);
       }
     },
 
