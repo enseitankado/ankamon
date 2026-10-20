@@ -103,7 +103,7 @@ qx.Class.define("tihamon.ui.Shell", {
     ICON: {
       dashboard: "◈", boards: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
-      info: "ℹ", backup: "⬇", copy: "⧉", cast: "⇪", logout: "⏏", lock: "🔒", diagnose: "⚕", system: "⚒", diskusage: "⛁",
+      info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", cast: "⇪", logout: "⏏", lock: "🔒", diagnose: "⚕", system: "⚒", diskusage: "⛁",
       network: "⇆", subnet: "▫", taskmgr: "☷"
     },
 

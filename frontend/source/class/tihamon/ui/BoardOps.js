@@ -648,7 +648,7 @@ qx.Class.define("tihamon.ui.BoardOps", {
         sessionHistory(sessions);
         group(ICON.sessions, "Oturum…", sessions);
 
-        // Dosyalar ▸ Dosya yöneticisi, Dosyaları kopyala, Yedekle ▸ <hesap> (kullanıcı isteği: eski
+        // Dosyalar ▸ Dosya yöneticisi, Dosyaları kopyala, Dosyaları dağıt, Dosyaları topla, Yedekle ▸ <hesap> (kullanıcı isteği: eski
         // "Yedekle" + "Dosya yöneticisi" tek grupta; Dosya yöneticisi ilk sırada). Bilgisayarı aç/kapat
         // çiftinin hemen üstünde.
         const files = sub();
@@ -656,6 +656,10 @@ qx.Class.define("tihamon.ui.BoardOps", {
           subAdd(files, ICON.filemanager, "Dosya yöneticisi", () => this.filemanager(board));
           // İki panelli gezgin: bu tahtanın kullanıcı dizinlerinden başka bir tahtaya kopyalama.
           subAdd(files, ICON.copy, "Dosyaları kopyala", () => tihamon.ui.files.CopyWindow.open(board, user));
+          // Toplu: bu bilgisayardan seçili tahtalardaki kullanıcıların bir konumuna (varsayılan Masaüstü) ve
+          // tersi (bkz. ui.files.BulkWindow). Pencerede tahta seçimi değiştirilebilir.
+          subAdd(files, ICON.distribute, "Dosyaları dağıt" + count, () => tihamon.ui.files.BulkWindow.open("distribute", online, user));
+          subAdd(files, ICON.collect, "Dosyaları topla" + count, () => tihamon.ui.files.BulkWindow.open("collect", online, user));
         }
         if (can("boards.backup")) {
           files.add(this.menuButton(ICON.backup, "Yedekle" + count, null,
