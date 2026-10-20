@@ -1,7 +1,7 @@
 /**
  * Disk kullanımı sekmelerinin "?" yardım penceresi (bkz. ui.DiskUsageTab): o sekmedeki verinin ne
- * olduğu, nerede saklandığı, saklama politikası, otomatik silme/özetleme/sıkıştırma ve en önemlisi
- * "kontrolsüz büyüyüp diski doldurur mu?" sorusunun yanıtı. Süreler ve politika durumları sabit metin
+ * olduğu, nerede saklandığı, saklama politikası, otomatik silme/özetleme/sıkıştırma ve diskte
+ * büyüme davranışı (yavaş birikim yalnız hatırlatılır, uyarı kutusu gerçek risk için). Süreler ve politika durumları sabit metin
  * değil — /api/storage/policy'den (o anki .env değerleri + TimescaleDB politikalarının gerçek ayarı ve
  * son çalışması + rsyslog kuyruk sınırları + /data diski, bkz. backend StoragePolicyApi) okunur.
  * Kodda karşılığı olmayan iddia yazılmaz: otomatik temizliği olmayan veri açıkça "yok" der.
@@ -54,6 +54,8 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
       .dh .v.ok{border-color:#2e8b2e;background:rgba(46,139,46,.12)}
       .dh .v.mid{border-color:#e0a020;background:rgba(224,160,32,.13)}
       .dh .v.bad{border-color:#d9534f;background:rgba(217,83,79,.12)}
+      .dh .v.note{border-color:rgba(128,128,128,.55);background:rgba(128,128,128,.08)}
+      .dh p.intro{margin:10px 0 4px}
       .dh ul{margin:4px 0;padding-left:20px}
     </style>`,
 
@@ -88,7 +90,13 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
         return "<div class='dh'>Bu sekme için yardım yok.</div>";
       }
       let h = `<div class="dh">${this.CSS}`;
-      h += `<div class="v ${T.verdict[0]}"><span class="t">Kontrolsüz büyüyüp diski doldurur mu? ${T.verdict[1]}</span>${T.verdict[2]}</div>`;
+      if (T.intro) {
+        h += `<p class="intro">${T.intro}</p>`;
+      }
+      if (T.verdict) {
+        const [cls, title, text] = T.verdict;
+        h += `<div class="v ${cls}">${title ? `<span class="t">${title}</span>` : ""}${text}</div>`;
+      }
       if (now || disk) {
         h += `<div class="muted">${[now, disk].filter(Boolean).join(" · ")}</div>`;
       }
@@ -105,13 +113,16 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
       return h + "</div>";
     },
 
-    /** Sekme başına içerik: {verdict: [sınıf, kısa yanıt, açıklama], rows: [[başlık, html]], todo?: [html]} */
+    /**
+     * Sekme başına içerik: {intro?: html (düz paragraf), verdict?: [sınıf, başlık (boşsa yok), açıklama],
+     * rows: [[başlık, html]], todo?: [html]}. Sınıf: ok/mid/bad uyarı, note = yalnız hatırlatma (yavaş birikim).
+     */
     __topics(mode, { env, pol, run, drop, compress, esc, p }) {
       const pg = "PostgreSQL/TimescaleDB veritabanı — sunucuda <code>data/postgres</code>";
       switch (mode) {
         case "system":
           return {
-            verdict: ["mid", "Süreyle sınırlı, boyutla değil.",
+            verdict: ["mid", "Kontrolsüz büyüyüp diski doldurur mu? Süreyle sınırlı, boyutla değil.",
               `Üzerinden ${drop("logs", "90 days")} geçen loglar her gün kendiliğinden silinir; ama bu süre içinde ne kadar log geleceğine sınır yoktur. ` +
               "Sürekli hata basan bir tahta o süre içinde çok yer tutabilir — aşağıdaki tahta satırlarından en büyükleri izleyin."],
             rows: [
@@ -130,9 +141,6 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
           };
         case "command":
           return {
-            verdict: ["bad", "Evet — otomatik silme yok, ama çok yavaş büyür.",
-              "Komut kayıtları denetim izi olduğu için hiçbir zaman kendiliğinden silinmez. Her komut tek bir kısa satırdır; " +
-              "boyut kullanım yoğunluğuyla orantılı ve genelde küçüktür — yukarıdaki boyutu ara sıra kontrol edin."],
             rows: [
               ["Ne?", "Tiha-Mon üzerinden tahtalarda çalıştırılan komutların kaydı: görevler, hazır işlemler, web terminal, " +
                 "dosya yöneticisi ve ekran işlemleri — kim, ne zaman, hangi tahtada, ne çalıştırdı."],
@@ -148,10 +156,12 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
           // rsyslog boyut yazımı ("4g", "512m") → "4 GB"
           q.maxDiskSpace = String(q.maxDiskSpace || "4g").replace(/^(\d+)\s*([kmgt])b?$/i, (m, n, u) => `${n} ${u.toUpperCase()}B`);
           return {
-            verdict: ["mid", "Canlı kuyruk sınırlı; bozuk kuyruk klasörleri birikebilir.",
-              `Canlı kuyruk en çok <b>${esc(q.maxDiskSpace || "4g")}</b> yer kaplayabilir ve loglar veritabanına yazıldıkça kendiliğinden boşalır (normalde boştur). ` +
+            intro: "Log kuyruğu, tahtalardan gelen logların veritabanı sunucusuna yazılmadan önce beklediği geçici konumdur: " +
+              "rsyslog kabul ettiği her logu önce bu disk kuyruğuna yazar, veritabanına yazılan loglar da kuyruktan silinir. " +
+              "Bu yüzden normalde boştur; yalnız veritabanı kapalı ya da yavaşken dolmaya başlar. " +
+              `Canlı kuyruk en çok <b>${esc(q.maxDiskSpace || "4g")}</b> yer kaplayabilir. ` +
               "Açılışta okunamayan kuyruk ise <code>bozuk-…</code> klasörüne kenara alınır; bunlar bu sınırın dışındadır ve " +
-              "<b>otomatik silinmez</b> — her bozuk açılışta bir tane eklenir."],
+              "otomatik silinmez — her bozuk açılışta bir tane eklenir.",
             rows: [
               ["Ne?", "rsyslog'un tahtalardan kabul edip veritabanına henüz yazamadığı loglar (Postgres kapalı/yavaşken birikir)."],
               ["Nerede?", "Sunucuda <code>data/rsyslog</code>: <code>tihamon_pg.*</code> parçaları + <code>tihamon_pg.qi</code> konum dosyası; " +
@@ -159,7 +169,7 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
               ["Sınırlar", `En çok ${esc(q.maxDiskSpace || "4g")} disk / ${Number(q.size || 5000000).toLocaleString("tr-TR")} kayıt. ` +
                 `Dolarsa log atılmaz: gönderen tahta ${Math.round(Number(q.timeoutEnqueue || 600000) / 60000)} dk bekletilir ` +
                 "(tahtalar kendi kuyruklarında tamponlar); süre dolarsa yeni kayıt düşer."],
-              ["Otomatik temizlik", "Canlı kuyruk: loglar veritabanına ulaşınca. Bozuk klasörler: <b>yok</b>."],
+              ["Otomatik temizlik", "Canlı kuyruk: loglar veritabanına yazılınca silinir. Bozuk klasörler: <b>yok</b>."],
               ["Uyarı", "Genel bakışta bekleyen kuyruk 50 MB'ı aşınca uyarı çıkar — büyüyorsa loglar veritabanına ulaşmıyor demektir."]
             ],
             todo: [
@@ -170,7 +180,7 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
         }
         case "metrics":
           return {
-            verdict: ["ok", "Hayır — süreyle sınırlı ve özetlenir.",
+            verdict: ["ok", "",
               `Ham ölçümler ${drop("metrics", "30 days")} sonra silinir; grafikler daha eski dönemler için özetlerden çizilir. ` +
               "Boyut tahta sayısı ve okuma aralığıyla orantılıdır, ham verinin süresi dolunca dengeye oturur; " +
               "yalnız saatlik özet süresi boyunca yavaşça büyür."],
@@ -191,9 +201,9 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
           };
         case "jobs":
           return {
-            verdict: ["bad", "Evet, yavaşça — görevler otomatik silinmez.",
-              "Görevler ve tahta sonuçları kendiliğinden silinmez. En büyük kalem olan canlı çıktı satırları 30 günden eskiyse silinir, " +
-              "<b>ama yalnız görev yürütücüsü başlarken</b> (konteyner yeniden başlatma/güncelleme); konteyner uzun süre açık kalırsa birikir."],
+            verdict: ["note", "Zamanla yavaşça birikir.",
+              "Görevler ve tahta sonuçları kendiliğinden silinmez. En büyük kalem olan canlı çıktı satırları 30 günden eskiyse " +
+              "görev yürütücüsü başlarken (konteyner yeniden başlatma/güncelleme) silinir. Ara sıra eski görevleri silmek yeterlidir."],
             rows: [
               ["Ne?", "Tiha-Mon'dan başlatılan işler (komut, hazır işlem, kapat/uyandır, oturum, yansıtma…): görev, tahta başına sonuç ve canlı çıktı satırları."],
               ["Nerede?", `${pg}: <code>jobs</code>, <code>job_targets</code>, <code>job_events</code>.`],
@@ -206,9 +216,9 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
           };
         case "diagnose":
           return {
-            verdict: ["bad", "Evet, çok yavaşça — raporlar otomatik silinmez.",
-              `Otomatik tarama tahta başına yaklaşık <b>${esc(env("DIAGNOSE_INTERVAL_DAYS", "7"))} günde bir</b> rapor üretir; raporlar ` +
-              "kendiliğinden silinmez. Rapor başına boyut küçük olduğundan büyüme yavaştır."],
+            verdict: ["note", "Çok yavaş birikir.",
+              `Otomatik tarama tahta başına yaklaşık ${esc(env("DIAGNOSE_INTERVAL_DAYS", "7"))} günde bir küçük bir rapor üretir; ` +
+              "raporlar kendiliğinden silinmez, eskileri ara sıra buradan silinebilir."],
             rows: [
               ["Ne?", "Sorun tespiti taramalarının raporları — haftalık otomatik tarama ve elle başlatılanlar."],
               ["Nerede?", `${pg}: <code>jobs</code> (tür <code>diagnose</code>), rapor <code>job_targets</code> içinde.`],
@@ -219,7 +229,7 @@ qx.Class.define("tihamon.ui.DiskUsageHelp", {
           };
         case "backups":
           return {
-            verdict: ["mid", "Dosya sayısı sınırlı, boyut değil.",
+            verdict: ["mid", "Kontrolsüz büyüyüp diski doldurur mu? Dosya sayısı sınırlı, boyut değil.",
               `En çok <b>${esc(env("BACKUP_KEEP_FULL", "7"))} tam</b> ve <b>${esc(env("BACKUP_KEEP_CONFIG", "28"))} yapılandırma</b> ` +
               "(ve Grafana) yedeği tutulur; yenisi alınınca en eskiler silinir. Ama tam yedek logları ve sensör verisini içerdiğinden " +
               "veriyle birlikte büyür; yer ≈ tam yedek sayısı × son tam yedek boyutu. Yedek almadan önce boş alan denetlenmez."],
