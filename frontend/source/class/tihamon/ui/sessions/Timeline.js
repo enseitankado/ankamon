@@ -58,6 +58,8 @@ qx.Class.define("tihamon.ui.sessions.Timeline", {
       .vis-item.vis-selected { box-shadow: 0 0 0 2px #1a73e8; }
       .vis-item .vis-item-content { padding: 1px 4px; }
       .vis-labelset .vis-label .vis-inner { padding: 4px 8px; }
+      .tm-group-header { position: absolute; top: 0; left: 0; z-index: 2; box-sizing: border-box;
+        align-items: flex-end; padding: 0 8px 4px; font-weight: bold; overflow: hidden; white-space: nowrap; }
       .vis-item.tm-s-ok, .tm-legend.tm-s-ok { background: #ceead6; border-color: #34a853; color: #0d652d; }
       .vis-item.tm-s-open, .tm-legend.tm-s-open { background: #d2e3fc; border-color: #1a73e8; color: #174ea6; }
       .vis-item.tm-s-locked, .tm-legend.tm-s-locked { background: #e9defc; border-color: #8430ce; color: #5e1d99; }
@@ -114,6 +116,41 @@ qx.Class.define("tihamon.ui.sessions.Timeline", {
     __pending: null,
     __pendingWindow: null,
     __pendingFit: false,
+    __header: "",
+    __headerEl: null,
+
+    /**
+     * Satır adları sütununun başlığı (ör. "Bilgisayar", "Kullanıcı"): eksen satırının solundaki boş köşeye
+     * yazılır; her yeniden çizimde sütunun genişliğine/eksenin yüksekliğine uydurulur.
+     */
+    setGroupHeader(text) {
+      this.__header = text || "";
+      this.__placeHeader();
+    },
+
+    __placeHeader() {
+      if (!this.__timeline || this.isDisposed()) {
+        return;
+      }
+      const left = this.__timeline.dom.leftContainer;   // .vis-panel.vis-left (dom.left içindeki içerik kutusu)
+      if (!this.__headerEl) {
+        this.__headerEl = document.createElement("div");
+        this.__headerEl.className = "tm-group-header";
+        this.__timeline.dom.root.appendChild(this.__headerEl);
+      }
+      this.__headerEl.textContent = this.__header;
+      // Sekme gizliyken (ör. sayfa açılışında Kullanıcılar sekmesi seçili değilken) çizim boyutsuz
+      // yapılır: eksen yerleşene dek kısa aralıklarla yeniden ölçülür.
+      const top = parseFloat(left.style.top) || 0;   // vis panelin yerini satır içi stille verir
+      if (!top && this.__header) {
+        qx.event.Timer.once(this.__placeHeader, this, 250);
+      }
+      Object.assign(this.__headerEl.style, {
+        width: left.offsetWidth + "px",
+        height: top + "px",
+        display: this.__header ? "flex" : "none"
+      });
+    },
 
     /**
      * Satırları ve çubukları verir. Var olan kimlikler yerinde güncellenir, artık olmayanlar
@@ -230,6 +267,8 @@ qx.Class.define("tihamon.ui.sessions.Timeline", {
         this.__pendingWindow = null;
       };
       this.__timeline.on("changed", applyPending);
+      // "changed" çizim bitmeden gelir (panel konumları henüz yazılmamış): ölçüm bir tur sonra.
+      this.__timeline.on("changed", () => qx.event.Timer.once(this.__placeHeader, this, 0));
       if (this.__pending) {
         this.setData(this.__pending.groups, this.__pending.items);
         this.__pending = null;

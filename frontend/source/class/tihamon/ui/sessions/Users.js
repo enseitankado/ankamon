@@ -396,8 +396,8 @@ qx.Class.define("tihamon.ui.sessions.Users", {
           content: esc(byBoard ? userName : boardName),
           className: "tm-s-" + state,
           title: `<b>${esc(s.username)}</b> · ${esc(boardName)}<br>` +
-            `${F.dateTime(s.started_at * 1000)} → ${s.ended_at ? F.dateTime(s.ended_at * 1000) : "devam ediyor"}<br>` +
-            `Süre: ${F.duration(end - s.started_at)}<br>` +
+            `Süre: ${F.duration(end - s.started_at)} (${F.dateTime(s.started_at * 1000)} → ` +
+            `${s.ended_at ? F.dateTime(s.ended_at * 1000) : "devam ediyor"})<br>` +
             `${s.kind === "webshell" ? "Web terminal · " : ""}${s.locked ? "Açık (kilitli)" : (s.end_detail || F.sessionEndReason(s.end_reason))}` +
             (s.kind === "webshell" ? "" : this.__lessonLines(s, end))
         };
@@ -406,6 +406,9 @@ qx.Class.define("tihamon.ui.sessions.Users", {
         items.push(...this.__offItems(new Set(groups.keys())));
       }
       this.__timeline.setData([...groups.entries()].map(([id, content]) => ({ id, content: esc(content) })), items);
+      // Satır adları sütununun başlığı: tahta satırlarında kayıtlı tahtalar dışında, log gönderen ama
+      // tahta olarak eklenmemiş makineler (bilgisayar adıyla) de bulunabildiğinden "Bilgisayar".
+      this.__timeline.setGroupHeader(byBoard ? "Bilgisayar" : "Kullanıcı");
       const nameLabel = byBoard ? "Tahta" : "Kullanıcı";
       if (this.__columns[0].label !== nameLabel) {
         this.__columns[0].label = nameLabel;
