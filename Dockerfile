@@ -24,8 +24,11 @@ RUN mkdir -p /out \
  && if curl -fsSL --retry 3 --retry-delay 5 https://www.wireshark.org/download/automated/data/manuf -o /tmp/manuf; \
     then gzip -9c /tmp/manuf > /out/manuf.gz; \
     else echo "UYARI: manuf indirilemedi; MAC üretici adları boş kalacak." >&2; : > /out/manuf.gz; fi
-COPY frontend/Manifest.json frontend/compile.json ./
+COPY frontend/Manifest.json frontend/compile.json frontend/ext-libs.js ./
 COPY frontend/source ./source
+# Eklentiler (ext/<ad>/, public depoda yok — bkz. ext/README.md): arayüz kısımları derlemeye katılır.
+COPY ext ./ext
+RUN node ext-libs.js ext
 # Oturum zaman çizelgesi (ui.sessions.Timeline): vis-timeline'ın bağımlılıkları gömülü standalone
 # derlemesi qooxdoo kaynağı olarak eklenir; sekme ilk açıldığında yüklenir (bkz. @asset).
 RUN mkdir -p source/resource/tihamon/vis \
@@ -123,6 +126,8 @@ COPY docker/rootfs/certs /opt/tiha-mon/certs
 COPY backend /opt/tiha-mon/app
 COPY actions /opt/tiha-mon/app/actions
 COPY worker /opt/tiha-mon/worker
+# Eklentilerin sunucu/worker kısımları (backend/, worker/); yoksa yalnız ext/README.md gelir.
+COPY ext /opt/tiha-mon/ext
 COPY --from=frontend /out/manuf.gz /opt/tiha-mon/worker/tihamon/netscan/manuf.gz
 COPY db /opt/tiha-mon/db
 COPY docker/backup /opt/tiha-mon/backup

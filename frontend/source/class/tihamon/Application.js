@@ -43,6 +43,7 @@ qx.Class.define("tihamon.Application", {
         // Shell/sayfalar oluşturulmadan önce uygulanır ki ilk çizim doğrudan doğru temayla olsun.
         tihamon.theme.Registry.apply(user.theme);
         this.__show(new tihamon.ui.Shell(user));
+        tihamon.ext.Extensions.start({ user, app: this });
       } catch (e) {
         this.__showLogin();
       }

@@ -12,3 +12,6 @@
 /worker/tihamon/netscan/manuf.gz
 __pycache__/
 *.pyc
+# Eklentiler (bkz. ext/README.md): her ext/<ad>/ kendi (ör. private) deposudur, bu depoya GİRMEZ.
+/ext/*
+!/ext/README.md

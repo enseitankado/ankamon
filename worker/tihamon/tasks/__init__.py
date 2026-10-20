@@ -20,3 +20,30 @@ from . import diagnose_schedule, board_identity, board_sessions, board_uptime, b
 # bakıp netleştirir (düzenli kapatma / ETAP otomatik kapanma / elektrik kesintisi …; bkz. o dosya).
 TASKS = [boards_from_logs, board_status, board_sessions, board_identity, telegraf_targets, board_uptime, session_end,
          diagnose_schedule]
+
+
+def _extension_tasks() -> list:
+    """Eklentilerin (public depoda yok, bkz. ext/README.md) periyodik görevleri: her
+    /opt/tiha-mon/ext/<ad>/worker/tasks.py, run(conn) tanımlayan modüllerden bir TASKS listesi verir;
+    bunlar çekirdek görevlerinin ardından aynı turda çalışır. Yüklenemeyen eklenti atlanır (worker durmaz)."""
+    import glob
+    import importlib.util
+    import logging
+    import sys
+
+    found = []
+    for path in sorted(glob.glob("/opt/tiha-mon/ext/*/worker/tasks.py")):
+        name = "tihamonext_" + path.split("/")[-3]
+        try:
+            # Eklentinin worker dizini import yoluna girer: tasks.py kendi modüllerini mutlak adla alabilir.
+            sys.path.insert(0, path.rsplit("/", 1)[0])
+            spec = importlib.util.spec_from_file_location(name, path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            found.extend(getattr(module, "TASKS", []))
+        except Exception:  # noqa: BLE001 — bir eklentinin hatası worker'ı düşürmesin
+            logging.getLogger("tihamon").exception("Eklenti görevleri yüklenemedi: %s", path)
+    return found
+
+
+TASKS += _extension_tasks()

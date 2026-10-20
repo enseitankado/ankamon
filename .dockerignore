@@ -10,3 +10,4 @@ frontend/themes
 worker/tihamon/netscan/manuf.gz
 **/__pycache__
 **/*.pyc
+ext/*/.git

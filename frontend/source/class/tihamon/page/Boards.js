@@ -301,6 +301,12 @@ qx.Class.define("tihamon.page.Boards", {
 
     /** Her sütunun altındaki metin kutularını (Excel tarzı sütun filtresi) uygular. */
     __apply() {
+      // Eklenti kancası: Durum kutusuna yazılan metni bir eklenti üstlenebilir (bkz. tihamon.ext.Extensions).
+      const status = this.__filterFields && this.__filterFields.status;
+      if (status && tihamon.ext.Extensions.handle("boards.statusFilter", (status.getValue() || "").trim(), this)) {
+        status.setValue("");
+        return;
+      }
       if (!this.__rows) {
         return;
       }
