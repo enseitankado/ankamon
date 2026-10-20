@@ -19,6 +19,8 @@ qx.Class.define("tihamon.ui.StatusBar", {
     MAX_HEIGHT: 500,
     STATS_INTERVAL_MS: 1000,
     USERS_INTERVAL_MS: 15000,
+    // Açık sayfa/sekme/pencere bu aralıkla yoklanır; değişmişse hemen bildirilir (bkz. __currentView).
+    VIEW_CHECK_MS: 3000,
     // CPU/RAM bu yüzdeyi bu kadar (ms) sürekli AŞARSA kırmızı + ⚠ ile vurgulanır (kullanıcı isteği).
     WARN_PERCENT: 85,
     WARN_SUSTAIN_MS: 10000
@@ -91,6 +93,14 @@ qx.Class.define("tihamon.ui.StatusBar", {
     this.__pollUsers();
     this.__usersTimer.start();
 
+    this.__viewTimer = new qx.event.Timer(tihamon.ui.StatusBar.VIEW_CHECK_MS);
+    this.__viewTimer.addListener("interval", () => {
+      if (this.__currentView() !== this.__sentView) {
+        this.__pollUsers();
+      }
+    });
+    this.__viewTimer.start();
+
     // "Aktif" (kullanıcı isteği): sekme görünür + pencere odakta. Olaylar yalnız tetikleyici; durum kısa bir
     // gecikmeyle document.hasFocus() ile okunur — odak iframe'e (Ekranlar, terminal) geçince pencere "blur"
     // alır ama hasFocus() iç çerçeveleri de sayar, yanlışlıkla "pasif" bildirilmez. Değişince hemen gönderilir.
@@ -117,6 +127,10 @@ qx.Class.define("tihamon.ui.StatusBar", {
       this.__usersTimer.stop();
       this.__usersTimer.dispose();
     }
+    if (this.__viewTimer) {
+      this.__viewTimer.stop();
+      this.__viewTimer.dispose();
+    }
     if (this.__onFocusChange) {
       window.removeEventListener("focus", this.__onFocusChange);
       window.removeEventListener("blur", this.__onFocusChange);
@@ -134,6 +148,50 @@ qx.Class.define("tihamon.ui.StatusBar", {
     __usersTip: null,
     __onFocusChange: null,
     __sentFocused: null,
+    __viewTimer: null,
+    __sentView: null,
+
+    /**
+     * Bu oturumun o an Tiha-Mon'da baktığı yer (alt çubuk ipucunda "Aktif"in sağında gösterilir): gezinme
+     * ağacında seçili düğümün yolu + görünen sayfadaki seçili iç sekmeler + öndeki pencerenin başlığı,
+     * ör. "Tahtalar ▸ Ekranlar · Web terminal — B Blok - Arge 2". Kabuğa (ui.Shell) bağımlılık olmasın diye
+     * görünür widget ağacından okunur: Stack'te gizli sayfalar görünür olmadığından atlanır.
+     */
+    __currentView() {
+      const text = s => String(s || "").replace(/<[^>]*>/g, "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
+      const parts = [];
+      const walk = w => {
+        if (!w.isSeeable()) {
+          return;
+        }
+        if (w instanceof qx.ui.tree.Tree) {
+          const path = [];
+          for (let item = w.getSelection()[0]; item && item !== w.getRoot(); item = item.getParent()) {
+            path.unshift(text(item.getLabel()));
+          }
+          parts.push(...path.filter(Boolean));
+          return;
+        }
+        if (w instanceof qx.ui.tabview.TabView) {
+          const page = w.getSelection()[0];
+          if (page && text(page.getLabel())) {
+            parts.push(text(page.getLabel()));
+          }
+        }
+        (w._getChildren ? w._getChildren() : []).forEach(child => child instanceof qx.ui.core.Widget && walk(child));
+      };
+      const shell = this.getLayoutParent();
+      if (shell) {
+        walk(shell);
+      }
+      let view = parts.join(" ▸ ");
+      const root = qx.core.Init.getApplication().getRoot();
+      const win = root.getActiveWindow && root.getActiveWindow();
+      if (win && win.isSeeable() && text(win.getCaption())) {
+        view += (view ? " · " : "") + text(win.getCaption());
+      }
+      return view.slice(0, 200);
+    },
 
     /** Tiha-Mon sekmesi görünür VE tarayıcı penceresi odakta mı (iç çerçevelerdeki odak dahil). */
     __isFocused() {
@@ -142,15 +200,17 @@ qx.Class.define("tihamon.ui.StatusBar", {
 
     /**
      * Oturum açmış Tiha-Mon kullanıcıları (/api/login-sessions/active): sayı her oturum sahibine; ipucundaki
-     * ayrıntı (kullanıcı, giriş zamanı, IP, son etkinlik) yalnız 'logins' yetkisine (sunucu süzer).
+     * ayrıntı (kullanıcı, giriş zamanı, bilgisayar, son etkinlik, açık sayfa) yalnız 'logins' yetkisine (sunucu süzer).
      */
     async __pollUsers() {
       let res;
       // Her yoklama bu oturumun "görünür + odakta" durumunu da bildirir (bkz. LoginSessionsApi::active).
       const focused = this.__isFocused();
+      const view = this.__currentView();
       this.__sentFocused = focused;
+      this.__sentView = view;
       try {
-        res = await tihamon.io.Api.get("/login-sessions/active", { focused: focused ? 1 : 0 });
+        res = await tihamon.io.Api.get("/login-sessions/active", { focused: focused ? 1 : 0, view });
       } catch (e) {
         return; // bir sonraki turda yeniden denenir
       }
@@ -162,6 +222,7 @@ qx.Class.define("tihamon.ui.StatusBar", {
         return;
       }
       // Satır = kullanıcı + IP (sunucu gruplar); aynı yerden birden çok açık oturum varsa sayısı yazılır.
+      // Bilgisayar: tahta/ağ envanterindeki takma ad (sunucu eşler), yoksa IP adresi.
       const rows = res.sessions.map(s => {
         const who = esc(s.username) + (s.full_name ? ` <span style="opacity:.7">(${esc(s.full_name)})</span>` : "");
         // Sunucu yalnız BAĞLI oturumları verir (çıkış yapmadan kapanmış tarayıcılar sayılmaz — bkz.
@@ -169,16 +230,19 @@ qx.Class.define("tihamon.ui.StatusBar", {
         const flags = [s.mine ? "siz" : "", s.active ? "" : "arka planda", s.sessions > 1 ? `${s.sessions} oturum` : ""]
           .filter(Boolean).join(", ");
         // Aktif = Tiha-Mon o kişinin tarayıcısında görünür sekmede ve pencere odakta (bkz. __isFocused).
-        const state = s.active ? "<span style=\"color:#2e9d4a;font-weight:bold\">Aktif</span>" : "";
+        // Sağında o an açık sayfa/sekme/pencere (bkz. __currentView); arka plandaki oturumda soluk.
+        const state = (s.active ? "<span style=\"color:#2e9d4a;font-weight:bold\">Aktif</span>" : "") +
+          (s.view ? ` <span style="opacity:${s.active ? .85 : .6}">${s.active ? "— " : ""}${esc(s.view)}</span>` : "");
+        const pc = s.computer ? `<span title="${esc(s.ip || "")}">${esc(s.computer)}</span>` : esc(s.ip || "");
         return `<tr><td><b>${who}</b>${flags ? ` <i>${flags}</i>` : ""}</td>` +
-          `<td>${F.dateTime(s.started_ts)}</td><td>${esc(s.ip || "")}</td>` +
+          `<td>${F.dateTime(s.started_ts)}</td><td>${pc}</td>` +
           `<td>${s.last_seen_ts ? F.ago(Math.round(s.last_seen_ts / 1000)) : "—"}</td><td>${state}</td></tr>`;
       });
       const th = "style=\"text-align:left;padding-right:14px\"";
       this.__usersTip.setLabel(
         `<b>Bağlı Tiha-Mon kullanıcıları: ${res.users}</b> (${res.total} oturum)` +
         `<table style="margin-top:4px;border-spacing:0 2px"><tr><th ${th}>Kullanıcı</th><th ${th}>Son giriş</th>` +
-        `<th ${th}>IP adresi</th><th ${th}>Son etkinlik</th><th ${th}>Durum</th></tr>` +
+        `<th ${th}>Bilgisayar</th><th ${th}>Son etkinlik</th><th ${th}>Durum</th></tr>` +
         rows.join("").replace(/<td>/g, "<td style=\"padding-right:14px\">") + "</table>"
       );
     },

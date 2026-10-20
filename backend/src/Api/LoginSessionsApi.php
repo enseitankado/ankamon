@@ -152,6 +152,8 @@ final class LoginSessionsApi
      * `?focused=0|1` (alt çubuk gönderir; göç 020): çağıran oturumun Tiha-Mon sekmesi görünür VE tarayıcı
      * penceresi odakta mı. `active` = gruptaki bir oturum odakta ve bildirimi FOCUS_STALE_SECONDS'tan taze
      * (sekme kapanınca/ağ gidince bildirim kesilir, kendiliğinden düşer) → ipucunda yeşil "Aktif".
+     * `?view=` (göç 024): oturumun o an açık sayfası/sekmesi/penceresi → ipucunda "Aktif"in sağında. Satırdaki
+     * `computer`: IP'nin tahta/ağ envanterindeki takma adı (Oturum geçmişiyle aynı eşleme, COMPUTER_JOIN).
      */
     public function active(Request $request, array $user): array
     {
@@ -161,15 +163,18 @@ final class LoginSessionsApi
             // açıldığında oluşur (göç 022) — yalnız API kullanan betikler kayıt bırakmaz. Bildirim son etkinliği de
             // yazar (15 sn'de bir; Auth::user dakikada bir yazar) — süreler 0 sn görünmesin.
             $focusedDb = $focused === '1' ? 't' : 'f';
+            $view = $request->query('view');
+            $view = $view === null || $view === '' ? null : mb_substr((string) $view, 0, 200);
             if (empty($user['login_session_id'])) {
                 $id = Db::value(
                     "INSERT INTO login_sessions (session_hash, user_id, username, ip, user_agent, started_at,
-                                                 last_seen_at, expires_at, focused, focus_at)
-                     SELECT s.id, s.user_id, u.username, s.ip, s.user_agent, s.created_at, now(), s.expires_at, ?, now()
+                                                 last_seen_at, expires_at, focused, focus_at, view)
+                     SELECT s.id, s.user_id, u.username, s.ip, s.user_agent, s.created_at, now(), s.expires_at, ?, now(), ?
                      FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?
-                     ON CONFLICT (session_hash) DO UPDATE SET last_seen_at = now(), focused = EXCLUDED.focused, focus_at = now()
+                     ON CONFLICT (session_hash) DO UPDATE SET last_seen_at = now(), focused = EXCLUDED.focused, focus_at = now(),
+                                                              view = EXCLUDED.view
                      RETURNING id",
-                    [$focusedDb, $user['session_id']]
+                    [$focusedDb, $view, $user['session_id']]
                 );
                 if ($id) {
                     $user['login_session_id'] = (int) $id;
@@ -182,8 +187,8 @@ final class LoginSessionsApi
                     );
                 }
             } else {
-                Db::exec('UPDATE login_sessions SET focused = ?, focus_at = now(), last_seen_at = now() WHERE id = ?',
-                    [$focusedDb, $user['login_session_id']]);
+                Db::exec('UPDATE login_sessions SET focused = ?, focus_at = now(), last_seen_at = now(), view = ? WHERE id = ?',
+                    [$focusedDb, $view, $user['login_session_id']]);
             }
         }
         $rows = Db::all(
@@ -191,14 +196,18 @@ final class LoginSessionsApi
                     (extract(epoch FROM max(ls.started_at)) * 1000)::bigint AS started_ts,
                     (extract(epoch FROM max(ls.last_seen_at)) * 1000)::bigint AS last_seen_ts,
                     bool_or(ls.focused AND ls.focus_at > now() - make_interval(secs => ?)) AS active,
-                    bool_or(ls.id = ?) AS mine
+                    bool_or(ls.id = ?) AS mine,
+                    -- Gruptaki en son bildirilen görünüm (odaktaki oturum önce).
+                    (array_agg(ls.view ORDER BY ls.focused AND ls.focus_at > now() - make_interval(secs => ?) DESC,
+                               ls.focus_at DESC NULLS LAST) FILTER (WHERE ls.view IS NOT NULL))[1] AS view,
+                    CASE WHEN ls.ip IN ('127.0.0.1', '::1') THEN 'Tiha-Mon sunucusu' ELSE max(pa.alias) END AS computer
              FROM sessions s
              JOIN login_sessions ls ON ls.session_hash = s.id
-             LEFT JOIN users u ON u.id = ls.user_id
+             LEFT JOIN users u ON u.id = ls.user_id" . self::COMPUTER_JOIN . "
              WHERE " . sprintf(self::PRESENT, self::PRESENCE_MINUTES) . "
              GROUP BY ls.username, ls.ip
              ORDER BY active DESC, max(ls.last_seen_at) DESC",
-            [self::FOCUS_STALE_SECONDS, $user['login_session_id'] ?? 0]
+            [self::FOCUS_STALE_SECONDS, $user['login_session_id'] ?? 0, self::FOCUS_STALE_SECONDS]
         );
         $users = count(array_unique(array_column($rows, 'username')));
         if (!Auth::can($user, 'logins')) {
