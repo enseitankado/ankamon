@@ -91,6 +91,12 @@ qx.Class.define("tihamon.page.Network", {
       }
       const id = this.__model.getValue(0, row);
       if (typeof id !== "number") {
+        // Servis alt satırı: 80 (http) / 443 (https) açıksa cihazın web arayüzünü yeni sekmede aç.
+        const m = typeof id === "string" && id.match(/^s:(\d+):tcp\/(80|443)$/);
+        const device = m && this.__devices.get(Number(m[1]));
+        if (device && device.ip) {
+          window.open((m[2] === "443" ? "https://" : "http://") + device.ip, "_blank", "noopener");
+        }
         return;
       }
       if (e.getColumn() === 2) {
@@ -281,7 +287,11 @@ qx.Class.define("tihamon.page.Network", {
           d.services.forEach(s => {
             const cells = [`s:${d.id}:${s.proto}/${s.port}`, false].concat(blank);
             cells[3] = "açık";
-            cells[4] = `└ ${s.port}/${s.proto}  ${s.service || ""}`;
+            // 80/443 (http/https) açıksa cihazın web arayüzü tıklanabilir: satıra URL + 🔗 konur,
+            // tıklanınca yeni sekmede açılır (bkz. cellTap). URL cihazın IP'sinden kurulur.
+            const web = s.proto === "tcp" && d.ip && (Number(s.port) === 80 || Number(s.port) === 443)
+              ? (Number(s.port) === 443 ? "https://" : "http://") + d.ip : null;
+            cells[4] = `└ ${s.port}/${s.proto}  ${s.service || ""}` + (web ? `  🔗 ${web}` : "");
             cells[9] = [s.product, s.version].filter(Boolean).join(" ");
             cells[11] = s.extra || "";
             out.push(cells);
