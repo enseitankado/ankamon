@@ -387,7 +387,7 @@ class Tile {
     this.whoamiEl.classList.toggle("error", whoami.status === "error");
     // "querying": sürmekte olan iş — metni üst sayfa verir ("ali oturumu açılıyor…", "Oturum sorgulanıyor…").
     this.whoamiEl.textContent = whoami.status === "querying"
-      ? (whoami.text || "Oturum sorgulanıyor…") : (whoami.text || "Oturum açık kullanıcı yok");
+      ? (whoami.text || "Oturum sorgulanıyor…") : (whoami.text || "Oturumu açık kullanıcı yok");
     this.whoamiEl.hidden = false;
   }
 

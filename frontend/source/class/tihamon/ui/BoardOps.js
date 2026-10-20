@@ -571,6 +571,15 @@ qx.Class.define("tihamon.ui.BoardOps", {
       // Bilgisayarı aç (WoL) + Bilgisayarı kapat: her zaman yan yana (kullanıcı isteği), çevrimiçi/
       // çevrimdışı tahtada da. Her biri seçimin yalnız uygun kısmına uygulanır (aç → kapalı olanlar,
       // kapat → açık olanlar); uygulanacak tahta yoksa madde görünür ama devre dışıdır.
+      // "Oturum…" ▸ Oturum geçmişi (kullanıcı isteği): Tahtalar ▸ Oturumlar o tahtaya süzülmüş açılır
+      // (bkz. page.Sessions.openWith, ui.sessions.List.showBoard). Tek tahta: sağ tıklanan. Sayfa 'logs' ister.
+      const sessionHistory = target => {
+        if (can("logs")) {
+          const name = board.label || board.hostname || board.ip || "#" + board.id;
+          subAdd(target, ICON.sessions, "Oturum geçmişi", () => qx.event.message.Bus.dispatchByName(
+            tihamon.ui.Shell.OPEN_PAGE, { page: "sessions", board: { id: board.id, name } }));
+        }
+      };
       const power = () => {
         if (!can("power")) {
           return;
@@ -636,6 +645,7 @@ qx.Class.define("tihamon.ui.BoardOps", {
           subAdd(sessions, ICON.sessions, "Oturumları sorgula" + count, () =>
             (sessionOps ? sessionOps.query(online) : this.__job({ type: "whoami", board_ids: online.map(b => b.id) }, "Oturumları sorgula")));
         }
+        sessionHistory(sessions);
         group(ICON.sessions, "Oturum…", sessions);
 
         // Dosyalar ▸ Dosya yöneticisi, Dosyaları kopyala, Yedekle ▸ <hesap> (kullanıcı isteği: eski
@@ -657,6 +667,11 @@ qx.Class.define("tihamon.ui.BoardOps", {
         if (can("taskmgr")) {
           add(ICON.taskmgr, "Görev yöneticisi", () => tihamon.ui.taskmgr.Window.open(board, user));
         }
+      } else {
+        // Kapalı tahtada da geçmiş anlamlı: "Oturum…" yalnız "Oturum geçmişi" ile.
+        const sessions = sub();
+        sessionHistory(sessions);
+        group(ICON.sessions, "Oturum…", sessions);
       }
       power();
       return menu.getChildren().length ? menu : null;

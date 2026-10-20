@@ -770,7 +770,7 @@ qx.Class.define("tihamon.page.Boards", {
     /**
      * BoardOps.menu'ye verilen önizleme işleyicileri: "Oturum aç"/"Oturumu kapat" onaydan sonra iş
      * penceresi açmadan çalışır; kutucuğun sol altında "x oturumu açılıyor/kapatılıyor…", bitince
-     * kullanıcı adı (ya da "Oturum açık kullanıcı yok") görünür.
+     * kullanıcı adı (ya da "Oturumu açık kullanıcı yok") görünür.
      */
     __sessionOps() {
       const known = id => {

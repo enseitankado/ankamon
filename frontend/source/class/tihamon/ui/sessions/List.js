@@ -69,6 +69,20 @@ qx.Class.define("tihamon.ui.sessions.List", {
     __shownIds: null,
     __shownRows: null,
 
+    __boardOnly: null,
+
+    /**
+     * Yalnız bu tahtanın oturumlarını gösterir (Tahtalar/Ekranlar sağ menüsü "Oturum geçmişi"): diğer süzgeçler
+     * temizlenir, "Tahta" süzgecine adı yazılır ve kimlikle birebir eşlenir.
+     * @param board {Map} {id, name}
+     */
+    showBoard(board) {
+      this.__boardOnly = { id: board.id, name: board.name };
+      Object.values(this.__filterFields).forEach(f => f.setValue(""));
+      this.__filterFields.board.setValue(board.name);
+      this.__apply();
+    },
+
     /** @param sessions {Array} /board-sessions yanıtındaki satırlar */
     setData(sessions) {
       const F = tihamon.util.Format;
@@ -98,10 +112,15 @@ qx.Class.define("tihamon.ui.sessions.List", {
       if (!this.__rows) {
         return;
       }
+      // Tahta sağ menüsü "Oturum geçmişi" (showBoard): "Tahta" kutusundaki ad birebir o tahtadır (kimlikle) —
+      // "içerir" eşleşmesi "B Blok - Arge 1" için "… Arge 1 (AMD)"yi de getirirdi. Kutu elle değişince bağ kalkar.
+      const boardOnly = this.__boardOnly && (this.__filterFields.board.getValue() || "") === this.__boardOnly.name
+        ? this.__boardOnly.id : null;
       const colFilters = this.__columns
-        .map((column, index) => ({ index: index + 1, text: (this.__filterFields[column.id].getValue() || "").toLowerCase().trim() }))
-        .filter(f => f.text);
-      const shown = this.__rows.filter(({ cells }) =>
+        .map((column, index) => ({ id: column.id, index: index + 1, text: (this.__filterFields[column.id].getValue() || "").toLowerCase().trim() }))
+        .filter(f => f.text && !(boardOnly !== null && f.id === "board"));
+      const shown = this.__rows.filter(({ cells, session }) =>
+        (boardOnly === null || session.board_id === boardOnly) &&
         colFilters.every(f => String(cells[f.index] ?? "").toLowerCase().includes(f.text)));
       this.__table.getTableModel().setData(shown.map(r => r.cells));
       this.__shownRows = shown;

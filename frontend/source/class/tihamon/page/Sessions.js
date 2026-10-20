@@ -61,6 +61,17 @@ qx.Class.define("tihamon.page.Sessions", {
       this.__users.setData(data.sessions);
     },
 
+    /**
+     * Shell.OPEN_PAGE {page: "sessions", board: {id, name}} — Tahtalar/Ekranlar sağ menüsü "Oturum geçmişi":
+     * Oturumlar sekmesi o tahtaya süzülmüş açılır.
+     */
+    openWith(data) {
+      if (data && data.board) {
+        this.__tabs.setSelection([this.__list]);
+        this.__list.showBoard(data.board);
+      }
+    },
+
     /** Kullanıcılar sekmesine geçip o kullanıcının oturum geçmişini gösterir (grid sağ menüsü). */
     showUserHistory(username, kind) {
       this.__tabs.setSelection([this.__users]);
