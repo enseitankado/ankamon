@@ -88,8 +88,9 @@ qx.Class.define("tihamon.ui.files.BulkIo", {
      * @return {Promise<String>} yükleme jetonu (dağıtma isteğinde kullanılır)
      */
     async upload(items, onProgress, isCancelled) {
-      const { token } = await tihamon.ui.files.Api.post("/bulk/upload", {});
       const total = items.reduce((sum, it) => sum + it.file.size, 0);
+      // Toplam önceden bildirilir: sunucuda yer yoksa yükleme hiç başlamaz (yarıda dolmaz).
+      const { token } = await tihamon.ui.files.Api.post("/bulk/upload", { total });
       let done = 0;
       for (const item of items) {
         if (isCancelled()) {
@@ -106,15 +107,15 @@ qx.Class.define("tihamon.ui.files.BulkIo", {
               resolve();
               return;
             }
-            let msg = `Yükleme hatası (${xhr.status})`;
+            let msg = tihamon.ui.files.Api.describe(xhr.status);
             try {
               msg = JSON.parse(xhr.responseText).error || msg;
             } catch (e) {
-              // gövde JSON değil
+              // gövde JSON değil (ör. nginx'in kendi hata sayfası): açıklama durum kodundan
             }
-            reject(new Error(item.rel + ": " + msg));
+            reject(new Error(`Yüklenemedi: ${item.rel} — ${msg}`));
           };
-          xhr.onerror = () => reject(new Error(item.rel + ": sunucuya ulaşılamadı."));
+          xhr.onerror = () => reject(new Error(`Yüklenemedi: ${item.rel} — ${tihamon.ui.files.Api.describe(0)}`));
           xhr.send(item.file);
         });
         done += item.file.size;

@@ -34,8 +34,7 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       images: ["Görseller", ["jpg", "jpeg", "png", "gif", "bmp", "webp", "svg"]],
       videos: ["Videolar", ["mp4", "mkv", "avi", "mov", "webm", "wmv"]],
       audio: ["Sesler", ["mp3", "wav", "ogg", "m4a", "flac"]],
-      archives: ["Arşivler", ["zip", "rar", "7z", "tar", "gz"]],
-      boards: ["Tahta çizimleri", ["xopp", "flipchart", "notebook"]]
+      archives: ["Arşivler", ["zip", "rar", "7z", "tar", "gz"]]
     },
 
     STATES: {
@@ -107,6 +106,7 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
     __phase: null,
     __cancelButton: null,
     __table: null,
+    __tree: null,
     __events: null,
     __report: null,
     __reportText: null,
@@ -653,6 +653,8 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       this.__report.setVisibility("excluded");
       this.__events.setHtml("");
       this.__table.getTableModel().setData([]);
+      this.__table.setVisibility("visible");
+      this.__tree.setVisibility("excluded");
       this.__lastJson = null;
       this.__speed = null;
       try {
@@ -711,6 +713,9 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       [180, 110, "1*", 110, 60, 90, "1*"].forEach((w, i) => behavior.setWidth(i, w));
       this.__table = table;
       page.add(table, { flex: 1 });
+      // Önizlemede tablo yerine dosya ağacı: bilgisayar ▸ kullanıcı (ikisi açık) ▸ klasörler (kapalı) ▸ dosyalar.
+      this.__tree = new qx.ui.tree.Tree().set({ hideRoot: true, visibility: "excluded", openMode: "tap" });
+      page.add(this.__tree, { flex: 1 });
 
       page.add(this.__heading("Olaylar"));
       this.__events = new qx.ui.embed.Html("").set({ height: 120, overflowY: "auto", decorator: this.__border(), padding: [4, 6] });
@@ -822,6 +827,63 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       return rows;
     },
 
+    /**
+     * Önizleme ağacı: her bilgisayar ve altındaki kullanıcı (konum) düğümleri açık gelir; onların içindeki
+     * klasörler kapalı (içerikleri tıklayınca açılır). Etiketlerde boyut (klasörde içindekilerin toplamı).
+     */
+    __renderTree(job) {
+      const T = qx.ui.tree;
+      const fmt = tihamon.util.Format.bytes;
+      const old = this.__tree.getRoot();
+      const root = new T.TreeFolder("");
+      root.setOpen(true);
+      const addNodes = (parent, node) => {
+        [...node.dirs.entries()].sort((a, b) => a[0].localeCompare(b[0], "tr")).forEach(([name, child]) => {
+          const folder = new T.TreeFolder(`${name}  —  ${fmt(child.size)} · ${child.count} dosya`);
+          parent.add(folder);
+          addNodes(folder, child);
+        });
+        node.files.sort((a, b) => a[0].localeCompare(b[0], "tr")).forEach(([name, size]) =>
+          parent.add(new T.TreeFile(`${name}  —  ${fmt(size)}`)));
+      };
+      job.boards.forEach(b => {
+        const targets = b.targets.filter(t => t.tree && t.tree.length);
+        const total = targets.reduce((n, t) => n + (t.total || 0), 0);
+        const boardNode = new T.TreeFolder(targets.length ? `${b.name}  —  ${fmt(total)}` : `${b.name}  —  ${b.message}`);
+        boardNode.setOpen(true);
+        root.add(boardNode);
+        targets.forEach(t => {
+          const tree = { dirs: new Map(), files: [], size: 0, count: 0 };
+          t.tree.forEach(([rel, size]) => {
+            const parts = rel.split("/");
+            let node = tree;
+            parts.slice(0, -1).forEach(part => {
+              if (!node.dirs.has(part)) {
+                node.dirs.set(part, { dirs: new Map(), files: [], size: 0, count: 0 });
+              }
+              node = node.dirs.get(part);
+              node.size += size;
+              node.count++;
+            });
+            node.files.push([parts[parts.length - 1], size]);
+          });
+          const userNode = new T.TreeFolder(`${t.user || t.dir}  (${t.dir})  —  ${fmt(t.total || 0)} · ${t.items} öğe`);
+          userNode.setOpen(true);
+          boardNode.add(userNode);
+          addNodes(userNode, tree);
+          if (t.tree_more) {
+            userNode.add(new T.TreeFile(`… ve ${t.tree_more} dosya daha (önizlemede gösterilmedi)`));
+          }
+        });
+      });
+      this.__tree.setRoot(root);
+      if (old) {
+        old.destroy();
+      }
+      this.__table.setVisibility("excluded");
+      this.__tree.setVisibility("visible");
+    },
+
     __renderRows(job) {
       this.__table.getTableModel().setData(this.__rows(job));
     },
@@ -856,6 +918,7 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
         const items = targets.reduce((n, t) => n + (t.items || 0), 0);
         const bytes = targets.reduce((n, t) => n + (t.state === "ok" ? t.total || 0 : 0), 0);
         this.__phase.setValue(`<span style="color:${color}">Önizleme hazır</span> — hiçbir şey aktarılmadı`);
+        this.__renderTree(job);
         this.__reportText.setValue(`<b>Önizleme</b>: ${ok} kullanıcıda toplam <b>${items} öğe, ` +
           `${tihamon.util.Format.bytes(bytes)}</b> toplanacak · ${esc(job.options.what_text)} · konum: ${esc(job.options.location_text)}`);
         this.__finishUi(job);

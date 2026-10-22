@@ -41,6 +41,7 @@ STAGE = os.environ.get("FILES_BULK_DIR", "/data/files/bulk")
 TTL = int(os.environ.get("FILES_BULK_TTL", "7200"))   # biten işin/yüklemenin ara dosyaları bu kadar saniye tutulur
 MAX_PARALLEL = int(os.environ.get("FILES_BULK_MAX_PARALLEL", "16"))
 DISK_RESERVE = 1 << 30   # toplamada diskte en az bu kadar boş yer bırakılır
+TREE_MAX = 3000          # önizleme ağacında hedef (kullanıcı) başına en çok bu kadar dosya
 CHUNK = 256 * 1024
 KEEP = 20
 
@@ -341,8 +342,14 @@ def cleanup(startup: bool = False) -> None:
 
 # ---------------------------------------------------------------- yükleme (dağıtma kaynağı)
 
-def new_upload(owner: str) -> str:
+def new_upload(owner: str, total: int = 0) -> str:
+    """total: yüklenecek toplam bayt (tarayıcı bildirir) — sunucuda yer yoksa yükleme hiç başlamaz.
+    Paketleme dosyaları arşive ekledikçe sildiğinden en çok total + en büyük dosya kadar yer gerekir."""
     cleanup()
+    free = shutil.disk_usage(STAGE).free - DISK_RESERVE - _reserved
+    if total > free:
+        raise RemoteError(f"Sunucuda yeterli boş disk alanı yok: {_human(total)} yüklenecek, "
+                          f"{_human(max(0, free))} kullanılabilir (1 GB pay hariç).")
     token = secrets.token_hex(12)
     path = os.path.join(STAGE, "u-" + token)
     os.makedirs(os.path.join(path, "files"), mode=0o700)
@@ -380,9 +387,24 @@ def _pack_upload(up: dict) -> tuple[str, list[str]]:
             info.mode = 0o755
         return info
 
+    # Her dosya arşive eklenir eklenmez silinir: büyük dağıtmada (ör. 11 GB) diskte aynı veri iki kez
+    # (yükleme + arşiv) durmasın — en çok bir dosyalık fazlalık olur.
     with tarfile.open(archive, "w", format=tarfile.GNU_FORMAT) as tar:
         for name in names:
-            tar.add(os.path.join(src, name), arcname=name, filter=owner_root)
+            top = os.path.join(src, name)
+            tar.add(top, arcname=name, recursive=False, filter=owner_root)
+            if os.path.isfile(top):
+                os.unlink(top)
+                continue
+            for base, dirs, files in os.walk(top):
+                dirs.sort()
+                for d in dirs:
+                    path = os.path.join(base, d)
+                    tar.add(path, arcname=os.path.relpath(path, src), recursive=False, filter=owner_root)
+                for f in sorted(files):
+                    path = os.path.join(base, f)
+                    tar.add(path, arcname=os.path.relpath(path, src), recursive=False, filter=owner_root)
+                    os.unlink(path)
     return archive, names
 
 
@@ -676,34 +698,51 @@ def _collect_board(job: dict, row: dict, access: dict) -> None:
         return
     row["message"] = "Öğeler listeleniyor…"
     opts = job["options"]
-    out = _ssh(access, _LIST, "1" if opts["deep"] else "0", "1" if opts["skip_hidden"] else "0",
+    # Önizlemede her zaman alt klasörlere inilir: klasörlerin içi de ağaçta gösterilir (bkz. TREE_MAX).
+    deep_list = opts["deep"] or opts["dry"]
+    out = _ssh(access, _LIST, "1" if deep_list else "0", "1" if opts["skip_hidden"] else "0",
                *[t["dir"] for t in targets], timeout=300)
-    listing: dict[str, list[tuple[str, int]]] = {}
+    raw: dict[str, list[tuple[str, int]] | None] = {}
     current = None
     for rec in out.split(b"\0"):
         text = rec.decode("utf-8", "replace")
         if text.startswith("D\t"):
             current = text[2:]
-            listing[current] = []
+            raw[current] = []
         elif text.startswith("M\t"):
-            listing[text[2:]] = None
+            raw[text[2:]] = None
             current = None
         elif current is not None and "\t./" in text:
             size, name = text.split("\t./", 1)
-            if (opts["deep"] or "/" not in name) and _wanted(name, opts):
-                listing[current].append((name, int(size) if size.isdigit() else 0))
+            raw[current].append((name, int(size) if size.isdigit() else 0))
     paths: list[str] = []
     for t in row["targets"]:
-        entries = listing.get(t["dir"])
+        entries = raw.get(t["dir"])
         if entries is None:
             t["state"], t["message"] = "skipped", "Dizin yok"
             continue
-        if not entries:
+        if opts["deep"]:
+            # Alt klasörlerin içi: desen dosya adına; toplanan öğe = dosya.
+            files = [(n, sz) for n, sz in entries if _wanted(n, opts)]
+            items, tree = [n for n, _ in files], files
+        elif deep_list:
+            # Önizleme, üst düzey seçim: üst düzey öğe desene uyuyorsa altındaki her şey gelir.
+            tops = sorted({n.split("/")[0] for n, _ in entries if _wanted(n.split("/")[0], opts)})
+            keep = set(tops)
+            tree = [(n, sz) for n, sz in entries if n.split("/")[0] in keep]
+            items = tops
+        else:
+            tree = [(n, sz) for n, sz in entries if "/" not in n and _wanted(n, opts)]
+            items = [n for n, _ in tree]
+        if not items:
             t["state"], t["message"] = "skipped", "Eşleşen öğe yok"
             continue
-        t["items"] = len(entries)
-        t["total"] = sum(s for _, s in entries)
-        t["_paths"] = [posixpath.join(t["dir"], n) for n, _ in entries]
+        t["items"] = len(items)
+        t["total"] = sum(sz for _, sz in tree)
+        t["_paths"] = [posixpath.join(t["dir"], n) for n in items]
+        if opts["dry"]:
+            t["tree"] = [[n, sz] for n, sz in tree[:TREE_MAX]]
+            t["tree_more"] = max(0, len(tree) - TREE_MAX)
         paths += t["_paths"]
         row["total"] += t["total"]
     if not paths:
@@ -711,7 +750,7 @@ def _collect_board(job: dict, row: dict, access: dict) -> None:
         _event(job, "info", f"{row['name']}: alınacak öğe yok.")
         return
     if opts["dry"]:
-        # Önizleme: bulunanlar yalnız raporlanır (ilk birkaç ad örnek olarak), hiçbir şey aktarılmaz.
+        # Önizleme: bulunanlar yalnız raporlanır (ağaç + ilk birkaç ad), hiçbir şey aktarılmaz.
         for t in row["targets"]:
             if t.get("_paths"):
                 names = [posixpath.relpath(p, t["dir"]) for p in t.pop("_paths")]

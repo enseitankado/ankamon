@@ -229,8 +229,14 @@ class BulkUsersHandler(Base):
 
 
 class BulkUploadHandler(Base):
-    def post(self):
-        self.write({"token": bulk.new_upload(self.user)})
+    async def post(self):
+        async def work():
+            try:
+                total = int(self.body().get("total") or 0)
+            except (TypeError, ValueError):
+                total = 0
+            return {"token": bulk.new_upload(self.user, total)}
+        await self.guard(work())
 
 
 @tornado.web.stream_request_body

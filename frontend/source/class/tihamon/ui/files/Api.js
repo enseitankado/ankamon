@@ -26,7 +26,29 @@ qx.Class.define("tihamon.ui.files.Api", {
         qx.event.message.Bus.dispatchByName(tihamon.io.Api.UNAUTHORIZED);
       }
       throw new Error((data && data.error) ||
-        (response.status === 403 ? "Bu işlem için dosya yöneticisi yetkiniz yok." : `Sunucu hatası (${response.status})`));
+        (response.status === 403 ? "Bu işlem için dosya yöneticisi yetkiniz yok." : this.describe(response.status)));
+    },
+
+    /**
+     * HTTP durum kodunun anlaşılır açıklaması (kod parantez içinde kalır) — sunucu kendi Türkçe iletisini
+     * göndermediğinde (nginx'in ürettiği 413/500/502/504 gibi) kullanıcı ne olduğunu anlasın.
+     */
+    describe(status) {
+      const text = {
+        0: "Sunucuya ulaşılamadı (ağ bağlantısı koptu ya da sunucu kapalı)",
+        400: "İstek geçersiz",
+        401: "Oturumun süresi doldu; yeniden giriş yapın",
+        403: "Bu işlem için yetkiniz yok",
+        404: "Bulunamadı (işin ya da yüklemenin süresi dolmuş olabilir)",
+        408: "Sunucu isteğin tamamını zamanında alamadı (zaman aşımı)",
+        413: "Dosya sunucunun kabul ettiği boyuttan büyük",
+        500: "Sunucuda beklenmeyen bir hata oluştu (ayrıntı sunucu günlüğünde)",
+        502: "Dosya servisi yanıt vermiyor (yeniden başlıyor olabilir; biraz sonra tekrar deneyin)",
+        503: "Servis geçici olarak kullanılamıyor",
+        504: "Sunucu zamanında yanıt vermedi (zaman aşımı)",
+        507: "Sunucuda yeterli disk alanı yok"
+      }[status] || "Sunucu hatası";
+      return `${text} (HTTP ${status})`;
     },
 
     list(board, path) {
