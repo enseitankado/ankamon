@@ -79,7 +79,12 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
     __stack: null,
     __boardBoxes: null,
     __boardCount: null,
-    __fileTable: null,
+    __fileTree: null,
+    __fileBusy: null,
+    __fileBusyLabel: null,
+    __fileRoot: null,
+    __nodePaths: null,
+    __nodeDirs: null,
     __fileInfo: null,
     __dropTarget: null,
     __location: null,
@@ -225,6 +230,12 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       this.__usersTimer = qx.event.Timer.once(this.__loadUsers, this, 600);
     },
 
+    /**
+     * Dağıtılacak dosyalar: sütunlu ağaç (Ad, Dosya, Boyut). Klasörler kapalı gelir; içerikleri ancak açılınca
+     * oluşturulur (on binlerce dosyalı klasörde de hızlı). Klasör okunurken (tarayıcının listelemesi uzun
+     * sürebilir) ağacın üstünde bilgilendirme gösterilir. "Kaldır" seçili klasörü/dosyayı (alt düzeyde de)
+     * listeden çıkarır.
+     */
     __createFileSection(parent) {
       parent.add(this.__heading("Dağıtılacak dosyalar (bu bilgisayardan)"));
       const tools = new qx.ui.container.Composite(new qx.ui.layout.HBox(6).set({ alignY: "middle" }));
@@ -237,8 +248,8 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       button("＋ Dosya ekle…", () => this.__addPicked(false));
       button("＋ Klasör ekle…", () => this.__addPicked(true));
       const remove = button("Kaldır", () => {
-        const names = this.__selectedFileRows();
-        this.__files = this.__files.filter(f => !names.includes(f.top));
+        const paths = this.__selectedPaths();
+        this.__files = this.__files.filter(f => !paths.some(p => f.rel === p || f.rel.startsWith(p + "/")));
         this.__renderFiles();
       });
       button("Temizle", () => {
@@ -250,48 +261,68 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       tools.add(this.__fileInfo, { flex: 1 });
       parent.add(tools);
 
-      const model = new qx.ui.table.model.Simple();
-      model.setColumns(["Ad", "Tür", "Dosya", "Boyut"]);
-      const table = new qx.ui.table.Table(model, {
-        tableColumnModel: obj => new qx.ui.table.columnmodel.Resize(obj)
-      }).set({ height: 150, statusBarVisible: false, columnVisibilityButtonVisible: false });
-      table.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.MULTIPLE_INTERVAL_SELECTION);
-      const behavior = table.getTableColumnModel().getBehavior();
+      const tree = new qx.ui.treevirtual.TreeVirtual(["Ad", "Dosya", "Boyut"]).set({
+        statusBarVisible: false, columnVisibilityButtonVisible: false
+      });
+      tree.setAlwaysShowOpenCloseSymbol(true);
+      tree.setSelectionMode(qx.ui.treevirtual.TreeVirtual.SelectionMode.MULTIPLE_INTERVAL);
+      const behavior = tree.getTableColumnModel().getBehavior();
       behavior.setWidth(0, "1*");
       behavior.setWidth(1, 80);
-      behavior.setWidth(2, 80);
-      behavior.setWidth(3, 100);
-      table.getSelectionModel().addListener("changeSelection", () =>
-        remove.setEnabled(this.__selectedFileRows().length > 0));
+      behavior.setWidth(2, 100);
+      // Kapalı klasör ilk açılışta doldurulur (bkz. __fillNode).
+      tree.addListener("treeOpenWhileEmpty", e => this.__fillNode(e.getData().nodeId));
+      tree.addListener("changeSelection", () => remove.setEnabled(this.__selectedPaths().length > 0));
       remove.setEnabled(false);
-      this.__fileTable = table;
-      this.__dropTarget = table;
-      parent.add(table);
+      this.__fileTree = tree;
+
+      // Ağacın üstünde ortalanmış bilgilendirme katmanı (yalnız okuma sürerken).
+      this.__fileBusy = new qx.ui.container.Composite(new qx.ui.layout.VBox().set({ alignX: "center", alignY: "middle" }))
+        .set({ backgroundColor: "surface", opacity: 0.94, visibility: "excluded" });
+      this.__fileBusyLabel = new qx.ui.basic.Label("").set({ rich: true, textAlign: "center", padding: 16 });
+      this.__fileBusy.add(this.__fileBusyLabel);
+      const box = new qx.ui.container.Composite(new qx.ui.layout.Canvas()).set({ height: 210 });
+      box.add(tree, { edge: 0 });
+      box.add(this.__fileBusy, { edge: 0 });
+      this.__dropTarget = box;
+      parent.add(box);
+      this.__renderFiles();
     },
 
-    __selectedFileRows() {
-      const model = this.__fileTable.getTableModel();
-      const names = [];
-      this.__fileTable.getSelectionModel().iterateSelection(row => names.push(model.getValue(0, row)));
-      return names;
+    /** Okuma sürüyor bilgisi (null: kaldır). */
+    __setFileBusy(html) {
+      this.__fileBusyLabel.setValue(html || "");
+      this.__fileBusy.setVisibility(html ? "visible" : "excluded");
+    },
+
+    /** Seçili düğümlerin göreli yolları. */
+    __selectedPaths() {
+      return this.__fileTree.getSelectedNodes().map(n => this.__nodePaths.get(n.nodeId)).filter(Boolean);
     },
 
     async __addPicked(folder) {
-      this.__addFiles(await tihamon.ui.files.BulkIo.pick(folder));
+      const items = await tihamon.ui.files.BulkIo.pick(folder, () => this.__setFileBusy(
+        "<b>Klasör okunuyor…</b><br>Tarayıcı klasördeki bütün dosyaları listeliyor; çok dosyalı klasörlerde " +
+        "bu birkaç saniye ile birkaç dakika sürebilir."));
+      await this.__addFiles(items);
     },
 
-    __addFiles(items) {
+    async __addFiles(items) {
       if (!items.length) {
+        this.__setFileBusy(null);
         return;
       }
+      this.__setFileBusy(`<b>${items.length.toLocaleString("tr-TR")} dosya listeye ekleniyor…</b>`);
+      await new Promise(r => setTimeout(r, 30));   // bilgi ekrana çizilsin
       const known = new Set(this.__files.map(f => f.rel));
       items.forEach(it => {
         if (!known.has(it.rel)) {
-          this.__files.push({ rel: it.rel, file: it.file, top: it.rel.split("/")[0] });
+          this.__files.push({ rel: it.rel, file: it.file });
           known.add(it.rel);
         }
       });
       this.__renderFiles();
+      this.__setFileBusy(null);
     },
 
     __bindDrop(widget) {
@@ -305,31 +336,80 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       });
       el.addEventListener("drop", async e => {
         e.preventDefault();
+        this.__setFileBusy("<b>Bırakılan öğeler okunuyor…</b>");
         try {
-          this.__addFiles(await tihamon.ui.files.BulkIo.fromDrop(e.dataTransfer));
+          await this.__addFiles(await tihamon.ui.files.BulkIo.fromDrop(e.dataTransfer, n =>
+            this.__setFileBusy(`<b>Bırakılan öğeler okunuyor…</b><br>${n.toLocaleString("tr-TR")} dosya bulundu`)));
         } catch (err) {
+          this.__setFileBusy(null);
           tihamon.ui.Dialog.error(err);
         }
       });
     },
 
+    /**
+     * Dosya listesinden klasör ağacı kurar (bellekte) ve görünür ağaca yalnız üst düzeyi koyar; klasörler
+     * kapalıdır. Klasör satırında içindeki dosya sayısı ve toplam boyut.
+     */
     __renderFiles() {
-      // Tabloda üst düzey öğeler (klasör tek satır, içindeki dosya sayısıyla) görünür.
-      const tops = new Map();
+      const root = { dirs: new Map(), files: [], size: 0, count: 0, path: "" };
       this.__files.forEach(f => {
-        const t = tops.get(f.top) || { dir: false, count: 0, size: 0 };
-        t.dir = t.dir || f.rel.includes("/");
-        t.count++;
-        t.size += f.file.size;
-        tops.set(f.top, t);
+        const parts = f.rel.split("/");
+        let node = root;
+        node.size += f.file.size;
+        node.count++;
+        for (let i = 0; i < parts.length - 1; i++) {
+          let child = node.dirs.get(parts[i]);
+          if (!child) {
+            child = { dirs: new Map(), files: [], size: 0, count: 0, path: parts.slice(0, i + 1).join("/") };
+            node.dirs.set(parts[i], child);
+          }
+          child.size += f.file.size;
+          child.count++;
+          node = child;
+        }
+        node.files.push(f);
       });
+      this.__fileRoot = root;
+      this.__nodePaths = new Map();
+      this.__nodeDirs = new Map();
+      const dm = this.__fileTree.getDataModel();
+      dm.clearData(false);
+      this.__addChildren(0, root);
+      dm.setData();
       const fmt = tihamon.util.Format.bytes;
-      this.__fileTable.getTableModel().setData(Array.from(tops.entries())
-        .map(([name, t]) => [name, t.dir ? "Klasör" : "Dosya", String(t.count), fmt(t.size)]));
-      const total = this.__files.reduce((s, f) => s + f.file.size, 0);
       this.__fileInfo.setValue(this.__files.length
-        ? `${this.__files.length} dosya · ${fmt(total)} — sürükleyip bırakarak ekleyebilirsiniz.`
+        ? `${this.__files.length.toLocaleString("tr-TR")} dosya · ${fmt(root.size)} — sürükleyip bırakarak ekleyebilirsiniz.`
         : "Dosya ya da klasörleri buraya sürükleyip bırakabilirsiniz.");
+    },
+
+    /** Bir klasörün doğrudan çocuklarını (önce klasörler, sonra dosyalar; ada göre) ağaca ekler. */
+    __addChildren(parentId, node) {
+      const dm = this.__fileTree.getDataModel();
+      const fmt = tihamon.util.Format.bytes;
+      const byName = (a, b) => a.localeCompare(b, "tr", { numeric: true });
+      [...node.dirs.keys()].sort(byName).forEach(name => {
+        const dir = node.dirs.get(name);
+        const id = dm.addBranch(parentId, name, false);
+        dm.setColumnData(id, 1, dir.count.toLocaleString("tr-TR"));
+        dm.setColumnData(id, 2, fmt(dir.size));
+        this.__nodePaths.set(id, dir.path);
+        this.__nodeDirs.set(id, dir);
+      });
+      node.files.slice().sort((a, b) => byName(a.rel, b.rel)).forEach(f => {
+        const id = dm.addLeaf(parentId, f.rel.split("/").pop());
+        dm.setColumnData(id, 2, fmt(f.file.size));
+        this.__nodePaths.set(id, f.rel);
+      });
+    },
+
+    /** Kapalı klasör ilk kez açılırken içeriği eklenir. */
+    __fillNode(nodeId) {
+      const dir = this.__nodeDirs.get(nodeId);
+      if (dir && (dir.dirs.size || dir.files.length)) {
+        this.__addChildren(nodeId, dir);
+        this.__fileTree.getDataModel().setData();
+      }
     },
 
     __createLocationSection(parent) {

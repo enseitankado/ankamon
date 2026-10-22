@@ -18,9 +18,12 @@ qx.Class.define("tihamon.ui.files.BulkIo", {
     /**
      * Dosya seçme penceresi açar.
      * @param folder {Boolean} true: bir klasör (alt klasörleriyle) seçilir
+     * @param onWait {Function?} seçim penceresi kapandı ama tarayıcı dosyaları henüz vermedi: çok dosyalı
+     *   klasörde tarayıcı önce bütün ağacı listeler, "change" ancak sonra gelir (uzun sürebilir). Pencere
+     *   kapanınca sayfa odağı geri alır; o anda "change"/"cancel" gelmemişse bu çağrılır.
      * @return {Promise<Array>} [{rel, file}] (vazgeçilirse boş)
      */
-    pick(folder) {
+    pick(folder, onWait) {
       return new Promise(resolve => {
         const input = document.createElement("input");
         input.type = "file";
@@ -29,15 +32,18 @@ qx.Class.define("tihamon.ui.files.BulkIo", {
           input.webkitdirectory = true;
         }
         input.style.display = "none";
-        input.addEventListener("change", () => {
-          const list = Array.from(input.files || []).map(file => ({ rel: file.webkitRelativePath || file.name, file }));
+        let settled = false;
+        const onFocus = () => setTimeout(() => !settled && onWait && onWait(), 300);
+        const done = list => {
+          settled = true;
+          window.removeEventListener("focus", onFocus);
           input.remove();
           resolve(list);
-        });
-        input.addEventListener("cancel", () => {
-          input.remove();
-          resolve([]);
-        });
+        };
+        input.addEventListener("change", () =>
+          done(Array.from(input.files || []).map(file => ({ rel: file.webkitRelativePath || file.name, file }))));
+        input.addEventListener("cancel", () => done([]));
+        window.addEventListener("focus", onFocus);
         document.body.appendChild(input);
         input.click();
       });
@@ -46,9 +52,10 @@ qx.Class.define("tihamon.ui.files.BulkIo", {
     /**
      * Sürükle-bırakla gelen öğeleri (klasörler dahil, özyinelemeli) okur.
      * @param dataTransfer {DataTransfer} drop olayının verisi
+     * @param onProgress {Function?} (okunan dosya sayısı) — en çok 200 dosyada bir
      * @return {Promise<Array>} [{rel, file}]
      */
-    async fromDrop(dataTransfer) {
+    async fromDrop(dataTransfer, onProgress) {
       const entries = Array.from(dataTransfer.items || [])
         .map(item => (item.webkitGetAsEntry ? item.webkitGetAsEntry() : null))
         .filter(Boolean);
@@ -60,6 +67,9 @@ qx.Class.define("tihamon.ui.files.BulkIo", {
         if (entry.isFile) {
           const file = await new Promise((ok, fail) => entry.file(ok, fail));
           out.push({ rel: prefix + entry.name, file });
+          if (onProgress && out.length % 200 === 0) {
+            onProgress(out.length);
+          }
           return;
         }
         const reader = entry.createReader();
