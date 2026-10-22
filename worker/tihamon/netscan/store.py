@@ -388,3 +388,17 @@ def apply_activity(conn, targets: list[dict], results: dict) -> None:
                 (results.get(dev["ip"]), dev["id"]),
             )
     bump(conn)
+
+
+def apply_flows(conn, results: dict) -> None:
+    """flows.observe sonucunu ({mac: {pps,kbps,proto}}) MAC ile net_devices'a yazar; yalnız kayıtlı cihazlar."""
+    if not results:
+        return
+    with conn.transaction():
+        for mac, f in results.items():
+            conn.execute(
+                "UPDATE net_devices SET flow_pps = %s, flow_kbps = %s, flow_proto = %s, flow_at = now()"
+                " WHERE mac = %s::macaddr",
+                (f["pps"], f["kbps"], f["proto"], mac),
+            )
+    bump(conn)

@@ -75,7 +75,7 @@ qx.Class.define("tihamon.page.Network", {
       // Ağ etkinliği: IP ID örneklemesinden yaklaşık pkt/sn (yalnız Windows; bkz. worker netscan/activity.py,
       // bellek network-usage-study). Boş = ölçülmedi/güvenilmez (Linux/kamera/yanıt yok). Sona eklendi:
       // servis/paylaşım alt satırları sabit (düşük) sütun sırası kullanır, boş kalır.
-      { id: "activity", label: "Ağ etkinliği", hint: "Ağ etkinliği (yaklaşık pkt/sn; yalnız Windows cihazlarda)", width: 130 }
+      { id: "activity", label: "Ağ etkinliği", hint: "Görülen akış yoğunluğu (kbit/sn + baskın protokol); Windows'ta gönderim hızı (IP ID)", width: 160 }
       // Ayrı "Takma ad" (MAC kaydı) sütunu yok (kullanıcı isteği, 2026-10-19: "Takma ad / Ad" ile yineleniyordu);
       // MAC ↔ takma ad kaydı "Takma ad / Ad"ın kendisini besler — bkz. ui.network.Ops.deviceName (known_alias).
     ];
@@ -209,6 +209,20 @@ qx.Class.define("tihamon.page.Network", {
 
       const wasChecked = new Set(this.__checkedDevices().map(d => d.id));
       const netName = new Map(nets.networks.map(n => [n.id, Ops.networkLabel(n)]));
+      // "Ağ etkinliği" hücresi: öncelik PASİF görülen akış yoğunluğu (tüm cihazlar; flow_kbps/pps + baskın
+      // protokol — bkz. worker netscan/flows.py). Görünürde akış yoksa Windows gönderim hızı (IP ID,
+      // activity_pps) yedek gösterilir. flow_at 10 dk'dan eskiyse görülen akış yok sayılır.
+      const flowText = d => {
+        const fresh = d.flow_at && (Date.now() / 1000 - d.flow_at) < 600;
+        if (fresh && (d.flow_kbps >= 1 || d.flow_pps >= 1)) {
+          const rate = d.flow_kbps >= 1 ? Math.round(d.flow_kbps) + " kbit/sn" : d.flow_pps.toFixed(1) + " pkt/sn";
+          return d.flow_proto ? rate + " · " + d.flow_proto : rate;
+        }
+        if (d.activity_pps != null && d.activity_pps >= 1) {
+          return "gönderim ~" + Math.round(d.activity_pps) + " pkt/sn";
+        }
+        return (fresh || d.activity_pps != null) ? "sakin" : "";
+      };
       this.__devices = new Map(data.devices.map(d => [d.id, d]));
       // cells: [kimlik, işaret, ▸, …sütunlar] — alt satırlar __apply'da eklenir.
       this.__rows = data.devices.map(d => ({
@@ -222,7 +236,7 @@ qx.Class.define("tihamon.page.Network", {
           netName.get(d.network_id) || d.network,
           F.ago(d.first_seen_at), d.online ? "şimdi" : F.ago(d.last_seen_at), d.notes || "",
           F.etap(d.etap),
-          d.activity_pps == null ? "" : (d.activity_pps < 1 ? "sakin" : Math.round(d.activity_pps) + " pkt/sn")
+          flowText(d)
         ]
       }));
       this.__apply();

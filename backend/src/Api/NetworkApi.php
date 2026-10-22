@@ -68,6 +68,7 @@ final class NetworkApi
                     extract(epoch FROM d.shares_scanned_at)::bigint AS shares_scanned_at,
                     d.shares_requested_at IS NOT NULL AS shares_requested, d.shares_auth,
                     extract(epoch FROM d.activity_at)::bigint AS activity_at, d.activity_pps,
+                    extract(epoch FROM d.flow_at)::bigint AS flow_at, d.flow_pps, d.flow_kbps, d.flow_proto,
                     b.id AS board_id, COALESCE(NULLIF(b.label, ''), b.hostname) AS board_name,
                     k.label AS known_alias,
                     COALESCE((SELECT json_agg(json_build_object('proto', s.proto, 'port', s.port, 'service', s.service,

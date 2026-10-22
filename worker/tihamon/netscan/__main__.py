@@ -21,7 +21,7 @@ import threading
 import time
 
 from .. import db
-from . import activity, ifaces, load, probe, store
+from . import activity, flows, ifaces, load, probe, store
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("tihamon.netscan")
@@ -37,6 +37,9 @@ SHARES_PAUSE = 2
 ACTIVITY_RESCAN_MINUTES = int(os.environ.get("NETSCAN_ACTIVITY_RESCAN_MINUTES", "5"))
 ACTIVITY_GAP = float(os.environ.get("NETSCAN_ACTIVITY_GAP", "4"))
 ACTIVITY_PAUSE = 30
+# Görülen akış gözlemi (pasif AF_PACKET): her pencere boyunca dinleyip cihaz başına yoğunluk çıkarır.
+FLOW_WINDOW = float(os.environ.get("NETSCAN_FLOW_WINDOW", "30"))
+FLOW_PAUSE = 5
 
 _state_lock = threading.Lock()
 _state: dict = {"phase": "starting"}
@@ -157,6 +160,34 @@ def _activity_loop() -> None:
             time.sleep(30)
 
 
+def _flow_loop() -> None:
+    """Ayrı kanal: sunucunun arabirimlerinde PASİF yakalamayla cihazların görülebilir akış yoğunluğunu
+    (pkt/sn, kbit/sn, baskın protokol) ölçer (bkz. flows.py). Alt ağ başına TEK arabirimde dinler
+    (çift sayma olmasın). Makine çok yoğunken (decision.busy) pencere atlanır; yakalama ICMP/ARP kadar hafif.
+    """
+    while True:
+        try:
+            with db.connect() as conn:
+                while True:
+                    if _decision["busy"]:
+                        time.sleep(ACTIVITY_PAUSE)
+                        continue
+                    nets = ifaces.networks()
+                    cap = [n["iface"] for n in nets]
+                    exclude = {mac for n in nets for (mac, _name) in n["local_macs"].values()}
+                    if not cap:
+                        time.sleep(ACTIVITY_PAUSE)
+                        continue
+                    results = flows.observe(cap, exclude, FLOW_WINDOW)
+                    store.apply_flows(conn, results)
+                    log.info("görülen akış: %d kaynak, %.0f sn pencere (%s)",
+                             len(results), FLOW_WINDOW, ",".join(cap))
+                    time.sleep(FLOW_PAUSE)
+        except Exception:
+            log.exception("görülen akış döngüsü hatası")
+            time.sleep(30)
+
+
 def _sweep(conn) -> None:
     nets = store.sync_networks(conn, ifaces.networks())
     _set(conn, networks=len(nets))
@@ -198,6 +229,7 @@ def main() -> None:
     threading.Thread(target=_service_loop, name="services", daemon=True).start()
     threading.Thread(target=_shares_loop, name="shares", daemon=True).start()
     threading.Thread(target=_activity_loop, name="activity", daemon=True).start()
+    threading.Thread(target=_flow_loop, name="flows", daemon=True).start()
 
     next_sweep = 0.0
     while True:
