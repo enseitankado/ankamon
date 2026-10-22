@@ -1,6 +1,7 @@
 /**
  * Loglar: iki tür — "Sistem logları" (ham syslog, /api/logs) ve "Komut logları"
- * (tahtalarda çalıştırılan komutlar, /api/command-logs). Tür sol ağaçtan setMode ile seçilir.
+ * (tahtalarda çalıştırılan komutlar, /api/command-logs — tiha-mon'dan gidenler ve tahtadaki kullanıcıların
+ * kendi sudo/pkexec/su komutları, kaynak "local"; "Kullanıcı" orada tahtadaki hesaptır). Tür sol ağaçtan setMode ile seçilir.
  *
  * Sayfalı: altta sayfa boyutu + önceki/sonraki (sunucuda offset/limit; toplam yalnız ilk sayfada
  * sayılır — bkz. LogsApi COUNT_CAP). Satırlar çoklu seçilebilir; sağ menü/Ctrl+C seçili satırların
@@ -155,7 +156,9 @@ qx.Class.define("tihamon.page.Logs", {
 
       let columns;
       if (command) {
-        this.__extra = this.__select([["", "Tüm kaynaklar"], ["action", "Hazır işlem"], ["command", "Serbest komut"], ["webshell", "Web terminal"], ["screen", "Ekran izleme / yönetim"]]);
+        this.__extra = this.__select([["", "Tüm kaynaklar"], ["action", "Hazır işlem"], ["command", "Serbest komut"], ["webshell", "Web terminal"], ["screen", "Ekran izleme / yönetim"],
+          // Tahtadaki kullanıcının kendi çalıştırdığı sudo/pkexec/su (syslog'dan kopyalanır — bkz. db/migrations/028).
+          ["local", "Tahtada yerel (sudo/pkexec/su)"]]);
         bar.add(this.__extra);
         columns = [
           { id: "time", label: "Zaman", width: 160 },
