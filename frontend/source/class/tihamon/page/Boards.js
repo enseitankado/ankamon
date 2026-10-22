@@ -167,6 +167,12 @@ qx.Class.define("tihamon.page.Boards", {
   },
 
   statics: {
+    /** Alt bardaki göstergeler (sağ menüdeki sırayla) — anahtarlar screen/index.html Tile.setStats ile aynı. */
+    STATS_ITEMS: [
+      ["net", "Ağ arabirimleri"], ["cpu", "İşlemci kullanımı"], ["temp", "İşlemci sıcaklığı"], ["mem", "Bellek (RAM)"],
+      ["disk_temp", "Disk sıcaklığı (HDD)"], ["fan", "Fan hızı"], ["battery", "CMOS pili"]
+    ],
+
     /**
      * "Oturum" sütununun metni: çevrimdışı ya da henüz yoklanmamış tahtada boş (bilinmiyor), oturum
      * yoksa "Oturum kapalı", varsa kullanıcı adı — ekran kilitliyse "(kilitli)" ekiyle.
@@ -384,6 +390,8 @@ qx.Class.define("tihamon.page.Boards", {
           qx.ui.menu.Manager.getInstance().hideAll();
         } else if (e.data.type === "tm-menu") {
           this.__openPreviewMenu(e.data.id, e.data.x, e.data.y, e.data.ids);
+        } else if (e.data.type === "tm-statsmenu") {
+          this.__openStatsMenu(e.data.id, e.data.x, e.data.y, e.data.ids);
         } else if (e.data.type === "tm-show") {
           // Kutucuğun ekran alanına çift tıklama = sağ menüdeki "Ekranı göster" (yalnız o tahta).
           const board = this.__boards.get(e.data.id);
@@ -636,6 +644,7 @@ qx.Class.define("tihamon.page.Boards", {
           // (bkz. migration 026, worker executor/netif.py + autoshutdown.py) — yalnız çevrimiçi tahtada.
           net: b.online ? b.netifs || null : null,
           autoshutdown: b.online ? b.autoshutdown || null : null,
+          hide: this.__statsHidden()[b.id] || [],
           hw: this.__hwSummary(b.facts),
           stats: m ? {
             cpu: m.cpu_percent ?? null, mem: m.mem_percent ?? null, temp: m.cpu_temp ?? m.temp_max ?? null,
@@ -750,6 +759,61 @@ qx.Class.define("tihamon.page.Boards", {
       }
       const rect = el.getBoundingClientRect();
       menu.openAtPoint({ left: Math.round(rect.left + x), top: Math.round(rect.top + y) });
+    },
+
+    /** Bu kullanıcının tahta başına gizlediği göstergeler: {"<tahta id>": ["fan", …]} (users.ui_prefs["screens.stats"]). */
+    __statsHidden() {
+      return ((this._user && this._user.ui_prefs) || {})["screens.stats"] || {};
+    },
+
+    /**
+     * Kutucuğun alt barına sağ tık (bkz. screen/index.html "tm-statsmenu"): hangi göstergelerin görüneceği.
+     * İşaretler sağ tıklanan tahtanın durumunu gösterir; değişiklik o an seçili TÜM kutucuklara uygulanır
+     * (seçim dışına sağ tıklanınca seçim o kutucuğa iner). Seçim kullanıcının tercihi olarak sunucuda saklanır
+     * (AuthApi::prefs, "screens.stats") — sekmeye her girişte ve başka tarayıcıda da aynı görünür.
+     */
+    __openStatsMenu(id, x, y, ids) {
+      const targets = (ids && ids.length ? ids : [id]).map(String);
+      const hiddenOf = bid => new Set(this.__statsHidden()[bid] || []);
+      const current = hiddenOf(String(id));
+      const menu = new qx.ui.menu.Menu();
+      menu.add(new qx.ui.menu.Button(targets.length > 1 ? `Göstergeler — seçili ${targets.length} tahta` : "Göstergeler").set({ enabled: false }));
+      menu.add(new qx.ui.menu.Separator());
+      const apply = mutate => {
+        const map = Object.assign({}, this.__statsHidden());
+        targets.forEach(bid => {
+          const set = hiddenOf(bid);
+          mutate(set);
+          if (set.size) {
+            map[bid] = [...set];
+          } else {
+            delete map[bid];
+          }
+        });
+        const prefs = this._user.ui_prefs || (this._user.ui_prefs = {});
+        prefs["screens.stats"] = map;
+        tihamon.io.Api.put("/auth/prefs", { key: "screens.stats", value: map }).catch(e => tihamon.ui.Dialog.error(e));
+        this.__pushPreview();
+      };
+      tihamon.page.Boards.STATS_ITEMS.forEach(([key, label]) => {
+        const box = new qx.ui.menu.CheckBox(label).set({ value: !current.has(key) });
+        box.addListener("changeValue", e => apply(set => (e.getData() ? set.delete(key) : set.add(key))));
+        menu.add(box);
+      });
+      menu.add(new qx.ui.menu.Separator());
+      const all = new qx.ui.menu.Button("Tümünü göster");
+      all.addListener("execute", () => apply(set => set.clear()));
+      menu.add(all);
+      if (this.__previewMenu) {
+        const old = this.__previewMenu;
+        qx.event.Timer.once(() => old.destroy(), null, 0);
+      }
+      this.__previewMenu = menu;
+      const el = this.__iframeEl();
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        menu.openAtPoint({ left: Math.round(rect.left + x), top: Math.round(rect.top + y) });
+      }
     },
 
     /** "Oturumları sorgula": seçili tahtalarda o an oturum açmış kullanıcıyı paralel sorgular;

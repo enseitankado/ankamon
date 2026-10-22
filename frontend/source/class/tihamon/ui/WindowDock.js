@@ -1,6 +1,7 @@
 /**
  * Küçültülebilir pencereler ve onları geri getiren şerit (kullanıcı isteği): bir "bağlam" (ör. Tahtalar ▸
- * Ekranlar sekmesi, bkz. page.Boards) GÖRÜNÜRKEN açılan her pencereye simge durumuna küçültme düğmesi eklenir.
+ * Ekranlar sekmesi, bkz. page.Boards) GÖRÜNÜRKEN açılan her pencereye simge durumuna küçültme düğmesi eklenir
+ * ve pencere kalıcı (modal) olmaktan çıkarılır: önde dururken de sekmenin diğer işlevleri kullanılabilir.
  * qooxdoo'da küçültülen pencere yalnız gizlenir (görev çubuğu yoktur); bu yüzden küçültülen pencereler alt
  * çubukta (bkz. ui.StatusBar) başlıklarıyla düğme olarak durur, tıklanınca geri açılır. Kalıcı (modal)
  * pencere küçültülünce arkasındaki engel de kalkar (qx kökü yalnız görünür modal pencereyi sayar).
@@ -43,7 +44,7 @@ qx.Class.define("tihamon.ui.WindowDock", {
     /** Pencereye küçültme düğmesi ekler; küçültülünce şeride, geri açılınca/kapanınca şeritten. */
     __adopt(win) {
       win.setUserData("tihamon.dock", true);
-      win.set({ showMinimize: true, allowMinimize: true });
+      win.set({ showMinimize: true, allowMinimize: true, modal: false });
       win.addListener("minimize", () => this.__add(win));
       win.addListener("appear", () => this.__remove(win));
       win.addListener("close", () => this.__remove(win));

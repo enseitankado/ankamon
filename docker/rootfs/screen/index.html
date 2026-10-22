@@ -117,8 +117,8 @@
   .tile .stats .warn { color: #ffb74d; }
   .tile .stats .crit { color: #ff6b6b; font-weight: 600; }
   .tile .stats .none { opacity: .55; }
-  /* Ağ arabirimleri (bkz. Tile.netIcons): sağa yaslı; etkin yeşil, değilse gri; ipucunda özellikler/yapılandırma. */
-  .tile .stats .net { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
+  /* Ağ arabirimleri (bkz. Tile.netIcons): barın solunda; etkin yeşil, değilse gri; ipucunda özellikler/yapılandırma. */
+  .tile .stats .net { display: inline-flex; gap: 6px; align-items: center; }
   .tile .stats .net svg { width: 15px; height: 15px; display: block; color: #6e7681; cursor: help; }
   .tile .stats .net svg.up { color: #3fb950; }
   /* Ekranlar araç çubuğunun "Donanım" düğmesi kapalıyken alt bar gizlenir (bkz. tm-view). */
@@ -275,8 +275,10 @@ class Tile {
         // Seçim dışı bir kutucuğa sağ tıklanırsa (çoğu dosya yöneticisindeki gibi) seçim ona
         // sıfırlanır; zaten seçimin bir parçasıysa (Shift/Ctrl ile yapılmış) seçim KORUNUR.
         if (!selected.has(this.board.id)) setSelected([this.board.id]);
+        // Alt barda sağ tık: hangi göstergelerin görüneceği (bkz. Boards.__openStatsMenu); başka yerde tahta menüsü.
+        const type = e.target.closest && e.target.closest(".stats") ? "tm-statsmenu" : "tm-menu";
         window.parent.postMessage(
-          { type: "tm-menu", id: this.board.id, ids: [...selected], x: e.clientX, y: e.clientY }, location.origin);
+          { type, id: this.board.id, ids: [...selected], x: e.clientX, y: e.clientY }, location.origin);
       }, true);
       // Basınca seçilir (görüntü alanı dahil — müdahale kipinde değilse): düz basış bu kutucuğu TEK
       // seçili yapar; Ctrl/⌘ tekli ekler/çıkarır; Shift, son seçilenden buna kadarki (görünür DOM
@@ -392,13 +394,17 @@ class Tile {
    * son 5 dakikada ölçüm yok — bkz. backend MetricsApi::latest). Yalnız gömülü kipte görünür (CSS).
    */
   setStats(stats) {
-    const net = this.board.online === false ? null : this.board.net;
-    const key = JSON.stringify([stats || null, net || null]);
+    // board.hide: bu kullanıcının bu tahtada gizlediği göstergeler (cpu, temp, mem, disk_temp, fan, battery, net —
+    // alt bara sağ tıkla seçilir, sunucuda kullanıcı tercihi; bkz. Boards.__openStatsMenu).
+    const hide = new Set(this.board.hide || []);
+    const net = this.board.online === false || hide.has("net") ? null : this.board.net;
+    const key = JSON.stringify([stats || null, net || null, [...hide]]);
     if (key === this.statsKey) return;
     this.statsKey = key;
+    this.statsEl.textContent = "";
+    this.netIcons(net);
     if (!stats) {
-      this.statsEl.innerHTML = `<span class="none">${this.board.online === false ? "Tahta kapalı" : "Ölçüm yok"}</span>`;
-      this.netIcons(net);
+      this.statsEl.insertAdjacentHTML("beforeend", `<span class="none">${this.board.online === false ? "Tahta kapalı" : "Ölçüm yok"}</span>`);
       return;
     }
     // Eşikler: warn/crit değerin üstünde ise renklenir; pilde ters (alt eşik) — CR2032 ~3 V, 2.5 V altı biter.
@@ -407,20 +413,22 @@ class Tile {
       const bad = low ? v => v <= crit : v => v >= crit, mid = low ? v => v <= warn : v => v >= warn;
       return `<span class="${bad(value) ? "crit" : mid(value) ? "warn" : ""}">${text}</span>`;
     };
-    const item = (label, ...parts) => `<span><span class="k">${label}</span>${parts.join(" - ")}</span>`;
+    // Gizlenen parçalar atlanır; bir göstergenin bütün parçaları gizliyse o gösterge hiç yazılmaz.
+    const item = (label, ...parts) => (parts = parts.filter(Boolean)).length
+      ? `<span><span class="k">${label}</span>${parts.join(" - ")}</span>` : "";
+    const show = (k, html) => hide.has(k) ? "" : html;
     const temp = v => Math.round(v) + " °C";
-    this.statsEl.innerHTML =
-      item("CPU:", val(stats.cpu, "%" + Math.round(stats.cpu), 70, 90),
-        val(stats.temp, temp(stats.temp ?? 0), 70, 85)) +
-      item("RAM:", val(stats.mem, "%" + Math.round(stats.mem), 80, 92)) +
-      item("HDD:", val(stats.disk_temp, temp(stats.disk_temp ?? 0), 50, 60)) +
-      item("Fan:", val(stats.fan, Math.round(stats.fan ?? 0) + " RPM", Infinity, Infinity)) +
-      item("Pil:", val(stats.battery, (stats.battery ?? 0).toFixed(2) + " V", 2.8, 2.5, true));
-    this.netIcons(net);
+    this.statsEl.insertAdjacentHTML("beforeend",
+      item("CPU:", show("cpu", val(stats.cpu, "%" + Math.round(stats.cpu), 70, 90)),
+        show("temp", val(stats.temp, temp(stats.temp ?? 0), 70, 85))) +
+      item("RAM:", show("mem", val(stats.mem, "%" + Math.round(stats.mem), 80, 92))) +
+      item("HDD:", show("disk_temp", val(stats.disk_temp, temp(stats.disk_temp ?? 0), 50, 60))) +
+      item("Fan:", show("fan", val(stats.fan, Math.round(stats.fan ?? 0) + " RPM", Infinity, Infinity))) +
+      item("Pil:", show("battery", val(stats.battery, (stats.battery ?? 0).toFixed(2) + " V", 2.8, 2.5, true))));
   }
 
   /**
-   * Alt barın sağına ağ arabirimi simgeleri: `net` {wifi_radio, ifaces: [{name, kind, up, …}]} (üst sayfadan —
+   * Alt barın soluna ağ arabirimi simgeleri: `net` {wifi_radio, ifaces: [{name, kind, up, …}]} (üst sayfadan —
    * worker executor/netif.py, ~30 sn'de bir) ya da null. Yeşil = etkin (kablolu: bağlantı var; Wi-Fi: kart açık),
    * gri = değil. Üzerine gelince ipucu (title) kartın özelliklerini ve yapılandırmasını gösterir.
    */
