@@ -54,7 +54,12 @@ FROM timescale/timescaledb:2.31.0-pg17
 
 # Okul ağındaki filtre HTTPS'i kendi sertifikasıyla keser; depolar HTTP üzerinden kullanılır
 # (paketler imzalı olduğundan bütünlük apk tarafından doğrulanır). pip/composer kullanılmaz.
+# apk upgrade: taban imajın kendi paketleri (ör. libexpat) imaj yeniden yayımlanana dek eski kalır.
+# Taban imajın eski Go ile derlenmiş, tiha-mon'un kullanmadığı araçları (gosu → su-exec kullanılır,
+# timescaledb-tune/parallel-copy) silinir: güvenlik taramasındaki açıkların çoğu bunlardaydı.
 RUN sed -i 's|https://|http://|' /etc/apk/repositories \
+ && apk upgrade --no-cache \
+ && rm -f /usr/local/bin/gosu /usr/local/bin/timescaledb-tune /usr/local/bin/timescaledb-parallel-copy \
  && apk add --no-cache \
       bash tzdata curl supervisor su-exec \
       nginx \

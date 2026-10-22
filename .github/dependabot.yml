@@ -1,0 +1,31 @@
+# Bağımlılık sürümlerini izler ve yükseltmeleri PR olarak açar (bakımcı birleştirir; kurulumlar
+# install.sh --update ile alır). Alpine paketleri (php84, nginx, grafana…) burada değil: taban imajın
+# Alpine sürümünden gelir; yamalı paketleri yakalamak haftalık güvenlik taramasının işidir.
+version: 2
+updates:
+  # Dockerfile'lardaki FROM etiketleri (timescaledb, node, filebrowser, mediamtx) ve Trivy.
+  - package-ecosystem: docker
+    directories: ["/", "/docker/rsyslog", "/.github/trivy"]
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    ignore:
+      # Derleme aşaması yalnız LTS node ile (tek sayılı sürümler LTS olmaz; büyük sürüm elle seçilir).
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+      # timescaledb etiketindeki -pgNN son eki Dependabot'ça korunur; PostgreSQL büyük sürüm geçişi veri
+      # dizininde pg_upgrade ister, bu yüzden elle yapılır.
+  # Arayüz (qooxdoo derleyicisi, vis-timeline).
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    groups:
+      frontend-minor:
+        update-types: [minor, patch]
+  # İş akışlarındaki eylemler (commit SHA ile sabit).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    labels: [dependencies]
