@@ -26,6 +26,18 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       ["sub", "Ev dizini altında…"], ["abs", "Mutlak yol (kullanıcıdan bağımsız)…"]
     ],
 
+    /** Topla ▸ "Yalnız şu türlerdeki dosyalar" kategorileri: [etiket, uzantılar]. */
+    TYPES: {
+      docs: ["Belgeler", ["pdf", "doc", "docx", "odt", "rtf", "txt"]],
+      slides: ["Sunular", ["ppt", "pptx", "pps", "ppsx", "odp"]],
+      sheets: ["Tablolar", ["xls", "xlsx", "ods", "csv"]],
+      images: ["Görseller", ["jpg", "jpeg", "png", "gif", "bmp", "webp", "svg"]],
+      videos: ["Videolar", ["mp4", "mkv", "avi", "mov", "webm", "wmv"]],
+      audio: ["Sesler", ["mp3", "wav", "ogg", "m4a", "flac"]],
+      archives: ["Arşivler", ["zip", "rar", "7z", "tar", "gz"]],
+      boards: ["Tahta çizimleri", ["xopp", "flipchart", "notebook"]]
+    },
+
     STATES: {
       queued: "⏸ Sırada", running: "⏳ Sürüyor", ok: "✔ Tamam", done: "✔ Tamam", partial: "⚠ Kısmen",
       failed: "✖ Hata", skipped: "– Atlandı", cancelled: "⏹ İptal"
@@ -79,6 +91,11 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
     __userInfo: null,
     __conflict: null,
     __patterns: null,
+    __what: null,
+    __typeBoxes: null,
+    __deep: null,
+    __skipJunk: null,
+    __whatText: null,
     __move: null,
     __delivery: null,
     __startButton: null,
@@ -122,6 +139,9 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       }
       this.__createLocationSection(right);
       this.__createUserSection(right);
+      if (this.__mode === "collect") {
+        this.__createWhatSection(right);
+      }
       this.__createOptionSection(right);
       body.add(right, { flex: 1 });
       page.add(body, { flex: 1 });
@@ -130,8 +150,15 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       bar.add(new qx.ui.basic.Label(
         "İş sunucuda yürür; aynı anda kaç tahtaya bağlanılacağı sunucunun işlemci/bellek durumuna göre otomatik ayarlanır.")
         .set({ textColor: "app-muted", rich: true }), { flex: 1 });
+      if (this.__mode === "collect") {
+        const preview = new qx.ui.form.Button("Önizle").set({
+          minWidth: 90, toolTipText: "Hiçbir şey aktarmadan, her tahtada neyin toplanacağını sayıp listeler"
+        });
+        preview.addListener("execute", () => this.__start(true));
+        bar.add(preview);
+      }
       this.__startButton = new qx.ui.form.Button(this.__mode === "distribute" ? "Dağıt" : "Topla").set({ minWidth: 110 });
-      this.__startButton.addListener("execute", this.__start, this);
+      this.__startButton.addListener("execute", () => this.__start(false));
       bar.add(this.__startButton);
       page.add(bar);
       return page;
@@ -424,6 +451,115 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       }
     },
 
+    /**
+     * Topla: NEYİN toplanacağı (konum yalnız NEREDEN'i söyler). Üç seçim: konumdaki her şey / yalnız seçilen
+     * dosya türleri / adı desene uyanlar; alt klasörlere inme ve kısayolları/gizli dosyaları dışlama.
+     * Altındaki özet cümlesi seçimin tamamını düz Türkçe söyler; "Önizle" aktarmadan sayar.
+     */
+    __createWhatSection(parent) {
+      parent.add(this.__heading("Toplanacak öğeler"));
+      const T = tihamon.ui.files.BulkPanel.TYPES;
+      const all = new qx.ui.form.RadioButton("Konumdaki her şey (dosyalar ve klasörler, klasörler içerikleriyle)").set({ model: "all" });
+      const types = new qx.ui.form.RadioButton("Yalnız şu türlerdeki dosyalar:").set({ model: "types" });
+      const pattern = new qx.ui.form.RadioButton("Adı şu desene uyanlar:").set({ model: "pattern" });
+      this.__what = new qx.ui.form.RadioGroup(all, types, pattern);
+      parent.add(all);
+
+      const typeRow = new qx.ui.container.Composite(new qx.ui.layout.Flow(10, 2).set({ alignY: "middle" }));
+      typeRow.add(types);
+      this.__typeBoxes = Object.keys(T).map(key => {
+        const cb = new qx.ui.form.CheckBox(T[key][0]).set({ value: key === "docs", toolTipText: T[key][1].join(" ") });
+        cb.setUserData("key", key);
+        cb.addListener("changeValue", () => {
+          if (cb.getValue()) {
+            this.__what.setSelection([types]);
+          }
+          this.__updateWhat();
+        });
+        typeRow.add(cb);
+        return cb;
+      });
+      parent.add(typeRow);
+
+      const patternRow = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
+      patternRow.add(pattern);
+      this.__patterns = new qx.ui.form.TextField().set({
+        placeholder: "ör. *.pdf  odev*  rapor?.docx",
+        toolTipText: "Boşlukla ayrılmış desenler; * herhangi bir metin, ? tek karakter (büyük/küçük harf duyarsız)."
+      });
+      this.__patterns.addListener("input", () => {
+        this.__what.setSelection([pattern]);
+        this.__updateWhat();
+      });
+      patternRow.add(this.__patterns, { flex: 1 });
+      parent.add(patternRow);
+
+      const flags = new qx.ui.container.Composite(new qx.ui.layout.HBox(16));
+      this.__deep = new qx.ui.form.CheckBox("Alt klasörlerin içindekiler de (klasör yapısı korunur)").set({ value: true });
+      this.__skipJunk = new qx.ui.form.CheckBox("Kısayolları (.desktop) ve gizli dosyaları alma").set({
+        value: true, toolTipText: "ETAP masaüstündeki uygulama kısayolları ve nokta ile başlayan ayar dosyaları/klasörleri"
+      });
+      flags.add(this.__deep);
+      flags.add(this.__skipJunk);
+      parent.add(flags);
+
+      this.__whatText = new qx.ui.basic.Label("").set({ rich: true, wrap: true, textColor: "app-muted" });
+      parent.add(this.__whatText);
+
+      this.__what.addListener("changeSelection", this.__updateWhat, this);
+      [this.__deep, this.__skipJunk].forEach(cb => cb.addListener("changeValue", this.__updateWhat, this));
+      this.__location.addListener("changeSelection", this.__updateWhat, this);
+      this.__locationPath.addListener("input", this.__updateWhat, this);
+      this.__logged.addListener("changeValue", this.__updateWhat, this);
+      this.__what.setSelection([all]);
+      this.__updateWhat();
+    },
+
+    /** Seçilen "ne"nin sunucuya gidecek biçimi: {patterns, excludes, deep, skip_hidden} ve açıklaması. */
+    __whatRequest() {
+      const T = tihamon.ui.files.BulkPanel.TYPES;
+      const mode = this.__what.getSelection()[0].getModel();
+      let patterns = [];
+      let what = "konumdaki her şey (klasörler içerikleriyle)";
+      if (mode === "types") {
+        const keys = this.__typeBoxes.filter(cb => cb.getValue()).map(cb => cb.getUserData("key"));
+        patterns = keys.reduce((list, k) => list.concat(T[k][1].map(ext => "*." + ext)), []);
+        what = keys.length ? keys.map(k => T[k][0].toLocaleLowerCase("tr")).join(", ") + " dosyaları" : "";
+      } else if (mode === "pattern") {
+        patterns = (this.__patterns.getValue() || "").split(/[\s,;]+/).filter(Boolean);
+        what = patterns.length ? `adı ${patterns.map(p => "“" + p + "”").join(", ")} desenine uyan öğeler` : "";
+      }
+      const deep = mode !== "all" && this.__deep.getValue();
+      const skip = this.__skipJunk.getValue();
+      return {
+        mode, what, deep,
+        body: { patterns, excludes: skip ? ["*.desktop"] : [], deep, skip_hidden: skip }
+      };
+    },
+
+    __updateWhat() {
+      if (!this.__whatText) {
+        return;
+      }
+      const esc = qx.bom.String.escape;
+      const w = this.__whatRequest();
+      this.__deep.setEnabled(w.mode !== "all");
+      const kind = this.__locationKind();
+      const loc = kind === "sub" || kind === "abs"
+        ? `“${esc((this.__locationPath.getValue() || "").trim() || "…")}”${kind === "sub" ? " (ev dizini altında)" : ""}`
+        : this.__location.getSelection()[0].getLabel();
+      const who = kind === "abs" ? "" : " seçili kullanıcıların";
+      if (!w.what) {
+        this.__whatText.setValue(`<span style="color:${this.__color("error")}">` +
+          (w.mode === "types" ? "En az bir dosya türü seçin." : "Bir ad deseni yazın.") + "</span>");
+        return;
+      }
+      this.__whatText.setValue(`<b>Toplanacak:</b> her seçili tahtada${who} <b>${esc(loc)}</b> konumundan ` +
+        `<b>${esc(w.what)}</b>` + (w.deep ? ", alt klasörlerin içindekiler dahil" : (w.mode === "all" ? "" : " (yalnız konumun kendisindekiler)")) +
+        (this.__skipJunk.getValue() ? "; kısayollar ve gizli dosyalar hariç" : "") +
+        `. Bu bilgisayara <i>tahta / kullanıcı / …</i> klasör yapısıyla gelir.`);
+    },
+
     __createOptionSection(parent) {
       parent.add(this.__heading("Seçenekler"));
       const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" }));
@@ -435,13 +571,7 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
         row.add(overwrite);
         row.add(skip);
       } else {
-        row.add(new qx.ui.basic.Label("Ad deseni:"));
-        this.__patterns = new qx.ui.form.TextField().set({
-          width: 220, placeholder: "*.pdf *.docx  (boşsa tümü)",
-          toolTipText: "Konumun içindeki üst düzey öğelerin adlarıyla eşleşir (büyük/küçük harf duyarsız; * ve ?)."
-        });
-        row.add(this.__patterns);
-        row.add(new qx.ui.basic.Label("Teslim:").set({ marginLeft: 10 }));
+        row.add(new qx.ui.basic.Label("Teslim:"));
         this.__delivery = new qx.ui.form.SelectBox().set({ width: 230 });
         this.__delivery.add(new qx.ui.form.ListItem("ZIP arşivi olarak indir", null, "zip"));
         this.__delivery.add(new qx.ui.form.ListItem("tar.gz arşivi olarak indir", null, "tgz"));
@@ -477,10 +607,14 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       if (this.__mode === "distribute" && !this.__files.length) {
         throw new Error("Dağıtılacak dosya ya da klasör ekleyin.");
       }
+      if (this.__mode === "collect" && !this.__whatRequest().what) {
+        throw new Error("Toplanacak öğeleri belirleyin: en az bir dosya türü seçin ya da bir ad deseni yazın.");
+      }
       return { boards, users, location };
     },
 
-    async __start() {
+    /** @param dry {Boolean} Topla ▸ Önizle: yalnız sayılır, hiçbir şey aktarılmaz/silinmez. */
+    async __start(dry) {
       let req;
       try {
         req = this.__request();
@@ -492,14 +626,14 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       const where = this.__location.getSelection()[0].getLabel().replace("…", "") +
         (req.location.path ? ` “${esc(req.location.path)}”` : "");
       this.__dirHandle = null;
-      if (this.__mode === "collect" && this.__delivery.getSelection()[0].getModel() === "folder") {
+      if (this.__mode === "collect" && !dry && this.__delivery.getSelection()[0].getModel() === "folder") {
         // Klasör seçici kullanıcı hareketi ister: başka bir await'ten önce açılır.
         this.__dirHandle = await tihamon.ui.files.BulkIo.pickFolder();
         if (!this.__dirHandle) {
           return;
         }
       }
-      if (this.__mode === "collect" && this.__move.getValue()) {
+      if (this.__mode === "collect" && !dry && this.__move.getValue()) {
         const ok = await tihamon.ui.Dialog.confirm(
           `<b>Taşıma</b>: ${req.boards.length} tahtada ${where} konumundan alınan öğeler, sunucuya sağ salim ` +
           "aktarıldıktan sonra <b>tahtadan silinecek</b>." +
@@ -508,6 +642,10 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
         if (!ok) {
           return;
         }
+      }
+      // Önceki (bitmiş) toplamanın — ör. önizlemenin — sunucudaki ara dosyaları bırakılır.
+      if (this.__job && this.__job.state !== "running" && this.__mode === "collect") {
+        tihamon.ui.files.Api.post(`/bulk/${this.__job.id}/discard`, {}).catch(() => null);
       }
       this.__stack.setSelection([this.__stack.getChildren()[1]]);
       this.__cancelled = false;
@@ -531,10 +669,9 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
             token, conflict: this.__conflict.getSelection()[0].getModel()
           }));
         } else {
-          const patterns = (this.__patterns.getValue() || "").split(/[\s,;]+/).filter(Boolean);
-          this.__phase.setValue("Toplanıyor…");
-          res = await tihamon.ui.files.Api.post("/bulk/collect", Object.assign(req, {
-            patterns, move: this.__move.getValue()
+          this.__phase.setValue(dry ? "Önizleme: tahtalarda neyin toplanacağı sayılıyor (hiçbir şey aktarılmaz)…" : "Toplanıyor…");
+          res = await tihamon.ui.files.Api.post("/bulk/collect", Object.assign(req, this.__whatRequest().body, {
+            move: this.__move.getValue(), dry: !!dry
           }));
         }
         this.__job = { id: res.id, state: "running" };
@@ -660,7 +797,7 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
           parts.push(fmt(this.__speed.rate) + "/sn");
         }
       }
-      parts.push(fmt(job.bytes) + (this.__mode === "distribute" ? " gönderildi" : " alındı"));
+      parts.push(fmt(job.bytes) + (this.__mode === "distribute" ? " gönderildi" : job.options.dry ? " bulundu" : " alındı"));
       parts.push("süre " + tihamon.util.Format.duration(Math.max(1, elapsed)));
       this.__progressText.setValue(parts.join(" · "));
     },
@@ -715,6 +852,15 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       const title = { done: "Tamamlandı", partial: "Hatalarla tamamlandı", failed: "Başarısız", cancelled: "İptal edildi" }[job.state] || job.state;
       const names = { done: "başarılı", partial: "kısmen", failed: "hatalı", skipped: "atlandı", cancelled: "iptal" };
       const summary = Object.keys(names).filter(k => counts[k]).map(k => `${counts[k]} ${names[k]}`).join(", ");
+      if (job.options && job.options.dry) {
+        const items = targets.reduce((n, t) => n + (t.items || 0), 0);
+        const bytes = targets.reduce((n, t) => n + (t.state === "ok" ? t.total || 0 : 0), 0);
+        this.__phase.setValue(`<span style="color:${color}">Önizleme hazır</span> — hiçbir şey aktarılmadı`);
+        this.__reportText.setValue(`<b>Önizleme</b>: ${ok} kullanıcıda toplam <b>${items} öğe, ` +
+          `${tihamon.util.Format.bytes(bytes)}</b> toplanacak · ${esc(job.options.what_text)} · konum: ${esc(job.options.location_text)}`);
+        this.__finishUi(job);
+        return;
+      }
       this.__phase.setValue(`<span style="color:${color}">${title}</span>`);
       this.__reportText.setValue(
         `<b>Rapor</b>: ${job.boards.length} tahta (${esc(summary)}) · ${ok} ${job.kind === "distribute" ? "hedefe kopyalandı" : "kaynaktan alındı"}` +
@@ -737,7 +883,7 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
         this.__reportButtons.add(b);
       };
       if (job) {
-        const hasData = job.kind === "collect" && job.boards.some(b => b.targets.some(t => t.state === "ok"));
+        const hasData = job.kind === "collect" && !job.options.dry && job.boards.some(b => b.targets.some(t => t.state === "ok"));
         if (hasData) {
           button("ZIP indir", () => this.__deliver("zip"));
           button("tar.gz indir", () => this.__deliver("tgz"));
@@ -751,9 +897,12 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
             });
           }
         }
+        if (job.options && job.options.dry) {
+          button("Bu seçimle topla", () => this.__start(false));
+        }
         button("Raporu kaydet (CSV)", () => this.__saveReport(job));
       }
-      button("Yeni işlem", () => {
+      button(job && job.options && job.options.dry ? "Seçime dön" : "Yeni işlem", () => {
         if (this.__job && this.__job.state !== "running" && this.__mode === "collect") {
           tihamon.ui.files.Api.post(`/bulk/${this.__job.id}/discard`, {}).catch(() => null);
         }

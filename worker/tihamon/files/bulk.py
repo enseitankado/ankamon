@@ -161,13 +161,22 @@ while [ $# -ge 2 ]; do
 done
 """
 
-# Toplama 1: verilen dizinlerin üst düzey girdileri ve boyutları ("D\t<dizin>" başlığı, ardından
-# "<bayt>\t./<ad>" — hepsi NUL ile ayrılmış). Olmayan dizin "M\t<dizin>".
+# Toplama 1: verilen dizinlerdeki öğeler ve boyutları ("D\t<dizin>" başlığı, ardından "<bayt>\t./<yol>" —
+# hepsi NUL ile ayrılmış). Olmayan dizin "M\t<dizin>". $1=1: alt klasörlere inilir, yalnız dosyalar
+# (yol dizine göre göreli, klasör yapısı korunur); 0: yalnız üst düzey girdiler (klasörler bütün, du ile).
+# $2=1: gizli (nokta ile başlayan) klasörlere hiç inilmez (ör. ev dizinindeki .cache).
 _LIST = r"""
+deep=$1; hid=$2; shift 2
 for d; do
   if [ ! -d "$d" ]; then printf 'M\t%s\0' "$d"; continue; fi
   printf 'D\t%s\0' "$d"
-  (cd -- "$d" && find . -mindepth 1 -maxdepth 1 -print0 | xargs -0r du -0sb --)
+  if [ "$deep" = 1 ] && [ "$hid" = 1 ]; then
+    find "$d" -mindepth 1 -name '.*' -prune -o -type f -printf '%s\t./%P\0'
+  elif [ "$deep" = 1 ]; then
+    find "$d" -mindepth 1 -type f -printf '%s\t./%P\0'
+  else
+    (cd -- "$d" && find . -mindepth 1 -maxdepth 1 -print0 | xargs -0r du -0sb --)
+  fi
 done
 exit 0
 """
@@ -285,6 +294,14 @@ def public(job: dict) -> dict:
     out["bytes"] = sum(b["bytes"] for b in job["boards"])
     out["total"] = sum(b["total"] for b in job["boards"])
     return out
+
+
+def _human(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024
+    return str(n)
 
 
 def _safe_dirname(text: str) -> str:
@@ -455,7 +472,7 @@ def _summary(job: dict) -> str:
     names = {"done": "başarılı", "partial": "kısmen", "failed": "başarısız", "skipped": "atlandı",
              "cancelled": "iptal"}
     parts = [f"{counts[s]} {names[s]}" for s in names if counts.get(s)]
-    verb = "Dağıtma" if job["kind"] == "distribute" else "Toplama"
+    verb = "Dağıtma" if job["kind"] == "distribute" else ("Önizleme" if job["options"].get("dry") else "Toplama")
     return f"{verb} bitti: {len(job['boards'])} tahta — " + ", ".join(parts) + "."
 
 
@@ -606,24 +623,50 @@ def _distribute_board(job: dict, row: dict, access: dict) -> None:
 # ---- toplama
 
 def start_collect(owner: str, boards: list[dict], users: dict, location: dict, patterns: list[str],
-                  move: bool, on_done) -> int:
+                  move: bool, on_done, excludes: list[str] = (), deep: bool = False, skip_hidden: bool = False,
+                  dry: bool = False) -> int:
+    """patterns: adı eşleşenler (boşsa tümü); excludes: adı eşleşenler hiç alınmaz (ör. *.desktop);
+    deep: alt klasörlerin içindeki dosyalar da (desen dosya adına uygulanır, klasör yapısı korunur);
+    skip_hidden: nokta ile başlayan dosya/klasörler alınmaz; dry: önizleme — yalnız sayılır, aktarılmaz."""
     import asyncio
     if not boards:
         raise RemoteError("Tahta seçilmedi.")
-    patterns = [p.strip() for p in patterns if isinstance(p, str) and p.strip()][:50]
+    clean = lambda items: [p.strip() for p in items if isinstance(p, str) and p.strip()][:50]
+    patterns, excludes = clean(patterns), clean(excludes)
     options = {"users": users, "location": location, "location_text": location_text(location),
-               "patterns": patterns, "move": bool(move)}
+               "patterns": patterns, "excludes": excludes, "deep": bool(deep), "skip_hidden": bool(skip_hidden),
+               "move": bool(move) and not dry, "dry": bool(dry)}
+    options["what_text"] = what_text(options)
     job = _new_job("collect", owner, boards, options)
     os.makedirs(os.path.join(job["_dir"], "data"), exist_ok=True)
-    _event(job, "info", f"{len(boards)} tahtadan toplanıyor; konum: {options['location_text']}"
-                        + (f", desen: {' '.join(patterns)}" if patterns else "")
-                        + (" — TAŞIMA: alınan öğeler tahtadan silinecek." if move else "."))
+    _event(job, "info", ("ÖNİZLEME (hiçbir şey aktarılmaz): " if dry else "")
+                        + f"{len(boards)} tahtada, konum: {options['location_text']} — {options['what_text']}"
+                        + (" — TAŞIMA: alınan öğeler tahtadan silinecek." if options["move"] else "."))
     asyncio.ensure_future(_schedule(job, _collect_board, on_done))
     return job["id"]
 
 
+def what_text(opts: dict) -> str:
+    """Neyin toplanacağının okunur özeti (olaylar/rapor)."""
+    text = ("adı eşleşen öğeler: " + " ".join(opts["patterns"])) if opts["patterns"] else "her şey"
+    if opts["deep"]:
+        text += " (alt klasörlerin içi dahil)"
+    skip = (["gizli dosyalar"] if opts["skip_hidden"] else []) + opts["excludes"]
+    return text + ("; hariç: " + ", ".join(skip) if skip else "")
+
+
 def _match(name: str, patterns: list[str]) -> bool:
     return not patterns or any(fnmatch.fnmatch(name.lower(), p.lower()) for p in patterns)
+
+
+def _wanted(rel: str, opts: dict) -> bool:
+    """Listelenen öğe (konuma göre göreli yol) toplanacak mı: desen/hariç tutma dosya ADINA uygulanır."""
+    name = posixpath.basename(rel)
+    if opts["skip_hidden"] and any(part.startswith(".") for part in rel.split("/")):
+        return False
+    if opts["excludes"] and any(fnmatch.fnmatch(name.lower(), p.lower()) for p in opts["excludes"]):
+        return False
+    return _match(name, opts["patterns"])
 
 
 def _collect_board(job: dict, row: dict, access: dict) -> None:
@@ -632,7 +675,9 @@ def _collect_board(job: dict, row: dict, access: dict) -> None:
     if targets is None or job["_cancel"]:
         return
     row["message"] = "Öğeler listeleniyor…"
-    out = _ssh(access, _LIST, *[t["dir"] for t in targets], timeout=300)
+    opts = job["options"]
+    out = _ssh(access, _LIST, "1" if opts["deep"] else "0", "1" if opts["skip_hidden"] else "0",
+               *[t["dir"] for t in targets], timeout=300)
     listing: dict[str, list[tuple[str, int]]] = {}
     current = None
     for rec in out.split(b"\0"):
@@ -645,7 +690,7 @@ def _collect_board(job: dict, row: dict, access: dict) -> None:
             current = None
         elif current is not None and "\t./" in text:
             size, name = text.split("\t./", 1)
-            if "/" not in name and _match(name, job["options"]["patterns"]):
+            if (opts["deep"] or "/" not in name) and _wanted(name, opts):
                 listing[current].append((name, int(size) if size.isdigit() else 0))
     paths: list[str] = []
     for t in row["targets"]:
@@ -664,6 +709,18 @@ def _collect_board(job: dict, row: dict, access: dict) -> None:
     if not paths:
         row["state"], row["message"] = "skipped", "Atlandı: alınacak öğe yok"
         _event(job, "info", f"{row['name']}: alınacak öğe yok.")
+        return
+    if opts["dry"]:
+        # Önizleme: bulunanlar yalnız raporlanır (ilk birkaç ad örnek olarak), hiçbir şey aktarılmaz.
+        for t in row["targets"]:
+            if t.get("_paths"):
+                names = [posixpath.relpath(p, t["dir"]) for p in t.pop("_paths")]
+                t["state"], t["bytes"] = "ok", t["total"]
+                t["message"] = ", ".join(names[:5]) + (f" … (+{len(names) - 5})" if len(names) > 5 else "")
+        row["state"] = "done"
+        row["message"] = f"{len(paths)} öğe bulunur"
+        row["bytes"] = row["total"]
+        _event(job, "info", f"{row['name']}: {len(paths)} öğe, {_human(row['total'])} toplanır.")
         return
     with _lock:
         free = shutil.disk_usage(STAGE).free - DISK_RESERVE - _reserved

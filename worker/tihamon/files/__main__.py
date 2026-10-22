@@ -13,7 +13,7 @@ POST /bulk/users      {boards:[…]}                → {boards:[{id, name, user
 POST /bulk/upload                                 → {token}   (dağıtılacak dosyalar için yükleme alanı)
 PUT  /bulk/upload/<jeton>?path=<göreli yol>       ← dosya gövdesi (akış)
 POST /bulk/distribute {token, boards, users:{logged, names}, location:{kind, path}, conflict} → {id}
-POST /bulk/collect    {boards, users, location, patterns:[…], move} → {id}
+POST /bulk/collect    {boards, users, location, patterns:[…], excludes:[…], deep, skip_hidden, move, dry} → {id}
 GET  /bulk/<id>                                   → iş durumu (tahta/hedef satırları, olaylar)
 POST /bulk/<id>/cancel | /bulk/<id>/discard
 GET  /bulk/<id>/archive?fmt=zip|tgz | /bulk/<id>/manifest | /bulk/<id>/file?path=…   (toplananlar)
@@ -266,6 +266,8 @@ class BulkUploadFileHandler(Base):
 def _bulk_record(owner: str):
     def done(job: dict) -> None:
         opts = job["options"]
+        if opts.get("dry"):
+            return   # önizleme: tahtada hiçbir şey değişmedi, kayda gerek yok
         for row in job["boards"]:
             if row["state"] in ("skipped", "cancelled") and not row["targets"]:
                 continue
@@ -275,7 +277,7 @@ def _bulk_record(owner: str):
                 text = f"dağıtıldı: {{{what}}} → {opts['location_text']} ({who})"
             else:
                 verb = "taşındı" if opts["move"] else "toplandı"
-                text = f"{verb}: {opts['location_text']}" + (f" [{' '.join(opts['patterns'])}]" if opts["patterns"] else "") + f" ({who})"
+                text = f"{verb}: {opts['location_text']} — {opts['what_text']} ({who})"
             text += f" — {row['message']}"
             _record({"id": row["id"], "name": row["name"]}, owner, text, row["state"] == "done")
     return done
@@ -304,8 +306,13 @@ class BulkCollectHandler(Base):
             patterns = data.get("patterns") or []
             if not isinstance(patterns, list):
                 raise RemoteError("Geçersiz desen.")
+            excludes = data.get("excludes") or []
+            if not isinstance(excludes, list):
+                raise RemoteError("Geçersiz hariç tutma.")
             return {"id": bulk.start_collect(self.user, boards, users, location, patterns,
-                                             bool(data.get("move")), _bulk_record(self.user))}
+                                             bool(data.get("move")), _bulk_record(self.user), excludes=excludes,
+                                             deep=bool(data.get("deep")), skip_hidden=bool(data.get("skip_hidden")),
+                                             dry=bool(data.get("dry")))}
         await self.guard(work())
 
 
