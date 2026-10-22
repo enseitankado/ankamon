@@ -1,0 +1,422 @@
+{
+  "uid": "tihamon-cevrimici",
+  "title": "Çevrim içi tahtalar",
+  "tags": [
+    "tiha-mon"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "editable": false,
+  "graphTooltip": 1,
+  "refresh": "1m",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "İşlemci kullanımı",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tihamon"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tihamon"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroup(time, '5m') AS time, board AS metric, (1 - avg(rate)) * 100 AS value\nFROM (SELECT m.time, b.name AS board,\n             (m.value - lag(m.value) OVER w) / NULLIF(extract(epoch FROM m.time - lag(m.time) OVER w), 0) AS rate\n      FROM v_metrics m JOIN v_boards b ON b.id = m.board_id AND b.online\n      WHERE $__timeFilter(m.time) AND m.name = 'node_cpu_seconds_total' AND m.mode = 'idle'\n      WINDOW w AS (PARTITION BY m.board_id, m.cpu ORDER BY m.time)) s\nWHERE rate BETWEEN 0 AND 1.05 GROUP BY 1, 2 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Bellek kullanımı",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tihamon"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tihamon"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroup(m.time, '5m') AS time, b.name AS metric,\n       (1 - avg(m.value) FILTER (WHERE m.name = 'node_memory_MemAvailable_bytes')\n          / NULLIF(avg(m.value) FILTER (WHERE m.name = 'node_memory_MemTotal_bytes'), 0)) * 100 AS value\nFROM v_metrics m JOIN v_boards b ON b.id = m.board_id AND b.online\nWHERE $__timeFilter(m.time) AND m.name IN ('node_memory_MemAvailable_bytes', 'node_memory_MemTotal_bytes')\nGROUP BY 1, 2 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "En yüksek sıcaklık",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tihamon"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tihamon"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroup(m.time, '5m') AS time, b.name AS metric, max(m.value) AS value\nFROM v_metrics m JOIN v_boards b ON b.id = m.board_id AND b.online\nWHERE $__timeFilter(m.time) AND m.name IN ('node_hwmon_temp_celsius', 'node_thermal_zone_temp')\n  AND m.value BETWEEN 5 AND 110\nGROUP BY 1, 2 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Sistem yükü (1 dk)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tihamon"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tihamon"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroup(m.time, '5m') AS time, b.name AS metric, avg(m.value) AS value\nFROM v_metrics m JOIN v_boards b ON b.id = m.board_id AND b.online\nWHERE $__timeFilter(m.time) AND m.name = 'node_load1'\nGROUP BY 1, 2 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Disk doluluğu (/)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tihamon"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tihamon"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroup(m.time, '15m') AS time, b.name AS metric,\n       (1 - avg(m.value) FILTER (WHERE m.name = 'node_filesystem_avail_bytes')\n          / NULLIF(avg(m.value) FILTER (WHERE m.name = 'node_filesystem_size_bytes'), 0)) * 100 AS value\nFROM v_metrics m JOIN v_boards b ON b.id = m.board_id AND b.online\nWHERE $__timeFilter(m.time) AND m.mountpoint = '/'\n  AND m.name IN ('node_filesystem_avail_bytes', 'node_filesystem_size_bytes')\nGROUP BY 1, 2 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Ağ trafiği — alınan (tüm arayüzler)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tihamon"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tihamon"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT time, board AS metric, sum(r) AS value\nFROM (SELECT $__timeGroup(time, '5m') AS time, board, device, avg(rate) AS r\n      FROM (SELECT m.time, b.name AS board, m.device,\n             (m.value - lag(m.value) OVER w) / NULLIF(extract(epoch FROM m.time - lag(m.time) OVER w), 0) AS rate\n      FROM v_metrics m JOIN v_boards b ON b.id = m.board_id AND b.online\n      WHERE $__timeFilter(m.time) AND m.name = 'node_network_receive_bytes_total' AND m.device <> 'lo'\n      WINDOW w AS (PARTITION BY m.board_id, m.device ORDER BY m.time)) s\n      WHERE rate >= 0 GROUP BY 1, 2, 3) t\nGROUP BY 1, 2 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Ağ trafiği — gönderilen (tüm arayüzler)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tihamon"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tihamon"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT time, board AS metric, sum(r) AS value\nFROM (SELECT $__timeGroup(time, '5m') AS time, board, device, avg(rate) AS r\n      FROM (SELECT m.time, b.name AS board, m.device,\n             (m.value - lag(m.value) OVER w) / NULLIF(extract(epoch FROM m.time - lag(m.time) OVER w), 0) AS rate\n      FROM v_metrics m JOIN v_boards b ON b.id = m.board_id AND b.online\n      WHERE $__timeFilter(m.time) AND m.name = 'node_network_transmit_bytes_total' AND m.device <> 'lo'\n      WINDOW w AS (PARTITION BY m.board_id, m.device ORDER BY m.time)) s\n      WHERE rate >= 0 GROUP BY 1, 2, 3) t\nGROUP BY 1, 2 ORDER BY 1"
+        }
+      ]
+    }
+  ]
+}
