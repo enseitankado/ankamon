@@ -17,7 +17,7 @@ final class BoardsApi
         b.source, b.monitor_enabled, b.exporter_port, b.online,
         b.ssh_ok, b.exporter_ok, b.facts, b.etap,
         b.session_username, b.session_locked, extract(epoch FROM b.session_checked_at)::bigint AS session_checked_at,
-        b.display_state,
+        b.display_state, b.netifs, b.autoshutdown,
         extract(epoch FROM b.last_seen_at)::bigint AS last_seen_at,
         extract(epoch FROM GREATEST(b.last_log_at, rl.at))::bigint AS last_log_at";
 
@@ -212,6 +212,9 @@ final class BoardsApi
         $board['facts'] = json_decode((string) $board['facts'], true) ?: new \stdClass();
         // ETAP faz bilgisi (bkz. migration 018, worker netscan/etap_phase.py); yoksa null.
         $board['etap'] = isset($board['etap']) ? json_decode((string) $board['etap'], true) : null;
+        // Ekranlar alt barı: ağ arabirimleri ve TiHA otomatik kapatma geri sayımı (bkz. migration 026); yoksa null.
+        $board['netifs'] = isset($board['netifs']) ? json_decode((string) $board['netifs'], true) : null;
+        $board['autoshutdown'] = isset($board['autoshutdown']) ? json_decode((string) $board['autoshutdown'], true) : null;
         return $board;
     }
 }

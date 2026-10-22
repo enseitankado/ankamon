@@ -62,6 +62,9 @@
     text-align: center; padding: 12px; font-size: 13px; color: #fff; font-weight: 600; pointer-events: none;
     background: rgba(0, 0, 0, .82); }
   .tile.live.blank .sleep, .tile.live.powersave .sleep { display: flex; }
+  /* TiHA geri sayımlı otomatik kapatması: kalan süre (bkz. Tile.tickShutdown, worker executor/autoshutdown.py). */
+  .tile .sleep .sd { margin-top: 6px; font-weight: 400; font-size: 12px; color: #ffcc80; }
+  .tile .sleep .sd:empty { display: none; }
   html.single #toolbar { display: none; }
   /* Gömülü kip (Tahtalar sayfasının "Ekranlar" sekmesi): sabit oranlı küçük kutucuklar, aşağı kaydırılır.
      Sınıf <html>'e eklenir (bkz. baştaki senkron betik), body'ye değil: <body> ayrıştırılmadan önce
@@ -114,6 +117,10 @@
   .tile .stats .warn { color: #ffb74d; }
   .tile .stats .crit { color: #ff6b6b; font-weight: 600; }
   .tile .stats .none { opacity: .55; }
+  /* Ağ arabirimleri (bkz. Tile.netIcons): sağa yaslı; etkin yeşil, değilse gri; ipucunda özellikler/yapılandırma. */
+  .tile .stats .net { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
+  .tile .stats .net svg { width: 15px; height: 15px; display: block; color: #6e7681; cursor: help; }
+  .tile .stats .net svg.up { color: #3fb950; }
   /* Ekranlar araç çubuğunun "Donanım" düğmesi kapalıyken alt bar gizlenir (bkz. tm-view). */
   html.embed.nostats .tile .stats { display: none; }
   /* "Başarım" görünümü: htop'un üst sol (çekirdek başına CPU, Mem, Swp) ve sağ (görevler, yük,
@@ -215,13 +222,14 @@ class Tile {
     this.control = false;     // fare/klavye ile müdahale (yalnız "screen.control" yetkisiyle; sunucu da denetler)
     this.el.innerHTML = `<div class="title"><span class="dot"></span><span class="name"></span>
       ${spec.control ? '<button class="ctl" title="Fare ve klavye ile tahtayı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
-      <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div><div class="sleep">Ekran güç tasarrufu kipinde</div>
+      <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div><div class="sleep"><div>Ekran güç tasarrufu kipinde<div class="sd"></div></div></div>
       <div class="whoami" hidden></div></div><div class="stats"></div>`;
     this.el.querySelector(".name").textContent = board.name || ("#" + board.id);
     this.view = this.el.querySelector(".view");
     this.msg = this.el.querySelector(".msg");
     this.whoamiEl = this.el.querySelector(".whoami");
     this.statsEl = this.el.querySelector(".stats");
+    this.sdEl = this.el.querySelector(".sleep .sd");
     this.perfEl = this.el.querySelector(".perf");
     this.perfIn = this.el.querySelector(".perf .in");
     this.perfWs = null;
@@ -229,6 +237,7 @@ class Tile {
     this.setWhoami(board.whoami);
     this.setStats(board.stats);
     this.el.classList.toggle("powersave", !!board.powersave);
+    this.tickShutdown();
     this.el.querySelector("button.fs").addEventListener("click", () => toggleFullscreen(single ? document.documentElement : this.el));
     const ctl = this.el.querySelector("button.ctl");
     if (ctl) ctl.addEventListener("click", () => this.setControl(!this.control));
@@ -349,7 +358,32 @@ class Tile {
     this.setWhoami(board.whoami);
     this.setStats(board.stats);
     this.el.classList.toggle("powersave", !!board.powersave);
+    this.tickShutdown();
     this.refreshWanted();
+  }
+
+  /**
+   * Güç tasarrufu yazısının altında TiHA'nın geri sayımlı otomatik kapatmasına kalan süre (saniyede bir —
+   * bkz. aşağıdaki setInterval). `board.autoshutdown` (üst sayfadan, ~30 sn'lik yoklamadan): {phase, kind,
+   * countdown, dialog_at, off_at} (epoch ms) ya da null (uygulanmıyor). Servis dakikada bir denetlediğinden
+   * ±1 dk sapabilir; "10 dakika ertele" dışarıdan görünmez (sonraki yoklamada düzelir).
+   */
+  tickShutdown() {
+    const sd = this.board.autoshutdown;
+    let text = "";
+    if (sd) {
+      const left = at => Math.max(0, Math.round((at - Date.now()) / 1000));
+      const fmt = s => s >= 3600 ? `${Math.floor(s / 3600)} sa ${String(Math.floor(s % 3600 / 60)).padStart(2, "0")} dk`
+        : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      if (sd.phase === "countdown" && sd.off_at) {
+        text = `Kapatma penceresi açık — ${fmt(left(sd.off_at))} sonra kapanacak`;
+      } else if (sd.dialog_at) {
+        const s = left(sd.dialog_at);
+        const what = sd.kind === "clock" ? "Saatli otomatik kapatma" : "Otomatik kapatma";
+        text = s > 0 ? `${what} uyarısına ${fmt(s)}` : `${what} uyarısı her an açılabilir`;
+      }
+    }
+    if (this.sdEl.textContent !== text) this.sdEl.textContent = text;
   }
 
   /**
@@ -358,11 +392,13 @@ class Tile {
    * son 5 dakikada ölçüm yok — bkz. backend MetricsApi::latest). Yalnız gömülü kipte görünür (CSS).
    */
   setStats(stats) {
-    const key = JSON.stringify(stats || null);
+    const net = this.board.online === false ? null : this.board.net;
+    const key = JSON.stringify([stats || null, net || null]);
     if (key === this.statsKey) return;
     this.statsKey = key;
     if (!stats) {
       this.statsEl.innerHTML = `<span class="none">${this.board.online === false ? "Tahta kapalı" : "Ölçüm yok"}</span>`;
+      this.netIcons(net);
       return;
     }
     // Eşikler: warn/crit değerin üstünde ise renklenir; pilde ters (alt eşik) — CR2032 ~3 V, 2.5 V altı biter.
@@ -380,6 +416,29 @@ class Tile {
       item("HDD:", val(stats.disk_temp, temp(stats.disk_temp ?? 0), 50, 60)) +
       item("Fan:", val(stats.fan, Math.round(stats.fan ?? 0) + " RPM", Infinity, Infinity)) +
       item("Pil:", val(stats.battery, (stats.battery ?? 0).toFixed(2) + " V", 2.8, 2.5, true));
+    this.netIcons(net);
+  }
+
+  /**
+   * Alt barın sağına ağ arabirimi simgeleri: `net` {wifi_radio, ifaces: [{name, kind, up, …}]} (üst sayfadan —
+   * worker executor/netif.py, ~30 sn'de bir) ya da null. Yeşil = etkin (kablolu: bağlantı var; Wi-Fi: kart açık),
+   * gri = değil. Üzerine gelince ipucu (title) kartın özelliklerini ve yapılandırmasını gösterir.
+   */
+  netIcons(net) {
+    if (!net || !net.ifaces || !net.ifaces.length) return;
+    const box = document.createElement("span");
+    box.className = "net";
+    for (const it of net.ifaces) {
+      const tmp = document.createElement("span");
+      tmp.innerHTML = NET_ICON[it.kind] || NET_ICON.other;
+      const svg = tmp.firstElementChild;
+      svg.classList.toggle("up", !!it.up);
+      const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      title.textContent = netHint(it, net.wifi_radio);
+      svg.appendChild(title);
+      box.appendChild(svg);
+    }
+    this.statsEl.appendChild(box);
   }
 
   /**
@@ -885,6 +944,41 @@ if (io) {
     });
   }, 3000);
 }
+
+// Ağ arabirimi simgeleri (renk currentColor — CSS .net svg / .up).
+const NET_ICON = {
+  wifi: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21l3.6-4.5a5.8 5.8 0 0 0-7.2 0z"/><path d="M4.9 12.2a11.3 11.3 0 0 1 14.2 0l-2 2.5a8.1 8.1 0 0 0-10.2 0z"/><path d="M1.2 7.6a17 17 0 0 1 21.6 0l-2 2.5a13.8 13.8 0 0 0-17.6 0z"/></svg>',
+  ethernet: '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M3 4h18v11h-4v3h-3v2h-4v-2H7v-3H3zm4 3v4h2V7zm4 0v4h2V7zm4 0v4h2V7z"/></svg>',
+  other: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 2h4v5h-4zM3 17h4v5H3zm14 0h4v5h-4zM11 7h2v4h7v6h-2v-4H6v4H4v-6h7z"/></svg>'
+};
+const NET_KIND = { wifi: "Kablosuz (Wi-Fi)", ethernet: "Kablolu (Ethernet)", other: "Ağ arabirimi" };
+const NET_METHOD = { auto: "DHCP (otomatik)", manual: "Elle (sabit IP)", disabled: "IPv4 kapalı", "link-local": "Yalnız yerel ağ", shared: "Paylaşılan (yönlendirici)" };
+
+/** Ağ simgesinin ipucu: tür, durum, bağlantı ve IP yapılandırması, donanım. */
+function netHint(it, radio) {
+  let state;
+  if (it.kind === "wifi") {
+    state = radio === false ? "Kapalı (Wi-Fi radyosu kapalı)" : it.state === 20 ? "Kullanılamıyor (kart kapalı/engelli)"
+      : it.state === 100 ? "Etkin, bağlı" : it.up ? "Etkin, bir ağa bağlı değil" : "Kapalı";
+  } else {
+    state = it.up ? "Bağlı" : !it.carrier ? "Bağlı değil (kablo takılı değil)" : "Bağlı değil";
+  }
+  const lines = [`${NET_KIND[it.kind] || NET_KIND.other} — ${it.name}`, `Durum: ${state}`];
+  if (it.ssid) lines.push(`Ağ (SSID): ${it.ssid}` + (it.signal != null ? `, sinyal %${it.signal}` : "") + (it.rate ? `, ${it.rate}` : ""));
+  if (it.connection) lines.push(`Bağlantı: ${it.connection}`);
+  if (it.method) lines.push(`Yapılandırma: ${NET_METHOD[it.method] || it.method}`);
+  if (it.ipv4 && it.ipv4.length) lines.push(`IPv4: ${it.ipv4.join(", ")}`);
+  if (it.gateway) lines.push(`Ağ geçidi: ${it.gateway}`);
+  if (it.dns && it.dns.length) lines.push(`DNS: ${it.dns.join(", ")}`);
+  if (it.ipv6 && it.ipv6.length) lines.push(`IPv6: ${it.ipv6.join(", ")}`);
+  if (it.mac) lines.push(`MAC: ${it.mac}`);
+  if (it.speed) lines.push(`Hız: ${it.speed >= 1000 ? it.speed / 1000 + " Gb/sn" : it.speed + " Mb/sn"}`);
+  if (it.driver) lines.push(`Sürücü: ${it.driver}`);
+  return lines.join("\n");
+}
+
+// TiHA otomatik kapatma geri sayımı (güç tasarrufu yazısının altında) — bkz. Tile.tickShutdown.
+setInterval(() => { if (!document.hidden) tiles.forEach(t => t.tickShutdown()); }, 1000);
 
 // Siyah (güç tasarrufundaki) ekran algısı — bkz. Tile.checkBlank.
 setInterval(() => { if (!document.hidden) tiles.forEach(t => t.checkBlank()); }, 2000);

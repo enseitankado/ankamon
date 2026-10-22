@@ -352,6 +352,8 @@ qx.Class.define("tihamon.page.Boards", {
      */
     __createScreensPage() {
       const page = new qx.ui.tabview.Page("Ekranlar");
+      // Bu sekme açıkken açılan pencereler simge durumuna küçültülebilir (alt çubukta durur — bkz. ui.WindowDock).
+      tihamon.ui.WindowDock.addContext(page);
       page.setLayout(new qx.ui.layout.VBox());
       page.setPadding([8, 0, 0, 0]);
       // qx.ui.embed.Iframe yerine düz <iframe> (Html bileşeni): Iframe her pointerdown'da üstüne saydam
@@ -630,6 +632,10 @@ qx.Class.define("tihamon.page.Boards", {
           whoami: whoami.get(b.id) || null,
           // Monitör DPMS ile kapalı (bkz. 025_board_display_state.sql): kutucukta "Ekran güç tasarrufu kipinde".
           powersave: !!b.online && ["Off", "Standby", "Suspend"].includes(b.display_state),
+          // Alt bardaki ağ simgeleri ve güç tasarrufu yazısının altındaki TiHA otomatik kapatma geri sayımı
+          // (bkz. migration 026, worker executor/netif.py + autoshutdown.py) — yalnız çevrimiçi tahtada.
+          net: b.online ? b.netifs || null : null,
+          autoshutdown: b.online ? b.autoshutdown || null : null,
           hw: this.__hwSummary(b.facts),
           stats: m ? {
             cpu: m.cpu_percent ?? null, mem: m.mem_percent ?? null, temp: m.cpu_temp ?? m.temp_max ?? null,

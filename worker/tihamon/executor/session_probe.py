@@ -11,8 +11,11 @@ LockedHint'i (başka bir kilit programı kullanılırsa) "yes". Uzak (SSH, Seat 
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+
+from . import autoshutdown, netif
 
 # Son satır: etkin VT'deki X'in monitör güç durumu ("M On|Off|Standby|Suspend" — bkz. 025_board_display_state.sql;
 # X seçimi screen/remote.py ile aynı).
@@ -27,7 +30,9 @@ set -- $(ps -eo args= | awk -v vt="vt${vt#tty}" '
     for (i = 2; i <= NF; i++) { if ($i ~ /^:[0-9]+$/) d = $i; if ($i == "-auth") a = $(i + 1); if ($i == vt) m = 1 }
     if (m && d != "") { print d, a; exit } }')
 [ -n "$1" ] && echo "M $(DISPLAY="$1" XAUTHORITY="$2" xset q 2>/dev/null | awk '/Monitor is/ { print $3 }')"
-"""
+""" + netif.SCRIPT + autoshutdown.SCRIPT
+# Aynı SSH turunda: ağ arabirimleri (NI/ND/NM/NW/NR satırları, bkz. executor/netif.py) ve TiHA otomatik
+# kapatma geri sayımı (SD satırı, bkz. executor/autoshutdown.py) — Ekranlar önizlemesinin alt barı için.
 
 _SSH_OPTS = [
     "-T",
@@ -56,7 +61,8 @@ def parse(output: str) -> tuple[str | None, bool]:
             sessions.append({})
         elif "=" in line and sessions:
             key, _, value = line.partition("=")
-            sessions[-1][key] = value
+            if " " not in key:  # loginctl anahtarları boşluksuz; ek bölümlerin satırları (SD …) karışmasın
+                sessions[-1][key] = value
     users = [s for s in sessions if s.get("Class") == "user" and s.get("Name") and s.get("Name") != "lightdm"]
     if not users:
         return None, False
@@ -67,7 +73,8 @@ def parse(output: str) -> tuple[str | None, bool]:
 
 
 def probe(board: dict, user: str, password: str, timeout: int = 8) -> dict:
-    """Döner: {"ok": bool, "user": str|None, "locked": bool, "display": str, "error": str}."""
+    """Döner: {"ok": bool, "user": str|None, "locked": bool, "display": str, "netifs": dict|None,
+    "shutdown": dict|None, "error": str}."""
     if not board.get("ip"):
         return {"ok": False, "user": None, "locked": False, "error": "IP yok"}
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", f"ConnectTimeout={min(timeout, 6)}",
@@ -81,7 +88,16 @@ def probe(board: dict, user: str, password: str, timeout: int = 8) -> dict:
         return {"ok": False, "user": None, "locked": False, "error": f"ssh çıkış kodu {proc.returncode}"}
     out = proc.stdout.decode("utf-8", "replace")
     name, locked = parse(out)
-    return {"ok": True, "user": name, "locked": locked, "display": display_state(out), "error": ""}
+    return {"ok": True, "user": name, "locked": locked, "display": display_state(out),
+            "netifs": netif.parse(out), "shutdown": autoshutdown.parse(out), "error": ""}
+
+
+def store_extras(conn, board_id: int, res: dict) -> None:
+    """Ağ arabirimleri ve otomatik kapatma durumunu yazar (bkz. göç 026; None = bilinmiyor/yok)."""
+    conn.execute(
+        "UPDATE boards SET netifs = %s::jsonb, autoshutdown = %s::jsonb WHERE id = %s",
+        (json.dumps(res.get("netifs")) if res.get("netifs") else None,
+         json.dumps(res.get("shutdown")) if res.get("shutdown") else None, board_id))
 
 
 def store_display(conn, board_id: int, state: str) -> None:

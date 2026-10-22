@@ -43,3 +43,4 @@ def run(conn) -> None:
         if res["ok"]:
             session_probe.store(conn, board_id, res["user"], res["locked"])
             session_probe.store_display(conn, board_id, res["display"])
+            session_probe.store_extras(conn, board_id, res)

@@ -51,6 +51,9 @@ qx.Class.define("tihamon.ui.StatusBar", {
     this.__foldButton.addListener("execute", () => this.__setFolded(!this.__folded));
     head.add(this.__foldButton);
     head.add(new qx.ui.basic.Label("Arka plan işlemleri").set({ font: "app-mono", textColor: "app-muted" }));
+    // Küçültülmüş pencereler (Ekranlar sekmesindeyken açılanlar — bkz. ui.WindowDock): tıklanınca geri açılır.
+    this.__dock = new tihamon.ui.WindowDock();
+    head.add(this.__dock);
     head.add(new qx.ui.core.Spacer(), { flex: 1 });
     // Oturum açmış Tiha-Mon kullanıcıları (kullanıcı isteği): sayı + üzerine gelince ayrıntı (bkz. __pollUsers).
     this.__usersTip = new qx.ui.tooltip.ToolTip("").set({ rich: true, showTimeout: 300, hideTimeout: 30000 });
@@ -65,7 +68,8 @@ qx.Class.define("tihamon.ui.StatusBar", {
     // Çubuğun herhangi bir yerine tıklamak da aç/kapat yapar; ok düğmesinin kendi execute'ü zaten
     // çalışır, burada yalnız onun DIŞINDAKİ alana tıklanınca tetiklenir.
     head.addListener("tap", e => {
-      if (e.getTarget() !== this.__foldButton && e.getTarget() !== this.__usersLabel) {
+      if (e.getTarget() !== this.__foldButton && e.getTarget() !== this.__usersLabel &&
+          !qx.ui.core.Widget.contains(this.__dock, e.getTarget())) {
         this.__setFolded(!this.__folded);
       }
     });
@@ -146,6 +150,7 @@ qx.Class.define("tihamon.ui.StatusBar", {
     __usersTimer: null,
     __usersLabel: null,
     __usersTip: null,
+    __dock: null,
     __onFocusChange: null,
     __sentFocused: null,
     __viewTimer: null,
