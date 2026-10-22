@@ -130,15 +130,42 @@ getent passwd | while IFS=: read -r u x uid gid g h s; do
 done
 """
 
-# Dağıtma: stdin'deki arşiv bir kez geçici dosyaya alınır, sonra her "sahip dizin" çiftine açılır.
-# Sahip verilmişse (kullanıcı hedefi) dizin yoksa oluşturulup ona verilir; açılan üst düzey öğeler
-# dizinin sahibine geçer (dizin root'unsa sahiplik root kalır). Her hedef için tek satır sonuç yazar.
+# Dağıtma: arşiv bir kez geçici dosyaya alınır — sunucudan stdin ile ya da (köprü kipi, $3 = kaynak tahta)
+# o tahtadan SFTP ile (tahtalardaki curl; Samba paylaşımı denendi ama curl yalnız SMBv1 konuşuyor, tahtalar
+# SMB2+ istiyor) — sonra her "sahip dizin" çiftine açılır. Sahip verilmişse (kullanıcı hedefi) dizin yoksa
+# oluşturulup ona verilir; açılan öğeler hedef dizinin sahibine (root'a ait dizin bir kullanıcının ev
+# dizini ağacındaysa o kullanıcıya) geçer ve sahibine tam erişim (u+rwX) verilir. Her hedef için tek satır
+# sonuç (OK/ERR), ilerleme için "P\t<bayt>" satırları yazar. $2 verilmişse arşiv sonunda oraya taşınır
+# (köprü kaynağı olarak saklanır; sunucu iş bitince siler).
 _DISTRIBUTE = r"""
-k=$1; shift
-t=$(mktemp /tmp/tihamon-dagit-XXXXXX) || exit 3
+k=$1; keep=$2; src=$3; shift 3
+t=$(mktemp /var/tmp/tihamon-dagit-XXXXXX) || exit 3
 trap 'rm -f "$t"' EXIT
-cat > "$t" || { echo "Arşiv alınamadı (tahtada /tmp dolu olabilir)." >&2; exit 3; }
+if [ -n "$src" ]; then
+  # Köprü: arşiv kaynak tahtadan SFTP ile çekilir (kimlik stdin'den, ps'te görünmez); ilerleme saniyede bir.
+  n=$(mktemp) && chmod 600 "$n" && cat > "$n"
+  curl -sS -k --netrc-file "$n" -o "$t" "sftp://$src$keep" 2>"$t.err" &
+  cp=$!
+  while kill -0 "$cp" 2>/dev/null; do printf 'P\t%s\n' "$(stat -c %s "$t" 2>/dev/null || echo 0)"; sleep 1; done
+  wait "$cp"; rc=$?
+  rm -f "$n"
+  [ "$rc" -eq 0 ] || { echo "Köprü tahtadan alınamadı: $(tail -n 1 "$t.err")" >&2; rm -f "$t.err"; exit 5; }
+  rm -f "$t.err"
+else
+  cat > "$t" || { echo "Arşiv alınamadı (tahtada /var/tmp dolu olabilir)." >&2; exit 3; }
+fi
+printf 'P\t%s\n' "$(stat -c %s "$t")"
 names=$(tar -tf "$t" | sed 's,/.*,,' | sort -u)
+# Hedef dizinin sahibi; dizin root'unsa ama bir kullanıcının ev dizini ağacındaysa o kullanıcı (ör.
+# /home/ogretmen altındaki root'a ait bir klasör) — kopyalananlar her durumda o kullanıcının olur.
+owner_of() {
+  o=$(stat -c '%u:%g' "$1")
+  if [ "$o" = "0:0" ]; then
+    u=$(getent passwd | awk -F: -v d="$1" '$3 >= 1000 && $3 < 60000 && $6 != "/" && (d == $6 || index(d, $6 "/") == 1) { print $3 ":" $4; exit }')
+    [ -n "$u" ] && o=$u
+  fi
+  printf '%s' "$o"
+}
 while [ $# -ge 2 ]; do
   o=$1; d=$2; shift 2
   if [ ! -d "$d" ]; then
@@ -154,12 +181,17 @@ while [ $# -ge 2 ]; do
     e=$(tar -xf "$t" -C "$d" --no-same-owner --overwrite 2>&1)
   fi
   [ $? -eq 0 ] || { printf 'ERR\t%s\t%s\n' "$d" "$(printf '%s' "$e" | tail -n 1)"; continue; }
-  own=$(stat -c '%u:%g' "$d")
-  if [ "$own" != "0:0" ]; then
-    printf '%s\n' "$names" | while IFS= read -r n; do [ -n "$n" ] && chown -R -- "$own" "$d/$n"; done
-  fi
+  own=$(owner_of "$d")
+  printf '%s\n' "$names" | while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    # Kullanıcı kendi dosyalarında tam yetkili: okuma/yazma, klasörlerde girme (u+rwX).
+    [ "$own" != "0:0" ] && chown -R -- "$own" "$d/$n"
+    chmod -R u+rwX -- "$d/$n"
+  done
   printf 'OK\t%s\n' "$d"
 done
+# Köprü kipinde arşiv iş bitene dek saklanır: başka tahtalar buradan çeker (sunucu sonunda siler).
+if [ -n "$keep" ]; then mv -f "$t" "$keep" && chmod 600 "$keep"; fi
 """
 
 # Toplama 1: verilen dizinlerdeki öğeler ve boyutları ("D\t<dizin>" başlığı, ardından "<bayt>\t./<yol>" —
@@ -576,7 +608,9 @@ def prepare_distribute(owner: str, token: str) -> dict:
 
 
 def start_distribute(owner: str, prepared: dict, boards: list[dict], users: dict, location: dict,
-                     conflict: str, on_done) -> int:
+                     conflict: str, on_done, relay: bool = True) -> int:
+    """relay: köprü kipi — sunucu arşivi yalnız birkaç tahtaya gönderir, diğerleri arşivi almış
+    tahtalardan SFTP ile çeker (bkz. _distribute_board, _relay_seeds)."""
     import asyncio
     if not boards:
         raise RemoteError("Tahta seçilmedi.")
@@ -585,61 +619,186 @@ def start_distribute(owner: str, prepared: dict, boards: list[dict], users: dict
     options = {"users": users, "location": location, "location_text": location_text(location),
                "conflict": "skip" if conflict == "skip" else "overwrite", "names": names,
                "size": os.path.getsize(prepared["archive"])}
+    seeds = _relay_seeds()
+    options["relay"] = bool(relay) and len(boards) > seeds
     job = _new_job("distribute", owner, boards, options)
     os.replace(prepared["archive"], os.path.join(job["_dir"], "files.tar"))
     if up:
         _rmtree(up["dir"])
+    job["_relay"] = {
+        "cond": threading.Condition(),
+        "seeds": seeds,          # sunucudan aynı anda en çok bu kadar tahtaya gönderilir
+        "direct": 0,             # şu an sunucudan gönderilen
+        "sources": [],           # arşivi saklayan tahtalar: {"access", "name", "busy"}
+        "path": f"/var/tmp/tihamon-relay-{secrets.token_hex(8)}.tar",
+        "kept": [],              # arşivi sakladığı için iş sonunda temizlenecek tahtalar
+    }
     _event(job, "info", f"{len(names)} öğe {len(boards)} tahtaya dağıtılıyor; konum: {options['location_text']}"
-                        + (", var olanlar atlanır." if options["conflict"] == "skip" else ", aynı adlıların üzerine yazılır."))
-    asyncio.ensure_future(_schedule(job, _distribute_board, on_done))
+                        + (", var olanlar atlanır" if options["conflict"] == "skip" else ", aynı adlıların üzerine yazılır")
+                        + (f"; köprü kipi: sunucu en çok {seeds} tahtaya gönderir, diğerleri arşivi almış tahtalardan çeker."
+                           if options["relay"] else "."))
+    asyncio.ensure_future(_schedule(job, _distribute_board, _relay_cleanup_wrap(job, on_done)))
     return job["id"]
+
+
+RELAY_PER_SOURCE = 2   # bir köprü tahtanın aynı anda kaynak olduğu en çok tahta
+
+
+def _relay_seeds() -> int:
+    """Sunucunun aynı anda arşiv göndereceği tahta sayısı: işlemci/bellek durumuna göre (parallel_limit'in
+    dörtte biri), 1–4 arası — sunucunun ağ çıkışı ve CPU'su boğulmasın."""
+    return max(1, min(4, parallel_limit() // 4))
+
+
+def _relay_source(job: dict, row: dict) -> dict | None:
+    """Köprü kipinde bu tahta için kaynak seçer: boş yuvası olan bir köprü tahta (döner, busy artırılır) ya da
+    sunucu (None — sunucudan gönderim yuvası alınmıştır). Gerekirse yuva açılana dek bekler."""
+    r = job["_relay"]
+    with r["cond"]:
+        while True:
+            if job["_cancel"]:
+                raise RemoteError("İptal edildi.")
+            free = [s for s in r["sources"] if s["busy"] < RELAY_PER_SOURCE]
+            if free:
+                src = min(free, key=lambda s: s["busy"])
+                src["busy"] += 1
+                return src
+            # Henüz köprü yok ya da hepsi dolu: sunucunun gönderim yuvası boşsa sunucudan alınır.
+            if r["direct"] < r["seeds"]:
+                r["direct"] += 1
+                return None
+            row["message"] = "Köprü tahta bekleniyor…"
+            r["cond"].wait(timeout=2)
+
+
+def _relay_release(job: dict, src: dict | None, became_source: dict | None) -> None:
+    r = job["_relay"]
+    with r["cond"]:
+        if src is None:
+            r["direct"] -= 1
+        else:
+            src["busy"] -= 1
+        if became_source:
+            r["sources"].append(became_source)
+        r["cond"].notify_all()
+
+
+def _relay_cleanup_wrap(job: dict, on_done):
+    """İş bitince (iptal dahil) arşivi saklayan tahtalardaki geçici dosyayı siler, sonra on_done."""
+    def done(public_job: dict) -> None:
+        r = job["_relay"]
+        for access in r["kept"]:
+            try:
+                _ssh(access, 'rm -f -- "$1"', r["path"], timeout=30)
+            except RemoteError:
+                log.warning("köprü arşivi silinemedi: %s", access.get("name"))
+        on_done(public_job)
+    return done
 
 
 def _distribute_board(job: dict, row: dict, access: dict) -> None:
     targets = _resolve(job, row, access)
     if targets is None or job["_cancel"]:
         return
+    opts = job["options"]
+    r = job["_relay"]
     archive = os.path.join(job["_dir"], "files.tar")
     row["total"] = os.path.getsize(archive)
-    row["message"] = f"Gönderiliyor ({len(targets)} hedef)…"
     for t in row["targets"]:
         t["state"] = "running"
-    args = [job["options"]["conflict"]]
-    for t in targets:
-        args += [t["owner"], t["dir"]]
-    cmd, env = ssh_command(access, _DISTRIBUTE, *args)
-    proc = _popen(job, cmd, env, subprocess.PIPE)
+    src = _relay_source(job, row) if opts["relay"] else None
+    keep = r["path"] if opts["relay"] else ""
+    became = None
     try:
-        with open(archive, "rb") as fh:
-            while not job["_cancel"]:
-                chunk = fh.read(CHUNK)
-                if not chunk:
-                    break
-                proc.stdin.write(chunk)
-                row["bytes"] += len(chunk)
-        proc.stdin.close()
-    except (BrokenPipeError, ConnectionResetError, ValueError):
-        pass
-    proc.stdin = None   # kapatıldı; communicate() yeniden flush etmeye çalışmasın
-    out, err = proc.communicate(timeout=600)
-    job["_procs"].discard(proc)
-    if job["_cancel"]:
-        raise RemoteError("İptal edildi.")
+        try:
+            out = _distribute_run(job, row, access, targets, src, keep)
+        except RemoteError as exc:
+            if src is None or job["_cancel"]:
+                raise
+            # Köprüden alınamadı: sunucudan doğrudan denenir (yuva sırası beklenerek).
+            _event(job, "warn", f"{row['name']}: köprü ({src['name']}) üzerinden alınamadı — {exc}; sunucudan gönderiliyor.")
+            _relay_release(job, src, None)
+            src = None
+            with r["cond"]:
+                while r["direct"] >= r["seeds"] and not job["_cancel"]:
+                    row["message"] = "Sunucudan gönderim sırası bekleniyor…"
+                    r["cond"].wait(timeout=2)
+                r["direct"] += 1
+            row["bytes"] = 0
+            out = _distribute_run(job, row, access, targets, None, keep)
+        if keep:
+            with r["cond"]:
+                r["kept"].append(access)
+            became = {"access": access, "name": row["name"], "busy": 0}
+    finally:
+        if opts["relay"]:
+            _relay_release(job, src, became)
     results = {}
-    for line in out.decode("utf-8", "replace").splitlines():
+    for line in out.splitlines():
         parts = line.split("\t", 2)
         if len(parts) >= 2 and parts[0] in ("OK", "ERR"):
             results[parts[1]] = (parts[0] == "OK", parts[2] if len(parts) > 2 else "")
-    if proc.returncode != 0 and not results:
-        raise _ssh_error(proc.returncode, err.decode("utf-8", "replace"))
+    via = f" (köprü: {src['name']})" if src else (" (sunucudan)" if opts["relay"] else "")
     for t in row["targets"]:
         ok, msg = results.get(t["dir"], (False, "Sonuç alınamadı."))
-        t["state"], t["message"] = ("ok", "Kopyalandı") if ok else ("failed", msg or "Hata")
+        t["state"], t["message"] = ("ok", "Kopyalandı" + via) if ok else ("failed", msg or "Hata")
         t["bytes"] = row["total"] if ok else 0
-        t["items"] = len(job["options"]["names"]) if ok else 0
+        t["items"] = len(opts["names"]) if ok else 0
         if not ok:
             _event(job, "error", f"{row['name']}: {t['user'] or t['dir']} — {t['message']}")
     _finish_row(job, row, "hedef")
+
+
+def _distribute_run(job: dict, row: dict, access: dict, targets: list[dict], src: dict | None, keep: str) -> str:
+    """Tahtada _DISTRIBUTE'u çalıştırır: arşiv sunucudan stdin ile ya da köprü tahtadan SFTP ile gelir.
+    Çıktının "P\t<bayt>" satırları ilerlemedir; OK/ERR satırlarını içeren çıktıyı döner."""
+    archive = os.path.join(job["_dir"], "files.tar")
+    args = [job["options"]["conflict"], keep, src["access"]["ip"] if src else ""]
+    for t in targets:
+        args += [t["owner"], t["dir"]]
+    row["message"] = (f"Köprüden alınıyor: {src['name']} ({len(targets)} hedef)…" if src
+                      else f"Sunucudan gönderiliyor ({len(targets)} hedef)…")
+    cmd, env = ssh_command(access, _DISTRIBUTE, *args)
+    proc = _popen(job, cmd, env, subprocess.PIPE)
+    lines: list[str] = []
+
+    def reader() -> None:
+        for raw in proc.stdout:
+            line = raw.decode("utf-8", "replace").rstrip("\n")
+            if line.startswith("P\t"):
+                if src and line[2:].isdigit():
+                    row["bytes"] = int(line[2:])
+            else:
+                lines.append(line)
+    th = threading.Thread(target=reader, daemon=True)
+    th.start()
+    try:
+        if src:
+            sa = src["access"]
+            proc.stdin.write(f"machine {sa['ip']} login {sa['user']} password {sa['password']}\n".encode())
+        else:
+            with open(archive, "rb") as fh:
+                while not job["_cancel"]:
+                    chunk = fh.read(CHUNK)
+                    if not chunk:
+                        break
+                    proc.stdin.write(chunk)
+                    row["bytes"] += len(chunk)
+        proc.stdin.close()
+    except (BrokenPipeError, ConnectionResetError, ValueError):
+        pass
+    if not src:
+        row["message"] = f"Tahtada açılıyor ({len(targets)} hedef)…"
+    proc.wait()
+    th.join(timeout=10)
+    err = proc.stderr.read().decode("utf-8", "replace")
+    job["_procs"].discard(proc)
+    if job["_cancel"]:
+        raise RemoteError("İptal edildi.")
+    out = "\n".join(lines)
+    if proc.returncode != 0 and "OK\t" not in out and "ERR\t" not in out:
+        raise _ssh_error(proc.returncode, err)
+    return out
 
 
 # ---- toplama

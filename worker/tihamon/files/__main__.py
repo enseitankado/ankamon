@@ -12,7 +12,7 @@ Toplu dağıtma/toplama (bkz. bulk.py; işler yalnız başlatan kullanıcıya g�
 POST /bulk/users      {boards:[…]}                → {boards:[{id, name, users:[…]|error}], limit}
 POST /bulk/upload                                 → {token}   (dağıtılacak dosyalar için yükleme alanı)
 PUT  /bulk/upload/<jeton>?path=<göreli yol>       ← dosya gövdesi (akış)
-POST /bulk/distribute {token, boards, users:{logged, names}, location:{kind, path}, conflict} → {id}
+POST /bulk/distribute {token, boards, users:{logged, names}, location:{kind, path}, conflict, relay} → {id}
 POST /bulk/collect    {boards, users, location, patterns:[…], excludes:[…], deep, skip_hidden, move, dry} → {id}
 GET  /bulk/<id>                                   → iş durumu (tahta/hedef satırları, olaylar)
 POST /bulk/<id>/cancel | /bulk/<id>/discard
@@ -298,7 +298,8 @@ class BulkDistributeHandler(Base):
             location = bulk.check_location(data.get("location"))
             prepared = await asyncio.to_thread(bulk.prepare_distribute, self.user, str(data.get("token") or ""))
             return {"id": bulk.start_distribute(self.user, prepared, boards, users, location,
-                                                data.get("conflict", "overwrite"), _bulk_record(self.user))}
+                                                data.get("conflict", "overwrite"), _bulk_record(self.user),
+                                                relay=bool(data.get("relay", True)))}
         await self.guard(work())
 
 

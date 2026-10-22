@@ -94,6 +94,7 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
     __userScroll: null,
     __userInfo: null,
     __conflict: null,
+    __relay: null,
     __patterns: null,
     __what: null,
     __typeBoxes: null,
@@ -176,12 +177,11 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
         // 2 — gönderilecekler, 3 — hedef (konum, kullanıcılar, aynı ad seçeneği)
         const step2 = this.__step(2, "Gönderilecek dosya ve klasörleri belirle", "bu bilgisayardan");
         this.__createFileSection(step2);
-        right.add(step2);
         const step3 = this.__step(3, "Hedefi belirle", "her seçili bilgisayarda");
         this.__createLocationSection(step3);
         this.__createUserSection(step3);
         this.__createOptionSection(step3);
-        right.add(step3, { flex: 1 });
+        right.add(this.__createSplit(step2, step3), { flex: 1 });
       } else {
         // 2 — nereden (konum, kullanıcılar), 3 — ne (öğeler, taşıma, teslim biçimi)
         const step2 = this.__step(2, "Nereden toplanacağını belirle", "her seçili bilgisayarda");
@@ -214,6 +214,33 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       head.add(this.__startButton);
       page.add(step4);
       return page;
+    },
+
+    /**
+     * Dağıt: 2. (gönderilecekler) ve 3. (hedef) bölge arasında sürüklenebilir ayraç. Oran kullanıcının
+     * hesabında saklanır (ui_prefs "bulk.distribute.split" — bkz. page.Base.savePref) ve her açılışta uygulanır.
+     */
+    __createSplit(top, bottom) {
+      const key = "bulk.distribute.split";
+      const prefs = (this.__user && this.__user.ui_prefs) || {};
+      const ratio = typeof prefs[key] === "number" ? Math.min(0.85, Math.max(0.15, prefs[key])) : 0.36;
+      const split = new qx.ui.splitpane.Pane("vertical");
+      // SplitPane.add çıplak sayı flex bekler (bkz. tiha-mon-architecture notu).
+      split.add(top, Math.round(ratio * 1000));
+      split.add(bottom, Math.round((1 - ratio) * 1000));
+      const save = () => qx.event.Timer.once(() => {
+        const a = top.getBounds();
+        const b = bottom.getBounds();
+        if (a && b && a.height + b.height > 0) {
+          const value = Math.round((a.height / (a.height + b.height)) * 1000) / 1000;
+          if (value !== prefs[key]) {
+            tihamon.page.Base.savePref(this.__user, key, value);
+          }
+        }
+      }, this, 50);
+      // Sürükleme bitince oran kaydedilir: sürüklerken yakalamayı bölmenin kendisi tutar, bırakınca "losecapture".
+      split.addListener("losecapture", save);
+      return split;
     },
 
     __checkList(height) {
@@ -292,12 +319,10 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
         return b;
       };
       button("＋ Dosya ekle…", () => this.__addPicked(false));
-      button("＋ Klasör ekle…", () => this.__addPicked(true));
-      const remove = button("Kaldır", () => {
-        const paths = this.__selectedPaths();
-        this.__files = this.__files.filter(f => !paths.some(p => f.rel === p || f.rel.startsWith(p + "/")));
-        this.__renderFiles();
-      });
+      button("＋ Klasör ekle…", () => this.__addPicked(true)).setToolTipText(
+        "Tarayıcı, klasördeki dosyaların siteye verilmesi için kendi güvenlik onayını sorar (sayfa bunu kapatamaz). " +
+        "Onay sorulmasın isterseniz klasörü buraya sürükleyip bırakın.");
+      const remove = button("Kaldır", () => this.__removeSelected());
       button("Temizle", () => {
         this.__files = [];
         this.__renderFiles();
@@ -319,6 +344,23 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       // Kapalı klasör ilk açılışta doldurulur (bkz. __fillNode).
       tree.addListener("treeOpenWhileEmpty", e => this.__fillNode(e.getData().nodeId));
       tree.addListener("changeSelection", () => remove.setEnabled(this.__selectedPaths().length > 0));
+      // Sağ menü: Kaldır. Sağ tıklanan satır seçili değilse seçim ona taşınır.
+      tree.addListener("cellContextmenu", e => {
+        const row = e.getRow();
+        if (row === null || row === undefined) {
+          tree.setContextMenu(null);
+          return;
+        }
+        if (!tree.getSelectionModel().isSelectedIndex(row)) {
+          tree.getSelectionModel().setSelectionInterval(row, row);
+        }
+        const menu = new qx.ui.menu.Menu();
+        const n = this.__selectedPaths().length;
+        menu.add(tihamon.ui.BoardOps.menuButton(tihamon.ui.Shell.ICON.delete,
+          n > 1 ? `Kaldır (${n} öğe)` : "Kaldır", () => this.__removeSelected()));
+        menu.addListenerOnce("disappear", () => qx.event.Timer.once(() => menu.destroy(), null, 0));
+        tree.setContextMenu(menu);
+      });
       remove.setEnabled(false);
       this.__fileTree = tree;
 
@@ -327,12 +369,37 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
         .set({ backgroundColor: "surface", opacity: 0.94, visibility: "excluded" });
       this.__fileBusyLabel = new qx.ui.basic.Label("").set({ rich: true, textAlign: "center", padding: 16 });
       this.__fileBusy.add(this.__fileBusyLabel);
-      const box = new qx.ui.container.Composite(new qx.ui.layout.Canvas()).set({ height: 210 });
+      const box = new qx.ui.container.Composite(new qx.ui.layout.Canvas()).set({ minHeight: 90 });
       box.add(tree, { edge: 0 });
       box.add(this.__fileBusy, { edge: 0 });
       this.__dropTarget = box;
-      parent.add(box);
+      parent.add(box, { flex: 1 });
       this.__renderFiles();
+    },
+
+    /** Seçili klasör/dosyaları listeden çıkarır; açık klasörler açık kalır (kullanıcı isteği). */
+    __removeSelected() {
+      const paths = this.__selectedPaths();
+      if (!paths.length) {
+        return;
+      }
+      this.__files = this.__files.filter(f => !paths.some(p => f.rel === p || f.rel.startsWith(p + "/")));
+      this.__renderFiles(this.__openPaths());
+    },
+
+    /** Ağaçta şu an açık klasörlerin göreli yolları. */
+    __openPaths() {
+      const open = [];
+      const data = this.__fileTree.getDataModel().getData();
+      data.forEach(node => {
+        if (node && node.type === qx.ui.treevirtual.MTreePrimitive.Type.BRANCH && node.bOpened) {
+          const path = this.__nodePaths.get(node.nodeId);
+          if (path) {
+            open.push(path);
+          }
+        }
+      });
+      return open;
     },
 
     /** Okuma sürüyor bilgisi (null: kaldır). */
@@ -397,7 +464,7 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
      * Dosya listesinden klasör ağacı kurar (bellekte) ve görünür ağaca yalnız üst düzeyi koyar; klasörler
      * kapalıdır. Klasör satırında içindeki dosya sayısı ve toplam boyut.
      */
-    __renderFiles() {
+    __renderFiles(openPaths) {
       const root = { dirs: new Map(), files: [], size: 0, count: 0, path: "" };
       this.__files.forEach(f => {
         const parts = f.rel.split("/");
@@ -422,6 +489,17 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       const dm = this.__fileTree.getDataModel();
       dm.clearData(false);
       this.__addChildren(0, root);
+      // Önceden açık olan klasörler (hâlâ varsa) yeniden açılır: üstten alta, içerikleri doldurularak.
+      (openPaths || []).slice().sort((a, b) => a.split("/").length - b.split("/").length).forEach(path => {
+        const id = [...this.__nodePaths.entries()].find(([nid, p]) => p === path && this.__nodeDirs.has(nid));
+        if (id) {
+          const dir = this.__nodeDirs.get(id[0]);
+          if (dir.dirs.size || dir.files.length) {
+            this.__addChildren(id[0], dir);
+          }
+          dm.setState(id[0], { bOpened: true });
+        }
+      });
       dm.setData();
       const fmt = tihamon.util.Format.bytes;
       this.__fileInfo.setValue(this.__files.length
@@ -695,6 +773,13 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
         this.__conflict = new qx.ui.form.RadioGroup(overwrite, skip);
         row.add(overwrite);
         row.add(skip);
+        this.__relay = new qx.ui.form.CheckBox("Köprü tahtalarla dağıt").set({
+          value: true, marginLeft: 16,
+          toolTipText: "Önerilir. Sunucu dosyaları yalnız birkaç bilgisayara gönderir (sayı sunucunun işlemci/bellek " +
+            "durumuna göre belirlenir); diğer bilgisayarlar onları almış bilgisayarlardan çeker. Çok bilgisayara " +
+            "büyük dağıtımda sunucunun ağ bağlantısı darboğaz olmaz. Köprüden alınamazsa sunucudan gönderilir."
+        });
+        row.add(this.__relay);
       } else {
         row.add(new qx.ui.basic.Label("Teslim:"));
         this.__delivery = new qx.ui.form.SelectBox().set({ width: 230 });
@@ -793,7 +878,7 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
           }, () => this.__cancelled);
           this.__phase.setValue("Dağıtılıyor…");
           res = await tihamon.ui.files.Api.post("/bulk/distribute", Object.assign(req, {
-            token, conflict: this.__conflict.getSelection()[0].getModel()
+            token, conflict: this.__conflict.getSelection()[0].getModel(), relay: this.__relay.getValue()
           }));
         } else {
           this.__phase.setValue(dry ? "Önizleme: tahtalarda neyin toplanacağı sayılıyor (hiçbir şey aktarılmaz)…" : "Toplanıyor…");
