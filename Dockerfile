@@ -3,7 +3,7 @@
 # (arayüz), 514 (log), 8554 + 8189 (ekran yansıtma: tahtaların RTSP okuması, tarayıcının WebRTC medyası).
 
 # ---------------------------------------------------------------- 1) Arayüzü derle (qooxdoo)
-FROM node:22-alpine AS frontend
+FROM node:24-alpine AS frontend
 WORKDIR /src
 # Dış kaynaklar (temalar, MAC üretici tablosu) bu GEÇİCİ aşamada kendi asıl adreslerinden indirilir.
 # Okul ağındaki MEB filtresi GitHub/wireshark.org HTTPS'ini kendi kökü ile keser: o kök YALNIZ bu
@@ -50,7 +50,7 @@ FROM gtstef/filebrowser:v1.5.8-stable@sha256:68455d4953bad8e984e1bc5d112ed1e9c91
 FROM bluenviron/mediamtx:1.21.2 AS mediamtx
 
 # ---------------------------------------------------------------- 2) Çalışma imajı
-FROM timescale/timescaledb:2.30.2-pg17
+FROM timescale/timescaledb:2.31.0-pg17
 
 # Okul ağındaki filtre HTTPS'i kendi sertifikasıyla keser; depolar HTTP üzerinden kullanılır
 # (paketler imzalı olduğundan bütünlük apk tarafından doğrulanır). pip/composer kullanılmaz.

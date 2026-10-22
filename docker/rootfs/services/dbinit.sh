@@ -18,6 +18,15 @@ if [ "$(psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='tihamon'
     psql -d postgres -q -c "CREATE DATABASE tihamon"
 fi
 psql -d tihamon -q -c "CREATE EXTENSION IF NOT EXISTS timescaledb"
+# İmaj yeni bir TimescaleDB getirdiyse veritabanındaki eklentiyi ona yükselt (imaj eski sürümlerin
+# kitaplıklarını da taşıdığı için yükseltilmeden de açılır, ama yeni sürümün düzeltmeleri devreye girmez).
+# Komut oturumun ilk komutu olmalı (-X: psqlrc yok). Başarısızlık açılışı durdurmaz; eski sürümle sürer.
+if [ "$(psql -d tihamon -tAc "SELECT extversion <> default_version FROM pg_extension e
+        JOIN pg_available_extensions a ON a.name = e.extname WHERE e.extname = 'timescaledb'")" = "t" ]; then
+    echo "tiha-mon: TimescaleDB eklentisi yükseltiliyor…"
+    psql -X -d tihamon -q -c "ALTER EXTENSION timescaledb UPDATE" \
+        || echo "tiha-mon: UYARI: TimescaleDB eklentisi yükseltilemedi; eski sürümle devam ediliyor." >&2
+fi
 
 # Göçler (migrations + roller + saklama süreleri) ve etapadmin hesabı. İkisi de yeniden çalıştırılabilir.
 export PGDATABASE=tihamon

@@ -1,4 +1,4 @@
-FROM alpine:3.22
+FROM alpine:3.24
 
 # Depolar HTTP üzerinden: okul ağındaki filtre HTTPS'i kendi sertifikasıyla araya girerek keser,
 # konteyner o sertifikayı tanımaz. Paketler imzalı olduğundan bütünlük apk tarafından doğrulanır.
