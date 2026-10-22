@@ -1,9 +1,0 @@
-{
-  "title": "x11VNC kur",
-  "description": "Tiha-Mon'daki \"Ekranı göster\" için x11vnc paketini kurar. Tahtada kalıcı bir servis ya da ağa açık port eklemez: x11vnc yalnız izleme sırasında, Tiha-Mon'un SSH tüneli üzerinden ve yalnız tahtanın kendi 127.0.0.1 adresinde salt-izleme kipinde çalışır. sshd'de TCP yönlendirme kapalıysa açar. Paket deposuna erişim gerekir.",
-  "category": "Ekran",
-  "feature": "actions",
-  "confirm": true,
-  "timeout": 600,
-  "params": []
-}
