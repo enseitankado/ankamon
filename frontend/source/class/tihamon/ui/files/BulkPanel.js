@@ -95,6 +95,9 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
     __userInfo: null,
     __conflict: null,
     __relay: null,
+    __upload: null,
+    __lastReq: null,
+    __askOnStop: false,
     __patterns: null,
     __what: null,
     __typeBoxes: null,
@@ -867,19 +870,13 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       this.__tree.setVisibility("excluded");
       this.__lastJson = null;
       this.__speed = null;
+      this.__job = null;
       try {
         let res;
         if (this.__mode === "distribute") {
-          const fmt = tihamon.util.Format.bytes;
-          this.__phase.setValue("Dosyalar sunucuya yükleniyor…");
-          const token = await tihamon.ui.files.BulkIo.upload(this.__files, (done, total) => {
-            this.__bar.setValue(total ? Math.floor((done / total) * 100) : 100);
-            this.__progressText.setValue(`Yükleme: ${fmt(done)} / ${fmt(total)}`);
-          }, () => this.__cancelled);
-          this.__phase.setValue("Dağıtılıyor…");
-          res = await tihamon.ui.files.Api.post("/bulk/distribute", Object.assign(req, {
-            token, conflict: this.__conflict.getSelection()[0].getModel(), relay: this.__relay.getValue()
-          }));
+          this.__upload = {};
+          this.__lastReq = req;
+          res = await this.__uploadAndDistribute(req);
         } else {
           this.__phase.setValue(dry ? "Önizleme: tahtalarda neyin toplanacağı sayılıyor (hiçbir şey aktarılmaz)…" : "Toplanıyor…");
           res = await tihamon.ui.files.Api.post("/bulk/collect", Object.assign(req, this.__whatRequest().body, {
@@ -888,14 +885,128 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
         }
         this.__job = { id: res.id, state: "running" };
       } catch (e) {
+        if (e.aborted) {
+          this.__askAfterCancel("upload");
+          return;
+        }
         this.__phase.setValue(`<span style="color:${this.__color("error")}">${esc(e.message)}</span>`);
         this.__finishUi(null);
         return;
       }
+      this.__startPolling();
+    },
+
+    /** Dağıt: dosyaları yükler (kesilmişse kaldığı dosyadan sürer — bkz. BulkIo.upload) ve işi başlatır. */
+    async __uploadAndDistribute(req) {
+      const fmt = tihamon.util.Format.bytes;
+      this.__phase.setValue("Dosyalar sunucuya yükleniyor…");
+      const token = await tihamon.ui.files.BulkIo.upload(this.__files, (done, total) => {
+        this.__bar.setValue(total ? Math.floor((done / total) * 100) : 100);
+        this.__progressText.setValue(`Yükleme: ${fmt(done)} / ${fmt(total)}`);
+      }, this.__upload);
+      this.__upload = null;
+      this.__phase.setValue("Dağıtılıyor…");
+      return tihamon.ui.files.Api.post("/bulk/distribute", Object.assign({}, req, {
+        token, conflict: this.__conflict.getSelection()[0].getModel(), relay: this.__relay.getValue()
+      }));
+    },
+
+    __startPolling() {
+      this.__stopPolling();
       this.__timer = new qx.event.Timer(700);
       this.__timer.addListener("interval", this.__poll, this);
       this.__timer.start();
       this.__poll();
+    },
+
+    /**
+     * Dağıt'ta İptal'den sonra (iş anında durdurulmuştur): sürdür / kopyalananlar kalsın / kopyalananları sil.
+     * @param phase {String} "upload" (tahtalara henüz bir şey gitmedi) | "job" (tahtalara kopyalama sürüyordu)
+     */
+    __askAfterCancel(phase) {
+      const win = tihamon.ui.Dialog.window("Dağıtma durduruldu", 520);
+      let text;
+      if (phase === "upload") {
+        const n = this.__upload ? this.__upload.index || 0 : 0;
+        text = `Dosyalar sunucuya yüklenirken durduruldu (${n} / ${this.__files.length} dosya yüklendi).<br>` +
+          "Tahtalara henüz hiçbir şey kopyalanmadı.";
+      } else {
+        const rows = this.__job ? this.__job.boards : [];
+        const done = rows.filter(b => ["done", "partial"].includes(b.state)).length;
+        const half = rows.filter(b => b.targets.some(t => (t.created || []).length) && !["done", "partial"].includes(b.state)).length;
+        const rest = rows.length - done;
+        text = `Kopyalama durduruldu: <b>${done}</b> tahtada tamamlandı, <b>${rest}</b> tahtada yarıda kaldı ya da başlamadı` +
+          (half ? ` (${half} tahtada bir kısmı kopyalanmıştı)` : "") + ".<br><br>" +
+          "<b>Kopyalananları sil</b> yalnız bu işin oluşturduğu dosya/klasörleri siler; hedefte önceden var olan " +
+          "aynı adlı öğelere dokunulmaz (üzerine yazılmışlarsa eski hâlleri geri gelmez).";
+      }
+      win.add(new qx.ui.basic.Label(text).set({ rich: true, wrap: true }));
+      let choice = "keep";
+      const button = (label, value, primary) => {
+        const b = new qx.ui.form.Button(label).set(primary ? { font: "bold" } : {});
+        b.addListener("execute", () => {
+          choice = value;
+          win.close();
+        });
+        return b;
+      };
+      const buttons = phase === "upload"
+        ? [button("Durdur", "keep"), button("Devam et", "resume", true)]
+        : [button("Kopyalananları sil", "revert"), button("Kopyalananlar kalsın", "keep"), button("Devam et", "resume", true)];
+      tihamon.ui.Dialog.buttons(win, buttons);
+      win.addListener("close", () => this.__afterCancelChoice(phase, choice));
+      win.open();
+    },
+
+    async __afterCancelChoice(phase, choice) {
+      const esc = qx.bom.String.escape;
+      if (choice === "resume") {
+        this.__cancelled = false;
+        this.__cancelButton.setEnabled(true);
+        this.__report.setVisibility("excluded");
+        try {
+          if (phase === "upload") {
+            const res = await this.__uploadAndDistribute(this.__lastReq);
+            this.__job = { id: res.id, state: "running" };
+          } else {
+            await tihamon.ui.files.Api.post(`/bulk/${this.__job.id}/resume`, {});
+            this.__job.state = "running";
+            this.__phase.setValue("Sürdürülüyor…");
+          }
+        } catch (e) {
+          if (e.aborted) {
+            this.__askAfterCancel("upload");
+            return;
+          }
+          this.__phase.setValue(`<span style="color:${this.__color("error")}">${esc(e.message)}</span>`);
+          this.__finishUi(this.__job && this.__job.boards ? this.__job : null);
+          return;
+        }
+        this.__lastJson = null;
+        this.__startPolling();
+        return;
+      }
+      if (phase === "upload") {
+        this.__upload = null;
+        this.__phase.setValue(`<span style="color:${this.__color("app-warn")}">Durduruldu</span> — tahtalara bir şey kopyalanmadı`);
+        this.__finishUi(null);
+        return;
+      }
+      if (choice === "revert") {
+        this.__phase.setValue("Kopyalananlar hedeflerden siliniyor…");
+        try {
+          const res = await tihamon.ui.files.Api.post(`/bulk/${this.__job.id}/revert`, {});
+          const job = await tihamon.ui.files.Api.request("GET", `/bulk/${this.__job.id}`);
+          this.__job = job;
+          this.__renderRows(job);
+          this.__renderEvents(job);
+          this.__phase.setValue(`<span style="color:${this.__color("app-warn")}">Durduruldu ve geri alındı</span> — ` +
+            `${res.boards} tahtada ${res.removed} öğe silindi` +
+            (res.failed ? `, <span style="color:${this.__color("error")}">${res.failed} tahtada silinemedi</span>` : ""));
+        } catch (e) {
+          tihamon.ui.Dialog.error(e);
+        }
+      }
     },
 
     // ------------------------------------------------------------------ çalışma / rapor sayfası
@@ -945,13 +1056,25 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       return qx.theme.manager.Color.getInstance().resolve(name) || name;
     },
 
+    /**
+     * İptal HEMEN uygulanır: yükleme sürüyorsa o anki istek kesilir; tahtalara kopyalama sürüyorsa sunucu
+     * süreçleri (tahtadakiler dahil) durdurur. Dağıt'ta ardından ne yapılacağı sorulur (bkz. __askAfterCancel).
+     */
     async __cancel() {
       this.__cancelled = true;
       this.__cancelButton.setEnabled(false);
+      if (this.__upload && !this.__job) {
+        this.__phase.setValue("Yükleme durduruluyor…");
+        tihamon.ui.files.BulkIo.abortUpload(this.__upload);   // __start / __afterCancelChoice soruyu açar
+        return;
+      }
       if (this.__job && this.__job.state === "running") {
+        this.__phase.setValue("Durduruluyor…");
+        this.__askOnStop = this.__mode === "distribute";
         try {
           await tihamon.ui.files.Api.post(`/bulk/${this.__job.id}/cancel`, {});
         } catch (e) {
+          this.__askOnStop = false;
           tihamon.ui.Dialog.error(e);
         }
       }
@@ -986,6 +1109,10 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       if (job.state !== "running") {
         this.__stopPolling();
         this.__finished(job);
+        if (this.__askOnStop && job.state === "cancelled") {
+          this.__askOnStop = false;
+          this.__askAfterCancel("job");
+        }
       }
     },
 

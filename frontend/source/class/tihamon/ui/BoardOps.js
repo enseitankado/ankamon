@@ -683,12 +683,16 @@ qx.Class.define("tihamon.ui.BoardOps", {
           add(ICON.taskmgr, "Görev yöneticisi", () => tihamon.ui.taskmgr.Window.open(board, user));
         }
       } else {
-        // Kapalı tahtada da geçmiş anlamlı: "Kullanıcılar" yalnız "Oturum geçmişi" ile.
+        // Kapalı tahtada en olası iş onu açmak: Bilgisayarı aç (WoL) ve güç seçenekleri EN ÜSTTE (kullanıcı
+        // isteği). Geçmiş yine anlamlı: "Kullanıcılar" yalnız "Oturum geçmişi" ile, altında.
+        power();
         const sessions = sub();
         sessionHistory(sessions);
         group(ICON.sessions, "Kullanıcılar", sessions);
       }
-      power();
+      if (board.online) {
+        power();
+      }
       return menu.getChildren().length ? menu : null;
     },
 

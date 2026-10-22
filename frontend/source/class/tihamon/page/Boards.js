@@ -91,8 +91,9 @@ qx.Class.define("tihamon.page.Boards", {
       { id: "mem", label: "Bellek", width: 80 },
       { id: "disk", label: "Disk", hint: "Disk doluluğu", width: 70 },
       // Ağ trafiği, Mbit/sn (bkz. backend MetricsApi::latest — node_exporter sayaçlarının son tarama aralığı).
-      { id: "net_rx", label: "Gelen", hint: "Gelen ağ trafiği (Mbit/sn)", width: 90 },
-      { id: "net_tx", label: "Giden", hint: "Giden ağ trafiği (Mbit/sn)", width: 90 },
+      // Başlıkta birim (kullanıcı isteği: "D:/U:Mbit/sn", hücrede yalnız sayı); ne olduğu ipucunda açıkça.
+      { id: "net_rx", label: "D:Mbit/sn", hint: "D (download / indirme): tahtanın ağdan ALDIĞI trafik, Mbit/sn — son ölçüm aralığının ortalaması", width: 95 },
+      { id: "net_tx", label: "U:Mbit/sn", hint: "U (upload / yükleme): tahtanın ağa GÖNDERDİĞİ trafik, Mbit/sn — son ölçüm aralığının ortalaması", width: 95 },
       // Sensörler (bkz. backend Core/BoardSensors.php). Fan/pil/anakart, tahtada Super I/O sürücüsü
       // yüklüyse gelir ("Fan/pil/anakart sensörlerini etkinleştir" işlemi); Kasa yoksa ACPI bölgesidir.
       { id: "temp", label: "CPU sıcaklığı", width: 100 },
@@ -275,7 +276,7 @@ qx.Class.define("tihamon.page.Boards", {
       this.__boards = new Map(boards.boards.map(b => [b.id, b]));
       this.__metrics = metrics.latest || {};
       const unit = (v, suffix) => v === null || v === undefined ? "" : v + suffix;
-      const mbit = v => v === null || v === undefined ? "" : v.toFixed(v < 10 ? 2 : 1) + " Mbit/sn";
+      const mbit = v => v === null || v === undefined ? "" : v.toFixed(v < 10 ? 2 : 1);   // birim sütun başlığında
       // cells[0]=kimlik, cells[1]=onay kutusu, cells[2..]=sütunlar.
       this.__rows = boards.boards.map(board => {
         const m = metrics.latest[board.id] || {};

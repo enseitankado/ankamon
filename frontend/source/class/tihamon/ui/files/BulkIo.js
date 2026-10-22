@@ -91,23 +91,31 @@ qx.Class.define("tihamon.ui.files.BulkIo", {
     },
 
     /**
-     * Seçilen dosyaları sunucudaki yükleme alanına gönderir (dosya başına bir PUT, akış).
-     * @param items {Array} [{rel, file}]
+     * Seçilen dosyaları sunucudaki yükleme alanına gönderir (dosya başına bir PUT, akış). Kesilebilir ve
+     * sürdürülebilir: `state` = {token, index, xhr, aborted} — iptal edilince (abort) o an giden istek HEMEN
+     * kesilir ve Promise {aborted: true} hatasıyla döner; aynı `state` ile yeniden çağrılınca kalan dosyalardan
+     * (kesilen dosya baştan) sürer, yükleme alanı (token) aynıdır.
      * @param onProgress {Function} (gönderilen bayt, toplam bayt)
-     * @param isCancelled {Function} true dönerse yükleme durur
      * @return {Promise<String>} yükleme jetonu (dağıtma isteğinde kullanılır)
      */
-    async upload(items, onProgress, isCancelled) {
+    async upload(items, onProgress, state) {
       const total = items.reduce((sum, it) => sum + it.file.size, 0);
-      // Toplam önceden bildirilir: sunucuda yer yoksa yükleme hiç başlamaz (yarıda dolmaz).
-      const { token } = await tihamon.ui.files.Api.post("/bulk/upload", { total });
-      let done = 0;
-      for (const item of items) {
-        if (isCancelled()) {
-          throw new Error("Yükleme iptal edildi.");
+      if (!state.token) {
+        // Toplam önceden bildirilir: sunucuda yer yoksa yükleme hiç başlamaz (yarıda dolmaz).
+        state.token = (await tihamon.ui.files.Api.post("/bulk/upload", { total })).token;
+        state.index = 0;
+      }
+      state.aborted = false;
+      const token = state.token;
+      let done = items.slice(0, state.index).reduce((sum, it) => sum + it.file.size, 0);
+      for (; state.index < items.length; state.index++) {
+        const item = items[state.index];
+        if (state.aborted) {
+          throw Object.assign(new Error("Yükleme durduruldu."), { aborted: true });
         }
         await new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
+          state.xhr = xhr;
           xhr.open("PUT", `/files-api/bulk/upload/${token}?` + new URLSearchParams({ path: item.rel }).toString());
           xhr.setRequestHeader("X-Requested-With", "tihamon");
           xhr.setRequestHeader("Content-Type", "application/octet-stream");
@@ -125,13 +133,23 @@ qx.Class.define("tihamon.ui.files.BulkIo", {
             }
             reject(new Error(`Yüklenemedi: ${item.rel} — ${msg}`));
           };
+          xhr.onabort = () => reject(Object.assign(new Error("Yükleme durduruldu."), { aborted: true }));
           xhr.onerror = () => reject(new Error(`Yüklenemedi: ${item.rel} — ${tihamon.ui.files.Api.describe(0)}`));
           xhr.send(item.file);
         });
+        state.xhr = null;
         done += item.file.size;
         onProgress(done, total);
       }
       return token;
+    },
+
+    /** Süren yüklemeyi hemen keser (bkz. upload — `state` sürdürmek için saklanır). */
+    abortUpload(state) {
+      state.aborted = true;
+      if (state.xhr) {
+        state.xhr.abort();
+      }
     },
 
     /** Toplananları arşiv olarak indirir (tarayıcının indirme yöneticisiyle; sunucuda akış). */

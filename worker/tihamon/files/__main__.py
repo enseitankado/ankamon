@@ -15,7 +15,7 @@ PUT  /bulk/upload/<jeton>?path=<göreli yol>       ← dosya gövdesi (akış)
 POST /bulk/distribute {token, boards, users:{logged, names}, location:{kind, path}, conflict, relay} → {id}
 POST /bulk/collect    {boards, users, location, patterns:[…], excludes:[…], deep, skip_hidden, move, dry} → {id}
 GET  /bulk/<id>                                   → iş durumu (tahta/hedef satırları, olaylar)
-POST /bulk/<id>/cancel | /bulk/<id>/discard
+POST /bulk/<id>/cancel | /bulk/<id>/discard | /bulk/<id>/resume | /bulk/<id>/revert
 GET  /bulk/<id>/archive?fmt=zip|tgz | /bulk/<id>/manifest | /bulk/<id>/file?path=…   (toplananlar)
 
 Kim yaptı: nginx'in oturumdan doldurduğu X-Auth-User. Değiştiren her işlem (silme, ad değiştirme, klasör,
@@ -345,6 +345,38 @@ class BulkCancelHandler(BulkJobHandler):
         self.write({"ok": bulk.cancel(int(job_id), self.user)})
 
 
+class BulkResumeHandler(BulkJobHandler):
+    """İptal edilmiş dağıtmayı sürdürür (bitmemiş tahtalar; arşiv sunucuda)."""
+    async def post(self, job_id):
+        self.job(job_id)
+        try:
+            self.write({"ok": bulk.resume(int(job_id), self.user)})
+        except RemoteError as exc:
+            self.set_status(400)
+            self.write({"error": str(exc)})
+
+
+class BulkRevertHandler(BulkJobHandler):
+    """Dağıtmanın hedeflerde yeni oluşturduğu öğeleri siler (iptal sonrası "kopyalananları sil")."""
+    async def post(self, job_id):
+        job = self.job(job_id)
+        try:
+            res = await asyncio.to_thread(bulk.revert, int(job_id), self.user)
+        except RemoteError as exc:
+            self.set_status(400)
+            self.write({"error": str(exc)})
+            return
+        await asyncio.to_thread(_record_revert, job, self.user, res)
+        self.write(res)
+
+
+def _record_revert(job: dict, user: str, res: dict) -> None:
+    for b in job["boards"]:
+        if any(t.get("message", "").startswith("Geri alındı") for t in b["targets"]):
+            _record({"id": b["id"], "name": b["name"]}, user,
+                    f"dağıtma geri alındı (iptal sonrası): kopyalanan öğeler {job['options']['location_text']} konumundan silindi")
+
+
 class BulkDiscardHandler(BulkJobHandler):
     def post(self, job_id):
         bulk.discard(self.job(job_id))
@@ -427,6 +459,8 @@ def main() -> None:
         (r"/bulk/(\d+)", BulkStatusHandler),
         (r"/bulk/(\d+)/cancel", BulkCancelHandler),
         (r"/bulk/(\d+)/discard", BulkDiscardHandler),
+        (r"/bulk/(\d+)/resume", BulkResumeHandler),
+        (r"/bulk/(\d+)/revert", BulkRevertHandler),
         (r"/bulk/(\d+)/manifest", BulkManifestHandler),
         (r"/bulk/(\d+)/file", BulkFileHandler),
         (r"/bulk/(\d+)/archive", BulkArchiveHandler),

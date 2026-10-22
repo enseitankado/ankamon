@@ -138,8 +138,8 @@ done
 # sonuç (OK/ERR), ilerleme için "P\t<bayt>" satırları yazar. $2 verilmişse arşiv sonunda oraya taşınır
 # (köprü kaynağı olarak saklanır; sunucu iş bitince siler).
 _DISTRIBUTE = r"""
-k=$1; keep=$2; src=$3; shift 3
-t=$(mktemp /var/tmp/tihamon-dagit-XXXXXX) || exit 3
+k=$1; keep=$2; src=$3; size=$4; tag=$5; shift 5
+t=$(mktemp "/var/tmp/tihamon-dagit-$tag-XXXXXX") || exit 3
 trap 'rm -f "$t"' EXIT
 if [ -n "$src" ]; then
   # Köprü: arşiv kaynak tahtadan SFTP ile çekilir (kimlik stdin'den, ps'te görünmez); ilerleme saniyede bir.
@@ -154,6 +154,8 @@ if [ -n "$src" ]; then
 else
   cat > "$t" || { echo "Arşiv alınamadı (tahtada /var/tmp dolu olabilir)." >&2; exit 3; }
 fi
+# Eksik arşiv (iptal/bağlantı kopması) hiç açılmaz: yarım dosyalar hedefe yayılmasın.
+[ "$(stat -c %s "$t")" = "$size" ] || { echo "Arşiv eksik geldi (aktarım yarıda kesildi)." >&2; exit 6; }
 printf 'P\t%s\n' "$(stat -c %s "$t")"
 names=$(tar -tf "$t" | sed 's,/.*,,' | sort -u)
 # Hedef dizinin sahibi; dizin root'unsa ama bir kullanıcının ev dizini ağacındaysa o kullanıcı (ör.
@@ -175,6 +177,11 @@ while [ $# -ge 2 ]; do
       e=$(mkdir -p -- "$d" 2>&1) || { printf 'ERR\t%s\t%s\n' "$d" "$e"; continue; }
     fi
   fi
+  # Bu işin YENİ oluşturacağı üst düzey öğeler (önceden yoksa): iptalde "kopyalananları sil" yalnız bunları
+  # siler — kullanıcının önceden var olan aynı adlı dosyalarına dokunulmaz.
+  printf '%s\n' "$names" | while IFS= read -r n; do
+    [ -n "$n" ] && [ ! -e "$d/$n" ] && [ ! -L "$d/$n" ] && printf 'NEW\t%s\t%s\n' "$d" "$n"
+  done
   if [ "$k" = skip ]; then
     e=$(tar -xf "$t" -C "$d" --no-same-owner --skip-old-files 2>&1)
   else
@@ -465,8 +472,29 @@ def cancel(job_id: int, owner: str) -> bool:
     for proc in list(job["_procs"]):
         if proc.poll() is None:
             proc.kill()
-    _event(job, "warn", "İptal istendi; yürüyen aktarımlar durduruluyor.")
+    if job.get("_relay"):
+        with job["_relay"]["cond"]:
+            job["_relay"]["cond"].notify_all()   # kaynak bekleyenler hemen çıksın
+    if job.get("_tag"):
+        # SSH bağlantısı kesilince tahtadaki curl/tar sürebilir: bu işin süreçleri tahtada da durdurulur.
+        running = [job["_access"][b["id"]] for b in job["boards"] if b["state"] == "running"]
+        for access in running:
+            _POOL.submit(_kill_remote, access, job["_tag"])
+    _event(job, "warn", "İptal edildi; yürüyen aktarımlar durduruldu.")
     return True
+
+
+# Etiket iki parça hâlinde verilir, tahtada birleştirilir: pkill'i çalıştıran kabukların komut satırında
+# bitişik geçmesin (yoksa pkill -f kendi kabuğunu da öldürür). İşin kendi süreçleri (sh argümanı, curl/tar
+# dosya yolu) etiketi bitişik taşır.
+_KILL = 't="$1$2"; pkill -f "$t"; sleep 1; pkill -9 -f "$t"; rm -f /var/tmp/tihamon-dagit-"$t"-*; exit 0'
+
+
+def _kill_remote(access: dict, tag: str) -> None:
+    try:
+        _ssh(access, _KILL, tag[:8], tag[8:], timeout=30)
+    except RemoteError as exc:
+        log.warning("iptal: %s üzerinde süreçler durdurulamadı: %s", access.get("name"), exc)
 
 
 def get(job_id: int, owner: str) -> dict | None:
@@ -478,7 +506,7 @@ async def _schedule(job: dict, work, on_done) -> None:
     """Tahta işlerini kaynak durumuna göre değişen bir sınırla paralel yürütür."""
     import asyncio
     loop = asyncio.get_running_loop()
-    pending = list(job["boards"])
+    pending = [b for b in job["boards"] if b["state"] == "queued"]
     running: set = set()
     try:
         while pending or running:
@@ -622,6 +650,7 @@ def start_distribute(owner: str, prepared: dict, boards: list[dict], users: dict
     seeds = _relay_seeds()
     options["relay"] = bool(relay) and len(boards) > seeds
     job = _new_job("distribute", owner, boards, options)
+    job["_tag"] = secrets.token_hex(8)   # tahtadaki geçici dosya adlarında: iptalde yalnız bu işin süreçleri durur
     os.replace(prepared["archive"], os.path.join(job["_dir"], "files.tar"))
     if up:
         _rmtree(up["dir"])
@@ -630,15 +659,85 @@ def start_distribute(owner: str, prepared: dict, boards: list[dict], users: dict
         "seeds": seeds,          # sunucudan aynı anda en çok bu kadar tahtaya gönderilir
         "direct": 0,             # şu an sunucudan gönderilen
         "sources": [],           # arşivi saklayan tahtalar: {"access", "name", "busy"}
-        "path": f"/var/tmp/tihamon-relay-{secrets.token_hex(8)}.tar",
+        "path": f"/var/tmp/tihamon-relay-{job['_tag']}.tar",
         "kept": [],              # arşivi sakladığı için iş sonunda temizlenecek tahtalar
     }
     _event(job, "info", f"{len(names)} öğe {len(boards)} tahtaya dağıtılıyor; konum: {options['location_text']}"
                         + (", var olanlar atlanır" if options["conflict"] == "skip" else ", aynı adlıların üzerine yazılır")
                         + (f"; köprü kipi: sunucu en çok {seeds} tahtaya gönderir, diğerleri arşivi almış tahtalardan çeker."
                            if options["relay"] else "."))
-    asyncio.ensure_future(_schedule(job, _distribute_board, _relay_cleanup_wrap(job, on_done)))
+    job["_on_done"] = _relay_cleanup_wrap(job, on_done)
+    asyncio.ensure_future(_schedule(job, _distribute_board, job["_on_done"]))
     return job["id"]
+
+
+def resume(job_id: int, owner: str) -> bool:
+    """İptal edilmiş dağıtmayı sürdürür: bitmemiş (iptal/sırada) tahtalar yeniden sıraya alınır; arşiv sunucuda
+    durduğu için yeniden yükleme gerekmez. Biten tahtalara dokunulmaz."""
+    import asyncio
+    job = jobs.get(job_id)
+    if not job or job["owner"] != owner or job["kind"] != "distribute" or job["state"] != "cancelled":
+        return False
+    if not os.path.exists(os.path.join(job["_dir"], "files.tar")):
+        raise RemoteError("Dağıtılacak arşiv artık sunucuda yok (süresi dolmuş); dosyaları yeniden seçin.")
+    rows = [b for b in job["boards"] if b["state"] in ("cancelled", "queued")]
+    if not rows:
+        return False
+    for b in rows:
+        b.update(state="queued", message="Sırada (sürdürülüyor)", bytes=0)
+        for t in b["targets"]:
+            t.update(state="queued", message="", bytes=0, items=0)
+    r = job["_relay"]
+    with r["cond"]:
+        r.update(direct=0, sources=[], kept=[])   # önceki köprü arşivleri iş sonunda silindi
+    job.update(_cancel=False, state="running", finished=None, _procs=set())
+    _event(job, "info", f"Sürdürülüyor: {len(rows)} tahta yeniden sıraya alındı.")
+    asyncio.ensure_future(_schedule(job, _distribute_board, job["_on_done"]))
+    return True
+
+
+_REVERT = 'while [ $# -ge 2 ]; do d=$1; n=$2; shift 2; rm -rf -- "$d/$n" && printf \'DEL\\t%s\\n\' "$n"; done; exit 0'
+
+
+def revert(job_id: int, owner: str) -> dict:
+    """Bitmiş/iptal edilmiş dağıtmanın hedeflerde YENİ oluşturduğu öğeleri siler (önceden var olan aynı adlı
+    öğelere dokunmaz — bkz. _DISTRIBUTE "NEW" satırları). Döner: {boards, removed, failed}."""
+    job = jobs.get(job_id)
+    if not job or job["owner"] != owner or job["kind"] != "distribute" or job["state"] == "running":
+        raise RemoteError("Geri alınacak dağıtma bulunamadı ya da hâlâ sürüyor.")
+    names = set(job["options"]["names"])
+    work = []
+    for b in job["boards"]:
+        args = []
+        for t in b["targets"]:
+            for n in t.get("created") or []:
+                if n in names and "/" not in n and n not in (".", ".."):
+                    args += [t["dir"], n]
+        if args:
+            work.append((b, args))
+    removed = failed = 0
+
+    def one(item):
+        b, args = item
+        try:
+            out = _ssh(job["_access"][b["id"]], _REVERT, *args, timeout=600).decode("utf-8", "replace")
+            return b, out.count("DEL\t"), None
+        except RemoteError as exc:
+            return b, 0, str(exc)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(parallel_limit(), len(work) or 1))) as pool:
+        for b, n, err in pool.map(one, work):
+            if err:
+                failed += 1
+                _event(job, "error", f"{b['name']}: kopyalananlar silinemedi — {err}")
+            else:
+                removed += n
+                for t in b["targets"]:
+                    if t.get("created"):
+                        t["message"] = f"Geri alındı: {len(t['created'])} öğe silindi"
+                        t["created"] = []
+                _event(job, "info", f"{b['name']}: kopyalanan {n} öğe hedeften silindi.")
+    return {"boards": len(work), "removed": removed, "failed": failed}
 
 
 RELAY_PER_SOURCE = 2   # bir köprü tahtanın aynı anda kaynak olduğu en çok tahta
@@ -753,7 +852,8 @@ def _distribute_run(job: dict, row: dict, access: dict, targets: list[dict], src
     """Tahtada _DISTRIBUTE'u çalıştırır: arşiv sunucudan stdin ile ya da köprü tahtadan SFTP ile gelir.
     Çıktının "P\t<bayt>" satırları ilerlemedir; OK/ERR satırlarını içeren çıktıyı döner."""
     archive = os.path.join(job["_dir"], "files.tar")
-    args = [job["options"]["conflict"], keep, src["access"]["ip"] if src else ""]
+    args = [job["options"]["conflict"], keep, src["access"]["ip"] if src else "",
+            str(os.path.getsize(archive)), job["_tag"]]
     for t in targets:
         args += [t["owner"], t["dir"]]
     row["message"] = (f"Köprüden alınıyor: {src['name']} ({len(targets)} hedef)…" if src
@@ -761,6 +861,8 @@ def _distribute_run(job: dict, row: dict, access: dict, targets: list[dict], src
     cmd, env = ssh_command(access, _DISTRIBUTE, *args)
     proc = _popen(job, cmd, env, subprocess.PIPE)
     lines: list[str] = []
+    names = set(job["options"]["names"])
+    created = {t["dir"]: t.setdefault("created", []) for t in row["targets"]}
 
     def reader() -> None:
         for raw in proc.stdout:
@@ -768,6 +870,10 @@ def _distribute_run(job: dict, row: dict, access: dict, targets: list[dict], src
             if line.startswith("P\t"):
                 if src and line[2:].isdigit():
                     row["bytes"] = int(line[2:])
+            elif line.startswith("NEW\t"):
+                parts = line.split("\t", 2)
+                if len(parts) == 3 and parts[2] in names:
+                    created.setdefault(parts[1], []).append(parts[2])
             else:
                 lines.append(line)
     th = threading.Thread(target=reader, daemon=True)
