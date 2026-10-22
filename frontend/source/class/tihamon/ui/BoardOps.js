@@ -709,7 +709,9 @@ qx.Class.define("tihamon.ui.BoardOps", {
       const status = new qx.ui.basic.Label("Hesaplar yükleniyor…").set({ rich: true, wrap: true, textColor: "app-muted" });
       win.add(status);
       const list = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
-      win.add(new qx.ui.container.Scroll(list).set({ maxHeight: 360, minHeight: 60 }), { flex: 1 });
+      // Scroll içeriği kadar büyümez: yükseklik hesaplar gelince satır sayısına göre verilir.
+      const scroll = new qx.ui.container.Scroll(list).set({ height: 60 });
+      win.add(scroll, { flex: 1 });
       const allFiles = new qx.ui.form.CheckBox("Kullanıcının tüm dosyalarını sil (ev dizini dahil)").set({ value: true });
       win.add(allFiles);
       const del = new qx.ui.form.Button("Sil").set({ enabled: false });
@@ -735,6 +737,10 @@ qx.Class.define("tihamon.ui.BoardOps", {
         boxes.push(box);
         list.add(box);
       });
+      const rootHeight = (qx.core.Init.getApplication().getRoot().getBounds() || { height: 800 }).height;
+      scroll.setHeight(Math.max(60, Math.min(boxes.length * 24 + 8, rootHeight - 260)));
+      qx.ui.core.queue.Manager.flush(); // yeni yükseklik uygulanmadan center() eski boyuta göre ortalar
+      win.center();
       status.setValue(boxes.length
         ? "Silinecek kullanıcıları işaretleyin." + (failed ? ` <span style="color:#c42b1c">${failed} tahtanın hesapları okunamadı.</span>` : "")
         : "Silinebilecek kullanıcı hesabı bulunamadı" + (failed ? " (hesaplar okunamadı)." : "."));
