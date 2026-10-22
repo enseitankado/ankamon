@@ -14,21 +14,51 @@ DATA=/data/filemanager
 THEMES=/opt/tiha-mon/filemanager/themes
 mkdir -p "$APP" "$APP/cache" "$DATA" /run/tiha-mon/filemanager
 # İkili, göreli yoldan (ör. "tmp/") yazdığı şeyleri çalışma dizinine göre konumlandırıyor; konteyner
-# imajının kendi dizinini (/opt) kirletmesin diye çalışma dizini de /run altında olsun.
-ln -sf /opt/tiha-mon/filemanager/http "$APP/http"
+# imajının kendi dizinini (/opt) kirletmesin diye çalışma dizini de /run altında olsun. Arayüzü de
+# çalışma dizinindeki internal/web/dist'ten sunar (2.x imajında ikiliye gömülü değil).
+mkdir -p "$APP/internal/web"
+ln -sfn /opt/tiha-mon/filemanager/dist "$APP/internal/web/dist"
 ln -sf /opt/tiha-mon/filemanager/filebrowser "$APP/filebrowser"
+rm -f "$APP/http"
+# 1.5.x'in BoltDB'si (database.db) 2.x'te SQLite'a bir kez aktarılır: kullanıcılar, tema/koyu kip
+# tercihleri. migrateFrom yalnız SQLite henüz yokken verilir (yoksa dosya yokken açılış hata verir);
+# eski dosya olduğu gibi kalır.
+MIGRATE=
+if [ ! -s "$DATA/filebrowser.sqlite" ] && [ -s "$DATA/database.db" ]; then
+    MIGRATE="    migrateFrom: \"$DATA/database.db\""
+fi
 cat > "$APP/config.yaml" <<YAML
-server:
+http:
   port: 8893
   listen: "127.0.0.1"
   baseURL: "/filemanager"
+  # Yalnız nginx'ten gelir (127.0.0.1); istemci adresi nginx'in X-Real-IP/X-Forwarded-For'undan alınır.
+  trustProxyHeaders: true
+  # Kullanılmıyor; açık kalsa /filemanager/dav/ nginx üzerinden erişilebilir olurdu.
+  disableWebDAV: true
+server:
+  # Açılışta/periyodik GitHub sorgusu (okul ağındaki filtre HTTPS'i keser); sürümü imaj belirler.
+  disableUpdateCheck: true
+  numImageProcessors: 1
   sources:
     - path: "/run/tiha-mon/filemanager"
       name: "tahtalar"
-  database: "$DATA/database.db"
+      config:
+        private: true
+        defaultPermissions:
+          view: true
+          download: true
+          modify: true
+          create: true
+          delete: true
   cacheDir: "$APP/cache"
+  cacheDirCleanup: true
+  database:
+    path: "$DATA/filebrowser.sqlite"
+$MIGRATE
 frontend:
   disableDefaultLinks: true
+  disablePWAInstall: true
   styling:
     customCSS: "/opt/tiha-mon/filemanager/tihamon.css"
     # tiha-mon Ayarlar'daki temaların karşılıkları (bkz. docker/rootfs/filemanager/themes/*.css —
@@ -75,14 +105,14 @@ userDefaults:
     darkMode: false
     # Yeni oluşturulan (ilk kez açılan) hesap tiha-mon'un varsayılan temasıyla başlasın (customThemes.default).
     customTheme: "default"
+  # Dosya izinleri (görme/indirme/değiştirme…) 2.x'te kaynak başına: yukarıda defaultPermissions.
   account:
     permissions:
       api: true
-      modify: true
-      create: true
-      delete: true
-      download: true
       admin: false
+      share: false
+      realtime: false
+    disableUpdateNotifications: true
 YAML
 
 cd "$APP"

@@ -38,10 +38,11 @@
       var theme = (me.user || me).theme || "blue-light";
       var key = theme === "blue-light" ? "default" : theme;
       var dark = DARK.indexOf(theme) !== -1;
-      return fetch("/filemanager/api/users?id=self").then(json).then(function (fb) {
+      // FileBrowser 2.x: kendi hesabı ?username=self ile okunur, sorgusuz PATCH oturumdaki kullanıcıyı günceller.
+      return fetch("/filemanager/api/users?username=self").then(json).then(function (fb) {
         if (fb.customTheme === key && !!fb.darkMode === dark) return;
-        return fetch("/filemanager/api/users?id=" + encodeURIComponent(fb.id), {
-          method: "PUT",
+        return fetch("/filemanager/api/users", {
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ which: ["customTheme", "darkMode"], data: { customTheme: key, darkMode: dark } })
         });

@@ -41,9 +41,10 @@ RUN npx qx compile --target=build \
 # ---------------------------------------------------------------- 1b) Dosya yöneticisi (FileBrowser
 # Quantum): resmi imajdan yalnız statik ikili + derlenmiş arayüz alınır (bkz. aşağıdaki COPY --from).
 # Alpine/musl ile doğrudan uyumlu, bağımlılıksız bir Go ikili — ayrı bir derleme adımı gerekmez.
-# Sürüm SABİT (digest ile): v1.5.9+ arayüzü ikiliye gömdü, /home/filebrowser/http yok ve yapılandırma
-# biçimi değişti — yükseltme ayrıca denenmeli.
-FROM gtstef/filebrowser:v1.5.8-stable@sha256:68455d4953bad8e984e1bc5d112ed1e9c918a0a04f104c13c9ece50790308894 AS filemanager
+# Sürüm SABİT (digest ile). 2.1.3-beta: 1.5.x/2.0.x-stable'ı etkileyen güvenlik danışmalarının (symlink ile
+# kapsam dışı okuma/yazma, XSS…) hepsini kapatan ilk sürüm; 2.1.x-stable çıkınca ona geçilir. 2.x imajında
+# arayüz ikiliye gömülü DEĞİL: ikili çalışma dizinine göre internal/web/dist'i sunar (bkz. filemanager.sh).
+FROM gtstef/filebrowser:2.1.3-beta@sha256:c91fbf4b442ba14f5d45f8687b74cf71477e36a1a8118b5d0643522dcf78f73c AS filemanager
 
 # ---------------------------------------------------------------- 1c) Ekran yansıtma aktarıcısı (MediaMTX):
 # resmi imajdan yalnız statik Go ikilisi alınır (Alpine deposunda paketi yok). Sürüm sabit tutulur.
@@ -98,7 +99,7 @@ RUN cd /tmp && apk fetch --no-cache -q novnc \
 
 # Dosya yöneticisi (FileBrowser Quantum) ikili + derlenmiş arayüzü.
 COPY --from=filemanager --chmod=755 /home/filebrowser/filebrowser /opt/tiha-mon/filemanager/filebrowser
-COPY --from=filemanager /home/filebrowser/http /opt/tiha-mon/filemanager/http
+COPY --from=filemanager /home/filebrowser/internal/web/dist /opt/tiha-mon/filemanager/dist
 
 # Ekran yansıtma aktarıcısı (bkz. docker/rootfs/services/mediamtx.sh).
 COPY --from=mediamtx --chmod=755 /mediamtx /opt/tiha-mon/mediamtx/mediamtx
