@@ -103,7 +103,7 @@ qx.Class.define("tihamon.ui.Shell", {
     ICON: {
       dashboard: "◈", boards: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
-      info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", bulk: "⇄", wakeScreen: "☀", cast: "⇪", logout: "⏏", lock: "🔒", diagnose: "⚕", system: "⚒", diskusage: "⛁",
+      info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", bulk: "⇄", wakeScreen: "☀", cast: "⇪", logout: "⏏", lock: "🔒", diagnose: "⚕", system: "⚒", diskusage: "⛁", software: "⬢",
       network: "⇆", subnet: "▫", taskmgr: "☷"
     },
 
@@ -134,6 +134,8 @@ qx.Class.define("tihamon.ui.Shell", {
       // Kullanıcılar ve Ayarlar "Sistem"in altında (kullanıcı isteği).
       // Disk kullanımı ve veri silme (eski açılır pencere — kullanıcı isteği: Sistem altında sayfa).
       { id: "diskusage", label: "Disk kullanımı", feature: "logs.manage", parent: "system", retap: true, create: u => new tihamon.page.DiskUsage(u) },
+      // Konteynerdeki kritik yazılımlar: sürüm, durum, Tiha-Mon'daki işlevi (yalnız yönetici).
+      { id: "software", label: "Yazılımlar", admin: true, parent: "system", retap: true, create: u => new tihamon.page.Software(u) },
       // Kullanıcılar ▸ Kullanıcılar (yalnız yönetici) + Oturumlar ('logins'): features yöneticide her zaman
       // sağlanır; 'logins' yetkili kullanıcı sayfayı yalnız Oturumlar sekmesiyle görür (bkz. page.Users).
       { id: "users", label: "Kullanıcılar", features: ["logins"], parent: "system", create: u => new tihamon.page.Users(u) },

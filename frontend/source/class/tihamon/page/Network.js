@@ -453,7 +453,8 @@ qx.Class.define("tihamon.page.Network", {
     /**
      * Bilgisayar ayrıntıları (modal; çift tıklama ve sağ menü — kullanıcı isteği): grid'in TÜM sütunlarının
      * (gizlenmiş olanlar dahil) değerleri iki sütunlu tabloda; ardından varsa açık portlar/servisler ve ağ
-     * paylaşımları. Satır sağ menüsü: değeri kopyala. "Düzenle" yalnız network.manage yetkisiyle.
+     * paylaşımları. Metin fareyle seçilip kopyalanabilir; "Tümünü kopyala" hepsini düz metin verir. "Düzenle"
+     * yalnız network.manage yetkisiyle.
      */
     __showDetails(device) {
       if (!device) {
@@ -481,34 +482,26 @@ qx.Class.define("tihamon.page.Network", {
       const win = tihamon.ui.Dialog.window("Bilgisayar ayrıntıları — " + name, Math.min(720, root.width - 40), { maximizable: true });
       win.set({ height: Math.min(720, root.height - 40) });
 
+      // Tablolar seçilebilir HTML (kullanıcı isteği: değerler fareyle seçilip panoya kopyalanabilsin) — qx
+      // tablo hücreleri seçilemiyordu. Hepsi kaydırılabilir tek sütunda; "Tümünü kopyala" düz metin verir.
+      const esc = qx.bom.String.escape;
+      const body = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
+      const plain = [];
       const table = (title, columns, rows, widths) => {
-        const model = new qx.ui.table.model.Simple();
-        model.setColumns(columns);
-        model.setData(rows);
-        const t = new qx.ui.table.Table(model, { tableColumnModel: obj => new qx.ui.table.columnmodel.Resize(obj) })
-          .set({ statusBarVisible: false, columnVisibilityButtonVisible: false, rowHeight: 26, showCellFocusIndicator: false,
-            height: Math.min(26 * rows.length + 34, title ? 220 : 520) });
-        const b = t.getTableColumnModel().getBehavior();
-        widths.forEach((w, i) => b.setWidth(i, w));
-        t.addListener("cellContextmenu", e => {
-          const r = e.getRow();
-          if (r === null || r === undefined) {
-            return;
-          }
-          const menu = new qx.ui.menu.Menu();
-          const value = String(model.getValue(columns.length - 1, r) ?? "");
-          const copy = new qx.ui.menu.Button("Değeri kopyala");
-          copy.addListener("execute", () => tihamon.util.Clipboard.copy(value));
-          menu.add(copy);
-          const copyRow = new qx.ui.menu.Button("Satırı kopyala");
-          copyRow.addListener("execute", () => tihamon.util.Clipboard.copy(model.getRowData(r).join("\t")));
-          menu.add(copyRow);
-          t.setContextMenu(menu);
-        });
+        const cell = "padding:4px 8px;border-bottom:1px solid rgba(128,128,128,.25);vertical-align:top;" +
+          "overflow-wrap:anywhere;text-align:left";
+        const html = '<table style="border-collapse:collapse;width:100%;font:inherit;table-layout:fixed">' +
+          "<colgroup>" + widths.map(w => (typeof w === "number" ? `<col style="width:${w}px">` : "<col>")).join("") + "</colgroup>" +
+          (title ? "<tr>" + columns.map(c => `<th style="${cell};font-weight:bold">${esc(c)}</th>`).join("") + "</tr>" : "") +
+          rows.map(r => "<tr>" + r.map((v, i) =>
+            `<td style="${cell}${!title && i === 0 ? ";opacity:.75" : ""}">${esc(String(v ?? ""))}</td>`).join("") + "</tr>").join("") +
+          "</table>";
         if (title) {
-          win.add(new qx.ui.basic.Label(title).set({ font: "bold", marginTop: 4 }));
+          body.add(new qx.ui.basic.Label(title).set({ font: "bold", marginTop: 8, selectable: true }));
+          plain.push("", title, columns.join("\t"));
         }
-        win.add(t, { flex: title ? 0 : 1 });
+        body.add(new qx.ui.basic.Label(html).set({ rich: true, wrap: true, selectable: true, allowGrowX: true }));
+        rows.forEach(r => plain.push(title ? r.join("\t") : `${r[0]}: ${r[1]}`));
       };
       table(null, ["Alan", "Değer"], fields, [180, "1*"]);
       if (device.services.length) {
@@ -521,7 +514,11 @@ qx.Class.define("tihamon.page.Network", {
           device.shares.map(sh => [sh.stype === "printer" ? "🖨 yazıcı" : "📁 klasör", sh.path || sh.name, sh.comment || ""]),
           [100, 240, "1*"]);
       }
+      win.add(new qx.ui.container.Scroll(body), { flex: 1 });
       const buttons = [];
+      const copyAll = new qx.ui.form.Button("Tümünü kopyala").set({ toolTipText: "Tüm ayrıntıları düz metin olarak panoya kopyalar" });
+      copyAll.addListener("execute", () => tihamon.util.Clipboard.copy(`Bilgisayar ayrıntıları — ${name}\n` + plain.join("\n")));
+      buttons.push(copyAll);
       if (this._can("network.manage")) {
         const edit = new qx.ui.form.Button("Düzenle");
         edit.addListener("execute", () => {

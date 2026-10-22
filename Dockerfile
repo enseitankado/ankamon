@@ -35,6 +35,12 @@ RUN mkdir -p source/resource/tihamon/vis \
  && cp node_modules/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js \
        node_modules/vis-timeline/styles/vis-timeline-graph2d.min.css \
        node_modules/vis-timeline/LICENSE.md source/resource/tihamon/vis/
+# Sistem ▸ Yazılımlar için ön yüz kütüphanelerinin sürümleri ve MAC üretici tablosunun indirildiği gün.
+RUN node -e 'const v = p => require("/src/node_modules/" + p + "/package.json").version; \
+      const fs = require("fs"); const m = fs.statSync("/out/manuf.gz"); \
+      fs.writeFileSync("/out/frontend-versions.json", JSON.stringify({ qooxdoo: v("@qooxdoo/framework"), \
+        "vis-timeline": v("vis-timeline"), node: process.versions.node, \
+        manuf: m.size > 0 ? m.mtime.toISOString().slice(0, 10) : "" }))'
 RUN npx qx compile --target=build \
  && rm -rf compiled/build/transpiled compiled/build/db.json compiled/build/resource-db.json
 
@@ -95,6 +101,7 @@ RUN cd /tmp && apk fetch --no-cache -q novnc \
  && tar -xzf novnc-*.apk usr/share/novnc 2>/dev/null \
  && mkdir -p /var/www/screen/novnc \
  && cp -r usr/share/novnc/core usr/share/novnc/vendor /var/www/screen/novnc/ \
+ && mkdir -p /opt/tiha-mon && ls novnc-*.apk | sed 's/^novnc-//; s/\.apk$//' > /opt/tiha-mon/novnc.version \
  && rm -rf /tmp/novnc-*.apk /tmp/usr
 
 # Dosya yöneticisi (FileBrowser Quantum) ikili + derlenmiş arayüzü.
@@ -141,6 +148,11 @@ COPY --from=frontend /src/compiled/build /var/www/tihamon
 
 RUN chmod +x /opt/tiha-mon/entrypoint.sh /opt/tiha-mon/services/*.sh \
  && ln -sf /opt/tiha-mon/supervisord.conf /etc/supervisord.conf
+
+# Sistem ▸ Yazılımlar: bileşen sürümleri imaj üretilirken bir kez toplanır (bkz. docker/rootfs/software-versions.py).
+COPY --from=frontend /out/frontend-versions.json /opt/tiha-mon/frontend-versions.json
+COPY docker/rootfs/software-versions.py /tmp/software-versions.py
+RUN python3 /tmp/software-versions.py && rm /tmp/software-versions.py
 
 EXPOSE 80 443 514/tcp 514/udp 8554/tcp 8189/udp 8189/tcp
 VOLUME /data

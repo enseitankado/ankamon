@@ -82,6 +82,7 @@ return [
     ['POST',   '/api/system/jobs/run',   [Api\SystemInfoApi::class, 'runJob'],   'admin'],
     ['GET',    '/api/system/database',   [Api\SystemInfoApi::class, 'database'], 'admin'],
     ['GET',    '/api/system/config',     [Api\SystemInfoApi::class, 'config'],   'admin'],
+    ['GET',    '/api/system/software',   [Api\SoftwareApi::class, 'index'],   'admin'],
     ['GET',    '/api/metrics/latest',    [Api\MetricsApi::class, 'latest'],    'boards'],
     ['GET',    '/api/metrics/{id}/sensors', [Api\MetricsApi::class, 'sensors'], 'boards'],
     ['GET',    '/api/metrics/info',      [Api\MetricsInfoApi::class, 'info'],  'metrics'],
