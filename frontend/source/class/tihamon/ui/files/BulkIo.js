@@ -155,12 +155,15 @@ qx.Class.define("tihamon.ui.files.BulkIo", {
     },
 
     /**
-     * Toplananları seçilen klasöre "<tahta>/<kullanıcı>/…" yapısıyla tek tek yazar (4 dosya paralel).
+     * Toplananları seçilen klasörün içinde "<arşiv adı>/<tahta>/<kullanıcı>/…" yapısıyla tek tek yazar
+     * (4 dosya paralel; arşiv adı sunucudan: "<tahta>_<ana dizin/dosya>_<alma zamanı>").
      * @param onProgress {Function} (yazılan bayt, toplam bayt, dosya sayısı, toplam dosya)
      * @return {Promise<Array>} yazılamayan dosyalar [{path, error}]
      */
-    async saveToFolder(jobId, dirHandle, onProgress) {
-      const { files } = await tihamon.ui.files.Api.request("GET", `/bulk/${jobId}/manifest`);
+    async saveToFolder(jobId, picked, onProgress) {
+      const { files, name } = await tihamon.ui.files.Api.request("GET", `/bulk/${jobId}/manifest`);
+      // Dosyalar seçilen klasörün içinde, arşiv adıyla aynı alt klasöre ("<tahta>_<ana ad>_<zaman>") yazılır.
+      const dirHandle = name ? await picked.getDirectoryHandle(name, { create: true }) : picked;
       const total = files.reduce((sum, f) => sum + f.size, 0);
       let bytes = 0;
       let count = 0;

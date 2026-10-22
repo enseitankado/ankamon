@@ -134,38 +134,85 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
       return new qx.ui.basic.Label(text).set({ font: "bold", marginTop: 4 });
     },
 
+    /**
+     * Numaralı adım kutusu (kullanıcı isteği: bileşenler ana işlemlere göre gruplanır, sıra numarası
+     * büyük ve fark edilir): ince çerçeve, başlıkta vurgu renginde daire içinde numara + adım adı.
+     * @return {qx.ui.container.Composite} kutu (başlık eklenmiş; içerik çağıran tarafından eklenir)
+     */
+    __step(n, title, hint) {
+      const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(6)).set({
+        padding: [8, 12, 10, 12],
+        decorator: new qx.ui.decoration.Decorator().set({ width: 1, color: "app-border", radius: 8 })
+      });
+      box.add(this.__stepHead(n, title, hint));
+      return box;
+    },
+
+    __stepHead(n, title, hint) {
+      const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" }));
+      const esc = qx.bom.String.escape;
+      head.add(new qx.ui.basic.Label(
+        `<span style="display:inline-block;width:30px;height:30px;line-height:30px;border-radius:50%;` +
+        `background:${this.__color("primary")};color:#fff;text-align:center;font-weight:700;font-size:17px">${n}</span>`
+      ).set({ rich: true, alignY: "middle" }));
+      head.add(new qx.ui.basic.Label(`<span style="font-size:15px;font-weight:600">${esc(title)}</span>` +
+        (hint ? `  <span style="opacity:.65">${esc(hint)}</span>` : "")).set({ rich: true, alignY: "middle" }));
+      return head;
+    },
+
     __createSetup(boards, selected) {
+      const distribute = this.__mode === "distribute";
       const page = new qx.ui.container.Composite(new qx.ui.layout.VBox(10));
-      const body = new qx.ui.container.Composite(new qx.ui.layout.HBox(14));
-      body.add(this.__createBoardColumn(boards, selected));
-      const right = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
-      if (this.__mode === "distribute") {
-        this.__createFileSection(right);
+      const body = new qx.ui.container.Composite(new qx.ui.layout.HBox(10));
+
+      // 1 — bilgisayarlar
+      const step1 = this.__step(1, "Bilgisayarları seç");
+      step1.set({ width: 290 });
+      step1.add(this.__createBoardColumn(boards, selected), { flex: 1 });
+      body.add(step1);
+
+      const right = new qx.ui.container.Composite(new qx.ui.layout.VBox(10));
+      if (distribute) {
+        // 2 — gönderilecekler, 3 — hedef (konum, kullanıcılar, aynı ad seçeneği)
+        const step2 = this.__step(2, "Gönderilecek dosya ve klasörleri belirle", "bu bilgisayardan");
+        this.__createFileSection(step2);
+        right.add(step2);
+        const step3 = this.__step(3, "Hedefi belirle", "her seçili bilgisayarda");
+        this.__createLocationSection(step3);
+        this.__createUserSection(step3);
+        this.__createOptionSection(step3);
+        right.add(step3, { flex: 1 });
+      } else {
+        // 2 — nereden (konum, kullanıcılar), 3 — ne (öğeler, taşıma, teslim biçimi)
+        const step2 = this.__step(2, "Nereden toplanacağını belirle", "her seçili bilgisayarda");
+        this.__createLocationSection(step2);
+        this.__createUserSection(step2);
+        right.add(step2, { flex: 1 });
+        const step3 = this.__step(3, "Neyin toplanacağını belirle");
+        this.__createWhatSection(step3);
+        this.__createOptionSection(step3);
+        right.add(step3);
       }
-      this.__createLocationSection(right);
-      this.__createUserSection(right);
-      if (this.__mode === "collect") {
-        this.__createWhatSection(right);
-      }
-      this.__createOptionSection(right);
       body.add(right, { flex: 1 });
       page.add(body, { flex: 1 });
 
-      const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-      bar.add(new qx.ui.basic.Label(
-        "İş sunucuda yürür; aynı anda kaç tahtaya bağlanılacağı sunucunun işlemci/bellek durumuna göre otomatik ayarlanır.")
-        .set({ textColor: "app-muted", rich: true }), { flex: 1 });
-      if (this.__mode === "collect") {
+      // 4 — başlat (tek satır: numara + ad + açıklama + düğmeler)
+      const step4 = this.__step(4, distribute ? "Dağıt" : "Topla");
+      const head = step4.getChildren()[0];
+      head.add(new qx.ui.basic.Label(
+        "İş sunucuda yürür; aynı anda kaç bilgisayara bağlanılacağı sunucunun işlemci/bellek durumuna göre otomatik ayarlanır.")
+        .set({ textColor: "app-muted", rich: true, wrap: true, alignY: "middle", marginLeft: 10 }), { flex: 1 });
+      if (!distribute) {
         const preview = new qx.ui.form.Button("Önizle").set({
           minWidth: 90, toolTipText: "Hiçbir şey aktarmadan, her tahtada neyin toplanacağını sayıp listeler"
         });
         preview.addListener("execute", () => this.__start(true));
-        bar.add(preview);
+        head.add(preview);
       }
-      this.__startButton = new qx.ui.form.Button(this.__mode === "distribute" ? "Dağıt" : "Topla").set({ minWidth: 110 });
+      this.__startButton = new qx.ui.form.Button(distribute ? "Dağıt" : "Topla").set({ minWidth: 120, font: "bold" });
       this.__startButton.addListener("execute", () => this.__start(false));
-      bar.add(this.__startButton);
-      page.add(bar);
+      head.add(this.__startButton);
+      page.add(step4);
       return page;
     },
 
@@ -176,8 +223,8 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
     },
 
     __createBoardColumn(boards, selected) {
-      const col = new qx.ui.container.Composite(new qx.ui.layout.VBox(6)).set({ width: 270 });
-      this.__boardCount = this.__heading("Tahtalar");
+      const col = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
+      this.__boardCount = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
       col.add(this.__boardCount);
       const filter = new qx.ui.form.TextField().set({ placeholder: "Süz…" });
       col.add(filter);
@@ -218,7 +265,7 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
     },
 
     __updateBoardCount() {
-      this.__boardCount.setValue(`Tahtalar (${this.__selectedBoards().length} / ${this.__boardBoxes.length} seçili)`);
+      this.__boardCount.setValue(`${this.__selectedBoards().length} / ${this.__boardBoxes.length} çevrimiçi bilgisayar seçili`);
     },
 
     __boardsChanged() {
@@ -237,7 +284,6 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
      * listeden çıkarır.
      */
     __createFileSection(parent) {
-      parent.add(this.__heading("Dağıtılacak dosyalar (bu bilgisayardan)"));
       const tools = new qx.ui.container.Composite(new qx.ui.layout.HBox(6).set({ alignY: "middle" }));
       const button = (label, handler) => {
         const b = new qx.ui.form.Button(label).set({ padding: [3, 10] });
@@ -413,7 +459,7 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
     },
 
     __createLocationSection(parent) {
-      parent.add(this.__heading(this.__mode === "distribute" ? "Hedef konum (her tahtada)" : "Toplanacak konum (her tahtada)"));
+      parent.add(this.__heading("Konum"));
       const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(6).set({ alignY: "middle" }));
       this.__location = new qx.ui.form.SelectBox().set({ width: 280 });
       tihamon.ui.files.BulkPanel.LOCATIONS.forEach(([key, label]) =>
@@ -537,7 +583,6 @@ qx.Class.define("tihamon.ui.files.BulkPanel", {
      * Altındaki özet cümlesi seçimin tamamını düz Türkçe söyler; "Önizle" aktarmadan sayar.
      */
     __createWhatSection(parent) {
-      parent.add(this.__heading("Toplanacak öğeler"));
       const T = tihamon.ui.files.BulkPanel.TYPES;
       const all = new qx.ui.form.RadioButton("Konumdaki her şey (dosyalar ve klasörler, klasörler içerikleriyle)").set({ model: "all" });
       const types = new qx.ui.form.RadioButton("Yalnız şu türlerdeki dosyalar:").set({ model: "types" });

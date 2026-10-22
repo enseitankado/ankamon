@@ -353,7 +353,9 @@ class BulkDiscardHandler(BulkJobHandler):
 class BulkManifestHandler(BulkJobHandler):
     async def get(self, job_id):
         job = self.job(job_id)
-        self.write({"files": await asyncio.to_thread(bulk.manifest, job)})
+        # name: "klasöre kaydet" kipinde dosyaların konacağı alt klasörün adı (arşiv adıyla aynı).
+        self.write({"files": await asyncio.to_thread(bulk.manifest, job),
+                    "name": await asyncio.to_thread(bulk.archive_name, job)})
 
 
 class BulkFileHandler(BulkJobHandler):
@@ -382,8 +384,8 @@ class BulkArchiveHandler(BulkJobHandler):
         if job["state"] == "running" or job.get("discarded"):
             raise tornado.web.HTTPError(404)
         fmt = "zip" if self.get_argument("fmt", "zip") == "zip" else "tgz"
-        stamp = __import__("time").strftime("%Y%m%d-%H%M", __import__("time").localtime(job["started"]))
-        name = f"toplanan-dosyalar-{stamp}." + ("zip" if fmt == "zip" else "tar.gz")
+        name = await asyncio.to_thread(bulk.archive_name, job)
+        name += ".zip" if fmt == "zip" else ".tar.gz"
         self.set_header("Content-Type", "application/zip" if fmt == "zip" else "application/gzip")
         self.set_header("Content-Disposition", f"attachment; filename*=UTF-8''{urllib.parse.quote(name)}")
         q: queue.Queue = queue.Queue(maxsize=8)

@@ -37,7 +37,7 @@ qx.Class.define("tihamon.ui.files.BulkWindow", {
       contentPadding: 10,
       showMinimize: false,
       width: Math.min(1180, bounds.width - 30),
-      height: Math.min(820, bounds.height - 30)
+      height: Math.min(920, bounds.height - 30)
     });
     const tabs = new qx.ui.tabview.TabView().set({ contentPadding: [10, 0, 0, 0] });
     const ICON = tihamon.ui.Shell.ICON;

@@ -872,6 +872,32 @@ class _Counter:
 
 # ---------------------------------------------------------------- teslim (toplanan → tarayıcı)
 
+def archive_name(job: dict) -> str:
+    """Toplananların indirme adı (uzantısız): "<kaynak tahta>_<ana dizin/dosya>_<alma zamanı>", ör.
+    "B Blok - Arge 2_Masaüstü_2026-10-22_13.45". Tahta: verisi alınan tahtanın takma adı (yoksa bilgisayar
+    adı); birden çoksa ilki + "+N tahta". Ana ad: toplamda tek üst düzey öğe alındıysa onun adı, değilse
+    konumun adı (Masaüstü, Belgeler…; alt/mutlak yolda son bileşen). Saatte ":" yok (Windows dosya adı)."""
+    boards = [b["name"] for b in job["boards"] if any(t["state"] == "ok" for t in b["targets"])] or \
+        [b["name"] for b in job["boards"]]
+    who = boards[0] + (f" +{len(boards) - 1} tahta" if len(boards) > 1 else "")
+    tops = set()
+    root = os.path.join(job["_dir"], "data")
+    for board_dir in (os.listdir(root) if os.path.isdir(root) else []):
+        for user_dir in os.listdir(os.path.join(root, board_dir)):
+            path = os.path.join(root, board_dir, user_dir)
+            if os.path.isdir(path):
+                tops.update(os.listdir(path))
+    loc = job["options"]["location"]
+    if len(tops) == 1:
+        main = tops.pop()
+    elif loc["kind"] in LOCATIONS:
+        main = LOCATIONS[loc["kind"]]
+    else:
+        main = posixpath.basename(loc["path"].rstrip("/")) or "kok"
+    stamp = time.strftime("%Y-%m-%d_%H.%M", time.localtime(job["finished"] or time.time()))
+    return _safe_dirname(f"{who}_{main}_{stamp}")
+
+
 def manifest(job: dict) -> list[dict]:
     root = os.path.join(job["_dir"], "data")
     files = []
