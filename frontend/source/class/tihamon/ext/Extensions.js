@@ -11,6 +11,8 @@
  * döndürürse olay "işlendi" sayılır ve çekirdek kendi varsayılan davranışını atlar. Kancalar:
  *  - "boards.statusFilter" (metin, sayfa): Tahtalar grid'inin Durum süzgeç kutusuna yazılan metin.
  *    İşlendi ise kutu temizlenir, süzme yapılmaz.
+ *  - "settings.extensionHidden" (eklenti adı): Ayarlar ▸ Eklentiler listesi. İşlendi ise (true) o eklentinin
+ *    bölümü gösterilmez (yalnız arayüz; API yönetici yetkisiyle yine erişilebilir).
  */
 qx.Class.define("tihamon.ext.Extensions", {
   type: "static",

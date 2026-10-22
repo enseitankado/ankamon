@@ -9,7 +9,9 @@ qx.Class.define("tihamon.ui.ExtensionsSettings", {
 
   construct() {
     super(new qx.ui.layout.VBox(12));
-    this._load();
+    // Her görünüşte yeniden yüklenir: değerler ve "settings.extensionHidden" kancasının kararı (eklentinin
+    // kendi durumuna bağlı olabilir) güncel olsun.
+    this.addListener("appear", this._load, this);
   },
 
   members: {
@@ -27,6 +29,12 @@ qx.Class.define("tihamon.ui.ExtensionsSettings", {
           "Yüklü eklenti yok. Eklentiler sunucuda <code>ext/&lt;ad&gt;/</code> altına kurulur " +
           "(bkz. ext/README.md); kurulumdan sonra burada listelenir."
         ).set({ rich: true, wrap: true, textColor: "app-muted" }));
+        return;
+      }
+      // Bir eklenti kendi bölümünü gizleyebilir (kanca "settings.extensionHidden", bkz. tihamon.ext.Extensions).
+      extensions = extensions.filter(ext => !tihamon.ext.Extensions.handle("settings.extensionHidden", ext.name));
+      if (!extensions.length) {
+        this.add(new qx.ui.basic.Label("Gösterilecek eklenti ayarı yok.").set({ textColor: "app-muted" }));
         return;
       }
       extensions.forEach(ext => this.add(this.__section(ext)));
