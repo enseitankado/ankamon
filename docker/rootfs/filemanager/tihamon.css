@@ -1,7 +1,7 @@
 /*
  * FileBrowser Quantum için tiha-mon'a özel düzeltmeler (bkz. docker/rootfs/services/filemanager.sh
  * -> frontend.styling.customCSS). FileBrowser Quantum'un CSS'i büyük ölçüde rem/em birimiyle yazılmış
- * (bkz. _variables.css: --borderRadius: 0.85rem, --icon-size: 3em, --header-height: calc(4em+...));
+ * (bkz. _variables.css: --borderRadius: 1em, --icon-size: 3em, --header-height: calc(4em+...));
  * kök font-size'ı küçültmek bu yüzden tüm aralık/yazı/köşe boyutlarını oranlı küçültüyor — tiha-mon'un
  * kendi kompakt arayüzüyle uyumlu hale getirmek için tek, etkili bir kaldıraç.
  */
@@ -17,4 +17,16 @@ html {
  */
 .sidebar-links {
   display: none !important;
+}
+
+/*
+ * FileBrowser 2.x: liste başlık satırı sabit beyaz zemin kullanıyor (koyu temalarda beyaz şerit kalıyordu);
+ * temanın yüzey rengini alsın. Kenar çubuğundaki yeni bulanıklık (backdrop-filter) temaların opak zemininde
+ * yalnız gereksiz çizim yükü.
+ */
+.listing-item-header {
+  background: var(--surfacePrimary) !important;
+}
+#sidebar {
+  backdrop-filter: none !important;
 }
