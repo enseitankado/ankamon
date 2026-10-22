@@ -358,3 +358,33 @@ def apply_shares(conn, dev: dict, result: dict) -> None:
             (result["auth"], dev["id"]),
         )
     bump(conn)
+
+
+# Ağ etkinliği (IP ID örneklemesi) yalnız Windows'ta güvenilirdir (bkz. activity.py); os_guess ile süzülür.
+_ACTIVITY_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached"
+                  " AND d.os_guess ILIKE '%%windows%%'")
+
+
+def activity_targets(conn, rescan_minutes: int) -> list[dict]:
+    """Etkinliği örneklenecek çevrim içi Windows cihazları (hiç ölçülmemiş ya da süresi dolmuş)."""
+    return conn.execute(
+        f"""SELECT d.id, host(d.ip) AS ip
+           FROM net_devices d JOIN net_networks n ON n.id = d.network_id
+           WHERE {_ACTIVITY_CAND}
+             AND (d.activity_at IS NULL OR d.activity_at < now() - make_interval(mins => %s))
+           ORDER BY d.activity_at NULLS FIRST, d.id""",
+        (rescan_minutes,),
+    ).fetchall()
+
+
+def apply_activity(conn, targets: list[dict], results: dict) -> None:
+    """activity.sample_many sonucunu yazar: her örneklenen cihaza activity_at, pps (ölçülemezse NULL)."""
+    if not targets:
+        return
+    with conn.transaction():
+        for dev in targets:
+            conn.execute(
+                "UPDATE net_devices SET activity_pps = %s, activity_at = now() WHERE id = %s",
+                (results.get(dev["ip"]), dev["id"]),
+            )
+    bump(conn)

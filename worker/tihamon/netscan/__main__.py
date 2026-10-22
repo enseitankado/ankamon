@@ -21,7 +21,7 @@ import threading
 import time
 
 from .. import db
-from . import ifaces, load, probe, store
+from . import activity, ifaces, load, probe, store
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("tihamon.netscan")
@@ -33,6 +33,10 @@ SERVICE_PAUSE = 5
 # Paylaşım (SMB) taraması servis taramasından hafiftir ama yine kendi aralığıyla yenilenir.
 SHARES_RESCAN_HOURS = int(os.environ.get("NETSCAN_SHARES_RESCAN_HOURS", "24"))
 SHARES_PAUSE = 2
+# Ağ etkinliği (IP ID örneklemesi): hafif; çevrim içi Windows cihazlar toplu örneklenir (bkz. activity.py).
+ACTIVITY_RESCAN_MINUTES = int(os.environ.get("NETSCAN_ACTIVITY_RESCAN_MINUTES", "5"))
+ACTIVITY_GAP = float(os.environ.get("NETSCAN_ACTIVITY_GAP", "4"))
+ACTIVITY_PAUSE = 30
 
 _state_lock = threading.Lock()
 _state: dict = {"phase": "starting"}
@@ -127,6 +131,32 @@ def _shares_loop() -> None:
             time.sleep(30)
 
 
+def _activity_loop() -> None:
+    """Ayrı kanal: çevrim içi Windows cihazların ağ etkinliğini (yaklaşık pkt/sn) IP ID örneklemesiyle
+    tahmin eder (bkz. activity.py, bellek network-usage-study). Hedefler TOPLU örneklenir (tek gap).
+    Yalnız makine çok yoğunken (decision.busy) ertelenir; ölçüm ICMP kadar hafiftir.
+    """
+    while True:
+        try:
+            with db.connect() as conn:
+                while True:
+                    if _decision["busy"]:
+                        time.sleep(ACTIVITY_PAUSE)
+                        continue
+                    targets = store.activity_targets(conn, ACTIVITY_RESCAN_MINUTES)
+                    if not targets:
+                        time.sleep(ACTIVITY_PAUSE)
+                        continue
+                    results = activity.sample_many([t["ip"] for t in targets], gap=ACTIVITY_GAP)
+                    store.apply_activity(conn, targets, results)
+                    measured = sum(1 for v in results.values() if v is not None)
+                    log.info("ağ etkinliği: %d Windows cihaz örneklendi, %d ölçüldü", len(targets), measured)
+                    time.sleep(ACTIVITY_PAUSE)
+        except Exception:
+            log.exception("ağ etkinliği döngüsü hatası")
+            time.sleep(30)
+
+
 def _sweep(conn) -> None:
     nets = store.sync_networks(conn, ifaces.networks())
     _set(conn, networks=len(nets))
@@ -167,6 +197,7 @@ def main() -> None:
              load.MIN_INTERVAL, load.MAX_INTERVAL, SERVICE_RESCAN_HOURS, TOP_PORTS)
     threading.Thread(target=_service_loop, name="services", daemon=True).start()
     threading.Thread(target=_shares_loop, name="shares", daemon=True).start()
+    threading.Thread(target=_activity_loop, name="activity", daemon=True).start()
 
     next_sweep = 0.0
     while True:

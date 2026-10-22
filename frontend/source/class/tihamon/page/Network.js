@@ -71,7 +71,11 @@ qx.Class.define("tihamon.page.Network", {
       { id: "seen", label: "Son görülme", width: 110 },
       { id: "notes", label: "Not", width: 150 },
       // FATİH fazı (bkz. util.Format.etap). Sona eklendi: servis alt satırları sabit sütun sırası kullanır.
-      { id: "faz", label: "Faz", width: 130 }
+      { id: "faz", label: "Faz", width: 130 },
+      // Ağ etkinliği: IP ID örneklemesinden yaklaşık pkt/sn (yalnız Windows; bkz. worker netscan/activity.py,
+      // bellek network-usage-study). Boş = ölçülmedi/güvenilmez (Linux/kamera/yanıt yok). Sona eklendi:
+      // servis/paylaşım alt satırları sabit (düşük) sütun sırası kullanır, boş kalır.
+      { id: "activity", label: "Ağ etkinliği", hint: "Ağ etkinliği (yaklaşık pkt/sn; yalnız Windows cihazlarda)", width: 130 }
       // Ayrı "Takma ad" (MAC kaydı) sütunu yok (kullanıcı isteği, 2026-10-19: "Takma ad / Ad" ile yineleniyordu);
       // MAC ↔ takma ad kaydı "Takma ad / Ad"ın kendisini besler — bkz. ui.network.Ops.deviceName (known_alias).
     ];
@@ -217,7 +221,8 @@ qx.Class.define("tihamon.page.Network", {
           d.services_scanned_at ? String(d.services.length) : "",
           netName.get(d.network_id) || d.network,
           F.ago(d.first_seen_at), d.online ? "şimdi" : F.ago(d.last_seen_at), d.notes || "",
-          F.etap(d.etap)
+          F.etap(d.etap),
+          d.activity_pps == null ? "" : (d.activity_pps < 1 ? "sakin" : Math.round(d.activity_pps) + " pkt/sn")
         ]
       }));
       this.__apply();
