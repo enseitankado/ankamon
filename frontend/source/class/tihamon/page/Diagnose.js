@@ -2,7 +2,7 @@
  * Bakım (menüdeki adı; eski adı "Sorun tespiti"): YALNIZ tespit raporu (kullanıcı isteği — Tahtalar grid'i, Ekranlar vb. yok).
  *
  * Taramalar "diagnose" görevleridir (bkz. worker/tihamon/executor/diagnose.py): "Şimdi tara" o an
- * çevrimiçi TÜM tahtaları sırayla denetler; ayrıca worker kaynaklar müsaitken her tahtayı haftada en az
+ * çevrimiçi TÜM tahtaları paralel denetler (aynı anda kaç tahta: konteynerin CPU/RAM boşluğuna göre); ayrıca worker kaynaklar müsaitken her tahtayı haftada en az
  * bir kez kendiliğinden tarar (bkz. worker/tihamon/tasks/diagnose_schedule.py). Raporlar /api/diagnose'dan
  * gelir (bkz. backend DiagnoseApi); "Rapor" seçicisinden önceki taramalar da açılabilir.
  *
@@ -27,7 +27,7 @@ qx.Class.define("tihamon.page.Diagnose", {
     button("Yenile", () => this.refresh());
     if (this._can("diagnose")) {
       button("Şimdi tara", () => this.__start())
-        .set({ toolTipText: "O an çevrimiçi olan tüm tahtaları sırayla denetler" });
+        .set({ toolTipText: "O an çevrimiçi olan tüm tahtaları denetler (sistem kaynaklarına göre birden çok tahta aynı anda)" });
     }
     top.add(new qx.ui.basic.Label("Rapor:").set({ marginLeft: 8 }));
     this.__runBox = new qx.ui.form.SelectBox().set({ width: 380 });

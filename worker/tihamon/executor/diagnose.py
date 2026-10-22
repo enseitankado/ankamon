@@ -1,4 +1,4 @@
-"""Sorun tespiti: seçilen tahtaları SIRAYLA denetler, tahta başına bulgu listesi üretir.
+"""Sorun tespiti: seçilen tahtaları denetler (runner PARALEL çalıştırır — whoami.dynamic_concurrency), tahta başına bulgu listesi üretir.
 
 Arayüz: "Sorun tespiti" sayfası (frontend page/Diagnose.js — Tahtalar grid'inin kendisinden türetilmiş).
 Görev türü "diagnose" (bkz. runner, backend JobsApi). Her tahtaya TEK SSH turu: hwfacts.SCRIPT (donanım

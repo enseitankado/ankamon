@@ -65,6 +65,11 @@
   /* TiHA geri sayımlı otomatik kapatması: kalan süre (bkz. Tile.tickShutdown, worker executor/autoshutdown.py). */
   .tile .sleep .sd { margin-top: 6px; font-weight: 400; font-size: 12px; color: #ffcc80; }
   .tile .sleep .sd:empty { display: none; }
+  /* "Başarım" açıkken (.perf kendi koyu zeminiyle zaten örtüyor) yazı tam örtü olmaz, sağ altta küçük
+     rozete döner: koyu örtü göstergeleri okunmaz kılıyordu (kullanıcı isteği). */
+  .tile .view:has(> .perf:not([hidden])) .sleep { inset: auto 4px 4px auto; max-width: 60%; padding: 3px 8px;
+    border-radius: 3px; font-size: 12px; background: rgba(0, 0, 0, .85); }
+  .tile .view:has(> .perf:not([hidden])) .sleep .sd { margin-top: 2px; font-size: 11px; }
   html.single #toolbar { display: none; }
   /* Gömülü kip (Tahtalar sayfasının "Ekranlar" sekmesi): sabit oranlı küçük kutucuklar, aşağı kaydırılır.
      Sınıf <html>'e eklenir (bkz. baştaki senkron betik), body'ye değil: <body> ayrıştırılmadan önce

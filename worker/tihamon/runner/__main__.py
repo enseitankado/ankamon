@@ -339,32 +339,54 @@ def _run_job(job) -> None:
                     _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
                     results[t["board_id"]] = result
         elif job["type"] == "diagnose":
-            # "Sorun tespiti" (bkz. executor/diagnose.py): tahtalar SIRAYLA — her biri bitince sonucu
-            # hemen yazılır (arayüzdeki ilerleme çubuğu job_targets durumlarından ilerler).
+            # "Bakım" taraması (bkz. executor/diagnose.py; elle "Şimdi tara" ya da haftalık otomatik): tahtalar
+            # PARALEL, aynı anda en çok `n` tahta — n konteynerin o anki CPU/RAM boşluğuna göre
+            # (whoami.dynamic_concurrency, kullanıcı isteği); biten tahtanın yerine sıradaki başlar. Her
+            # tahta bitince sonucu hemen yazılır (arayüzdeki ilerleme çubuğu job_targets durumlarından
+            # ilerler). Her iş parçacığı KENDİ veritabanı bağlantısını açar (command/action'daki not).
             user, password = _board_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
-            # Görev başında hepsi "running" işaretlendi; sırayla gidildiğinden sırası gelmeyenler "Sırada" görünsün.
+            # Görev başında hepsi "running" işaretlendi; sırası gelmeyenler "Sırada" görünsün.
             conn.execute("UPDATE job_targets SET status = 'queued' WHERE job_id = %s", (job["id"],))
-            for i, t in enumerate(targets, 1):
-                conn.execute("UPDATE job_targets SET status = 'running' WHERE job_id = %s AND board_id = %s",
-                             (job["id"], t["board_id"]))
-                ev = stream.Events(conn, job["id"], t["board_id"])
+
+            def scan(t):
+                wconn = db.connect()
                 try:
-                    ev.add("info", f"[{i}/{len(targets)}] Denetleniyor…")
-                    ev.flush()
-                    result = diagnose.run(conn, t, user, password)
-                    if result["status"] == "ok":
-                        report = json.loads(result["output"])
-                        bad = sum(c["level"] == "bad" for c in report["checks"])
-                        warn = sum(c["level"] == "warn" for c in report["checks"])
-                        ev.add("ok", f"Bitti: {bad} acil, {warn} dikkat gerektiren bulgu.")
-                    else:
-                        ev.add("fail", result["output"])
+                    wconn.execute("UPDATE job_targets SET status = 'running' WHERE job_id = %s AND board_id = %s",
+                                  (job["id"], t["board_id"]))
+                    ev = stream.Events(wconn, job["id"], t["board_id"])
+                    try:
+                        ev.add("info", "Denetleniyor…")
+                        ev.flush()
+                        try:
+                            result = diagnose.run(wconn, t, user, password)
+                        except Exception as e:  # bir tahtanın hatası diğerlerinin taramasını düşürmesin
+                            log.exception("bakım taraması: tahta %s", t["board_id"])
+                            result = {"status": "failed", "rc": None, "output": f"Denetim hatası: {e}"}
+                        if result["status"] == "ok":
+                            report = json.loads(result["output"])
+                            bad = sum(c["level"] == "bad" for c in report["checks"])
+                            warn = sum(c["level"] == "warn" for c in report["checks"])
+                            ev.add("ok", f"Bitti: {bad} acil, {warn} dikkat gerektiren bulgu.")
+                        else:
+                            ev.add("fail", result["output"])
+                    finally:
+                        ev.close()
+                    _write_one(wconn, job, t["board_id"], result, names.get(t["board_id"], ""))
+                    return result
                 finally:
-                    ev.close()
-                _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
-                results[t["board_id"]] = result
+                    wconn.close()
+
+            n = max(1, min(whoami.dynamic_concurrency(), len(targets)))
+            if len(targets) > 1:
+                general.add("info", f"{len(targets)} tahta paralel denetleniyor — aynı anda en çok {n} tahta"
+                            + (" (sistem kaynaklarına göre; diğerleri sırada bekler)" if n < len(targets) else ""))
+                general.flush()
+            with ThreadPoolExecutor(max_workers=n) as pool:
+                futures = {pool.submit(scan, t): t for t in targets}
+                for future in as_completed(futures):
+                    results[futures[future]["board_id"]] = future.result()
         else:
             raise RuntimeError(f"Bilinmeyen görev türü: {job['type']}")
 
