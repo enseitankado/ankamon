@@ -56,12 +56,12 @@
   .tile.live .msg { display: none; }
   /* Ekran güç tasarrufunda: tahtanın monitörü DPMS ile kapalı (üst sayfadan "powersave" — periyodik SSH
      yoklaması, bkz. Boards.js __previewList) ya da bağlı görüntü tümüyle siyah (bkz. Tile.checkBlank).
-     DPMS'te x11vnc son görüntüyü vermeye devam eder: yazı yarı saydam koyu zeminle görüntünün üstünde.
-     Uyandırmak için sağ menü Ekran ▸ Uyandır. */
+     DPMS'te x11vnc son görüntüyü vermeye devam eder: yazı koyu zeminle görüntünün üstünde; zemin arkadaki
+     görüntüyü yalnız hafifçe belli edecek kadar saydam (kullanıcı isteği). Uyandırmak için sağ menü Ekran ▸ Uyandır. */
   .tile .sleep { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
-    text-align: center; padding: 12px; font-size: 13px; color: #9aa4b0; pointer-events: none; }
+    text-align: center; padding: 12px; font-size: 13px; color: #fff; font-weight: 600; pointer-events: none;
+    background: rgba(0, 0, 0, .82); }
   .tile.live.blank .sleep, .tile.live.powersave .sleep { display: flex; }
-  .tile.live.powersave .sleep { background: rgba(0, 0, 0, .6); color: #fff; font-weight: 600; }
   html.single #toolbar { display: none; }
   /* Gömülü kip (Tahtalar sayfasının "Ekranlar" sekmesi): sabit oranlı küçük kutucuklar, aşağı kaydırılır.
      Sınıf <html>'e eklenir (bkz. baştaki senkron betik), body'ye değil: <body> ayrıştırılmadan önce
