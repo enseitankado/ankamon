@@ -60,6 +60,17 @@ def run(conn) -> None:
     # güncel satırlara yetiştiğimizde (parti _BATCH'ten küçük) normal şekilde her tur çalışır.
     if len(rows) < _BATCH:
         _close_offline(conn)
+    _link_orphans(conn)
+
+
+def _link_orphans(conn) -> None:
+    """Tahta kaydı oturumdan SONRA açılmışsa (silinip loglardan yeniden açılan ya da elle eklenen tahta)
+    o adın tahtasız oturumlarını tahtaya bağlar — Oturumlar'da tahtanın takma adıyla görünsünler."""
+    linked = conn.execute(
+        """UPDATE board_sessions s SET board_id = b.id FROM boards b
+           WHERE s.board_id IS NULL AND lower(b.hostname) = lower(s.host)""").rowcount
+    if linked:
+        log.info("%d tahtasız oturum tahtasına bağlandı", linked)
 
 
 def _cursor(conn):
@@ -130,8 +141,8 @@ def _close_offline(conn) -> None:
     edilmeden" açık kalma süresi en kötü durumda bir STATUS_TICK_SECONDS kadardır.
 
     İki durum ayrı ele alınır: (1) oturumun board_id'si var ve o tahta artık çevrimdışı
-    (board_status'a göre); (2) hostname `boards`'ta hiç yok (ör. elle silinip blocklist'e
-    eklenmiş ama cihaz hâlâ log gönderiyor — bkz. BoardsApi::delete) — bu durumda tahtanın kendi
+    (board_status'a göre); (2) hostname `boards`'ta hiç yok (ör. kaydı henüz açılmamış
+    ya da silinmiş ama cihaz hâlâ log gönderiyor) — bu durumda tahtanın kendi
     "online" kaydı olmadığından, hostname'in son _STALE süresinde hiç log göndermemiş olması
     çevrimdışı sayılır.
     """

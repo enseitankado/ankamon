@@ -75,13 +75,6 @@ def run(conn) -> None:
             if _looks_fake(row["host"], row["ip"]):
                 log.info("şüpheli kaynak yok sayıldı (otomatik kayıt açılmadı): %s (%s)", row["host"], row["ip"])
                 continue
-            # Elle silinmiş bir tahtanın hostname'i blocklist'teyse otomatik yeniden açılmaz
-            # (bkz. BoardsApi::delete); "Ekle" ile elle yeniden kaydedilince blocklist'ten kalkar.
-            blocked = conn.execute(
-                "SELECT 1 FROM board_blocklist WHERE hostname = lower(%(host)s)", row
-            ).fetchone()
-            if blocked:
-                continue
             conn.execute(
                 """INSERT INTO boards (hostname, ip, source, last_log_at)
                    VALUES (%(host)s, %(ip)s::inet, 'syslog', %(last_log_at)s)""",

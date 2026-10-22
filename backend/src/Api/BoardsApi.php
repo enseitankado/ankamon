@@ -55,10 +55,6 @@ final class BoardsApi
             throw ApiError::badRequest('IP adresi ya da bilgisayar adı gerekli.');
         }
         $fields['source'] = 'manual';
-        if (!empty($fields['hostname'])) {
-            // Daha önce silinmiş aynı adla elle yeniden eklenince, worker'ın engeli kalkar.
-            Db::exec('DELETE FROM board_blocklist WHERE hostname = lower(?)', [$fields['hostname']]);
-        }
         $columns = array_keys($fields);
         $id = Db::value(
             'INSERT INTO boards (' . implode(', ', $columns) . ') VALUES (' . implode(', ', array_fill(0, count($columns), '?')) . ') RETURNING id',
@@ -83,9 +79,9 @@ final class BoardsApi
 
     /**
      * Tahtayı, loglarını ve sensör geçmişini TAMAMEN siler (geri alınamaz). `logs` tablosunda
-     * board_id yoktur; ilişki yalnız hostname eşleşmesiyle kurulur (bkz. sınıf başı not). Hostname
-     * hâlâ log gönderiyorsa worker (boards_from_logs) kaydı kendiliğinden yeniden açmasın diye
-     * hostname board_blocklist'e eklenir — "Ekle" ile elle yeniden kaydedilince kalkar.
+     * board_id yoktur; ilişki yalnız hostname eşleşmesiyle kurulur (bkz. sınıf başı not). Silinen
+     * tahta engellenmez (kullanıcı isteği, 2026-10-22): hâlâ log gönderiyorsa worker
+     * (boards_from_logs) kaydı kendiliğinden yeniden açar.
      */
     public function delete(Request $request, array $user): array
     {
@@ -101,13 +97,6 @@ final class BoardsApi
             ['DELETE FROM metrics_tag WHERE board_id = ?', [(string) $id]],
             ['DELETE FROM boards WHERE id = ?', [$id]],
         ]);
-        if (!empty($board['hostname'])) {
-            Db::exec(
-                'INSERT INTO board_blocklist (hostname) VALUES (lower(?))
-                 ON CONFLICT (hostname) DO UPDATE SET deleted_at = now()',
-                [$board['hostname']]
-            );
-        }
         Audit::log($user, $request, 'board.delete', (string) $id);
         return ['ok' => true, 'logs_deleted' => $logsDeleted, 'metrics_deleted' => $metricsDeleted];
     }

@@ -1013,9 +1013,8 @@ qx.Class.define("tihamon.page.Boards", {
     /**
      * Bir ya da daha fazla tahtayı; loglarını ve sensör geçmişini de dahil ederek TAMAMEN siler
      * (toolbar "Sil" düğmesi işaretli tüm tahtaları, satır sağ menüsü tek tahtayı [board] olarak
-     * gönderir) — bkz. backend BoardsApi::delete (logs + metrics + board_blocklist). Hostname hâlâ
-     * log gönderiyorsa worker artık kaydı kendiliğinden yeniden açmaz (blocklist); "Ekle" ile elle
-     * yeniden kaydedilirse engel kalkar.
+     * gönderir) — bkz. backend BoardsApi::delete (logs + metrics). Silinen tahta engellenmez: hâlâ
+     * log gönderiyorsa worker kaydı kendiliğinden yeniden açar.
      *
      * İlerleme penceresi her tahta için ayrı bir satırla açılır ve kayıtlar SIRAYLA (paralel değil)
      * silinir; her DELETE sonucu geldikçe o satır anlık "⏳ siliniyor…" → "✓/✕ ..." olarak güncellenir
