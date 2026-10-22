@@ -67,6 +67,13 @@ qx.Class.define("tihamon.page.Settings", {
         "Oturumlar ▸ Kullanıcılar çizelgesinde bir oturumun üzerine gelince hangi derslere denk geldiği " +
         "(ör. \"1. ders: 5 dk sonra açıldı, bitimden 2 dk önce kapandı\") bu saatlere göre yazılır.", lessons);
       tabs.add(lessonsPage);
+
+      // Eklentiler (ext/<ad>): yüklü eklentiler ve ayar şemalarını bildirenlerin formu (bkz.
+      // ui.ExtensionsSettings, Core\Extensions). Kendi "Kaydet"i vardır; aşağıdaki global Kaydet'e girmez.
+      const extPage = this.__page("Eklentiler");
+      extPage.add(new tihamon.ui.ExtensionsSettings(), { flex: 1 });
+      tabs.add(extPage);
+
       this._rememberTab(tabs, "settings"); // sekmeler her yüklemede yeniden kurulur; son seçili geri gelir
 
       this.__body.add(tabs, { flex: 1 });

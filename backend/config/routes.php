@@ -103,6 +103,10 @@ return [
 
     ['GET',    '/api/settings',          [Api\SettingsApi::class, 'show'],     'admin'],
     ['PUT',    '/api/settings',          [Api\SettingsApi::class, 'update'],   'admin'],
+    // Eklentiler (ext/<ad>): çekirdek adlarını bilmez, EXT_DIR taranır (bkz. Core\Extensions). Ad gövdede
+    // taşınır; Router'daki {id} yalnız rakam eşlediğinden yola konmaz.
+    ['GET',    '/api/extensions',          [Api\ExtensionsApi::class, 'list'],         'admin'],
+    ['PUT',    '/api/extensions/settings', [Api\ExtensionsApi::class, 'saveSettings'], 'admin'],
     ['GET',    '/api/lesson-times',      [Api\LessonTimesApi::class, 'show'],   'user'],
     ['PUT',    '/api/lesson-times',      [Api\LessonTimesApi::class, 'update'], 'admin'],
     ['GET',    '/api/audit',             [Api\AuditApi::class, 'index'],       'admin'],
