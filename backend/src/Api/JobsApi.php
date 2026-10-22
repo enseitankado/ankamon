@@ -180,11 +180,23 @@ final class JobsApi
         return ['id' => $jobId];
     }
 
+    /** "Kullanıcı sil" ile asla silinmeyen tahta hesapları (bkz. actionJob, actions/user-delete/run.sh). */
+    private const UNDELETABLE_USERS = ['etapadmin', 'root'];
+
     private function actionJob(Request $request): array
     {
         $action = Actions::all()[(string) $request->input('action', '')]
             ?? throw ApiError::badRequest('Bilinmeyen işlem.');
         $values = Actions::values($action, (array) $request->input('values', []));
+        if ($action['id'] === 'user-delete') {
+            // Barikat: tahtanın yönetici hesabı (ve root) hiçbir yoldan (sağ menü, Komut çalıştır listesi,
+            // doğrudan API) silinemez — tahtada actions/user-delete/run.sh de aynı listeyi ayrıca reddeder.
+            $names = preg_split('/[\s,]+/', strtolower((string) ($values['KULLANICILAR'] ?? '')), -1, PREG_SPLIT_NO_EMPTY);
+            $blocked = array_values(array_intersect($names, self::UNDELETABLE_USERS));
+            if ($blocked) {
+                throw ApiError::badRequest(implode(', ', $blocked) . ' hesabı silinemez (tahta yönetimi için korunur).');
+            }
+        }
         return [$action['feature'], $action['title'], ['action' => $action['id'], 'values' => $values], true];
     }
 

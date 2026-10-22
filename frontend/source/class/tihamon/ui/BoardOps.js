@@ -705,9 +705,12 @@ qx.Class.define("tihamon.ui.BoardOps", {
       }
       const esc = qx.bom.String.escape;
       const where = boards.length > 1 ? `${boards.length} tahta` : esc(boards[0].label || boards[0].hostname || boards[0].ip);
-      const win = tihamon.ui.Dialog.window(`Kullanıcı sil — ${where}`, 460);
+      const win = tihamon.ui.Dialog.window(`Kullanıcı sil — ${where}`, 480);
       const status = new qx.ui.basic.Label("Hesaplar yükleniyor…").set({ rich: true, wrap: true, textColor: "app-muted" });
       win.add(status);
+      // Listenin üstünde süzme kutusu: ad ya da tam adda geçen metne göre (işaretli olanlar gizlense de seçili kalır).
+      const filter = new qx.ui.form.TextField().set({ placeholder: "Süz… (kullanıcı adı ya da tam ad)", liveUpdate: true });
+      win.add(filter);
       const list = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
       // Scroll içeriği kadar büyümez: yükseklik hesaplar gelince satır sayısına göre verilir.
       const scroll = new qx.ui.container.Scroll(list).set({ height: 60 });
@@ -729,16 +732,24 @@ qx.Class.define("tihamon.ui.BoardOps", {
       const failed = results.filter(r => r.status === "rejected").length;
       const boxes = [];
       const update = () => del.setEnabled(boxes.some(b => b.getValue()));
-      [...merged.values()].forEach(({ acc, n }) => {
+      // Tahtanın yönetici hesabı listelenmez (sunucu da reddeder — bkz. JobsApi::UNDELETABLE_USERS).
+      [...merged.values()].filter(({ acc }) => !["etapadmin", "root"].includes(acc.name)).forEach(({ acc, n }) => {
         const label = (acc.full_name && acc.full_name !== acc.name ? `${esc(acc.full_name)} (${esc(acc.name)})` : esc(acc.name)) +
           (boards.length > 1 ? ` <span style="opacity:.7">— ${n}/${boards.length} tahtada</span>` : "");
         const box = new qx.ui.form.CheckBox(label).set({ model: acc.name, rich: true });
         box.addListener("changeValue", update);
+        box.setUserData("search", `${acc.name} ${acc.full_name || ""}`.toLocaleLowerCase("tr"));
         boxes.push(box);
         list.add(box);
       });
       const rootHeight = (qx.core.Init.getApplication().getRoot().getBounds() || { height: 800 }).height;
-      scroll.setHeight(Math.max(60, Math.min(boxes.length * 24 + 8, rootHeight - 260)));
+      // Daha uzun liste (kullanıcı isteği): en az ~12 satırlık yer, ekrana sığdığı kadar.
+      // Pencerenin geri kalanı (başlık, durum, süzme kutusu, dosya seçeneği, düğmeler) ~330 px.
+      scroll.setHeight(Math.max(Math.min(300, rootHeight - 330), Math.min(boxes.length * 24 + 8, rootHeight - 330)));
+      filter.addListener("changeValue", () => {
+        const q = (filter.getValue() || "").trim().toLocaleLowerCase("tr");
+        boxes.forEach(b => b.setVisibility(!q || b.getUserData("search").includes(q) ? "visible" : "excluded"));
+      });
       qx.ui.core.queue.Manager.flush(); // yeni yükseklik uygulanmadan center() eski boyuta göre ortalar
       win.center();
       status.setValue(boxes.length
