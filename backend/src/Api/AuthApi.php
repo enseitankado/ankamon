@@ -268,6 +268,12 @@ final class AuthApi
         if (!Auth::can($user, 'filemanager')) {
             throw ApiError::forbidden();
         }
+        // FileBrowser 2.x'in yönetici hesap adları (varsayılan "admin" + services/filemanager.sh
+        // auth.adminUsername): bu adla gelen proxy başlığı FileBrowser'da yönetici oturumu açar. Aynı adlı
+        // bir Tiha-Mon kullanıcısı dosya yöneticisine (FileBrowser hesabıyla) giremez.
+        if (in_array(strtolower((string) $user['username']), ['admin', 'tihamon-fb-admin'], true)) {
+            throw ApiError::forbidden('Bu kullanıcı adı dosya yöneticisinde ayrılmıştır; başka adlı bir kullanıcıyla girin.');
+        }
         // Kim bağladı: köprü bunu başarılı bağlamada komut loguna yazar (bkz. worker/tihamon/filemanager).
         header('X-Auth-User: ' . $user['username']);
         return ['ok' => true];

@@ -92,6 +92,10 @@ frontend:
       ubuntu: { description: "Ubuntu (Yaru, Linux)", css: "$THEMES/ubuntu.css" }
       filebrowser: { description: "FileBrowser (özgün)", css: "$THEMES/filebrowser.css" }
 auth:
+  # 2.x açılışta bu adla yönetici hesabı açar; varsayılan "admin" proxy başlığıyla (X-Auth-User: admin)
+  # "admin" adlı bir Tiha-Mon kullanıcısına FileBrowser yöneticiliği verirdi. Hem bu ad hem eski "admin"
+  # Tiha-Mon tarafında dosya yöneticisine kapalıdır (bkz. backend AuthApi::filemanager).
+  adminUsername: "tihamon-fb-admin"
   methods:
     password:
       enabled: false
