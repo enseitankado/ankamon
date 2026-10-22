@@ -234,6 +234,11 @@ def cached(conn, board_id: int, cutoff_ts: int) -> list | None:
     return facts["accounts"]
 
 
+def invalidate(conn, board_id: int) -> None:
+    """Hesap listesi önbelleğini düşürür (ör. "Kullanıcı sil" sonrası): sonraki istek tahtadan yeniden okur."""
+    conn.execute("UPDATE boards SET facts = facts - 'accounts' - 'accounts_at' WHERE id = %s", (board_id,))
+
+
 def store(conn, board_id: int, accounts: list, ts: int) -> None:
     conn.execute("UPDATE boards SET facts = facts || %s::jsonb WHERE id = %s",
                  (json.dumps({"accounts": accounts, "accounts_at": ts}, ensure_ascii=False), board_id))

@@ -140,6 +140,10 @@ def _run_job(job) -> None:
                     # Wi-Fi aç/kapat: grid'in "Wi-Fi" sütunu ve Bilgi kartı yeni durumu hemen göstersin.
                     if action in hwfacts.WIFI_ACTIONS and result["status"] == "ok":
                         hwfacts.mark_wifi_radio(wconn, t["board_id"], hwfacts.WIFI_ACTIONS[action])
+                    # Kullanıcı sil: "Oturum aç"/"Yedekle"/"Kullanıcı sil" listeleri silineni göstermesin
+                    # (kısmi başarıda da — bazı hesaplar silinmiş olabilir).
+                    if action == "user-delete":
+                        accounts.invalidate(wconn, t["board_id"])
                     return result
                 finally:
                     wconn.close()

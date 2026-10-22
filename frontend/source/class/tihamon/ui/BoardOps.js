@@ -571,7 +571,7 @@ qx.Class.define("tihamon.ui.BoardOps", {
       // Bilgisayarı aç (WoL) + Bilgisayarı kapat: her zaman yan yana (kullanıcı isteği), çevrimiçi/
       // çevrimdışı tahtada da. Her biri seçimin yalnız uygun kısmına uygulanır (aç → kapalı olanlar,
       // kapat → açık olanlar); uygulanacak tahta yoksa madde görünür ama devre dışıdır.
-      // "Oturum…" ▸ Oturum geçmişi (kullanıcı isteği): Tahtalar ▸ Oturumlar o tahtaya süzülmüş açılır
+      // "Kullanıcılar" ▸ Oturum geçmişi (kullanıcı isteği): Tahtalar ▸ Oturumlar o tahtaya süzülmüş açılır
       // (bkz. page.Sessions.openWith, ui.sessions.List.showBoard). Tek tahta: sağ tıklanan. Sayfa 'logs' ister.
       const sessionHistory = target => {
         if (can("logs")) {
@@ -638,7 +638,7 @@ qx.Class.define("tihamon.ui.BoardOps", {
         // "Bilgi kartı" burada değil: Tahtalar sayfasındaki "Logları göster"in hemen altında (kullanıcı
         // isteği) — bkz. page.Boards __rowMenu.
 
-        // Oturum… ▸ Oturum aç ▸ <hesap>, Oturumu kapat, Oturumu kilitle, Oturumları sorgula.
+        // Kullanıcılar ▸ Oturum aç ▸ <hesap>, Oturumu kapat, Oturumu kilitle, Oturumları sorgula, Oturum geçmişi, Kullanıcı sil…
         const sessions = sub();
         if (can("boards.login")) {
           sessions.add(this.menuButton(ICON.sessions, "Oturum aç" + count, null,
@@ -653,7 +653,12 @@ qx.Class.define("tihamon.ui.BoardOps", {
             (sessionOps ? sessionOps.query(online) : this.__job({ type: "whoami", board_ids: online.map(b => b.id) }, "Oturumları sorgula")));
         }
         sessionHistory(sessions);
-        group(ICON.sessions, "Oturum…", sessions);
+        // Kullanıcı sil…: hesap(lar) seçilir, dosyaları silme varsayılan açık (bkz. deleteUsers; işi
+        // hazır işlem "user-delete" yapar — Komut çalıştır listesinde de var).
+        if (can("boards.users")) {
+          subAdd(sessions, ICON.delete, "Kullanıcı sil…" + count, () => this.deleteUsers(online));
+        }
+        group(ICON.sessions, "Kullanıcılar", sessions);
 
         // Dosyalar ▸ Dosya yöneticisi, Bilgisayarlar arasında kopyala, Dosyaları dağıt/topla, Yedekle ▸ <hesap> (kullanıcı isteği: eski
         // "Yedekle" + "Dosya yöneticisi" tek grupta; Dosya yöneticisi ilk sırada). Bilgisayarı aç/kapat
@@ -678,13 +683,82 @@ qx.Class.define("tihamon.ui.BoardOps", {
           add(ICON.taskmgr, "Görev yöneticisi", () => tihamon.ui.taskmgr.Window.open(board, user));
         }
       } else {
-        // Kapalı tahtada da geçmiş anlamlı: "Oturum…" yalnız "Oturum geçmişi" ile.
+        // Kapalı tahtada da geçmiş anlamlı: "Kullanıcılar" yalnız "Oturum geçmişi" ile.
         const sessions = sub();
         sessionHistory(sessions);
-        group(ICON.sessions, "Oturum…", sessions);
+        group(ICON.sessions, "Kullanıcılar", sessions);
       }
       power();
       return menu.getChildren().length ? menu : null;
+    },
+
+    /**
+     * Kullanıcılar ▸ Kullanıcı sil…: seçili (çevrimiçi) tahtalardaki hesaplar tek listede (çoklu seçimde
+     * birleşik; her hesabın kaç tahtada olduğu yazılır), silinecekler işaretlenir. "Tüm dosyaları sil"
+     * varsayılan açık (kullanıcı isteği). İşi hazır işlem "user-delete" yapar (bkz. actions/user-delete):
+     * hesabı olmayan tahtada o kullanıcı atlanır. Sonrasında hesap listesi önbellekleri düşürülür.
+     */
+    async deleteUsers(boards) {
+      if (!boards.length) {
+        tihamon.ui.Dialog.alert("Çevrimiçi tahta yok.");
+        return;
+      }
+      const esc = qx.bom.String.escape;
+      const where = boards.length > 1 ? `${boards.length} tahta` : esc(boards[0].label || boards[0].hostname || boards[0].ip);
+      const win = tihamon.ui.Dialog.window(`Kullanıcı sil — ${where}`, 460);
+      const status = new qx.ui.basic.Label("Hesaplar yükleniyor…").set({ rich: true, wrap: true, textColor: "app-muted" });
+      win.add(status);
+      const list = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
+      win.add(new qx.ui.container.Scroll(list).set({ maxHeight: 360, minHeight: 60 }), { flex: 1 });
+      const allFiles = new qx.ui.form.CheckBox("Kullanıcının tüm dosyalarını sil (ev dizini dahil)").set({ value: true });
+      win.add(allFiles);
+      const del = new qx.ui.form.Button("Sil").set({ enabled: false });
+      tihamon.ui.Dialog.buttons(win, [del]);
+      win.open();
+
+      // Hesaplar: her tahtadan (önbellekten ya da "accounts" görevinden), ada göre birleştirilir.
+      const results = await Promise.allSettled(boards.map(b => this.__accounts(b)));
+      const merged = new Map();
+      results.forEach(r => (r.status === "fulfilled" ? r.value : []).forEach(acc => {
+        const hit = merged.get(acc.name) || { acc, n: 0 };
+        hit.n++;
+        merged.set(acc.name, hit);
+      }));
+      const failed = results.filter(r => r.status === "rejected").length;
+      const boxes = [];
+      const update = () => del.setEnabled(boxes.some(b => b.getValue()));
+      [...merged.values()].forEach(({ acc, n }) => {
+        const label = (acc.full_name && acc.full_name !== acc.name ? `${esc(acc.full_name)} (${esc(acc.name)})` : esc(acc.name)) +
+          (boards.length > 1 ? ` <span style="opacity:.7">— ${n}/${boards.length} tahtada</span>` : "");
+        const box = new qx.ui.form.CheckBox(label).set({ model: acc.name, rich: true });
+        box.addListener("changeValue", update);
+        boxes.push(box);
+        list.add(box);
+      });
+      status.setValue(boxes.length
+        ? "Silinecek kullanıcıları işaretleyin." + (failed ? ` <span style="color:#c42b1c">${failed} tahtanın hesapları okunamadı.</span>` : "")
+        : "Silinebilecek kullanıcı hesabı bulunamadı" + (failed ? " (hesaplar okunamadı)." : "."));
+
+      del.addListener("execute", async () => {
+        const names = boxes.filter(b => b.getValue()).map(b => b.getModel());
+        const files = allFiles.getValue();
+        const shown = names.map(n => "• " + esc(n)).join("<br>");
+        const ok = await tihamon.ui.Dialog.confirm(
+          `<b>${where}</b> üzerinde ${names.length} kullanıcı <b>kalıcı olarak</b> silinsin mi?<br><br>${shown}<br><br>` +
+          (files
+            ? "Ev dizinleri ve sistemin başka yerlerindeki tüm dosyaları da <b>silinecek</b>; geri alınamaz."
+            : "Yalnız hesaplar silinecek; dosyaları tahtada kalacak.") +
+          "<br>Açık oturumları ve çalışan programları önce kapatılır.", "Sil");
+        if (!ok) {
+          return;
+        }
+        win.close();
+        boards.forEach(b => delete this.__accountsCache[b.id]);
+        this.__job({
+          type: "action", action: "user-delete", board_ids: boards.map(b => b.id),
+          values: { KULLANICILAR: names.join(" "), DOSYALAR: files ? "tum" : "koru" }
+        }, `Kullanıcı sil — ${names.join(", ")}`);
+      });
     },
 
     /**

@@ -335,7 +335,7 @@ qx.Class.define("tihamon.page.Boards", {
      * komut loguna yazılmaz, bkz. ekran köprüsü nolog). Sekme görünmez olunca (Liste sekmesi ya da
      * başka bir sayfa) SCREENS_STOP_MS sonra iframe boşaltılır: bütün akışlar ve tahtalardaki
      * x11vnc'ler kapanır (yük tasarrufu); sekmeye dönülünce yeniden başlar.
-     * Kutucuk sağ menüsü grid satırınınkiyle AYNI (__rowMenu); "Oturum… ▸ Oturumları sorgula" (bkz.
+     * Kutucuk sağ menüsü grid satırınınkiyle AYNI (__rowMenu); "Kullanıcılar ▸ Oturumları sorgula" (bkz.
      * __openPreviewMenu, BoardOps.menu) — SSH ile anlık sorgu sonucu (bkz. __whoamiState, worker/tihamon/executor/
      * whoami.py) sol altta gösterilir (bkz. __previewList, docker/rootfs/screen'de Tile.setWhoami).
      * "Oturum aç"/"Oturumu kapat" da önizlemeden açılınca iş penceresi açmaz; ilerleme ve sonuç aynı
@@ -716,7 +716,7 @@ qx.Class.define("tihamon.page.Boards", {
     },
 
     /**
-     * Önizleme kutucuğunun sağ menüsü — grid satırınınkiyle AYNI (__rowMenu); yalnız "Oturum…" altındaki
+     * Önizleme kutucuğunun sağ menüsü — grid satırınınkiyle AYNI (__rowMenu); yalnız "Kullanıcılar" altındaki
      * Oturum aç / Oturumu kapat / Oturumları sorgula burada sessionOps ile iş penceresi yerine kutucuk
      * durumuna yönlendirilir (bkz. __sessionOps). Çoklu seçim: iframe'de Shift/Ctrl ile seçilenler (bkz.
      * docker/rootfs/screen/index.html "tm-menu").

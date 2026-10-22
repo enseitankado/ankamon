@@ -17,6 +17,7 @@ return [
     'taskmgr' => 'boards',
     'boards.backup' => 'boards',
     'boards.login' => 'boards',
+    'boards.users' => 'boards',
     'logs.manage' => 'logs',
     'logs.exclude' => 'logs',
     'sessions.manage' => 'logs',

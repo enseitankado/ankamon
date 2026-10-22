@@ -1,0 +1,19 @@
+{
+  "title": "Kullanıcı sil",
+  "description": "Tahtadaki yerel kullanıcı hesaplarını siler. Kullanıcının açık oturumu ve çalışan programları önce kapatılır. \"Tüm dosyaları\" seçiliyse ev dizini ve kullanıcının sistemin başka yerlerindeki (ör. ortak alan, /tmp) dosyaları da kalıcı olarak silinir; geri alınamaz. Sistem hesapları (UID 1000'in altı) ve root silinmez. Birden fazla kullanıcı boşluk ya da virgülle ayrılarak yazılabilir; tahtada olmayan kullanıcı atlanır.",
+  "category": "Kullanıcılar",
+  "feature": "boards.users",
+  "confirm": true,
+  "timeout": 900,
+  "params": [
+    {"key": "KULLANICILAR", "label": "Kullanıcı adları (boşluk ya da virgülle)", "type": "text", "default": "",
+     "required": true,
+     "pattern": "^[a-z_][a-z0-9_.-]{0,31}([ ,]+[a-z_][a-z0-9_.-]{0,31})*[ ,]*$",
+     "pattern_error": "kullanıcı adları küçük harf, rakam, _ . - içerebilir; boşluk ya da virgülle ayrılır"},
+    {"key": "DOSYALAR", "label": "Dosyalar", "type": "select", "default": "tum",
+     "options": [
+       {"value": "tum", "label": "Kullanıcının tüm dosyalarını sil (ev dizini dahil)"},
+       {"value": "koru", "label": "Yalnız hesabı sil, dosyalar kalsın"}
+     ]}
+  ]
+}

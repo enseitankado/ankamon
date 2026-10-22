@@ -21,6 +21,7 @@ return [
     'filemanager' => 'Tahtanın tüm dosya sistemine (root) web üzerinden erişim — gezinme, indirme, yükleme',
     'boards.backup' => 'Tahtadaki bir hesabın ev dizinini (kişisel dosyalar dahil) yedekleyip indirme (sağ menü "Yedekle")',
     'diagnose' => 'Bakım (sorun tespiti): seçili tahtalarda donanım, disk sağlığı (SMART), sıcaklık ve sistem denetimi çalıştırma',
+    'boards.users' => 'Tahtadaki kullanıcı hesaplarını silme, isteğe bağlı tüm dosyalarıyla (sağ menü "Kullanıcılar ▸ Kullanıcı sil…" ve hazır işlem "Kullanıcı sil") — geri alınamaz',
     'boards.login' =>'Tahtada seçilen hesapla parolasız oturum açma (sağ menü "Oturum aç" — açık oturum kapanır)',
     'network' => 'Ağ envanteri: bağlı ağlardaki çevrim içi/dışı cihazları ve açık servislerini görüntüleme',
     'network.manage' => 'Ağ envanterinde cihaz ekleme, düzenleme, silme; ağ adı/tarama ayarı; taramayı hemen başlatma',
