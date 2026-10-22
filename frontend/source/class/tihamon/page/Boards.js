@@ -628,6 +628,8 @@ qx.Class.define("tihamon.page.Boards", {
         return {
           id: b.id, name: b.label || b.hostname || b.ip || ("#" + b.id), online: !!b.online,
           whoami: whoami.get(b.id) || null,
+          // Monitör DPMS ile kapalı (bkz. 025_board_display_state.sql): kutucukta "Ekran güç tasarrufu kipinde".
+          powersave: !!b.online && ["Off", "Standby", "Suspend"].includes(b.display_state),
           hw: this.__hwSummary(b.facts),
           stats: m ? {
             cpu: m.cpu_percent ?? null, mem: m.mem_percent ?? null, temp: m.cpu_temp ?? m.temp_max ?? null,
@@ -796,8 +798,17 @@ qx.Class.define("tihamon.page.Boards", {
         wake: boards => {
           const before = new Map(boards.map(b => [b.id, this.__whoamiState && this.__whoamiState.get(b.id)]));
           this.__sessionJob(boards.map(b => b.id), { type: "wake" }, () => "Ekran uyandırılıyor…",
-            t => (t.status === "ok" ? before.get(t.board_id) || { status: "ok", text: known(t.board_id) }
-              : { status: "error", text: "Uyandırılamadı" }));
+            t => {
+              if (t.status !== "ok") {
+                return { status: "error", text: "Uyandırılamadı" };
+              }
+              // "Güç tasarrufu" yazısı tahta listesinin bir sonraki tazelenmesini beklemeden kalksın.
+              const board = this.__boards.get(t.board_id);
+              if (board) {
+                board.display_state = "On";
+              }
+              return before.get(t.board_id) || { status: "ok", text: known(t.board_id) };
+            });
         },
         // Kilitte oturum açık kalır: kutucukta kullanıcı adı "(kilitli)" ile görünür (çıktının ilk satırı).
         lock: boards => this.__sessionJob(boards.map(b => b.id), { type: "lock" },

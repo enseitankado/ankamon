@@ -14,11 +14,19 @@ from __future__ import annotations
 import os
 import subprocess
 
+# Son satır: etkin VT'deki X'in monitör güç durumu ("M On|Off|Standby|Suspend" — bkz. 025_board_display_state.sql;
+# X seçimi screen/remote.py ile aynı).
 _SCRIPT = r"""
 for s in $(loginctl list-sessions --no-legend 2>/dev/null | awk '$4 == "seat0" {print $1}'); do
   echo "S"
   loginctl show-session "$s" -p Name -p Class -p Active -p LockedHint 2>/dev/null
 done
+vt=$(cat /sys/class/tty/tty0/active 2>/dev/null)
+set -- $(ps -eo args= | awk -v vt="vt${vt#tty}" '
+  $1 ~ /(^|\/)Xorg$/ { d = ""; a = ""; m = 0
+    for (i = 2; i <= NF; i++) { if ($i ~ /^:[0-9]+$/) d = $i; if ($i == "-auth") a = $(i + 1); if ($i == vt) m = 1 }
+    if (m && d != "") { print d, a; exit } }')
+[ -n "$1" ] && echo "M $(DISPLAY="$1" XAUTHORITY="$2" xset q 2>/dev/null | awk '/Monitor is/ { print $3 }')"
 """
 
 _SSH_OPTS = [
@@ -28,11 +36,22 @@ _SSH_OPTS = [
 ]
 
 
+def display_state(output: str) -> str:
+    """Betiğin "M <durum>" satırından monitör durumu ("On", "Off", "Standby", "Suspend"; bilinmiyorsa "")."""
+    for line in output.splitlines():
+        if line.startswith("M "):
+            state = line[2:].strip()
+            return state if state in ("On", "Off", "Standby", "Suspend") else ""
+    return ""
+
+
 def parse(output: str) -> tuple[str | None, bool]:
     """loginctl çıktısından (kullanıcı ya da None, kilitli mi)."""
     sessions: list[dict] = []
     for line in output.splitlines():
         line = line.strip()
+        if line.startswith("M "):
+            continue
         if line == "S":
             sessions.append({})
         elif "=" in line and sessions:
@@ -48,7 +67,7 @@ def parse(output: str) -> tuple[str | None, bool]:
 
 
 def probe(board: dict, user: str, password: str, timeout: int = 8) -> dict:
-    """Döner: {"ok": bool, "user": str|None, "locked": bool, "error": str}."""
+    """Döner: {"ok": bool, "user": str|None, "locked": bool, "display": str, "error": str}."""
     if not board.get("ip"):
         return {"ok": False, "user": None, "locked": False, "error": "IP yok"}
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", f"ConnectTimeout={min(timeout, 6)}",
@@ -60,8 +79,14 @@ def probe(board: dict, user: str, password: str, timeout: int = 8) -> dict:
         return {"ok": False, "user": None, "locked": False, "error": "zaman aşımı"}
     if proc.returncode != 0:
         return {"ok": False, "user": None, "locked": False, "error": f"ssh çıkış kodu {proc.returncode}"}
-    name, locked = parse(proc.stdout.decode("utf-8", "replace"))
-    return {"ok": True, "user": name, "locked": locked, "error": ""}
+    out = proc.stdout.decode("utf-8", "replace")
+    name, locked = parse(out)
+    return {"ok": True, "user": name, "locked": locked, "display": display_state(out), "error": ""}
+
+
+def store_display(conn, board_id: int, state: str) -> None:
+    """Monitör güç durumunu yazar ("" = bilinmiyor → NULL)."""
+    conn.execute("UPDATE boards SET display_state = NULLIF(%s, '') WHERE id = %s", (state, board_id))
 
 
 def store(conn, board_id: int, user: str | None, locked: bool | None = None) -> None:

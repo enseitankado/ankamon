@@ -271,7 +271,10 @@ def _run_job(job) -> None:
                            "Bitti." if result["status"] == "ok" else f"Başarısız ({result['status']}).")
                     ev.close()
                     # Tahtalar grid'inin "Oturum" sütunu hemen güncellensin (bkz. executor/session_probe.py).
-                    if result["status"] == "ok" and job["type"] != "wake":
+                    if result["status"] == "ok" and job["type"] == "wake":
+                        # Ekranlar'daki "güç tasarrufu" yazısı bir sonraki yoklamayı beklemeden kalksın.
+                        session_probe.store_display(conn, t["board_id"], "On")
+                    elif result["status"] == "ok":
                         if job["type"] == "login":
                             session_probe.store(conn, t["board_id"], username, False)
                         else:
@@ -280,6 +283,7 @@ def _run_job(job) -> None:
                             st = session_probe.probe(t, user, password)
                             if st["ok"]:
                                 session_probe.store(conn, t["board_id"], st["user"], st["locked"])
+                                session_probe.store_display(conn, t["board_id"], st["display"])
         elif job["type"] == "backup_home":
             # "Yedekle": tahtalar SIRAYLA (command/action gibi) — her tahtanın canlı raporu ve ilerlemesi
             # okunaklı aksın, aynı anda onlarca tahtanın ağ/disk yükü birikmesin; `conn` da yalnız bu
