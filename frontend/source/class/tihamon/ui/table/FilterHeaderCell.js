@@ -36,6 +36,10 @@ qx.Class.define("tihamon.ui.table.FilterHeaderCell", {
     this.__filterField.addListener("tap", e => e.stopPropagation());
     this.__filterField.addListener("pointerdown", e => e.stopPropagation());
     this.__filterField.addListener("dbltap", e => e.stopPropagation());
+    // Tuşlar da tabloya kabarmasın: qx Table keypress'te Boşluk'u (satır seçimi) ve ok/Home/End/PageUp
+    // tuşlarını kendisi işleyip varsayılanı engelliyor — kutuya boşluk yazılamıyordu ("Arge 2" → "Arge2").
+    this.__filterField.addListener("keypress", e => e.stopPropagation());
+    this.__filterField.addListener("keydown", e => e.stopPropagation());
     this._add(this.__filterField, { row: 1, column: 0, colSpan: 3 });
     // Başlık yüksekliğinin fazlası etiket satırına değil kutunun satırına gitsin ve kutu etiketin
     // hemen altında (üste hizalı) dursun: aksi hâlde birçok temada (Açık/Koyu Mavi, Indigo, Simple…)
