@@ -30,7 +30,6 @@ qx.Class.define("tihamon.page.Maintenance", {
     // Ahenk kontrol sonuçları (hazır işlem "Ahenk kontrol" — bkz. page.Ahenk).
     add("ahenk", "Ahenk", "diagnose", tihamon.page.Ahenk);
     this._rememberTab(this.__tabs, "maintenance"); // son seçili sekme (dinleyiciden önce: activate tetiklenmesin)
-    this._hideTabBar(this.__tabs); // sekmeler sol ağaçta "Bakım"ın alt seçenekleri (bkz. ui.Shell PAGES tabs)
     this.__tabs.addListener("changeSelection", () => {
       const page = this.__current();
       if (page && !this.__switching) {

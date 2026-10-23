@@ -21,7 +21,6 @@ qx.Class.define("tihamon.page.DiskUsage", {
       this.__tabs.add(tab);
     });
     this._rememberTab(this.__tabs, "diskusage"); // son seçili sekme (bkz. Base._rememberTab)
-    this._hideTabBar(this.__tabs); // sekmeler sol ağaçta "Disk kullanımı"nın alt seçenekleri
     this.add(this.__tabs, { flex: 1 });
   },
 

@@ -1,7 +1,8 @@
 /**
  * Loglar: iki tür — "Sistem logları" (ham syslog, /api/logs) ve "Komut logları"
  * (tahtalarda çalıştırılan komutlar, /api/command-logs — tiha-mon'dan gidenler ve tahtadaki kullanıcıların
- * kendi sudo/pkexec/su komutları, kaynak "local"; "Kullanıcı" orada tahtadaki hesaptır). Tür sol ağaçtan setMode ile seçilir.
+ * kendi sudo/pkexec/su komutları, kaynak "local"; "Kullanıcı" orada tahtadaki hesaptır). Tür sayfadaki sekmelerden
+ * ya da sol ağaçtaki Loglar alt seçeneklerinden seçilir (ikisi eşzamanlı; bkz. KINDS, setMode).
  *
  * Sayfalı: altta sayfa boyutu + önceki/sonraki (sunucuda offset/limit; toplam yalnız ilk sayfada
  * sayılır — bkz. LogsApi COUNT_CAP). Satırlar çoklu seçilebilir; sağ menü/Ctrl+C seçili satırların
@@ -19,19 +20,37 @@ qx.Class.define("tihamon.page.Logs", {
     // "Disk kullanımı" düğmesi burada DEĞİL, __build()'in kurduğu süzgeç satırında (Ara'nın sağında,
     // en sağa yaslı) — bkz. __build().
     this.__body = new qx.ui.container.Composite(new qx.ui.layout.VBox(10));
-    this.add(this.__body, { flex: 1 });
-    this.__mode = "system";
+    // Tür sekmeleri (kullanıcı isteği): Sistem logları / Komut logları. Sol ağaçta Loglar'ın alt seçenekleri
+    // de bu sekmelerdir (bkz. ui.Shell PAGES tabs, Base.selectTab/_rememberTab); gövde seçili sekmenin içinde.
+    this.__tabs = new qx.ui.tabview.TabView();
+    tihamon.page.Logs.KINDS.forEach(([key, label]) => {
+      const tab = new qx.ui.tabview.Page(label);
+      tab.setLayout(new qx.ui.layout.VBox());
+      tab.setUserData("key", key);
+      this.__tabs.add(tab);
+    });
+    this.add(this.__tabs, { flex: 1 });
+    this._rememberTab(this.__tabs, "logs"); // son seçili tür (dinleyiciden önce: geri yükleme onu tetiklemesin)
+    this.__mode = this.currentTab() || "system";
+    this.__placeBody();
+    this.__tabs.addListener("changeSelection", () => {
+      this.__placeBody();
+      this.__applyMode(this.currentTab());
+    });
     this.__pageSize = tihamon.page.Logs.PAGE_SIZES.includes(this.__loadPageSize()) ? this.__loadPageSize() : 500;
     this.__build();
   },
 
   statics: {
-    PAGE_SIZES: [100, 200, 500, 1000]
+    PAGE_SIZES: [100, 200, 500, 1000],
+    // Tür sekmeleri: [anahtar (= mod, sol ağaç yaprağının "tab"ı — bkz. ui.Shell LOG_KINDS), etiket]
+    KINDS: [["system", "Sistem logları"], ["command", "Komut logları"]]
   },
 
   members: {
     __title: null,
     __body: null,
+    __tabs: null,
     __mode: null,
     __board: null,
     __range: null,
@@ -59,12 +78,29 @@ qx.Class.define("tihamon.page.Logs", {
     __exclusionsButton: null,
     __exclusions: 0,
 
-    /** Sol ağaçtaki log türünü uygular. */
+    /** Log türünü uygular (sol ağaç, durum çubuğu); ilgili tür sekmesi de seçilir. */
     setMode(mode) {
+      this.__applyMode(mode);
+      this.selectTab(mode); // sekme dinleyicisinin __applyMode'u aynı tür olduğundan yeniden yüklemez
+    },
+
+    __applyMode(mode) {
       if (mode && mode !== this.__mode) {
         this.__mode = mode;
         this.__build();
         this.refresh();
+      }
+    },
+
+    /** Gövdeyi (süzgeç satırı + tablo) seçili tür sekmesinin içine taşır. */
+    __placeBody() {
+      const tab = this.__tabs.getSelection()[0];
+      const parent = this.__body.getLayoutParent();
+      if (tab && parent !== tab) {
+        if (parent) {
+          parent.remove(this.__body);
+        }
+        tab.add(this.__body, { flex: 1 });
       }
     },
 
@@ -79,6 +115,7 @@ qx.Class.define("tihamon.page.Logs", {
     setBoardFilter(boardId, severity) {
       this.__mode = "system";
       this.__build();
+      this.selectTab("system"); // tür sekmesi de (aynı tür: dinleyici yeniden yüklemez)
       this.__pendingBoardId = boardId;
       if (severity !== undefined && severity !== null) {
         const item = this.__extra.getSelectables().find(it => it.getModel() === String(severity));

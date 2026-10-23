@@ -98,7 +98,6 @@ qx.Class.define("tihamon.page.Settings", {
       tabs.add(extPage);
 
       this._rememberTab(tabs, "settings"); // sekmeler her yüklemede yeniden kurulur; son seçili geri gelir
-      this._hideTabBar(tabs); // sekmeler sol ağaçta "Ayarlar"ın alt seçenekleri (bkz. ui.Shell PAGES tabs)
 
       this.__body.add(tabs, { flex: 1 });
 

@@ -541,17 +541,6 @@ qx.Class.define("tihamon.page.Base", {
       return tab ? this.__tabId(tab) : null;
     },
 
-    /** Sekmeler sol ağaçta alt seçenek olduğunda sayfadaki sekme çubuğu gizlenir (bkz. ui.Shell PAGES tabs). */
-    _hideTabBar(tabs) {
-      // Gizlenmez (excluded/hidden değil): sıfır yükseklikte, içi kırpılmış, saydam ve tıklanamaz. TabView'ın
-      // scrollChildIntoView'ı ve temaların sekme altı çizgi animasyonu (ville.theme.MTabView) düğmelerin
-      // konumunu ve çizginin DOM'unu okuyor — gizli çubukta ikisi de yoktu ("reading 'left'" /
-      // "reading 'addEventListener'" hataları).
-      const bar = tabs.getChildControl("bar");
-      bar.set({ height: 0, minHeight: 0, maxHeight: 0, margin: 0, padding: 0, opacity: 0 });
-      bar.getContentElement().setStyles({ overflow: "hidden", pointerEvents: "none" });
-    },
-
     /** Tek bir arayüz tercihini sunucuya yazar (bkz. Base.savePref). */
     __savePref(name, value) {
       tihamon.page.Base.savePref(this._user, name, value);

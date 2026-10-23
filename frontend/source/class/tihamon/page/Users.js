@@ -36,7 +36,6 @@ qx.Class.define("tihamon.page.Users", {
       this.__tabs.add(this.__logins);
     }
     this._rememberTab(this.__tabs, "users"); // son seçili sekme (bkz. Base._rememberTab)
-    this._hideTabBar(this.__tabs); // sekmeler sol ağaçta "Kullanıcılar"ın alt seçenekleri
     this.__tabs.addListener("changeSelection", () => this.refresh());
     this.add(this.__tabs, { flex: 1 });
   },
