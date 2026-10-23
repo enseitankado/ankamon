@@ -17,7 +17,7 @@ final class AhenkApi
     public function index(Request $request): array
     {
         $rows = Db::all(
-            "SELECT b.id, COALESCE(NULLIF(b.label, ''), NULLIF(b.hostname, ''), b.ip) AS name, b.ip, b.online,
+            "SELECT b.id, COALESCE(NULLIF(b.label, ''), NULLIF(b.hostname, ''), host(b.ip)) AS name, host(b.ip) AS ip, b.online,
                     extract(epoch FROM r.checked_at)::bigint AS checked_at, r.exit_code, r.tool_commit, r.job_id,
                     COALESCE(r.summary, '{}'::jsonb) AS summary
              FROM boards b LEFT JOIN ahenk_reports r ON r.board_id = b.id
