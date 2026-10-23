@@ -402,3 +402,35 @@ def apply_flows(conn, results: dict) -> None:
                 (f["pps"], f["kbps"], f["proto"], mac),
             )
     bump(conn)
+
+
+_HOSTNAME_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached"
+                  " AND (d.hostname IS NULL OR d.hostname = '')")
+
+
+def next_hostname_target(conn, retry_hours: int) -> dict | None:
+    """Hostname'i boş, çevrim içi bir cihaz (NetBIOS/SMB portu açık olanlar önce). Çözülemeyenler
+    hostname_tried_at ile geciktirilir; retry_hours'tan eski denemeler yeniden sıraya girer."""
+    return conn.execute(
+        f"""SELECT d.id, host(d.ip) AS ip,
+                   EXISTS (SELECT 1 FROM net_services s WHERE s.device_id = d.id AND s.port IN (137, 139, 445)) AS netbios
+           FROM net_devices d JOIN net_networks n ON n.id = d.network_id
+           WHERE {_HOSTNAME_CAND}
+             AND (d.hostname_tried_at IS NULL OR d.hostname_tried_at < now() - make_interval(hours => %s))
+           ORDER BY netbios DESC, d.hostname_tried_at NULLS FIRST, d.id
+           LIMIT 1""",
+        (retry_hours,),
+    ).fetchone()
+
+
+def apply_hostname(conn, dev: dict, name: str) -> None:
+    """Çözülen adı yazar (hâlâ boşsa); her durumda deneme anını işaretler (yeniden-denemeyi geciktirir)."""
+    if name:
+        conn.execute(
+            "UPDATE net_devices SET hostname = %s, hostname_tried_at = now()"
+            " WHERE id = %s AND (hostname IS NULL OR hostname = '')",
+            (name, dev["id"]),
+        )
+        bump(conn)
+    else:
+        conn.execute("UPDATE net_devices SET hostname_tried_at = now() WHERE id = %s", (dev["id"],))

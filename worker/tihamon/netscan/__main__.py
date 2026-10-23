@@ -40,6 +40,9 @@ ACTIVITY_PAUSE = 30
 # Görülen akış gözlemi (pasif AF_PACKET): her pencere boyunca dinleyip cihaz başına yoğunluk çıkarır.
 FLOW_WINDOW = float(os.environ.get("NETSCAN_FLOW_WINDOW", "30"))
 FLOW_PAUSE = 5
+# Hostname çözme (NetBIOS + ters DNS): hostname'i boş çevrim içi cihazlar tek tek adlandırılmaya çalışılır.
+HOSTNAME_RETRY_HOURS = int(os.environ.get("NETSCAN_HOSTNAME_RETRY_HOURS", "6"))
+HOSTNAME_PAUSE = 3
 
 _state_lock = threading.Lock()
 _state: dict = {"phase": "starting"}
@@ -188,6 +191,32 @@ def _flow_loop() -> None:
             time.sleep(30)
 
 
+def _hostname_loop() -> None:
+    """Ayrı kanal: hostname'i boş çevrim içi cihazların adını NetBIOS (nmblookup -A) ve ters DNS ile çözer
+    (bkz. probe.netbios_name/reverse_dns). Çoğu Windows PC'nin DNS PTR kaydı yoktur; ad NetBIOS'tan gelir.
+    Tek tek, yük-uyarlamalı; çözülemeyen cihaz hostname_tried_at ile geciktirilir (yeniden-denemeyi azaltır).
+    """
+    while True:
+        try:
+            with db.connect() as conn:
+                while True:
+                    if _decision["busy"]:
+                        time.sleep(HOSTNAME_PAUSE)
+                        continue
+                    dev = store.next_hostname_target(conn, HOSTNAME_RETRY_HOURS)
+                    if dev is None:
+                        time.sleep(60)
+                        continue
+                    name = probe.netbios_name(dev["ip"]) or probe.reverse_dns(dev["ip"])
+                    store.apply_hostname(conn, dev, name)
+                    if name:
+                        log.info("hostname çözüldü: %s → %s", dev["ip"], name)
+                    time.sleep(HOSTNAME_PAUSE)
+        except Exception:
+            log.exception("hostname döngüsü hatası")
+            time.sleep(30)
+
+
 def _sweep(conn) -> None:
     nets = store.sync_networks(conn, ifaces.networks())
     _set(conn, networks=len(nets))
@@ -230,6 +259,7 @@ def main() -> None:
     threading.Thread(target=_shares_loop, name="shares", daemon=True).start()
     threading.Thread(target=_activity_loop, name="activity", daemon=True).start()
     threading.Thread(target=_flow_loop, name="flows", daemon=True).start()
+    threading.Thread(target=_hostname_loop, name="hostname", daemon=True).start()
 
     next_sweep = 0.0
     while True:

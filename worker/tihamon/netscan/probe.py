@@ -181,6 +181,21 @@ def reverse_dns(ip: str) -> str:
     return "" if name == ip else name  # musl, PTR kaydı yokken adresin kendisini döndürür
 
 
+def netbios_name(ip: str) -> str:
+    """NetBIOS ad sorgusu (nmblookup -A): DNS PTR kaydı OLMAYAN Windows PC'lerin bilgisayar adı. Yoksa ''.
+
+    Çıktıda her NetBIOS adı 'AD   <tür> - [<GROUP>] B <ACTIVE>' satırıyla gelir. İş istasyonu adı,
+    GROUP olmayan (benzersiz) <00> kayıttır; çalışma grubu ad(lar)ı <GROUP> ile işaretlidir, atlanır.
+    """
+    out = _run(["nmblookup", "-A", ip], timeout=8)
+    for line in out.splitlines():
+        if "<00>" in line and "<GROUP>" not in line:
+            name = line.split()[0].strip()
+            if name and name not in ("MAC", "Looking"):
+                return name
+    return ""
+
+
 # ---------------------------------------------------------------- SMB/NetBIOS paylaşımları
 # NT_STATUS_... metninden sonucu çıkarırız. ACCESS_DENIED/LOGON_FAILURE = kimlik gerekiyor,
 # diğerleri (HOST_UNREACHABLE, CONNECTION_REFUSED…) erişilemez.
