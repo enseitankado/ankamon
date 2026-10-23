@@ -190,6 +190,76 @@ publish-aaaa-on-ipv4=no"
 }
 configure_avahi || warn "Avahi ayarlanamadı; istemciler sunucuya IP adresiyle bağlanabilir."
 
+# ------------------------------------------------------------------ Ağlar arası yalıtım
+# Sunucu tahta ağına ve idari ağa ayrı kartlarla bağlı olabilir; bu ağlar switch'te yalıtılmıştır ve
+# sunucu bu yalıtımı delmemelidir. Docker ip_forward'ı açar; bugün FORWARD zincirinin DROP politikası
+# (Docker'ın koyduğu) korur, ama buna güvenilmez: fiziksel kartlar arasında yönlendirme kendi nftables
+# tablomuzla açıkça düşürülür (Docker köprüleri — derleme/yardımcı konteynerler — muaf). Tiha-Mon host
+# ağında çalıştığı için yönlendirmeye hiç ihtiyaç duymaz. Ayrıca: aynı ağdaki iki kart birbirinin IP'si
+# için ARP yanıtı vermesin (ARP flux) ve sunucu ICMP yönlendirme bildirimi (redirect) göndermesin.
+# Kaldırmak için: sudo systemctl disable --now tihamon-netguard
+configure_netguard() {
+    local sysctl_conf=/etc/sysctl.d/90-tihamon-net.conf
+    local want_sysctl="# tiha-mon (install.sh): ARP yanıtı yalnız adresin sahibi karttan; ICMP redirect yok.
+net.ipv4.conf.all.arp_ignore = 1
+net.ipv4.conf.default.arp_ignore = 1
+net.ipv4.conf.all.arp_announce = 2
+net.ipv4.conf.default.arp_announce = 2
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0"
+    if [ "$(cat "$sysctl_conf" 2>/dev/null)" != "$want_sysctl" ]; then
+        printf '%s\n' "$want_sysctl" | as_root tee "$sysctl_conf" >/dev/null
+        as_root sysctl -q -p "$sysctl_conf" >/dev/null || warn "Ağ sysctl ayarları uygulanamadı."
+    fi
+
+    local nft
+    nft=$(command -v nft || true)
+    if [ -z "$nft" ] && have apt-get; then
+        as_root apt-get install -y -q nftables >/dev/null 2>&1 || true
+        nft=$(command -v nft || true)
+    fi
+    [ -n "$nft" ] || { warn "nft bulunamadı; ağlar arası yönlendirme yalnız Docker'ın FORWARD politikasıyla engelli."; return 0; }
+
+    local rules=/etc/tihamon/netguard.nft unit=/etc/systemd/system/tihamon-netguard.service
+    local want_rules='# tiha-mon (install.sh): fiziksel ağ kartları arasında IP yönlendirmesi yok (tahta ağı <-> idari ağ).
+# Docker köprüleri (docker0, br-*) muaf: derleme ve yardımcı konteynerler dışarı çıkabilsin.
+table inet tihamon_guard
+delete table inet tihamon_guard
+table inet tihamon_guard {
+    chain forward {
+        type filter hook forward priority filter - 10; policy accept;
+        iifname "docker0" accept
+        iifname "br-*" accept
+        oifname "docker0" accept
+        oifname "br-*" accept
+        counter drop
+    }
+}'
+    local want_unit="[Unit]
+Description=tiha-mon: ağ kartları arası yönlendirme engeli
+After=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=$nft -f $rules
+ExecStop=$nft delete table inet tihamon_guard
+
+[Install]
+WantedBy=multi-user.target"
+    if [ "$(cat "$rules" 2>/dev/null)" != "$want_rules" ] || [ "$(cat "$unit" 2>/dev/null)" != "$want_unit" ]; then
+        say "Ağlar arası yalıtım: fiziksel kartlar arasında yönlendirme engelleniyor (tihamon-netguard)…"
+        as_root mkdir -p /etc/tihamon
+        printf '%s\n' "$want_rules" | as_root tee "$rules" >/dev/null
+        printf '%s\n' "$want_unit" | as_root tee "$unit" >/dev/null
+        as_root systemctl daemon-reload
+    fi
+    as_root systemctl enable tihamon-netguard >/dev/null 2>&1 || true
+    as_root systemctl restart tihamon-netguard || warn "tihamon-netguard başlatılamadı (bkz. journalctl -u tihamon-netguard)."
+}
+configure_netguard || warn "Ağlar arası yalıtım ayarlanamadı."
+
 # ------------------------------------------------------------------ Kaynak kod
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
 if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
@@ -370,7 +440,10 @@ if [ -n "$NEW_ADMIN_PASSWORD" ]; then
 else
     echo "    Parola        : ilk kurulumda belirlenen (ilk değer: $INSTALL_DIR/.env → ETAPADMIN_PASSWORD)"
 fi
-echo "    Log sunucusu  : ${ADDRESS:-bu sunucu}:$SYSLOG_PORT (TCP/UDP) — TiHA'nın \"Merkezi log sunucusu\" adımına bu adresi yazın"
+# Sunucu birden çok ağa bağlıysa (tahta + idari) her kartın adresi; tahtalar kendi ağındakini kullanır.
+ADDRESSES=$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+(\.[0-9]+){3}$' | grep -v -E '^172\.(1[6-9]|2[0-9]|3[01])\.' | paste -sd ' ' - || true)
+echo "    Log sunucusu  : ${ADDRESSES:-${ADDRESS:-bu sunucu}} — port $SYSLOG_PORT (TCP/UDP); TiHA'nın \"Merkezi log sunucusu\" adımına tahtaların ağındaki adresi yazın"
+echo "    Ağ arabirimleri: birden çok ağa bağlıysa Ayarlar ▸ Ağ arabirimleri'nden tahta ağını seçin"
 echo "    Veri ve yedek : $INSTALL_DIR/data"
 echo "    Güncelleme    : sudo $INSTALL_DIR/install.sh --update"
 exit 0

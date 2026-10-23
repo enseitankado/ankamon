@@ -1,6 +1,7 @@
 /**
  * Ayarlar: herkese açık "Görünüm" (tema) sekmesi + yalnız yöneticiye görünen "Tahta erişimi"
- * (SSH + Samba + ekran istemcisinin otomatik kurulumu) ve "Ders saatleri" (ui.LessonTimesEditor, /api/lesson-times)
+ * (SSH + Samba + ekran istemcisinin otomatik kurulumu), "Ağ arabirimleri" (tahta/idari ağ rolleri) ve
+ * "Ders saatleri" (ui.LessonTimesEditor, /api/lesson-times)
  * sekmeleri. Sayfa herkese açıktır (bkz. ui.Shell.PAGES); admin
  * olmayan kullanıcı yalnız kendi tema tercihini görür (sekme yok, tek bölüm doğrudan), `/settings`
  * admin uç noktasına hiç istek atılmaz. Admin'de bölümler dikey uzamak yerine kategori başına bir
@@ -60,6 +61,28 @@ qx.Class.define("tihamon.page.Settings", {
       ).set({ rich: true, wrap: true, textColor: "app-muted" }));
       tabs.add(access);
 
+      // Ağ rolleri (bkz. worker/tihamon/netroles.py): sunucu tahta ağına ve idari ağa ayrı kartlarla
+      // bağlıysa tahta işleri yalnız tahta ağında yapılır; idari ağa taşmaz.
+      const netPage = this.__page("Ağ arabirimleri");
+      const roles = settings.network_roles || {};
+      const boardIface = this.__ifaceBox(settings.interfaces, roles.board_iface, "Otomatik (bağlı her ağ)");
+      const adminIface = this.__ifaceBox(settings.interfaces, roles.admin_iface, "Seçilmedi");
+      const netForm = new qx.ui.container.Composite(new qx.ui.layout.Grid(10, 8));
+      netForm.getLayout().setColumnFlex(1, 1);
+      netForm.add(new qx.ui.basic.Label("Tahta ağı"), { row: 0, column: 0 });
+      netForm.add(boardIface, { row: 0, column: 1 });
+      netForm.add(new qx.ui.basic.Label("İdari ağ"), { row: 1, column: 0 });
+      netForm.add(adminIface, { row: 1, column: 1 });
+      this.__section(netPage, "Ağ arabirimleri",
+        "Sunucu tahta ağına ve idari ağa ayrı kartlarla bağlıysa hangisinin hangisi olduğunu seçin. " +
+        "<b>Yalnız tahta ağında</b> yapılanlar: ağ taraması ve görülen akış gözlemi, servis/paylaşım/etkinlik " +
+        "taramaları, loglardan otomatik tahta kaydı ve tahta IP'sinin güncellenmesi; tahtaların Samba parolası da " +
+        "yalnız kayıtlı tahtalarda denenir. <b>İki ağda da</b> çalışanlar: panel, web terminal, log alımı " +
+        `(port ${settings.syslog_port}), Wake-on-LAN (tahtanın ağına, o arabirimin maskesiyle), ekran yansıtma ` +
+        "ve yerel ad duyurusu (Avahi). Yalnız idari ağ seçilirse, yalnız o karta bağlı ağlar dışındaki her ağ " +
+        "tahta ağı sayılır. İki kart aynı ağdaysa o ağ ikisi birden sayılır.", netForm);
+      tabs.add(netPage);
+
       const lessonsPage = this.__page("Ders saatleri");
       const lessons = new tihamon.ui.LessonTimesEditor(await tihamon.io.Api.get("/lesson-times"));
       this.__section(lessonsPage, "Okulun ders saatleri",
@@ -85,7 +108,11 @@ qx.Class.define("tihamon.page.Settings", {
           await tihamon.io.Api.put("/settings", {
             ssh_access: ssh.values(),
             samba_access: samba.values(),
-            screen_vnc_autoinstall: vncAuto.getValue()
+            screen_vnc_autoinstall: vncAuto.getValue(),
+            network_roles: {
+              board_iface: boardIface.getSelection()[0].getModel(),
+              admin_iface: adminIface.getSelection()[0].getModel()
+            }
           });
           await tihamon.io.Api.put("/lesson-times", lessons.getValue());
           tihamon.ui.Dialog.alert("Ayarlar kaydedildi.");
@@ -138,6 +165,29 @@ qx.Class.define("tihamon.page.Settings", {
       });
       form.add(box);
       this.__section(target, "Görünüm", "Tema seçimi seçer seçmez uygulanır (sayfa yeniden yüklenir) ve hesabınızda saklanır.", form);
+    },
+
+    /**
+     * Arabirim seçimi: ilk seçenek boş değer (otomatik/seçilmedi), sonra sunucunun kartları ("eth1 —
+     * 10.0.0.5/16"). Kayıtlı arabirim artık yoksa (kart söküldü) yine listede tutulur ki seçim kaybolmasın.
+     */
+    __ifaceBox(interfaces, current, emptyLabel) {
+      const box = new qx.ui.form.SelectBox();
+      const items = [{ name: "", label: emptyLabel }].concat((interfaces || []).map(i => ({
+        name: i.name,
+        label: `${i.name} — ${i.addresses.length ? i.addresses.join(", ") : "IPv4 adresi yok"}${i.up ? "" : " (kapalı)"}`
+      })));
+      if (current && !items.some(i => i.name === current)) {
+        items.push({ name: current, label: `${current} — şu an bulunamadı` });
+      }
+      items.forEach(i => {
+        const item = new qx.ui.form.ListItem(i.label, null, i.name);
+        box.add(item);
+        if (i.name === (current || "")) {
+          box.setSelection([item]);
+        }
+      });
+      return box;
     },
 
     /** Sekme sayfası: TabView.Page düz bir qx.ui.core.Widget değildir — VBox düzeni elle kurulur. */

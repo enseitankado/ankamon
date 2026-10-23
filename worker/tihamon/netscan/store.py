@@ -7,13 +7,15 @@ from concurrent.futures import ThreadPoolExecutor
 
 from psycopg.types.json import Jsonb
 
-from .. import activity
+from .. import activity, netroles
 from . import classify, etap_phase, oui, probe
 
 log = logging.getLogger("tihamon.netscan")
 
 # Üst üste bu kadar taramada görülmeyen cihaz çevrimdışı sayılır (telefonlar uykuda ARP'yi kaçırabilir).
 MISSES_BEFORE_OFFLINE = 2
+# Aday sorgularında: cihazın ağı tahta ağı mı (Ayarlar ▸ Ağ arabirimleri; bkz. netroles).
+_BOARD_NET = netroles.board_net_sql("n")
 
 
 def bump(conn) -> None:
@@ -51,7 +53,24 @@ def sync_networks(conn, detected: list[dict]) -> list[dict]:
         activity.record(conn, f"Ağ: sunucu artık bu ağa bağlı değil — {row['cidr']}", "warn")
     if changed or gone:
         bump(conn)
-    return [n for n in detected if n["scan_enabled"]]
+    return _scannable(detected, netroles.roles(conn))
+
+
+def _scannable(detected: list[dict], role: dict) -> list[dict]:
+    """Taranacak ağlar: taraması açık VE tahta ağı olanlar (bkz. netroles); tarama arabirimi role göre seçilir."""
+    nets = [n for n in detected if n["scan_enabled"] and netroles.is_board_net(n["ifaces"], role)]
+    for n in nets:
+        n["iface"] = netroles.scan_iface(n, role)
+    return nets
+
+
+def scannable(conn, detected: list[dict]) -> list[dict]:
+    """sync_networks'ün yazmadan eşi (pasif akış gözlemi için): kayıtlı scan_enabled'a ve role göre süzer."""
+    enabled = {r["cidr"]: r["scan_enabled"] for r in conn.execute(
+        "SELECT cidr::text AS cidr, scan_enabled FROM net_networks").fetchall()}
+    for n in detected:
+        n["scan_enabled"] = enabled.get(n["cidr"], False)
+    return _scannable(detected, netroles.roles(conn))
 
 
 def _boards(conn) -> dict[str, dict]:
@@ -236,7 +255,7 @@ def next_service_target(conn, rescan_hours: int, requested_only: bool) -> dict |
         f"""SELECT d.id, host(d.ip) AS ip, d.mac::text AS mac, d.vendor, d.hostname, d.network_id,
                   host(n.gateway) AS gateway
            FROM net_devices d JOIN net_networks n ON n.id = d.network_id
-           WHERE d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached
+           WHERE d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND {_BOARD_NET}
              AND {cond}
            ORDER BY d.services_requested_at DESC NULLS LAST, d.services_scanned_at NULLS FIRST, d.id
            LIMIT 1""",
@@ -286,11 +305,11 @@ def apply_services(conn, dev: dict, scan: dict | None) -> None:
 def service_queue(conn, rescan_hours: int) -> tuple[int, int]:
     """(bekleyen, toplam): servis taraması gereken çevrim içi cihazlar / taranabilir tüm çevrim içi cihazlar."""
     row = conn.execute(
-        """SELECT count(*) FILTER (WHERE d.services_requested_at IS NOT NULL OR d.services_scanned_at IS NULL
+        f"""SELECT count(*) FILTER (WHERE d.services_requested_at IS NOT NULL OR d.services_scanned_at IS NULL
                                    OR d.services_scanned_at < now() - make_interval(hours => %s)) AS pending,
                   count(*) AS total
            FROM net_devices d JOIN net_networks n ON n.id = d.network_id
-           WHERE d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached""",
+           WHERE d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND {_BOARD_NET}""",
         (rescan_hours,),
     ).fetchone()
     return row["pending"], row["total"]
@@ -298,7 +317,7 @@ def service_queue(conn, rescan_hours: int) -> tuple[int, int]:
 
 # ---------------------------------------------------------------- SMB/NetBIOS paylaşımları (ayrı kanal)
 # Aday cihaz: çevrim içi, taranabilir ağda, net_services'te 139 ya da 445 portu AÇIK (NetBIOS/SMB) olan.
-_SHARE_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached"
+_SHARE_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND " + _BOARD_NET +
                " AND EXISTS (SELECT 1 FROM net_services s WHERE s.device_id = d.id AND s.port IN (139, 445))")
 
 
@@ -314,7 +333,8 @@ def next_shares_target(conn, rescan_hours: int, requested_only: bool) -> dict | 
         "(d.shares_requested_at IS NOT NULL OR d.shares_scanned_at IS NULL"
         " OR d.shares_scanned_at < now() - make_interval(hours => %s))")
     return conn.execute(
-        f"""SELECT d.id, host(d.ip) AS ip, d.mac::text AS mac, d.hostname
+        f"""SELECT d.id, host(d.ip) AS ip, d.mac::text AS mac, d.hostname,
+                  EXISTS (SELECT 1 FROM boards b WHERE b.mac = d.mac OR b.ip = d.ip) AS is_board
            FROM net_devices d JOIN net_networks n ON n.id = d.network_id
            WHERE {_SHARE_CAND} AND {cond}
            ORDER BY d.shares_requested_at DESC NULLS LAST, d.shares_scanned_at NULLS FIRST, d.id
@@ -361,7 +381,7 @@ def apply_shares(conn, dev: dict, result: dict) -> None:
 
 
 # Ağ etkinliği (IP ID örneklemesi) yalnız Windows'ta güvenilirdir (bkz. activity.py); os_guess ile süzülür.
-_ACTIVITY_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached"
+_ACTIVITY_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND " + _BOARD_NET +
                   " AND d.os_guess ILIKE '%%windows%%'")
 
 
@@ -404,7 +424,7 @@ def apply_flows(conn, results: dict) -> None:
     bump(conn)
 
 
-_HOSTNAME_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached"
+_HOSTNAME_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND " + _BOARD_NET +
                   " AND (d.hostname IS NULL OR d.hostname = '')")
 
 

@@ -126,7 +126,8 @@ def _shares_loop() -> None:
                         continue
                     _set(conn, shares={"phase": "scanning", "pending": pending, "total": total, "target": dev["ip"]})
                     log.info("paylaşım taraması: %s (%s)", dev["ip"], dev["mac"])
-                    result = probe.smb_shares(dev["ip"], dev["hostname"], creds)
+                    # Tahtaların Samba parolası yalnız kayıtlı tahtalarda denenir (başka cihaza sızmasın).
+                    result = probe.smb_shares(dev["ip"], dev["hostname"], creds if dev["is_board"] else None)
                     store.apply_shares(conn, dev, result)
                     log.info("paylaşım taraması bitti: %s — %d paylaşım (%s)", dev["ip"],
                              len(result["shares"]), result["auth"])
@@ -176,7 +177,8 @@ def _flow_loop() -> None:
                         time.sleep(ACTIVITY_PAUSE)
                         continue
                     nets = ifaces.networks()
-                    cap = [n["iface"] for n in nets]
+                    # Yalnız taraması açık tahta ağlarında dinlenir (bkz. netroles); kendi MAC'lerimiz hepsinden.
+                    cap = [n["iface"] for n in store.scannable(conn, [dict(n) for n in nets])]
                     exclude = {mac for n in nets for (mac, _name) in n["local_macs"].values()}
                     if not cap:
                         time.sleep(ACTIVITY_PAUSE)

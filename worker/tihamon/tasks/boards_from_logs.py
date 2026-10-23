@@ -7,12 +7,18 @@ Kalıcı kimlik MAC'tir; logdan açılan kayıt board_identity görevinde MAC'e 
 Yalnız zamanında teslim edilen loglar sayılır: tahta bağlantısı kopukken kuyruğunda biriken loglar
 o günkü (eski) bilgisayar adını taşır; onlar yeni kayıt açmamalı, IP'yi de değiştirmemeli (imajdan
 klonlanan tahta, kaynak tahtanın kuyruğunu da taşıyıp kendi IP'sinden gönderebilir).
+
+Syslog portu iki ağdan da (tahta + idari) log kabul eder; ama Ayarlar ▸ Ağ arabirimleri'nde rol seçildiyse
+YALNIZ tahta ağından gelen kaynaklar tahta kaydı açar/IP günceller (bkz. netroles). Aksi halde idari ağdan
+tek bir sahte syslog paketi bir tahtanın IP'sini kendi adresine çevirip yönetim bağlantılarını (root
+parolasıyla SSH) üstüne çekebilirdi. İdari ağdan gelen loglar yine Loglar'da görünür.
 """
 
 import ipaddress
 import logging
 
-from .. import activity
+from .. import activity, netroles
+from ..netscan import ifaces
 
 log = logging.getLogger(__name__)
 
@@ -54,8 +60,30 @@ RECENT = """
 """
 
 
+def _board_source(conn):
+    """ip → tahta ağından mı. Rol seçilmemişse (varsayılan) her kaynak kabul edilir (eski davranış)."""
+    role = netroles.roles(conn)
+    if not role["board_iface"] and not role["admin_iface"]:
+        return lambda ip: True
+    cidrs = netroles.board_cidrs(conn, ifaces.networks())
+
+    def accept(ip: str | None) -> bool:
+        if not ip:
+            return True  # IP'siz kayıt IP değiştiremez (COALESCE); ad eşleşmesiyle güncellenir
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        return any(addr in net for net in cidrs)
+    return accept
+
+
 def run(conn) -> None:
+    from_board_net = _board_source(conn)
     for row in conn.execute(RECENT).fetchall():
+        if not from_board_net(row["ip"]):
+            log.debug("tahta ağı dışından log kaynağı (envantere işlenmedi): %s (%s)", row["host"], row["ip"])
+            continue
         updated = conn.execute(
             """UPDATE boards
                SET ip = COALESCE(%(ip)s::inet, ip), last_log_at = %(last_log_at)s, updated_at = now()
