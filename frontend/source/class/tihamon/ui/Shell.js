@@ -289,7 +289,8 @@ qx.Class.define("tihamon.ui.Shell", {
         }
         const widget = this.__open(item.getUserData("page"));
         if (!tab && this.__tabsOf(item.getUserData("page")).length) {
-          this.__selectTabLeaf(item.getUserData("page"), widget.currentTab());
+          // Seçim olayının içinde ağaç seçimi değiştirilemiyor (geri alınıyor): bir sonraki turda.
+          qx.event.Timer.once(() => this.__selectTabLeaf(item.getUserData("page"), widget.currentTab()), this, 0);
         }
         const mode = item.getUserData("mode");
         if (mode && widget.setMode) {

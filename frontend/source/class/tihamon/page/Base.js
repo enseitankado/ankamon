@@ -537,6 +537,9 @@ qx.Class.define("tihamon.page.Base", {
     /** Sekmeler sol ağaçta alt seçenek olduğunda sayfadaki sekme çubuğu gizlenir (bkz. ui.Shell PAGES tabs). */
     _hideTabBar(tabs) {
       tabs.getChildControl("bar").setVisibility("excluded");
+      // TabView sekme değişince düğmesini görünür alana kaydırır (scrollChildIntoView); çubuk gizliyken
+      // düğmenin konumu yok — "Cannot read properties of null (reading 'left')" hatası veriyordu.
+      tabs.scrollChildIntoView = () => {};
     },
 
     /** Tek bir arayüz tercihini sunucuya yazar (bkz. Base.savePref). */
