@@ -77,6 +77,18 @@ qx.Class.define("tihamon.util.Ansi", {
       return out + (open ? "</span>" : "");
     },
 
+    /**
+     * Durum etiketlerini ([ OK ] / [WARN] / [FAIL] / [INFO]) renk kodu taşımıyorlarsa aracın kendi
+     * renkleriyle (yeşil / sarı / kırmızı / camgöbeği, kalın) boyar. ahenk-debug bu etiketleri modül
+     * yüklenirken üretiyor, --renk=her-zaman ise sonra işleniyor; sonuçta etiketler renksiz geliyor.
+     * Zaten renkli olanlara dokunulmaz (aracın ileride düzeltilmesi hâlinde çift boyama olmaz).
+     */
+    colorBadges(text) {
+      const code = { "[ OK ]": "1;32", "[WARN]": "1;33", "[FAIL]": "1;31", "[INFO]": "1;36" };
+      return String(text || "").replace(/(^|[^m])(\[ OK \]|\[WARN\]|\[FAIL\]|\[INFO\])/g,
+        (m, pre, badge) => `${pre}\x1b[${code[badge]}m${badge}\x1b[0m`);
+    },
+
     /** Renk kodları atılmış düz metin (panoya kopyalamak için). */
     strip(text) {
       return String(text || "").replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r/g, "");

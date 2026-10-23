@@ -333,7 +333,7 @@ qx.Class.define("tihamon.page.Ahenk", {
         ` · ahenk-debug ${esc((data.tool_commit || "").slice(0, 7))} · ${findings.length} bulgu` +
         (data.report_text ? "" : " · renkli çıktı bir sonraki kontrolde gelir")).set({ rich: true, selectable: true }));
       const html = `<pre style="margin:0;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere;` +
-        `font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:${Ansi.FOREGROUND}">${Ansi.toHtml(text)}</pre>`;
+        `font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:${Ansi.FOREGROUND}">${Ansi.toHtml(Ansi.colorBadges(text))}</pre>`;
       const body = new qx.ui.container.Composite(new qx.ui.layout.Grow()).set({ backgroundColor: Ansi.BACKGROUND });
       body.add(new qx.ui.basic.Label(html).set({ rich: true, wrap: true, selectable: true, allowGrowX: true }));
       win.add(new qx.ui.container.Scroll(body).set({ backgroundColor: Ansi.BACKGROUND }), { flex: 1 });
