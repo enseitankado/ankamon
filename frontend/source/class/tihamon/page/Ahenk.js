@@ -32,7 +32,7 @@ qx.Class.define("tihamon.page.Ahenk", {
       { id: "name", label: "Tahta", width: 190 },
       { id: "checked", label: "Son kontrol", width: 110 },
       { id: "result", label: "Sonuç", width: 105 },
-      { id: "problems", label: "Bulgular (kritik/uyarı)" },
+      { id: "problems", label: "Bulgular (kritik/uyarı)", width: 300 },
       { id: "version", label: "Ahenk sürümü", width: 110 },
       { id: "service", label: "Servis", width: 110 },
       { id: "registered", label: "Lider kaydı (yerel)", width: 120 },
