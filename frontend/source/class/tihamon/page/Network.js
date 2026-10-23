@@ -75,7 +75,8 @@ qx.Class.define("tihamon.page.Network", {
       // Ağ etkinliği: IP ID örneklemesinden yaklaşık pkt/sn (yalnız Windows; bkz. worker netscan/activity.py,
       // bellek network-usage-study). Boş = ölçülmedi/güvenilmez (Linux/kamera/yanıt yok). Sona eklendi:
       // servis/paylaşım alt satırları sabit (düşük) sütun sırası kullanır, boş kalır.
-      { id: "activity", label: "Ağ etkinliği (kbit/sn)", hint: "Görülen akış yoğunluğu — kbit/sn, pasif gözlem (tek sayısal değer; protokol ve Windows IP-ID ayrıntısı Bilgisayar ayrıntıları penceresinde)", width: 150 }
+      { id: "activity", label: "Ağ etkinliği", hint: "Göreli ağ yoğunluğu 0–100 (anlık en yüksek görülen akış = 100; pasif gözlem). Ham değer: 'Ağ akışı' sütunu.", width: 120 },
+      { id: "activity_detail", label: "Ağ akışı", hint: "Görülen akış ayrıntısı: kbit/sn + baskın protokol; görünür akış yoksa Windows IP-ID gönderim hızı (sakin/boş).", width: 170 }
       // Ayrı "Takma ad" (MAC kaydı) sütunu yok (kullanıcı isteği, 2026-10-19: "Takma ad / Ad" ile yineleniyordu);
       // MAC ↔ takma ad kaydı "Takma ad / Ad"ın kendisini besler — bkz. ui.network.Ops.deviceName (known_alias).
     ];
@@ -223,9 +224,28 @@ qx.Class.define("tihamon.page.Network", {
       // "Ağ etkinliği" STANDART sayısal metrik: görülen akış yoğunluğu, kbit/sn (pasif gözlem, flows.py).
       // Hücre tek bir SAYI (birim sütun başlığında); ölçüm yoksa (flow_at 10 dk'dan eski) null = boş.
       // Baskın protokol ve Windows IP-ID gönderim hızı artık grid'de değil, Bilgisayar ayrıntıları penceresinde.
-      const flowNum = d => {
+      // İki sütun aynı pasif gözlem verisinden (flows.py):
+      //  - "Ağ etkinliği": 0–100 GÖRELİ yoğunluk — referans o anki tüm cihazların görülen akışı (en yüksek = 100).
+      //  - "Ağ akışı": insan-okur ayrıntı (kbit/sn + baskın protokol; görünür akış yoksa Windows IP-ID gönderim hızı).
+      const freshKbps = d => {
         const fresh = d.flow_at && (Date.now() / 1000 - d.flow_at) < 600;
-        return fresh && d.flow_kbps != null ? Math.round(d.flow_kbps * 10) / 10 : null;
+        return fresh && d.flow_kbps != null ? d.flow_kbps : null;
+      };
+      const maxFlow = Math.max(0, ...data.devices.map(d => freshKbps(d) || 0));
+      const normNum = d => {
+        const v = freshKbps(d);
+        return v == null ? null : (maxFlow > 0 ? Math.round(100 * v / maxFlow) : 0);
+      };
+      const flowText = d => {
+        const v = freshKbps(d);
+        if (v != null && (d.flow_kbps >= 1 || d.flow_pps >= 1)) {
+          const rate = d.flow_kbps >= 1 ? Math.round(d.flow_kbps) + " kbit/sn" : d.flow_pps.toFixed(1) + " pkt/sn";
+          return d.flow_proto ? rate + " · " + d.flow_proto : rate;
+        }
+        if (d.activity_pps != null && d.activity_pps >= 1) {
+          return "gönderim ~" + Math.round(d.activity_pps) + " pkt/sn";
+        }
+        return (v != null || d.activity_pps != null) ? "sakin" : "";
       };
       this.__devices = new Map(data.devices.map(d => [d.id, d]));
       // cells: [kimlik, işaret, ▸, …sütunlar] — alt satırlar __apply'da eklenir.
@@ -240,7 +260,7 @@ qx.Class.define("tihamon.page.Network", {
           netName.get(d.network_id) || d.network,
           F.ago(d.first_seen_at), d.online ? "şimdi" : F.ago(d.last_seen_at), d.notes || "",
           F.etap(d.etap),
-          flowNum(d)
+          normNum(d), flowText(d)
         ]
       }));
       this.__apply();
@@ -274,9 +294,10 @@ qx.Class.define("tihamon.page.Network", {
       const asc = this.__model.isSortAscending();
       const ipCol = 2 + this.__columns.findIndex(c => c.id === "ip");
       const activityCol = 2 + this.__columns.findIndex(c => c.id === "activity");
+      const detailCol = 2 + this.__columns.findIndex(c => c.id === "activity_detail");
       if (col >= 2) {
         const key = col === ipCol ? (r => tihamon.page.Network.ipKey(r.cells[col]))
-          : col === activityCol ? (r => tihamon.page.Network.activityKey(r.device))
+          : (col === activityCol || col === detailCol) ? (r => tihamon.page.Network.activityKey(r.device))
           : (r => String(r.cells[col] ?? "").toLocaleLowerCase("tr"));
         shown = shown.slice().sort((a, b) => {
           const ka = key(a);
