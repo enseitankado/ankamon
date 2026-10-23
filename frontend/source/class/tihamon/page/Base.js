@@ -7,6 +7,8 @@ qx.Class.define("tihamon.page.Base", {
   type: "abstract",
 
   statics: {
+    // Sayfanın sekmesi değişti ({page, tab}) — ui.Shell ağaçtaki sekme yaprağını vurgular.
+    TAB_CHANGED: "tihamon.tabChanged",
     _canvas: null,
 
     /**
@@ -174,6 +176,8 @@ qx.Class.define("tihamon.page.Base", {
   },
 
   members: {
+    __tabView: null,
+    __pendingTab: null,
     _user: null,
     _toolbar: null,
     _actions: null,
@@ -479,8 +483,11 @@ qx.Class.define("tihamon.page.Base", {
      */
     _rememberTab(tabs, name) {
       const key = "tab." + name;
-      const idOf = tab => tab.getUserData("key") || String(tab.getLabel() || "").replace(/\s*\(\d+\)$/, "");
-      const saved = (this._user.ui_prefs || {})[key];
+      const idOf = tab => this.__tabId(tab);
+      // Ağaçtan istenmiş ama sekmeler henüz kurulmamışsa (ör. Ayarlar her yüklemede yeniden kurar) o sekme.
+      const saved = this.__pendingTab || (this._user.ui_prefs || {})[key];
+      this.__pendingTab = null;
+      this.__tabView = tabs;
       const tab = saved && tabs.getChildren().find(t => idOf(t) === saved);
       if (tab && tabs.getSelection()[0] !== tab) {
         tabs.setSelection([tab]);
@@ -490,7 +497,46 @@ qx.Class.define("tihamon.page.Base", {
         if (selected && idOf(selected) !== (this._user.ui_prefs || {})[key]) {
           this.__savePref(key, idOf(selected));
         }
+        // Sol ağaç açık sekmenin yaprağını vurgulasın (sekme sayfanın içinden değiştiğinde de — bkz. ui.Shell).
+        if (selected) {
+          qx.event.message.Bus.dispatchByName(tihamon.page.Base.TAB_CHANGED, { page: this, tab: idOf(selected) });
+        }
       });
+    },
+
+    /** Sekme kimliği: userData "key" varsa o, yoksa etiket (sondaki "(3)" gibi sayaç hariç). */
+    __tabId(tab) {
+      return tab.getUserData("key") || String(tab.getLabel() || "").replace(/\s*\(\d+\)$/, "");
+    },
+
+    /**
+     * Sol ağaçtaki sekme seçeneği (bkz. ui.Shell PAGES tabs): sayfanın _rememberTab'a verdiği TabView'da o
+     * sekmeyi seçer. Sekmeler henüz kurulmadıysa istek bekletilir, kurulunca (_rememberTab) uygulanır.
+     * @return {Boolean} hemen seçildi mi
+     */
+    selectTab(key) {
+      const tabs = this.__tabView && !this.__tabView.isDisposed() ? this.__tabView : null;
+      const tab = tabs && tabs.getChildren().find(t => this.__tabId(t) === key);
+      if (!tab) {
+        this.__pendingTab = key;
+        return false;
+      }
+      if (tabs.getSelection()[0] !== tab) {
+        tabs.setSelection([tab]);
+      }
+      return true;
+    },
+
+    /** O an açık sekmenin kimliği (ağaçta vurgulamak için); sekmesiz sayfada null. */
+    currentTab() {
+      const tabs = this.__tabView && !this.__tabView.isDisposed() ? this.__tabView : null;
+      const tab = tabs && tabs.getSelection()[0];
+      return tab ? this.__tabId(tab) : null;
+    },
+
+    /** Sekmeler sol ağaçta alt seçenek olduğunda sayfadaki sekme çubuğu gizlenir (bkz. ui.Shell PAGES tabs). */
+    _hideTabBar(tabs) {
+      tabs.getChildControl("bar").setVisibility("excluded");
     },
 
     /** Tek bir arayüz tercihini sunucuya yazar (bkz. Base.savePref). */

@@ -66,6 +66,11 @@ qx.Class.define("tihamon.page.Ahenk", {
     Object.keys(saved).forEach(id => this.__fields[id] && this.__fields[id].setValue(saved[id]));
 
     this.__table.addListener("cellDbltap", e => this.__showReport(this.__boardAt(e.getRow())));
+    // Satır sağ menüsü: Raporu göster (+ yetki varsa çevrim içi tahtada Ahenk kontrol).
+    this.__table.addListener("cellContextmenu", e => {
+      const board = this.__boardAt(e.getRow());
+      this.__table.setContextMenu(board ? this.__rowMenu(board) : null);
+    });
     this.__table.getSelectionModel().addListener("changeSelection", () => this.__detail.setEnabled(!!this.__selectedBoard()));
     this.__detail.setEnabled(false);
     this.add(this.__table, { flex: 1 });
@@ -291,6 +296,20 @@ qx.Class.define("tihamon.page.Ahenk", {
       this.__apply();
     },
 
+    __rowMenu(board) {
+      const menu = new qx.ui.menu.Menu();
+      const ICON = tihamon.ui.Shell.ICON;
+      const report = tihamon.ui.BoardOps.menuButton(ICON.info, "Raporu göster", () => this.__showReport(board));
+      report.setEnabled(board.checked_at !== null);
+      menu.add(report);
+      if (this._can("actions")) {
+        const run = tihamon.ui.BoardOps.menuButton(ICON.run, "Ahenk kontrol", () => this.__runOn([board]));
+        run.setEnabled(!!board.online);
+        menu.add(run);
+      }
+      return menu;
+    },
+
     __run(all) {
       const checked = this._checkedIds(this.__table);
       const boards = (this.__boards || []).filter(b => b.online && (all || checked.includes(b.id)));
@@ -298,9 +317,13 @@ qx.Class.define("tihamon.page.Ahenk", {
         tihamon.ui.Dialog.alert(all ? "Çevrim içi tahta yok." : "Önce çevrim içi bir ya da daha fazla tahta işaretleyin.");
         return;
       }
+      this.__runOn(boards);
+    },
+
+    __runOn(boards) {
       tihamon.ui.Jobs.show(tihamon.io.Api.post("/jobs", {
         type: "action", action: "ahenk-check", board_ids: boards.map(b => b.id), values: { KAPSAM: "tam" }
-      }).then(res => res.id), `Ahenk kontrol — ${boards.length} tahta`);
+      }).then(res => res.id), `Ahenk kontrol — ${boards.length > 1 ? boards.length + " tahta" : boards[0].name}`);
     },
 
     /** ahenk-debug'ın renkli ham çıktısı (koyu zeminde, seçilebilir); yoksa (eski rapor) bulgu listesi. */

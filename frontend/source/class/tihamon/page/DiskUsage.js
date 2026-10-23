@@ -12,9 +12,16 @@ qx.Class.define("tihamon.page.DiskUsage", {
     this.__tabs = new qx.ui.tabview.TabView();
     const specs = tihamon.ui.DiskUsage.specs();
     this.__summary = new tihamon.ui.DiskUsageSummary(specs, mode => this.openWith({ tab: mode }));
+    // Sekme kimlikleri ağaçtaki alt seçeneklerle aynı (bkz. ui.Shell PAGES tabs): "summary" + spec.mode.
+    this.__summary.setUserData("key", "summary");
     this.__tabs.add(this.__summary);
-    specs.forEach(spec => this.__tabs.add(new tihamon.ui.DiskUsageTab(this, spec)));
+    specs.forEach(spec => {
+      const tab = new tihamon.ui.DiskUsageTab(this, spec);
+      tab.setUserData("key", spec.mode);
+      this.__tabs.add(tab);
+    });
     this._rememberTab(this.__tabs, "diskusage"); // son seçili sekme (bkz. Base._rememberTab)
+    this._hideTabBar(this.__tabs); // sekmeler sol ağaçta "Disk kullanımı"nın alt seçenekleri
     this.add(this.__tabs, { flex: 1 });
   },
 

@@ -86,6 +86,16 @@ qx.Class.define("tihamon.ui.Shell", {
     qx.event.message.Bus.subscribe(tihamon.ui.Shell.OPEN_LOGS_MODE, msg => this.__openLogsMode(msg.getData()));
     // Genel bakış kartları (bkz. page.Dashboard __target) buradan sayfa/pencere açar.
     qx.event.message.Bus.subscribe(tihamon.ui.Shell.OPEN_PAGE, msg => this.__openPage(msg.getData()));
+    // Sekmeli sayfa sekmesini kendisi değiştirince (ör. Disk kullanımı ▸ Özet'te dilime tıklama) ağaçtaki
+    // vurgu da o sekmenin yaprağına geçer.
+    qx.event.message.Bus.subscribe(tihamon.page.Base.TAB_CHANGED, msg => {
+      const { page: widget, tab } = msg.getData();
+      const id = Object.keys(this.__pages).find(k => this.__pages[k] === widget);
+      const page = id && tihamon.ui.Shell.PAGES.find(p => p.id === id);
+      if (page && this.__stack.getSelection()[0] === this.__scrolls[id]) {
+        this.__selectTabLeaf(page, tab);
+      }
+    });
   },
 
   statics: {
@@ -97,7 +107,8 @@ qx.Class.define("tihamon.ui.Shell", {
     NAV_MIN: 150,
     NAV_MAX: 600,
     // Kullanıcı henüz açıp kapatmadıysa KAPALI başlayan klasörler (kullanıcı isteği); bkz. __rememberOpen.
-    NAV_FOLDED: ["boards", "network", "system"],
+    // Sekmeleri ağaçta alt seçenek olan sayfalar (Bakım, Disk kullanımı, Kullanıcılar, Ayarlar) da kapalı başlar.
+    NAV_FOLDED: ["boards", "network", "system", "diagnose", "diskusage", "users", "settings"],
 
     // Metin tabanlı düğüm simgeleri (bkz. sınıf başı not). Boş: belirgin bir simge gerekmiyor.
     ICON: {
@@ -124,7 +135,12 @@ qx.Class.define("tihamon.ui.Shell", {
       // herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı
       // isteği); eski {page: "metrics"} bağlantıları __openPage'de buraya yönlenir. id "diagnose" kalır
       // (nav_order / nav.open kayıtları). Oturumlar'ın altında (kullanıcı isteği).
-      { id: "diagnose", label: "Bakım", features: ["diagnose", "metrics"], parent: "boards", create: u => new tihamon.page.Maintenance(u) },
+      // tabs: sayfanın sekmeleri ağaçta düğümün ALT seçenekleri (kullanıcı isteği; sayfadaki sekme çubuğu
+      // gizlenir). key = sekmenin kimliği (bkz. page.Base.selectTab: userData "key" ya da etiket); feature /
+      // admin: o sekmenin yetkisi (sayfanın kendi sekme yetkisiyle aynı). Fonksiyon da olabilir (dinamik liste).
+      { id: "diagnose", label: "Bakım", features: ["diagnose", "metrics"], parent: "boards", create: u => new tihamon.page.Maintenance(u),
+        tabs: [{ key: "diagnose", label: "Bakım", feature: "diagnose" }, { key: "metrics", label: "Sensörler", feature: "metrics" },
+          { key: "ahenk", label: "Ahenk", feature: "diagnose" }] },
       // Loglar Tahtalar'ın altında EN SONDA (kullanıcı isteği).
       { id: "logs", label: "Loglar", feature: "logs", parent: "boards", create: u => new tihamon.page.Logs(u) },
       // Ağ envanteri: altında sunucunun bağlı olduğu fiziksel ağlar (dinamik, bkz. __fillNetworks).
@@ -133,16 +149,20 @@ qx.Class.define("tihamon.ui.Shell", {
       { id: "system", label: "Sistem", admin: true, retap: true, create: u => new tihamon.page.System(u) },
       // Kullanıcılar ve Ayarlar "Sistem"in altında (kullanıcı isteği).
       // Disk kullanımı ve veri silme (eski açılır pencere — kullanıcı isteği: Sistem altında sayfa).
-      { id: "diskusage", label: "Disk kullanımı", feature: "logs.manage", parent: "system", retap: true, create: u => new tihamon.page.DiskUsage(u) },
+      { id: "diskusage", label: "Disk kullanımı", feature: "logs.manage", parent: "system", retap: true, create: u => new tihamon.page.DiskUsage(u),
+        tabs: () => [{ key: "summary", label: "Özet" }].concat(tihamon.ui.DiskUsage.specs().map(spec => ({ key: spec.mode, label: spec.label }))) },
       // Konteynerdeki kritik yazılımlar: sürüm, durum, Tiha-Mon'daki işlevi (yalnız yönetici).
       { id: "software", label: "Yazılımlar", admin: true, parent: "system", retap: true, create: u => new tihamon.page.Software(u) },
       // Kullanıcılar ▸ Kullanıcılar (yalnız yönetici) + Oturumlar ('logins'): features yöneticide her zaman
       // sağlanır; 'logins' yetkili kullanıcı sayfayı yalnız Oturumlar sekmesiyle görür (bkz. page.Users).
-      { id: "users", label: "Kullanıcılar", features: ["logins"], parent: "system", create: u => new tihamon.page.Users(u) },
+      { id: "users", label: "Kullanıcılar", features: ["logins"], parent: "system", create: u => new tihamon.page.Users(u),
+        tabs: [{ key: "users", label: "Hesaplar", admin: true }, { key: "Oturumlar", label: "Oturumlar", feature: "logins" }] },
       // admin/feature yok: herkese açık (kendi tema tercihini herkes değiştirebilir); sayfa içinde
       // sistem ayarları (SSH/Samba/keşif) yalnız admin'e gösterilir — bkz. page.Settings. Sistem
       // yalnız yöneticiye açık olduğundan diğer kullanıcılarda kökte görünür (bkz. __createTree).
-      { id: "settings", label: "Ayarlar", parent: "system", create: u => new tihamon.page.Settings(u) }
+      // Sekmeler yalnız yöneticide (diğer kullanıcı yalnız kendi temasını görür, sekme yok).
+      { id: "settings", label: "Ayarlar", parent: "system", create: u => new tihamon.page.Settings(u),
+        tabs: ["Görünüm", "Tahta erişimi", "Ders saatleri", "Eklentiler"].map(label => ({ key: label, label, admin: true })) }
     ],
     LOG_KINDS: [
       { label: "Sistem logları", mode: "system" },
@@ -187,6 +207,12 @@ qx.Class.define("tihamon.ui.Shell", {
 
     __can(feature) {
       return this.__user.is_admin || this.__user.features.includes(feature);
+    },
+
+    /** Sayfanın kullanıcıya açık sekmeleri (ağaçtaki alt seçenekler — bkz. PAGES tabs). */
+    __tabsOf(page) {
+      const tabs = typeof page.tabs === "function" ? page.tabs() : (page.tabs || []);
+      return tabs.filter(tab => (tab.admin ? this.__user.is_admin : !tab.feature || this.__can(tab.feature)));
     },
 
     __allowed(page) {
@@ -256,7 +282,15 @@ qx.Class.define("tihamon.ui.Shell", {
           // "Ağ" kökü: bütün ağlar (0); alt düğüm: o ağ. Sayfa gösterilmeden önce (tek yenileme).
           this.__widget(item.getUserData("page")).setNetwork(item.getUserData("network") || 0);
         }
+        const tab = item.getUserData("tab");
+        if (tab) {
+          // Önce sekme seçilir, sonra sayfa gösterilir: sayfa açılınca doğrudan o sekmeyi yükler (tek yenileme).
+          this.__widget(item.getUserData("page")).selectTab(tab);
+        }
         const widget = this.__open(item.getUserData("page"));
+        if (!tab && this.__tabsOf(item.getUserData("page")).length) {
+          this.__selectTabLeaf(item.getUserData("page"), widget.currentTab());
+        }
         const mode = item.getUserData("mode");
         if (mode && widget.setMode) {
           widget.setMode(mode);
@@ -309,14 +343,26 @@ qx.Class.define("tihamon.ui.Shell", {
         return this.__buildNetworkNode(page);
       }
       const label = `${tihamon.ui.Shell.ICON[page.id] || ""} ${page.label}`.trim();
-      const node = children.length ? new qx.ui.tree.TreeFolder(label) : new qx.ui.tree.TreeFile(label);
+      const tabs = this.__tabsOf(page);
+      const node = children.length || tabs.length ? new qx.ui.tree.TreeFolder(label) : new qx.ui.tree.TreeFile(label);
       this.__hideThemeIcon(node);
       node.setUserData("page", page);
       if (page.retap) {
         this.__addRetap(node);
       }
+      // Sekmeler alt seçenek: seçilince sayfa o sekmede açılır; seçiliyken yeniden tıklamak sayfayı yeniler.
+      tabs.forEach(tab => {
+        const leaf = new qx.ui.tree.TreeFile(tab.label);
+        this.__hideThemeIcon(leaf);
+        leaf.setUserData("page", page);
+        leaf.setUserData("tab", tab.key);
+        this.__addRetap(leaf);
+        node.add(leaf);
+      });
       if (children.length) {
         children.forEach(child => node.add(this.__buildNode(child, [])));
+      }
+      if (children.length || tabs.length) {
         this.__rememberOpen(node, page.id);
       }
       return node;
@@ -480,8 +526,11 @@ qx.Class.define("tihamon.ui.Shell", {
       if (!page || !this.__allowed(page)) {
         return;
       }
-      // Alt düğümler de aranır (ör. "Tahtalar" altındaki "Loglar" klasörü); kip yaprakları hariç.
-      const leaf = this.__tree.getRoot().getItems(true).find(n => n.getUserData("page") === page && !n.getUserData("mode"));
+      // Alt düğümler de aranır (ör. "Tahtalar" altındaki "Loglar" klasörü); kip yaprakları hariç. İstenen
+      // sekmenin yaprağı varsa o (ör. Genel bakış ▸ Sensörler → Bakım ▸ Sensörler), yoksa sayfanın düğümü.
+      const items = this.__tree.getRoot().getItems(true);
+      const leaf = (data.tab && items.find(n => n.getUserData("page") === page && n.getUserData("tab") === data.tab)) ||
+        items.find(n => n.getUserData("page") === page && !n.getUserData("mode") && !n.getUserData("tab"));
       if (leaf) {
         this.__reveal(leaf);
         this.__silentTree = true;
@@ -491,6 +540,20 @@ qx.Class.define("tihamon.ui.Shell", {
       const widget = this.__open(page);
       if (widget.openWith) {
         widget.openWith(data);
+      } else if (data.tab) {
+        widget.selectTab(data.tab);
+      }
+    },
+
+    /** Sekmeli sayfa açılınca ağaçta o an açık sekmenin yaprağı vurgulanır (sessizce; üst klasör açılır). */
+    __selectTabLeaf(page, key) {
+      const leaf = key && this.__tree.getRoot().getItems(true)
+        .find(n => n.getUserData("page") === page && n.getUserData("tab") === key);
+      if (leaf) {
+        this.__reveal(leaf);
+        this.__silentTree = true;
+        this.__tree.setSelection([leaf]);
+        this.__silentTree = false;
       }
     },
 

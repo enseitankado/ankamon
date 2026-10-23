@@ -1,6 +1,6 @@
 /**
  * Kullanıcılar (Sistem altında), iki sekme (kullanıcı isteği):
- *  - "Kullanıcılar" (yalnız yönetici): hesaplar ve hangi özellikleri kullanabilecekleri.
+ *  - "Hesaplar" (yalnız yönetici): hesaplar ve hangi özellikleri kullanabilecekleri.
  *  - "Oturumlar" ('logins' yetkisi): Tiha-Mon oturum geçmişi — bkz. ui.users.LoginSessions.
  * Sayfa 'logins' yetkisi olan yönetici olmayan kullanıcıya da açıktır (yalnız Oturumlar sekmesiyle; bkz. Shell.PAGES).
  */
@@ -14,7 +14,8 @@ qx.Class.define("tihamon.page.Users", {
     this.__tabs = new qx.ui.tabview.TabView();
 
     if (user.is_admin) {
-      const tab = new qx.ui.tabview.Page("Kullanıcılar").set({ layout: new qx.ui.layout.VBox(8), padding: 8 });
+      // "Hesaplar" (kullanıcı isteği; eski adı "Kullanıcılar" — kimlik "users" kalır, kayıtlı sekme tercihi bozulmasın).
+      const tab = new qx.ui.tabview.Page("Hesaplar").set({ layout: new qx.ui.layout.VBox(8), padding: 8 });
       tab.setUserData("key", "users");
       const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8));
       [["Yenile", () => this.__loadUsers()],
@@ -35,6 +36,7 @@ qx.Class.define("tihamon.page.Users", {
       this.__tabs.add(this.__logins);
     }
     this._rememberTab(this.__tabs, "users"); // son seçili sekme (bkz. Base._rememberTab)
+    this._hideTabBar(this.__tabs); // sekmeler sol ağaçta "Kullanıcılar"ın alt seçenekleri
     this.__tabs.addListener("changeSelection", () => this.refresh());
     this.add(this.__tabs, { flex: 1 });
   },
