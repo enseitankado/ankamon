@@ -10,6 +10,23 @@ use Tihamon\Core\Request;
 /** Tahta listesindeki anlık göstergeler. Zaman serisi grafikleri Grafana'dadır. */
 final class MetricsApi
 {
+    /**
+     * GET /api/metrics/coverage — Bakım ▸ Sensörler bilgilendirmesi: tahta başına son 7 günde sensör verisi
+     * (metrik izleme / node_exporter) gelmiş mi, fan ya da anakart (Super I/O) sensörü var mı. Verisi hiç
+     * olmayan tahtalarda sayfa hangi hazır komutların kurulacağını söyler.
+     */
+    public function coverage(): array
+    {
+        $rows = Db::all(
+            "SELECT b.id, COALESCE(NULLIF(b.label, ''), NULLIF(b.hostname, ''), host(b.ip)) AS name, b.online,
+                    EXISTS (SELECT 1 FROM metrics m JOIN metrics_tag t USING (tag_id)
+                            WHERE t.board_id = b.id::text AND m.time > now() - interval '7 days') AS has_data,
+                    EXISTS (SELECT 1 FROM metrics_tag t WHERE t.board_id = b.id::text
+                            AND (t.name = 'node_hwmon_fan_rpm' OR t.chip ~ '(it87|nct6|f71)')) AS has_board_sensors
+             FROM boards b ORDER BY name");
+        return ['boards' => $rows];
+    }
+
     public function latest(): array
     {
         $rows = Db::all(

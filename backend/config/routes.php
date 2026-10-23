@@ -86,6 +86,7 @@ return [
     ['GET',    '/api/metrics/latest',    [Api\MetricsApi::class, 'latest'],    'boards'],
     ['GET',    '/api/metrics/{id}/sensors', [Api\MetricsApi::class, 'sensors'], 'boards'],
     ['GET',    '/api/metrics/info',      [Api\MetricsInfoApi::class, 'info'],  'metrics'],
+    ['GET',    '/api/metrics/coverage',  [Api\MetricsApi::class, 'coverage'], 'metrics'],
 
     ['GET',    '/api/actions',           [Api\ActionsApi::class, 'index'],     'user'],
     ['GET',    '/api/diagnose',          [Api\DiagnoseApi::class, 'runs'],    'diagnose'],

@@ -35,12 +35,18 @@ qx.Class.define("tihamon.page.Metrics", {
     this._actions.add(this.__select);
     this.__open = this._addButton("Grafana'yı yeni sekmede aç", () => window.open(this.__url(), "_blank", "noopener"));
     this.__open.setToolTipText("Panoları tam ekran incelemek ve düzenlemek için");
+    // Sensör verisi hiç gelmeyen tahtalar için kurulum yönergesi (bkz. __updateNotice).
+    this.__notice = new qx.ui.basic.Label("").set({ rich: true, wrap: true, selectable: true, visibility: "excluded",
+      padding: [8, 12], backgroundColor: "#fff4ce", textColor: "#3b2f00" });
+    this.add(this.__notice);
     this.__frame = new qx.ui.embed.Iframe("about:blank");
     this.add(this.__frame, { flex: 1 });
   },
 
   members: {
     __frame: null,
+    __notice: null,
+    __coverage: null,
     __select: null,
     __filling: false,
     __shown: null,
@@ -56,8 +62,38 @@ qx.Class.define("tihamon.page.Metrics", {
       return id === null ? tihamon.page.Metrics.ALL_URL : tihamon.page.Metrics.BOARD_URL + id;
     },
 
+    /**
+     * Sensör verisi hiç olmayan tahtalar için bilgilendirme: tüm tahtalar görünümünde o tahtaların listesi,
+     * tek tahtada yalnız o tahta. Kurulum hazır komutlarla yapılır (actions/node-exporter, sensors-superio).
+     */
+    __updateNotice() {
+      const esc = qx.bom.String.escape;
+      const list = this.__coverage || [];
+      const id = this.__boardId();
+      const missing = list.filter(b => !b.has_data && (id === null || b.id === id));
+      const noBoard = list.filter(b => b.has_data && !b.has_board_sensors && (id === null || b.id === id));
+      const how = "Kurmak için Tahtalar'da tahtaları işaretleyip <b>Komut çalıştır ▸ Hazır / Serbest komut çalıştır</b> " +
+        "penceresinden önce <b>Sensörler — Metrik izlemeyi kur</b> (işlemci, bellek, disk, ağ, sıcaklık), ardından fan ve " +
+        "anakart ölçümleri için <b>Sensörler — Fan/pil/anakart sensörlerini etkinleştir</b> hazır komutunu çalıştırın. " +
+        "Veri birkaç dakika içinde grafiklere gelmeye başlar.";
+      const names = arr => arr.slice(0, 12).map(b => esc(b.name) + (b.online ? "" : " (kapalı)")).join(", ") +
+        (arr.length > 12 ? ` ve ${arr.length - 12} tahta daha` : "");
+      let html = "";
+      if (missing.length) {
+        html = (id === null
+          ? `<b>${missing.length} tahtada hiç sensör verisi yok:</b> ${names(missing)}.<br>`
+          : "<b>Bu tahtada hiç sensör verisi yok:</b> sensör istemcisi (metrik izleme) kurulu değil ya da çalışmıyor.<br>") + how;
+      } else if (id !== null && noBoard.length) {
+        html = "Bu tahtada fan / anakart sensörü verisi yok. <b>Komut çalıştır ▸ Sensörler — Fan/pil/anakart sensörlerini etkinleştir</b> " +
+          "hazır komutu anakartın donanım izleme yongası destekleniyorsa bunları açar.";
+      }
+      this.__notice.setValue(html);
+      this.__notice.setVisibility(html ? "visible" : "excluded");
+    },
+
     /** Panoyu yalnız adres değiştiyse yükler (sekmeye her dönüşte Grafana baştan çizilmesin). */
     __show() {
+      this.__updateNotice();
       const url = this.__url();
       if (url !== this.__shown) {
         this.__shown = url;
@@ -81,6 +117,11 @@ qx.Class.define("tihamon.page.Metrics", {
         boards = (await tihamon.io.Api.get("/boards")).boards;
       } catch (e) {
         // "boards" yetkisi yoksa yalnız "Tüm çevrim içi tahtalar" kalır.
+      }
+      try {
+        this.__coverage = (await tihamon.io.Api.get("/metrics/coverage")).boards;
+      } catch (e) {
+        this.__coverage = null; // bilgilendirme gösterilmez; grafikler yine açılır
       }
       const keep = this.__boardId();
       this.__filling = true;

@@ -326,16 +326,17 @@ qx.Class.define("tihamon.page.Ahenk", {
       const text = data.report_text ||
         findings.map(f => `[${f.severity}] ${f.title}${f.detail ? "\n    " + String(f.detail).replace(/\n/g, "\n    ") : ""}`).join("\n");
       const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
-      const win = tihamon.ui.Dialog.window(`Ahenk raporu — ${board.name}`, Math.min(1100, root.width - 40), { maximizable: true });
-      win.set({ height: Math.min(820, root.height - 40) });
+      // Ekran kadar geniş: çıktı satırları uzun ve KIRILMAZ (kullanıcı isteği) — sığmayan yatay kaydırılır.
+      const win = tihamon.ui.Dialog.window(`Ahenk raporu — ${board.name}`, root.width - 24, { maximizable: true });
+      win.set({ height: root.height - 24 });
       win.add(new qx.ui.basic.Label(
         `${esc(tihamon.page.Ahenk.RESULT[data.exit_code] || String(data.exit_code))} · ${esc(F.dateTime(data.checked_at * 1000))}` +
         ` · ahenk-debug ${esc((data.tool_commit || "").slice(0, 7))} · ${findings.length} bulgu` +
         (data.report_text ? "" : " · renkli çıktı bir sonraki kontrolde gelir")).set({ rich: true, selectable: true }));
-      const html = `<pre style="margin:0;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere;` +
+      const html = `<pre style="margin:0;padding:10px 12px;white-space:pre;` +
         `font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:${Ansi.FOREGROUND}">${Ansi.toHtml(Ansi.colorBadges(text))}</pre>`;
       const body = new qx.ui.container.Composite(new qx.ui.layout.Grow()).set({ backgroundColor: Ansi.BACKGROUND });
-      body.add(new qx.ui.basic.Label(html).set({ rich: true, wrap: true, selectable: true, allowGrowX: true }));
+      body.add(new qx.ui.basic.Label(html).set({ rich: true, wrap: false, selectable: true }));
       win.add(new qx.ui.container.Scroll(body).set({ backgroundColor: Ansi.BACKGROUND }), { flex: 1 });
       const copyText = new qx.ui.form.Button("Çıktıyı kopyala");
       copyText.addListener("execute", () => tihamon.util.Clipboard.copy(Ansi.strip(text)));
