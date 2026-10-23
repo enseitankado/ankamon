@@ -33,7 +33,8 @@ final class AhenkApi
     public function show(Request $request): array
     {
         $row = Db::one(
-            "SELECT extract(epoch FROM checked_at)::bigint AS checked_at, exit_code, tool_commit, report
+            "SELECT extract(epoch FROM checked_at)::bigint AS checked_at, exit_code, tool_commit, report,
+                    report_text
              FROM ahenk_reports WHERE board_id = ?", [(int) $request->arg('id')]);
         if ($row === null) {
             throw ApiError::notFound('Bu tahtada henüz Ahenk kontrolü yapılmadı.');

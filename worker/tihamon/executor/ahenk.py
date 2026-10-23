@@ -1,7 +1,7 @@
 """Ahenk kontrol raporunu tahtadan alıp veritabanına yazar (Bakım ▸ Ahenk sekmesi).
 
 Hazır işlem actions/ahenk-check tahtada ahenk-debug'ı (enseitankado/ahenk-debug) --json ile çalıştırır ve
-raporu /opt/ahenk-debug/son-rapor.json'a yazar; iş çıktısı satır/uzunluk sınırlı olduğundan (bkz.
+raporu /opt/ahenk-debug/son-rapor.json'a (renkli metin raporu son-rapor.ansi'ye) yazar; iş çıktısı satır/uzunluk sınırlı olduğundan (bkz.
 runner/stream.py) JSON çıktıdan değil bu dosyadan okunur. Runner, işlem o tahtada başarıyla bitince
 fetch_and_store()'u çağırır (bkz. runner/__main__.py). Tahta başına yalnız son rapor tutulur
 (ahenk_reports, db/migrations/030_ahenk_reports.sql): summary tablo sütunları, report tam ham veri.
@@ -65,12 +65,13 @@ def _summary(d: dict, rc: int) -> dict:
 def fetch_and_store(conn, board: dict, user: str, password: str, job_id: int | None, events=None) -> None:
     """Tahtadaki son raporu okur ve ahenk_reports'a yazar. Okunamazsa yalnız olay/log (iş başarısı bozulmaz)."""
     cmd = (f"cat {_DIR}/son-rapor.json; printf '{_SEP}'; cat {_DIR}/son-rapor.rc 2>/dev/null; "
-           f"printf '{_SEP}'; cut -d' ' -f2 {_DIR}/VERSION 2>/dev/null")
+           f"printf '{_SEP}'; cut -d' ' -f2 {_DIR}/VERSION 2>/dev/null; printf '{_SEP}'; "
+           f"cat {_DIR}/son-rapor.ansi 2>/dev/null")
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:
         r = subprocess.run(["sshpass", "-e", "ssh", "-T", *_SSH_OPTS, f"{user}@{board['ip']}", cmd],
                            stdin=subprocess.DEVNULL, capture_output=True, env=env, timeout=60)
-        raw, rc_txt, commit = (r.stdout.decode("utf-8", "replace").split(_SEP) + ["", ""])[:3]
+        raw, rc_txt, commit, text = (r.stdout.decode("utf-8", "replace").split(_SEP, 3) + ["", "", ""])[:4]
         report = json.loads(raw)
         rc = int(rc_txt.strip() or 0)
     except (OSError, subprocess.TimeoutExpired, ValueError) as e:
@@ -79,13 +80,13 @@ def fetch_and_store(conn, board: dict, user: str, password: str, job_id: int | N
             events.add("err", f"Ahenk raporu tahtadan okunamadı (tabloya yazılmadı): {e}")
         return
     conn.execute(
-        """INSERT INTO ahenk_reports (board_id, checked_at, job_id, exit_code, tool_commit, summary, report)
-           VALUES (%s, now(), %s, %s, %s, %s::jsonb, %s::jsonb)
+        """INSERT INTO ahenk_reports (board_id, checked_at, job_id, exit_code, tool_commit, summary, report, report_text)
+           VALUES (%s, now(), %s, %s, %s, %s::jsonb, %s::jsonb, %s)
            ON CONFLICT (board_id) DO UPDATE SET checked_at = now(), job_id = EXCLUDED.job_id,
              exit_code = EXCLUDED.exit_code, tool_commit = EXCLUDED.tool_commit,
-             summary = EXCLUDED.summary, report = EXCLUDED.report""",
+             summary = EXCLUDED.summary, report = EXCLUDED.report, report_text = EXCLUDED.report_text""",
         (board["board_id"], job_id, rc, commit.strip()[:40] or None,
          json.dumps(_summary(report, rc), ensure_ascii=False, default=str),
-         json.dumps(report, ensure_ascii=False, default=str)))
+         json.dumps(report, ensure_ascii=False, default=str), text or None))
     if events:
         events.add("info", "Ahenk raporu kaydedildi (Bakım ▸ Ahenk)")

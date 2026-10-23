@@ -2,6 +2,7 @@
   "title": "Ahenk kontrol",
   "description": "ahenk-debug aracıyla (github.com/enseitankado/ahenk-debug) tahtadaki Ahenk istemcisinin kayıt ve bağlantı zincirini teşhis eder: servis, Lider kaydı (yerel ve sunucu tarafı), kimlik MAC'i / klon çakışması, canlı mesajlaşma (Pulsar) bağlantısı, DNS/TCP, ETA kaydı (okul), donanım ve faz. Araç Tiha-Mon sunucusunda güncel tutulur ve tahtada /opt/ahenk-debug'a yalnız yeni sürüm çıkmışsa kopyalanır. Rapor üçüncü taraf servislere GÖNDERİLMEZ (--no-send); sonuçlar Bakım ▸ Ahenk sekmesinde tablo olarak görünür. Araç Ahenk ayarlarını değiştirmez; yalnız bağlantı yokken Lider'e tek bir test mesajı yollar (Ahenk'in açılışta yaptığı gibi).",
   "category": "Ahenk",
+  "hidden": true,
   "feature": "actions",
   "confirm": false,
   "timeout": 300,

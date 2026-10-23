@@ -10,6 +10,9 @@ Her alt dizin, tahtalarda SSH (root) ile çalıştırılabilen bir hazır işlem
 Yeni işlem eklemek için yeni bir dizin açmak yeterlidir; API ve worker kataloğu bu dizinden okur
 (imaj yeniden derlenmelidir: `docker compose up -d --build api worker`).
 
+`hidden: true`: işlem "Komut çalıştır" listesinde görünmez (kendi sayfasından başlatılır, ör. ahenk-check →
+Bakım ▸ Ahenk); görev olarak yine çalıştırılabilir.
+
 Parametre türleri: `text`, `number`, `select` (`options: [{value, label}]`), `password` (gizli: maskeli
 alan; API yanıtlarına ve denetim kaydına `***` yazılır, değer görev bitince jobs.params'tan silinir).
 İsteğe bağlı `pattern` (düzenli ifade) + `pattern_error`: değer tahtaya gitmeden sunucuda denetlenir.

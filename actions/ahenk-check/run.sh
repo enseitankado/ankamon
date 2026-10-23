@@ -24,6 +24,12 @@ case "$rc" in
 esac
 echo "$rc" > "$DIR/son-rapor.rc"
 
+# Renkli, okunur rapor (Bakım ▸ Ahenk'te satıra çift tıklayınca gösterilir): aynı teşhis metin kipinde,
+# ANSI renkleriyle. Aktif Pulsar testi yalnız bağlantı yokken yapıldığından ikinci çalıştırma yük getirmez.
+set -- --no-send --renk=her-zaman
+[ "${KAPSAM:-tam}" = "hizli" ] && set -- "$@" --no-net
+python3 "$TOOL" "$@" > "$DIR/son-rapor.ansi" 2>&1 || true
+
 # Okunur özet (canlı çıktı penceresi): sonuç + uyarı/kritik bulgular.
 python3 - "$REPORT" "$rc" <<'PY'
 import json, sys
