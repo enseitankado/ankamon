@@ -87,6 +87,9 @@ qx.Class.define("tihamon.page.Network", {
     // "Durum" sütunu: çevrim içi cihazın soluna küçük yeşil yuvarlak (bkz. ui.table.StatusRenderer).
     // Sütun indeksi: id + onay kutusu (2) + "exp" (0) + "status" (1) = 3.
     this.__table.getTableColumnModel().setDataCellRenderer(3, new tihamon.ui.table.StatusRenderer());
+    // "Cihaz türü" hücresine türe özgü minik ikon (bkz. ui.table.DeviceTypeRenderer).
+    this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "type"),
+      new tihamon.ui.table.DeviceTypeRenderer());
     this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply);
     this.__model.addListener("dataChanged", this.__onDataChanged, this);
 
