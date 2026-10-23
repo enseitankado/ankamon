@@ -2,7 +2,8 @@
 
 Bir hazır işlem action.json'da "tools": ["eta-112"] derse runner işlemden ÖNCE:
   1. ensure(): aracın sunucudaki kopyasını hazırlar (/data/tools/<ad>/). Günün ilk kullanımında
-     GitHub'da yeni sürüm (son commit) var mı bakar, varsa indirir. Tahta her seferinde internetten
+     (TOOLS'ta "check_every_run" ise her kullanımda) GitHub'da yeni sürüm (son commit) var mı bakar,
+     varsa indirir. Tahta her seferinde internetten
      indirmez — kopya ana makinede durur.
   2. upload(): her tahtada uzak kopyanın sha256'sını karşılaştırır; farklıysa (ya da yoksa) SSH
      üzerinden SFTP ile kopyalar (geçici ad → atomik yeniden adlandırma), aynıysa atlar.
@@ -40,6 +41,17 @@ TOOLS = {
         "branch": "main",
         "file": "eta-112.py",
         "remote_dir": "/opt/eta-112",
+    },
+    # Ahenk kayıt/bağlantı teşhis aracı (hazır işlem "Ahenk kontrol", actions/ahenk-check). Sık güncellendiği
+    # için GitHub'daki son commit HER çalıştırmada denetlenir (tek küçük API isteği); dosya yalnız commit
+    # değişince indirilir, tahtaya da yalnız sha256 farklıysa kopyalanır.
+    "ahenk-debug": {
+        "title": "ahenk-debug",
+        "repo": "enseitankado/ahenk-debug",
+        "branch": "main",
+        "file": "ahenk_debug.py",
+        "remote_dir": "/opt/ahenk-debug",
+        "check_every_run": True,
     },
 }
 
@@ -112,14 +124,15 @@ def ensure(name: str, events) -> dict:
     today = _dt.date.today().isoformat()
     have = os.path.exists(local) and state.get("sha256") == _sha256(local)
 
-    if have and state.get("checked") == today:
+    if have and state.get("checked") == today and not tool.get("check_every_run"):
         events.add("info", f"{tool['title']}: sunucudaki kopya kullanılıyor (sürüm {state['commit'][:7]}, "
                            f"bugün denetlendi)")
         events.flush()  # genel olay tahta olaylarından önce görünsün
         _write_version(name, state)
         return {"path": local, "commit": state["commit"], "sha256": state["sha256"]}
 
-    events.add("info", f"{tool['title']}: günün ilk kullanımı — GitHub'da yeni sürüm denetleniyor "
+    events.add("info", f"{tool['title']}: {'' if tool.get('check_every_run') else 'günün ilk kullanımı — '}"
+                       f"GitHub'da yeni sürüm denetleniyor "
                        f"({tool['repo']}, {tool['branch']})…")
     events.flush()
     try:

@@ -11,7 +11,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import activity, db
-from ..executor import accounts, backup, cast, diagnose, display, hwfacts, session_probe, tools, whoami, wol
+from ..executor import accounts, ahenk, backup, cast, diagnose, display, hwfacts, session_probe, tools, whoami, wol
 from ..executor.jobs import ACTIONS_DIR, _board_access, _claim, _targets, _write_one, _write_results
 from . import stream
 
@@ -130,6 +130,9 @@ def _run_job(job) -> None:
                                     break
                             if result is None:
                                 result = stream.run(t, user, password, body=body, env=env, timeout=timeout, events=ev)
+                                # Ahenk kontrol: JSON rapor tahtada dosyada — okunup Bakım ▸ Ahenk tablosuna yazılır.
+                                if action == ahenk.ACTION and result["status"] == "ok":
+                                    ahenk.fetch_and_store(wconn, t, user, password, job["id"], ev)
                     except Exception as e:  # tek tahtanın beklenmedik hatası diğerlerini durdurmasın
                         log.exception("görev #%s tahta %s", job["id"], t["board_id"])
                         ev.add("fail", f"Beklenmeyen hata: {e}")

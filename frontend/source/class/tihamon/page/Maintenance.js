@@ -1,6 +1,6 @@
 /**
- * Bakım (sol menüde Tahtalar > Bakım): iki sekme — "Bakım" (sorun tespiti raporu, page.Diagnose) ve
- * "Sensörler" (Grafana panosu, page.Metrics). Kullanıcı isteğiyle Sensörler ayrı menü öğesi olmaktan
+ * Bakım (sol menüde Tahtalar > Bakım): sekmeler — "Bakım" (sorun tespiti raporu, page.Diagnose),
+ * "Sensörler" (Grafana panosu, page.Metrics) ve "Ahenk" (Ahenk kontrol sonuçları, page.Ahenk). Kullanıcı isteğiyle Sensörler ayrı menü öğesi olmaktan
  * çıkıp buraya taşındı. Her sekme yalnız kendi yetkisiyle görünür ("diagnose" / "metrics"); sayfa
  * ikisinden biri olan kullanıcıya açılır (bkz. ui.Shell PAGES features).
  *
@@ -27,6 +27,8 @@ qx.Class.define("tihamon.page.Maintenance", {
     };
     add("diagnose", "Bakım", "diagnose", tihamon.page.Diagnose);
     add("metrics", "Sensörler", "metrics", tihamon.page.Metrics);
+    // Ahenk kontrol sonuçları (hazır işlem "Ahenk kontrol" — bkz. page.Ahenk).
+    add("ahenk", "Ahenk", "diagnose", tihamon.page.Ahenk);
     this._rememberTab(this.__tabs, "maintenance"); // son seçili sekme (dinleyiciden önce: activate tetiklenmesin)
     this.__tabs.addListener("changeSelection", () => {
       const page = this.__current();
@@ -53,7 +55,7 @@ qx.Class.define("tihamon.page.Maintenance", {
       }
     },
 
-    /** Bkz. ui.Shell OPEN_PAGE: {tab: "metrics"|"diagnose"} o sekmeyi seçer (ve sayfasını yeniler). */
+    /** Bkz. ui.Shell OPEN_PAGE: {tab: "metrics"|"diagnose"|"ahenk"} o sekmeyi seçer (ve sayfasını yeniler). */
     openWith(opts) {
       const tab = this.__tabs.getChildren().find(t => t.getUserData("key") === (opts && opts.tab));
       if (tab && this.__tabs.getSelection()[0] !== tab) {

@@ -90,6 +90,9 @@ return [
     ['GET',    '/api/actions',           [Api\ActionsApi::class, 'index'],     'user'],
     ['GET',    '/api/diagnose',          [Api\DiagnoseApi::class, 'runs'],    'diagnose'],
     ['GET',    '/api/diagnose/{id}',     [Api\DiagnoseApi::class, 'show'],    'diagnose'],
+    // Bakım ▸ Ahenk: tahtaların son Ahenk kontrol raporları (hazır işlem actions/ahenk-check).
+    ['GET',    '/api/ahenk',             [Api\AhenkApi::class, 'index'],    'diagnose'],
+    ['GET',    '/api/ahenk/{id}',        [Api\AhenkApi::class, 'show'],     'diagnose'],
     ['GET',    '/api/jobs',              [Api\JobsApi::class, 'index'],        'user'],
     ['POST',   '/api/jobs',              [Api\JobsApi::class, 'create'],       'user'],
     ['GET',    '/api/jobs/{id}',         [Api\JobsApi::class, 'show'],         'user'],
