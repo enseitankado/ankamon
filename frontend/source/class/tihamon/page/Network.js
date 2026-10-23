@@ -145,6 +145,20 @@ qx.Class.define("tihamon.page.Network", {
         return Number.MAX_SAFE_INTEGER;
       }
       return ip.split(".").reduce((acc, part) => acc * 256 + (parseInt(part, 10) || 0), 0);
+    },
+
+    /** "Ağ etkinliği" sütununun sayısal sıralama anahtarı (büyüklük; göreli). Hücre metni "N kbit/sn · PROTO"
+     * olduğundan sözlüksel sıralanırdı; bunun yerine cihaz verisinden sayı üretilir (bkz. flowText):
+     * gözlenen akış (kbit/sn) en üst bant, Windows IP-ID gönderim hızı (pkt/sn) orta bant, ölçülmemiş en altta. */
+    activityKey(d) {
+      const fresh = d.flow_at && (Date.now() / 1000 - d.flow_at) < 600;
+      if (fresh && d.flow_kbps != null) {
+        return 1e6 + d.flow_kbps;
+      }
+      if (d.activity_pps != null) {
+        return d.activity_pps;
+      }
+      return -1;
     }
   },
 
@@ -269,8 +283,11 @@ qx.Class.define("tihamon.page.Network", {
       const col = this.__model.getSortColumnIndex();
       const asc = this.__model.isSortAscending();
       const ipCol = 2 + this.__columns.findIndex(c => c.id === "ip");
+      const activityCol = 2 + this.__columns.findIndex(c => c.id === "activity");
       if (col >= 2) {
-        const key = col === ipCol ? (r => tihamon.page.Network.ipKey(r.cells[col])) : (r => String(r.cells[col] ?? "").toLocaleLowerCase("tr"));
+        const key = col === ipCol ? (r => tihamon.page.Network.ipKey(r.cells[col]))
+          : col === activityCol ? (r => tihamon.page.Network.activityKey(r.device))
+          : (r => String(r.cells[col] ?? "").toLocaleLowerCase("tr"));
         shown = shown.slice().sort((a, b) => {
           const ka = key(a);
           const kb = key(b);
