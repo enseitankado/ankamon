@@ -543,10 +543,13 @@ qx.Class.define("tihamon.page.Base", {
 
     /** Sekmeler sol ağaçta alt seçenek olduğunda sayfadaki sekme çubuğu gizlenir (bkz. ui.Shell PAGES tabs). */
     _hideTabBar(tabs) {
-      tabs.getChildControl("bar").setVisibility("excluded");
-      // TabView sekme değişince düğmesini görünür alana kaydırır (scrollChildIntoView); çubuk gizliyken
-      // düğmenin konumu yok — "Cannot read properties of null (reading 'left')" hatası veriyordu.
-      tabs.scrollChildIntoView = () => {};
+      // Gizlenmez (excluded/hidden değil): sıfır yükseklikte, içi kırpılmış, saydam ve tıklanamaz. TabView'ın
+      // scrollChildIntoView'ı ve temaların sekme altı çizgi animasyonu (ville.theme.MTabView) düğmelerin
+      // konumunu ve çizginin DOM'unu okuyor — gizli çubukta ikisi de yoktu ("reading 'left'" /
+      // "reading 'addEventListener'" hataları).
+      const bar = tabs.getChildControl("bar");
+      bar.set({ height: 0, minHeight: 0, maxHeight: 0, margin: 0, padding: 0, opacity: 0 });
+      bar.getContentElement().setStyles({ overflow: "hidden", pointerEvents: "none" });
     },
 
     /** Tek bir arayüz tercihini sunucuya yazar (bkz. Base.savePref). */
