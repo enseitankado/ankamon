@@ -502,6 +502,13 @@ qx.Class.define("tihamon.page.Base", {
           qx.event.message.Bus.dispatchByName(tihamon.page.Base.TAB_CHANGED, { page: this, tab: idOf(selected) });
         }
       });
+      // Sekmeler geç kurulan sayfada (Ayarlar her yüklemede yeniden kurar) açılışta seçilen sekme de bildirilsin.
+      qx.event.Timer.once(() => {
+        const current = !tabs.isDisposed() && tabs.getSelection()[0];
+        if (current) {
+          qx.event.message.Bus.dispatchByName(tihamon.page.Base.TAB_CHANGED, { page: this, tab: idOf(current) });
+        }
+      }, this, 0);
     },
 
     /** Sekme kimliği: userData "key" varsa o, yoksa etiket (sondaki "(3)" gibi sayaç hariç). */

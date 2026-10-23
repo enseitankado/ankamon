@@ -552,6 +552,9 @@ qx.Class.define("tihamon.ui.Shell", {
         .find(n => n.getUserData("page") === page && n.getUserData("tab") === key);
       if (leaf) {
         this.__reveal(leaf);
+        // Az önce açılan klasörün yaprakları henüz yerleşmedi: seçim onu görünür alana kaydırırken
+        // konumu okur — önce düzen uygulanır (yoksa "Cannot read properties of null (reading 'left')").
+        qx.ui.core.queue.Manager.flush();
         this.__silentTree = true;
         this.__tree.setSelection([leaf]);
         this.__silentTree = false;
