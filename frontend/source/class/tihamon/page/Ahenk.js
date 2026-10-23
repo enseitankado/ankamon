@@ -23,6 +23,8 @@ qx.Class.define("tihamon.page.Ahenk", {
     },
     // Sütun tanımları — kimlikler kalıcı tercihlerde (süzgeç/sıralama/görünürlük) anahtardır, değiştirmeyin.
     COLUMNS: [
+      // Tahta açık mı (çalışıyor mu) — en başta (kullanıcı isteği); yeşil/gri nokta + ayrıntılı ipucu.
+      { id: "online", label: "Durum", hint: "Tahta durumu (açık / kapalı)", width: 105 },
       { id: "name", label: "Tahta", width: 190 },
       { id: "checked", label: "Son kontrol", width: 110 },
       { id: "result", label: "Sonuç", width: 105 },
@@ -36,8 +38,7 @@ qx.Class.define("tihamon.page.Ahenk", {
       { id: "mac", label: "Kimlik MAC'i", width: 150 },
       { id: "school", label: "Okul", hint: "Okul (ETA kaydı)", width: 240 },
       { id: "where", label: "İl / ilçe", width: 150 },
-      { id: "phase", label: "Faz", width: 150 },
-      { id: "online", label: "Durum", hint: "Tahta durumu", width: 105 }
+      { id: "phase", label: "Faz", width: 150 }
     ]
   },
 
@@ -271,7 +272,7 @@ qx.Class.define("tihamon.page.Ahenk", {
         const has = b.checked_at !== null;
         const registered = String(s.registered) === "1" || s.registered === true;
         return [
-          b.id, false, b.name,
+          b.id, false, b.online ? "Çevrim içi" : "Çevrim dışı", b.name,
           has ? F.ago(b.checked_at) : "hiç",
           has ? (R[b.exit_code] || String(b.exit_code)) : "—",
           (s.problems || []).join(" · "),
@@ -284,8 +285,7 @@ qx.Class.define("tihamon.page.Ahenk", {
           s.identity_mac ? s.identity_mac + (s.mac_match === false ? " ✗" : "") : "",
           s.school ? `${s.school}${s.school_code ? " (" + s.school_code + ")" : ""}${s.unit ? " · " + s.unit : ""}` : "",
           [s.city, s.town].filter(Boolean).join(" / "),
-          typeof s.phase === "object" && s.phase ? (s.phase.phase || s.phase.name || "") : (s.phase || ""),
-          b.online ? "Çevrim içi" : "Çevrim dışı"
+          typeof s.phase === "object" && s.phase ? (s.phase.phase || s.phase.name || "") : (s.phase || "")
         ];
       });
       this.__apply();
