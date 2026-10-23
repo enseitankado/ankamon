@@ -75,7 +75,7 @@ qx.Class.define("tihamon.page.Network", {
       // Ağ etkinliği: IP ID örneklemesinden yaklaşık pkt/sn (yalnız Windows; bkz. worker netscan/activity.py,
       // bellek network-usage-study). Boş = ölçülmedi/güvenilmez (Linux/kamera/yanıt yok). Sona eklendi:
       // servis/paylaşım alt satırları sabit (düşük) sütun sırası kullanır, boş kalır.
-      { id: "activity", label: "Ağ etkinliği", hint: "Görülen akış yoğunluğu (kbit/sn + baskın protokol); Windows'ta gönderim hızı (IP ID)", width: 160 }
+      { id: "activity", label: "Ağ etkinliği (kbit/sn)", hint: "Görülen akış yoğunluğu — kbit/sn, pasif gözlem (tek sayısal değer; protokol ve Windows IP-ID ayrıntısı Bilgisayar ayrıntıları penceresinde)", width: 150 }
       // Ayrı "Takma ad" (MAC kaydı) sütunu yok (kullanıcı isteği, 2026-10-19: "Takma ad / Ad" ile yineleniyordu);
       // MAC ↔ takma ad kaydı "Takma ad / Ad"ın kendisini besler — bkz. ui.network.Ops.deviceName (known_alias).
     ];
@@ -152,13 +152,7 @@ qx.Class.define("tihamon.page.Network", {
      * gözlenen akış (kbit/sn) en üst bant, Windows IP-ID gönderim hızı (pkt/sn) orta bant, ölçülmemiş en altta. */
     activityKey(d) {
       const fresh = d.flow_at && (Date.now() / 1000 - d.flow_at) < 600;
-      if (fresh && d.flow_kbps != null) {
-        return 1e6 + d.flow_kbps;
-      }
-      if (d.activity_pps != null) {
-        return d.activity_pps;
-      }
-      return -1;
+      return fresh && d.flow_kbps != null ? d.flow_kbps : -1;
     }
   },
 
@@ -226,16 +220,12 @@ qx.Class.define("tihamon.page.Network", {
       // "Ağ etkinliği" hücresi: öncelik PASİF görülen akış yoğunluğu (tüm cihazlar; flow_kbps/pps + baskın
       // protokol — bkz. worker netscan/flows.py). Görünürde akış yoksa Windows gönderim hızı (IP ID,
       // activity_pps) yedek gösterilir. flow_at 10 dk'dan eskiyse görülen akış yok sayılır.
-      const flowText = d => {
+      // "Ağ etkinliği" STANDART sayısal metrik: görülen akış yoğunluğu, kbit/sn (pasif gözlem, flows.py).
+      // Hücre tek bir SAYI (birim sütun başlığında); ölçüm yoksa (flow_at 10 dk'dan eski) null = boş.
+      // Baskın protokol ve Windows IP-ID gönderim hızı artık grid'de değil, Bilgisayar ayrıntıları penceresinde.
+      const flowNum = d => {
         const fresh = d.flow_at && (Date.now() / 1000 - d.flow_at) < 600;
-        if (fresh && (d.flow_kbps >= 1 || d.flow_pps >= 1)) {
-          const rate = d.flow_kbps >= 1 ? Math.round(d.flow_kbps) + " kbit/sn" : d.flow_pps.toFixed(1) + " pkt/sn";
-          return d.flow_proto ? rate + " · " + d.flow_proto : rate;
-        }
-        if (d.activity_pps != null && d.activity_pps >= 1) {
-          return "gönderim ~" + Math.round(d.activity_pps) + " pkt/sn";
-        }
-        return (fresh || d.activity_pps != null) ? "sakin" : "";
+        return fresh && d.flow_kbps != null ? Math.round(d.flow_kbps * 10) / 10 : null;
       };
       this.__devices = new Map(data.devices.map(d => [d.id, d]));
       // cells: [kimlik, işaret, ▸, …sütunlar] — alt satırlar __apply'da eklenir.
@@ -250,7 +240,7 @@ qx.Class.define("tihamon.page.Network", {
           netName.get(d.network_id) || d.network,
           F.ago(d.first_seen_at), d.online ? "şimdi" : F.ago(d.last_seen_at), d.notes || "",
           F.etap(d.etap),
-          flowText(d)
+          flowNum(d)
         ]
       }));
       this.__apply();
