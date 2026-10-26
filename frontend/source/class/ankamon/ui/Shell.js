@@ -312,7 +312,55 @@ qx.Class.define("ankamon.ui.Shell", {
           qx.event.Timer.once(() => this.__selectTabLeaf(item.getUserData("page"), widget.currentTab()), this, 0);
         }
       });
+      // Seviyeye göre yazı: tema yazı tipleri ağaç görününce uygulanmış olur; tema değişince yeniden hesaplanır.
+      this.__tree.addListenerOnce("appear", () => this.__styleNavLevels());
+      const restyle = () => qx.event.Timer.once(() => this.__styleNavLevels(), this, 0);
+      qx.theme.manager.Font.getInstance().addListener("changeTheme", restyle);
+      qx.theme.manager.Appearance.getInstance().addListener("changeTheme", restyle);
       return this.__tree;
+    },
+
+    /**
+     * Ana menü seviyeleri (kullanıcı isteği): 1. seviye kalın; 3. ve daha derin seviyeler aynı yazıyla, bir tık
+     * (1 px) küçük; 2. seviye temanın yazısıyla. Yazı tipi sabit verilmez, o temanın ağaç yazısından türetilir
+     * (temaların aileleri/boyutları farklı; Fluent kalınlığı "weight" ile, Tangible "bold" ile tanımlar).
+     */
+    __styleNavLevels() {
+      const fonts = qx.theme.manager.Font.getInstance();
+      const style = (item, depth) => {
+        const label = item.getChildControl("label");
+        label.resetFont(); // temanın yazısına dön (tema değişmiş olabilir)
+        if (depth === 2) {
+          return;
+        }
+        let base = label.getFont() || item.getFont() || "default";
+        base = typeof base === "string" ? fonts.resolve(base) : base;
+        if (!(base instanceof qx.bom.Font)) {
+          return;
+        }
+        const font = new qx.bom.Font();
+        ["size", "lineHeight", "family", "bold", "italic", "weight", "color", "letterSpacing", "decoration", "textShadow"]
+          .forEach(key => {
+            const value = base.get(key);
+            if (value !== null && value !== undefined) {
+              font.set(key, value);
+            }
+          });
+        if (depth === 1) {
+          font.setBold(true);
+          if (font.getWeight()) {
+            font.setWeight("bold");
+          }
+        } else if (font.getSize()) {
+          font.setSize(font.getSize() - 1);
+        }
+        label.setFont(font);
+      };
+      const walk = (parent, depth) => parent.getChildren().forEach(item => {
+        style(item, depth);
+        walk(item, depth + 1);
+      });
+      walk(this.__tree.getRoot(), 1);
     },
 
     /**
