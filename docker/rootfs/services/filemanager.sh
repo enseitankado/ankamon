@@ -120,7 +120,4 @@ userDefaults:
 YAML
 
 cd "$APP"
-# Yeniden adlandırma göçü (bir kez, zararsız): eski 'tihamon-fb-admin' yöneticisini kaldırmayı dene.
-# Yeni proxy başlığı ankamon-fb-admin; eski hesap zaten atıl (yalnız proxy auth). Hata açılışı etkilemez.
-timeout 10 ./filebrowser -c "$APP/config.yaml" users rm tihamon-fb-admin >/dev/null 2>&1 || true
 exec ./filebrowser -c "$APP/config.yaml"
