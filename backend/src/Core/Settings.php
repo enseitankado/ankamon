@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 /** settings tablosu: anahtar → JSON değer. Worker da aynı tabloyu okur. */
 final class Settings
@@ -16,9 +16,9 @@ final class Settings
         // [{name, start: "HH:MM", end: "HH:MM"}] — Oturumlar çizelgesi oturumu derslere eşler.
         'lesson_times' => ['days' => [1, 2, 3, 4, 5], 'lessons' => []],
         // Ekranlar: tahtada x11vnc yoksa "Ekran istemcisini kur" (actions/vnc-install) arka planda
-        // kendiliğinden çalıştırılsın mı (bkz. worker/tihamon/screen/__main__.py). Varsayılan: evet.
+        // kendiliğinden çalıştırılsın mı (bkz. worker/ankamon/screen/__main__.py). Varsayılan: evet.
         'screen_vnc_autoinstall' => true,
-        // Ağ rolleri (Ayarlar ▸ Ağ arabirimleri; bkz. worker/tihamon/netroles.py): tahta ağı ve idari ağın
+        // Ağ rolleri (Ayarlar ▸ Ağ arabirimleri; bkz. worker/ankamon/netroles.py): tahta ağı ve idari ağın
         // arabirim adları. Boş = otomatik (bağlı her ağ tahta ağı sayılır). Tahta işleri (ağ taraması,
         // syslog'dan tahta kaydı, Samba paylaşım taraması) yalnız tahta ağında yapılır.
         'network_roles' => ['board_iface' => '', 'admin_iface' => ''],

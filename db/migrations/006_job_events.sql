@@ -1,5 +1,5 @@
 -- Görev olay akışı: komut/işlem görevlerinin tahta başına canlı ayrıntısı (bağlanılıyor, bağlandı,
--- çıktı satırları, çıkış kodu…). Görev yürütücüsü (worker/tihamon/runner) olayları oluştukça yazar;
+-- çıktı satırları, çıkış kodu…). Görev yürütücüsü (worker/ankamon/runner) olayları oluştukça yazar;
 -- arayüzün canlı çıktı penceresi /api/jobs/{id}/events?after=<son id> ile artımlı okur.
 -- job_targets.output yine özet (son hâl) olarak tutulur; bu tablo ayrıntılı zaman çizelgesidir.
 CREATE TABLE IF NOT EXISTS job_events (

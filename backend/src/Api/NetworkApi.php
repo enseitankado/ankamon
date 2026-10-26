@@ -1,23 +1,23 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /**
  * Ağ envanteri (sol menü "Ağ"): sunucunun bağlı olduğu fiziksel ağlar ve oralarda görülen bütün
- * cihazlar (çevrimdışı olanlar dahil). Kayıtların çoğunu tarayıcı açar — worker/tihamon/netscan;
+ * cihazlar (çevrimdışı olanlar dahil). Kayıtların çoğunu tarayıcı açar — worker/ankamon/netscan;
  * şema db/migrations/015_network_inventory.sql. Cihaz kimliği MAC adresidir.
  *
  * Canlı güncelleme: arayüz state()'i birkaç saniyede bir okur; version değişmişse listeyi yeniden çeker.
  */
 final class NetworkApi
 {
-    // Arayüzdeki tür listesi ile worker/tihamon/netscan/classify.py adları aynı tutulur (serbest metin de kabul edilir).
+    // Arayüzdeki tür listesi ile worker/ankamon/netscan/classify.py adları aynı tutulur (serbest metin de kabul edilir).
     private const TEXT_LIMITS = ['label' => 120, 'device_type' => 60, 'model' => 160, 'notes' => 2000, 'hostname' => 160];
 
     public function index(): array
@@ -194,17 +194,17 @@ final class NetworkApi
         if ($request->has('services')) {
             $ids = self::ids($request->input('services'));
             Db::exec('UPDATE net_devices SET services_requested_at = now() WHERE id = ANY(?::int[])', ['{' . implode(',', $ids) . '}']);
-            Db::exec("SELECT pg_notify('tihamon_netscan', 'services')");
+            Db::exec("SELECT pg_notify('ankamon_netscan', 'services')");
             self::changed();
             Audit::log($user, $request, 'network.scan.services', implode(',', $ids));
         } elseif ($request->has('shares')) {
             $ids = self::ids($request->input('shares'));
             Db::exec('UPDATE net_devices SET shares_requested_at = now() WHERE id = ANY(?::int[])', ['{' . implode(',', $ids) . '}']);
-            Db::exec("SELECT pg_notify('tihamon_netscan', 'shares')");
+            Db::exec("SELECT pg_notify('ankamon_netscan', 'shares')");
             self::changed();
             Audit::log($user, $request, 'network.scan.shares', implode(',', $ids));
         } else {
-            Db::exec("SELECT pg_notify('tihamon_netscan', 'sweep')");
+            Db::exec("SELECT pg_notify('ankamon_netscan', 'sweep')");
         }
         return ['ok' => true];
     }

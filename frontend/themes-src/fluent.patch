@@ -11,9 +11,9 @@
 -    qx.Class.include(qx.ui.menu.Menu, ville.theme.MMenu);
 -    qx.Class.include(qx.ui.tabview.TabView, ville.theme.MTabView);
 -  },
-+  // tiha-mon yaması: özgün "boot" bu mixin'leri tema TANIMLANIRKEN ekliyordu; derlenmiş pakette o anda
++  // ankamon yaması: özgün "boot" bu mixin'leri tema TANIMLANIRKEN ekliyordu; derlenmiş pakette o anda
 +  // qx.ui.basic.Image vb. henüz yüklenmemiş olduğundan uygulama hiç açılmıyordu ("reading 'Image'").
-+  // Ekleme artık Fluent ilk kez SEÇİLDİĞİNDE yapılır — bkz. tihamon.theme.Registry.__setupFluent.
++  // Ekleme artık Fluent ilk kez SEÇİLDİĞİNDE yapılır — bkz. ankamon.theme.Registry.__setupFluent.
    
    appearances :
    {    
@@ -23,7 +23,7 @@
        var plftstart = menubounds.left;
  
        var popupup = this.getOpenAnimation();
-+      // tiha-mon yaması: bu mixin Fluent yüklenince TÜM menülere eklenir; Fluent dışı bir tema
++      // ankamon yaması: bu mixin Fluent yüklenince TÜM menülere eklenir; Fluent dışı bir tema
 +      // seçiliyken openAnimation tanımsızdır — animasyonsuz açıl (aksi halde menüler hata verir).
 +      if (!popupup) {
 +        return;

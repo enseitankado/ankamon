@@ -1,6 +1,6 @@
 {
   "title": "Log sunucusunu ayarla",
-  "description": "Tahtanın sistem kayıtlarını merkezi log sunucusuna yönlendirir (TiHA'nın \"Merkezi log sunucusu\" adımıyla aynı yapılandırma: sunucu kapalıyken kayıtlar tahtada birikir, dönünce gönderilir). Sunucu adresi boş bırakılırsa bu Tiha-Mon sunucusu kullanılır.",
+  "description": "Tahtanın sistem kayıtlarını merkezi log sunucusuna yönlendirir (TiHA'nın \"Merkezi log sunucusu\" adımıyla aynı yapılandırma: sunucu kapalıyken kayıtlar tahtada birikir, dönünce gönderilir). Sunucu adresi boş bırakılırsa bu Ankamon sunucusu kullanılır.",
   "category": "Loglar",
   "feature": "actions",
   "confirm": true,

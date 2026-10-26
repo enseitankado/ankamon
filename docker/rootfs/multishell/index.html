@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="utf-8">
-<title>Tiha-Mon — Çoklu web terminal</title>
+<title>Ankamon — Çoklu web terminal</title>
 <style>
   :root { --border: #d0d4da; --bar: #0e2a47; --bar-text: #fff; }
   * { box-sizing: border-box; }
@@ -64,7 +64,7 @@
     p.set("title", c.title || c.hostname);
     // Yazı boyutu: web terminal penceresinin A−/A+ seçimi (bkz. ui/BoardOps.js __terminalWindow).
     try {
-      var fs = parseInt(localStorage.getItem("tihamon.webshell.fontSize"), 10);
+      var fs = parseInt(localStorage.getItem("ankamon.webshell.fontSize"), 10);
       if (fs) p.set("fontsize", fs);
     } catch (e) { /* localStorage yok: webssh varsayılanı */ }
     return "/webshell/?" + p.toString();

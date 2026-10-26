@@ -1,14 +1,14 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
-use Tihamon\Core\Storage;
-use Tihamon\Core\Supervisor;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
+use Ankamon\Core\Storage;
+use Ankamon\Core\Supervisor;
 
 /**
  * Sistem sayfası (yalnız yönetici): Genel / Zamanlanmış işler / Veritabanı / Yapılandırma sekmeleri.
@@ -54,7 +54,7 @@ final class SystemInfoApi
         ['Parolalar', 'ETAPADMIN_PASSWORD', 'etapadmin ilk parolası', true],
     ];
 
-    private const BACKUP_SUMMARY = '/run/tiha-mon/backups.json';
+    private const BACKUP_SUMMARY = '/run/ankamon/backups.json';
 
     public function overview(Request $request): array
     {
@@ -74,7 +74,7 @@ final class SystemInfoApi
             }
         }
         $started = @filemtime('/proc/1');
-        $built = @filemtime('/var/www/tihamon/tihamon/index.js');
+        $built = @filemtime('/var/www/ankamon/ankamon/index.js');
         return [
             'hostname' => gethostname(),
             'container_started_at' => $started ? $started * 1000 : null,

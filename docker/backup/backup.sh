@@ -32,7 +32,7 @@ prune() { # prune <önek> <saklanacak adet>
 config_backup() {
     ts=$(date +%Y%m%d-%H%M%S)
     # Hypertable verisi _timescaledb_internal şemasındaki parçalarda durur; onları dışarıda bırakmak yeter.
-    dump "$DIR/config-$ts.dump" tihamon --exclude-table-data='_timescaledb_internal.*' || return 1
+    dump "$DIR/config-$ts.dump" ankamon --exclude-table-data='_timescaledb_internal.*' || return 1
     dump "$DIR/grafana-$ts.dump" grafana || return 1
     prune config "$BACKUP_KEEP_CONFIG"
     prune grafana "$BACKUP_KEEP_CONFIG"
@@ -40,7 +40,7 @@ config_backup() {
 
 full_backup() {
     ts=$(date +%Y%m%d-%H%M%S)
-    dump "$DIR/full-$ts.dump" tihamon || return 1
+    dump "$DIR/full-$ts.dump" ankamon || return 1
     prune full "$BACKUP_KEEP_FULL"
 }
 

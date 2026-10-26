@@ -1,6 +1,6 @@
 {
   "title": "Wi-Fi'yi kapat",
-  "description": "Kablosuz ağ kartının radyosunu kapatır (nmcli radio wifi off) — bağlı olmasa da sürekli ağ tarayan kartın enerji tüketimini keser. ETAP giriş ekranı açılışta Wi-Fi'yi zorla açtığından, giriş ekranının bunu yapması bir polkit kuralıyla engellenir; böylece yeniden başlatmada da kapalı kalır. Kablolu bağlantı (ve Tiha-Mon erişimi) etkilenmez. Geri almak için \"Wi-Fi'yi aç\".",
+  "description": "Kablosuz ağ kartının radyosunu kapatır (nmcli radio wifi off) — bağlı olmasa da sürekli ağ tarayan kartın enerji tüketimini keser. ETAP giriş ekranı açılışta Wi-Fi'yi zorla açtığından, giriş ekranının bunu yapması bir polkit kuralıyla engellenir; böylece yeniden başlatmada da kapalı kalır. Kablolu bağlantı (ve Ankamon erişimi) etkilenmez. Geri almak için \"Wi-Fi'yi aç\".",
   "category": "Ağ",
   "feature": "actions",
   "confirm": true,

@@ -1,5 +1,5 @@
 # eta-112 ile BIOS parolasını temizler. Araç runner tarafından /opt/eta-112'ye kopyalanmıştır
-# (bkz. worker/tihamon/executor/tools.py).
+# (bkz. worker/ankamon/executor/tools.py).
 set -u
 T=/opt/eta-112/eta-112.py
 [ -f "$T" ] || { echo "eta-112 tahtada bulunamadı ($T)." >&2; exit 1; }

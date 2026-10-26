@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 use PDO;
 
@@ -17,9 +17,9 @@ final class Db
                 'pgsql:host=%s;port=%s;dbname=%s',
                 getenv('PG_HOST') ?: 'postgres',
                 getenv('PG_PORT') ?: '5432',
-                getenv('PG_DB') ?: 'tihamon'
+                getenv('PG_DB') ?: 'ankamon'
             );
-            self::$pdo = new PDO($dsn, getenv('PG_USER') ?: 'tihamon', getenv('PG_PASSWORD') ?: '', [
+            self::$pdo = new PDO($dsn, getenv('PG_USER') ?: 'ankamon', getenv('PG_PASSWORD') ?: '', [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,

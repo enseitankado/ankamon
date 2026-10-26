@@ -1,8 +1,8 @@
 set -u
 
 # Araç runner tarafından (action.json "tools") /opt/ahenk-debug'a yalnız değiştiyse kopyalandı; bkz.
-# worker/tihamon/executor/tools.py. JSON rapor dosyaya yazılır (iş çıktısı satır/uzunluk sınırlı): runner iş
-# bitince onu okuyup veritabanına alır (bkz. worker/tihamon/executor/ahenk.py) — Bakım ▸ Ahenk sekmesi.
+# worker/ankamon/executor/tools.py. JSON rapor dosyaya yazılır (iş çıktısı satır/uzunluk sınırlı): runner iş
+# bitince onu okuyup veritabanına alır (bkz. worker/ankamon/executor/ahenk.py) — Bakım ▸ Ahenk sekmesi.
 # --no-send ZORUNLU: aracın varsayılanı raporu paste.rs + ntfy.sh'e (üçüncü taraf) göndermektir.
 DIR=/opt/ahenk-debug
 TOOL="$DIR/ahenk_debug.py"

@@ -13,7 +13,7 @@ HTTPS_PORT=${HTTPS_PORT:-443}
 if [ "$HTTPS_PORT" = 0 ]; then
     sed -i '/#https$/d' "$CONF"
 else
-    /opt/tiha-mon/services/tls.sh
+    /opt/ankamon/services/tls.sh
     suffix=
     [ "$HTTPS_PORT" = 443 ] || suffix=":$HTTPS_PORT"
     sed -i -e "s/__HTTPS_PORT__/$HTTPS_PORT/" -e "s/__HTTPS_SUFFIX__/$suffix/" "$CONF"

@@ -1,14 +1,14 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Actions;
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Auth;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\Actions;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Auth;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /** Görev kuyruğu: API yalnız kuyruğa yazar; tahtalara bağlanan worker'dır. */
 final class JobsApi
@@ -58,7 +58,7 @@ final class JobsApi
 
     /**
      * Canlı çıktı penceresi için artımlı okuma: görev durumu + tahta başına durum + `after`'dan sonraki
-     * olaylar (bağlanılıyor/bağlandı/çıktı satırları/çıkış kodu — bkz. worker/tihamon/runner).
+     * olaylar (bağlanılıyor/bağlandı/çıktı satırları/çıkış kodu — bkz. worker/ankamon/runner).
      * Pencere bunu kısa aralıkla çağırır; yalnız yeni olaylar döner.
      */
     public function events(Request $request, array $user): array
@@ -96,12 +96,12 @@ final class JobsApi
             'command' => $this->commandJob($request),
             'wol' => ['power', 'Uyandır (Wake-on-LAN)', [], true],
             // "screen" yetkisiyle: Ekranlar sekmesindeki önizlemelerin sağ menüsünden tetiklenir
-            // (bkz. worker/tihamon/executor/whoami.py) — tahtada o an oturum açmış GERÇEK kullanıcıyı
+            // (bkz. worker/ankamon/executor/whoami.py) — tahtada o an oturum açmış GERÇEK kullanıcıyı
             // SSH ile anlık sorgular (board_sessions'ın log tabanlı, bazen bayat kaydına güvenmez).
             'whoami' => ['screen', 'Oturumları sorgula', [], true],
             // "Bilgi kartı" (Tahtalar grid'i VE Ekranlar sekmesi sağ menüsü — bkz. frontend
             // ui/BoardOps.js infoCard): donanım bilgisini (disk/RAM/BIOS/çekirdek/anakart) SSH ile
-            // canlı toplar, 60dk önbellek (bkz. worker/tihamon/executor/hwfacts.py). Her iki girişten
+            // canlı toplar, 60dk önbellek (bkz. worker/ankamon/executor/hwfacts.py). Her iki girişten
             // de erişilebildiğinden yetki denetimi aşağıda özel: 'boards' YA DA 'screen' yeterli.
             'facts' => ['boards', 'Donanım bilgisi', [], true],
             // Sağ menü "Oturum aç" (bkz. frontend ui/BoardOps.js loginMenu, worker executor/accounts.py):
@@ -172,7 +172,7 @@ final class JobsApi
                 throw ApiError::badRequest('Seçilen tahtalar bulunamadı.');
             }
         }
-        Db::exec("SELECT pg_notify('tihamon_jobs', ?)", [(string) $jobId]);
+        Db::exec("SELECT pg_notify('ankamon_jobs', ?)", [(string) $jobId]);
         $pdo->commit();
 
         $logged = $type === 'action' ? Actions::redactParams($params) : $params; // parola denetim kaydına yazılmaz

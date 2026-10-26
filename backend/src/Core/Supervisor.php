@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 /**
  * supervisord XML-RPC istemcisi (unix soketi /run/supervisor.sock — bkz. supervisord.conf

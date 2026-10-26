@@ -3,7 +3,7 @@
 # ÖNCE okunmasına dayanır (Debian rsyslog.conf: $IncludeConfig, ardından auth.log vb.) → iletim + yerel dosya ikisi de.
 set -eu
 
-CONF=/etc/rsyslog.d/89-tihamon-pam-noise.conf
+CONF=/etc/rsyslog.d/89-ankamon-pam-noise.conf
 command -v rsyslogd >/dev/null 2>&1 || { echo "Tahtada rsyslog yok; süzülecek bir şey yok."; exit 0; }
 
 if [ "${MODE:-on}" = off ]; then
@@ -17,8 +17,8 @@ fi
 BACKUP=
 [ -f "$CONF" ] && BACKUP=$(mktemp) && cp -p "$CONF" "$BACKUP"
 cat > "$CONF" <<'CONF_EOF'
-# Tiha-Mon: Pardus pam_etap.py gürültüsü (zararsız; her SSH/oturum girişinde 2 satır).
-# Kaldırmak için bu dosyayı silip rsyslog'u yeniden başlatın ya da Tiha-Mon'da "PAM log gürültüsünü süz → Süzmeyi kaldır".
+# Ankamon: Pardus pam_etap.py gürültüsü (zararsız; her SSH/oturum girişinde 2 satır).
+# Kaldırmak için bu dosyayı silip rsyslog'u yeniden başlatın ya da Ankamon'da "PAM log gürültüsünü süz → Süzmeyi kaldır".
 if $msg contains "pam_sm_open_session() isn't defined" or $msg contains "pam_sm_close_session() isn't defined" then stop
 CONF_EOF
 chmod 644 "$CONF"

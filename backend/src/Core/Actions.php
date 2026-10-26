@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 /**
  * Uzaktan işlem kataloğu: actions/<kimlik>/action.json (+ tahtada çalışacak run.sh).
@@ -17,7 +17,7 @@ final class Actions
         foreach (glob($dir . '/*/action.json') ?: [] as $file) {
             $action = json_decode((string) file_get_contents($file), true);
             if (!is_array($action)) {
-                error_log("tiha-mon: okunamayan işlem tanımı: $file");
+                error_log("ankamon: okunamayan işlem tanımı: $file");
                 continue;
             }
             $id = basename(dirname($file));

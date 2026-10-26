@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tiha-Mon — Ekranımı yansıt</title>
+<title>Ankamon — Ekranımı yansıt</title>
 <link rel="icon" href="data:,">
 <!--
   Ekran yansıtma: bu bilgisayarın ekranını (ya da bir pencereyi/sekmeyi) seçili tahtalarda tam ekran gösterir.
@@ -14,11 +14,11 @@
     1) getDisplayMedia → RTCPeerConnection → WHIP: POST /cast/mtx/<yayın>/whip (nginx → MediaMTX, "cast" yetkisi).
        Yayın adı "c-<32 rastgele karakter>": tahtaların okuma anahtarı da budur (bkz. services/mediamtx.sh).
     2) Bağlantı kurulunca POST /api/jobs {type: cast_start} — runner her tahtada SSH ile ekranı uyandırır,
-       ekran koruyucuyu kapatır ve mpv'yi tam ekran başlatır (bkz. worker/tihamon/executor/cast.py).
+       ekran koruyucuyu kapatır ve mpv'yi tam ekran başlatır (bkz. worker/ankamon/executor/cast.py).
     3) Durdur / sekmeyi kapat / tarayıcının "Paylaşımı durdur"u: WHIP oturumu silinir, cast_stop görevi
        gönderilir (tahtadaki oynatıcı yayın bitince zaten kendiliğinden kapanır; görev ekran koruyucuyu
        hemen geri kurar).
-  Ekran yakalama yalnız güvenli bağlamda (HTTPS) çalışır — Tiha-Mon HTTPS ile açılmalı (bkz. services/tls.sh).
+  Ekran yakalama yalnız güvenli bağlamda (HTTPS) çalışır — Ankamon HTTPS ile açılmalı (bkz. services/tls.sh).
 -->
 <style>
   * { box-sizing: border-box; }
@@ -158,7 +158,7 @@ const usage = new Map();   // tahta id → {rx: {bytes, ts, mbps}, perf: son ba�
 function api(method, path, body) {
   return fetch("/api" + path, {
     method, credentials: "same-origin", keepalive: method !== "GET",
-    headers: { "X-Requested-With": "tihamon", ...(body ? { "Content-Type": "application/json" } : {}) },
+    headers: { "X-Requested-With": "ankamon", ...(body ? { "Content-Type": "application/json" } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
@@ -218,7 +218,7 @@ async function capture() {
   const m = await navigator.mediaDevices.getDisplayMedia({
     video: { width: { max: q.width }, height: { max: q.height }, frameRate: { ideal: q.fps, max: q.fps } },
     audio: $("audio").checked,
-    // Seçim penceresinde "Tüm ekran" önde gelsin; Tiha-Mon sekmesinin kendisi listelenmesin.
+    // Seçim penceresinde "Tüm ekran" önde gelsin; Ankamon sekmesinin kendisi listelenmesin.
     surfaceSwitching: "include",
     selfBrowserSurface: "exclude",
     systemAudio: "include",
@@ -304,7 +304,7 @@ async function publish() {
 
   await new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(
-      "Medya bağlantısı kurulamadı. Bu bilgisayardan Tiha-Mon sunucusunun 8189 (UDP/TCP) portuna erişilebilmeli.")), 15000);
+      "Medya bağlantısı kurulamadı. Bu bilgisayardan Ankamon sunucusunun 8189 (UDP/TCP) portuna erişilebilmeli.")), 15000);
     const check = () => {
       if (pc.connectionState === "connected") { clearTimeout(t); resolve(); }
       else if (pc.connectionState === "failed") { clearTimeout(t); reject(new Error("Medya bağlantısı başarısız (ICE).")); }

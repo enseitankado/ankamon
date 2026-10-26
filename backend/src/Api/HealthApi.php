@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Db;
+use Ankamon\Core\Db;
 
 final class HealthApi
 {

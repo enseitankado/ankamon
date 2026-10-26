@@ -6,11 +6,11 @@
 # Erişim kuralları:
 #   - yayınlama yalnız 127.0.0.1'den (yani yalnız nginx vekili üzerinden, yetki denetiminden geçmiş);
 #   - okuma yalnız "c-<rastgele 24+ karakter>" adlı yollardan — yol adını yalnız yayını başlatan sayfa
-#     ve o yayının tahtaları bilir (bkz. docker/rootfs/cast/index.html, worker/tihamon/executor/cast.py).
+#     ve o yayının tahtaları bilir (bkz. docker/rootfs/cast/index.html, worker/ankamon/executor/cast.py).
 # Dışa açık portlar: RTSP 8554/tcp (tahtalar okur), WebRTC ICE 8189/udp+tcp (tarayıcının medya akışı).
 set -eu
 
-CONF=/run/tiha-mon/mediamtx.yml
+CONF=/run/ankamon/mediamtx.yml
 cat > "$CONF" <<EOF
 logLevel: warn
 logDestinations: [stdout]
@@ -62,4 +62,4 @@ paths:
   all_others:
 EOF
 
-exec /opt/tiha-mon/mediamtx/mediamtx "$CONF"
+exec /opt/ankamon/mediamtx/mediamtx "$CONF"

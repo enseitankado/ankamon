@@ -1,8 +1,8 @@
 {
-  "uid": "tihamon-genel",
+  "uid": "ankamon-genel",
   "title": "Tahta genel bakış",
   "tags": [
-    "tiha-mon"
+    "ankamon"
   ],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -21,7 +21,7 @@
         "type": "query",
         "datasource": {
           "type": "grafana-postgresql-datasource",
-          "uid": "tihamon"
+          "uid": "ankamon"
         },
         "refresh": 2,
         "sort": 0,
@@ -38,7 +38,7 @@
       "title": "İşlemci kullanımı",
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "tihamon"
+        "uid": "ankamon"
       },
       "gridPos": {
         "x": 0,
@@ -74,7 +74,7 @@
           "refId": "A",
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "tihamon"
+            "uid": "ankamon"
           },
           "format": "time_series",
           "rawQuery": true,
@@ -88,7 +88,7 @@
       "title": "Bellek kullanımı",
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "tihamon"
+        "uid": "ankamon"
       },
       "gridPos": {
         "x": 12,
@@ -124,7 +124,7 @@
           "refId": "A",
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "tihamon"
+            "uid": "ankamon"
           },
           "format": "time_series",
           "rawQuery": true,
@@ -138,7 +138,7 @@
       "title": "Sıcaklık",
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "tihamon"
+        "uid": "ankamon"
       },
       "gridPos": {
         "x": 0,
@@ -172,7 +172,7 @@
           "refId": "A",
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "tihamon"
+            "uid": "ankamon"
           },
           "format": "time_series",
           "rawQuery": true,
@@ -186,7 +186,7 @@
       "title": "Sistem yükü",
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "tihamon"
+        "uid": "ankamon"
       },
       "gridPos": {
         "x": 12,
@@ -220,7 +220,7 @@
           "refId": "A",
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "tihamon"
+            "uid": "ankamon"
           },
           "format": "time_series",
           "rawQuery": true,
@@ -234,7 +234,7 @@
       "title": "Disk doluluğu",
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "tihamon"
+        "uid": "ankamon"
       },
       "gridPos": {
         "x": 0,
@@ -270,7 +270,7 @@
           "refId": "A",
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "tihamon"
+            "uid": "ankamon"
           },
           "format": "time_series",
           "rawQuery": true,
@@ -284,7 +284,7 @@
       "title": "Ağ trafiği (alınan)",
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "tihamon"
+        "uid": "ankamon"
       },
       "gridPos": {
         "x": 12,
@@ -318,7 +318,7 @@
           "refId": "A",
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "tihamon"
+            "uid": "ankamon"
           },
           "format": "time_series",
           "rawQuery": true,
@@ -332,7 +332,7 @@
       "title": "Son loglar",
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "tihamon"
+        "uid": "ankamon"
       },
       "gridPos": {
         "x": 0,
@@ -352,7 +352,7 @@
           "refId": "A",
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "tihamon"
+            "uid": "ankamon"
           },
           "format": "table",
           "rawQuery": true,

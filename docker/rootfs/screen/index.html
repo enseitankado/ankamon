@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tiha-Mon — Tahta ekranı</title>
+<title>Ankamon — Tahta ekranı</title>
 <script>
   // Senkron (modül betiğinden ÖNCE çalışır — modül betiği <defer> gibi ertelenir): embed/single
   // sınıfını <html>'e HEMEN ekler. Bu olmadan tarayıcı, modül betiği devreye girip .embed'e özgü
@@ -130,7 +130,7 @@
   html.embed.nostats .tile .stats { display: none; }
   /* "Başarım" görünümü: htop'un üst sol (çekirdek başına CPU, Mem, Swp) ve sağ (görevler, yük,
      çalışma süresi) panelleri ekran önizlemesinin üstünde, saniyelik (bkz. Tile.renderPerf,
-     worker/tihamon/screen/perf.py). Yazı kutucukla ölçeklenir (container query); satır çoksa
+     worker/ankamon/screen/perf.py). Yazı kutucukla ölçeklenir (container query); satır çoksa
      (--rows) yüksekliğe sığacak kadar küçülür. Ekran katmanlarının üstünde, .msg/.whoami'nin altında. */
   .tile .perf { position: absolute; inset: 0; container-type: size; pointer-events: none;
     background: rgba(8, 12, 18, .8); color: #e6edf3; font-family: "DejaVu Sans Mono", ui-monospace, monospace; }
@@ -598,7 +598,7 @@ class Tile {
   /**
    * Siyah ekran / "Bağlanıyor…" göstermeden yeni bir akışa geçer (müdahale kipi aç/kapa, kalite
    * değişimi). Tahtadaki x11vnc salt izleme (-viewonly) ya da girdi kabul eden kipte başlatıldığından
-   * (güvenlik tahta tarafında, bkz. worker/tihamon/screen/remote.py) kip değişimi yeni bir bağlantı
+   * (güvenlik tahta tarafında, bkz. worker/ankamon/screen/remote.py) kip değişimi yeni bir bağlantı
    * gerektirir — ama o kurulurken eski görüntü canlı kalır.
    */
   reconnect() {
@@ -656,7 +656,7 @@ class Tile {
   /**
    * "Başarım" görünümü: yalnız görünüm açıkken VE kutucuk bağlı kalmalıyken (sekme açık, görünür
    * alanda, tahta çevrimiçi — bkz. refreshWanted) tahta başına tek bir WebSocket; kopunca 5 sn sonra
-   * yeniden denenir. Kapanınca akış ve tahtadaki döngü biter (bkz. worker/tihamon/screen/perf.py).
+   * yeniden denenir. Kapanınca akış ve tahtadaki döngü biter (bkz. worker/ankamon/screen/perf.py).
    */
   syncPerf() {
     const want = view.perf && this.wanted;

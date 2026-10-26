@@ -18,7 +18,7 @@ path = pathlib.Path("/usr/lib/python3.12/site-packages/webssh/handler.py")
 src = path.read_text()
 
 before = "        workers = clients.get(ip, {})"
-after = "        workers = clients.setdefault(ip, {})  # tiha-mon: atomik al/oluştur, yarış durumunu önler"
+after = "        workers = clients.setdefault(ip, {})  # ankamon: atomik al/oluştur, yarış durumunu önler"
 assert before in src, "webssh handler.py beklenen satırı içermiyor (sürüm değişmiş olabilir)"
 src = src.replace(before, after, 1)
 
@@ -28,4 +28,4 @@ assert before2 in src, "webssh handler.py'daki artık gereksiz 'if not workers' 
 src = src.replace(before2, after2, 1)
 
 path.write_text(src)
-print("tiha-mon: webssh handler.py yarış durumu düzeltmesi uygulandı")
+print("ankamon: webssh handler.py yarış durumu düzeltmesi uygulandı")

@@ -1,10 +1,10 @@
 #!/bin/sh
 # HTTPS sertifikaları (nginx.sh her açılışta çağırır). Tarayıcının ekran yakalama API'si
 # (getDisplayMedia — "Ekranımı yansıt") yalnız güvenli bağlamda (HTTPS) çalışır; okulda alan adı ve
-# genel bir CA olmadığından Tiha-Mon kendi yerel CA'sını üretir:
+# genel bir CA olmadığından Ankamon kendi yerel CA'sını üretir:
 #   /data/tls/ca.crt + ca.key       — bir kez üretilir, kalıcıdır (10 yıl). Yönetici bilgisayarına bir
 #                                     kez "güvenilen kök" olarak kurulursa tarayıcı uyarısı hiç çıkmaz;
-#                                     http://<sunucu>/tihamon-ca.crt adresinden indirilir.
+#                                     http://<sunucu>/ankamon-ca.crt adresinden indirilir.
 #   /data/tls/server.crt + .key     — CA ile imzalı; konu alternatif adları (SAN) sunucunun o anki IP'leri
 #                                     + ana makine adı. Ağ segmenti değişince (IP listesi farklıysa) ya da
 #                                     süresi 30 günden az kaldıysa kendiliğinden yeniden üretilir; CA aynı
@@ -19,7 +19,7 @@ umask 077
 if [ ! -s "$DIR/ca.key" ] || [ ! -s "$DIR/ca.crt" ]; then
     openssl req -x509 -newkey rsa:3072 -nodes -sha256 -days 3650 \
         -keyout "$DIR/ca.key" -out "$DIR/ca.crt" \
-        -subj "/O=Tiha-Mon/CN=Tiha-Mon Yerel CA ($(hostname))" \
+        -subj "/O=Ankamon/CN=Ankamon Yerel CA ($(hostname))" \
         -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
         -addext "keyUsage=critical,keyCertSign,cRLSign" >/dev/null 2>&1
     rm -f "$DIR/server.crt"
@@ -44,7 +44,7 @@ renew=
 if [ -n "$renew" ]; then
     openssl req -new -newkey rsa:2048 -nodes -sha256 \
         -keyout "$DIR/server.key.new" -out "$DIR/server.csr" \
-        -subj "/O=Tiha-Mon/CN=$host" >/dev/null 2>&1
+        -subj "/O=Ankamon/CN=$host" >/dev/null 2>&1
     printf 'subjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n' \
         "$sans" > "$DIR/server.ext"
     # 825 gün: tarayıcıların el ile kurulan kökler için de kabul ettiği üst sınır (macOS/iOS kuralı).

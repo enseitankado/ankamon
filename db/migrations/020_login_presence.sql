@@ -1,4 +1,4 @@
--- Oturumun tarayıcıdaki durumu (alt çubuk ipucunda yeşil "Aktif"): Tiha-Mon sekmesi GÖRÜNÜR ve tarayıcı
+-- Oturumun tarayıcıdaki durumu (alt çubuk ipucunda yeşil "Aktif"): Ankamon sekmesi GÖRÜNÜR ve tarayıcı
 -- penceresi ODAKTA mı. Tarayıcı durum değişince hemen, sürerken 15 sn'de bir bildirir (bkz. StatusBar
 -- __pollUsers, LoginSessionsApi::active). Bildirim kesilirse (sekme kapandı, ağ gitti) focus_at eskir ve
 -- "Aktif" sayılmaz (LoginSessionsApi::FOCUS_STALE_SECONDS).

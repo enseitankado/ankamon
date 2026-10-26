@@ -1,4 +1,4 @@
--- Web terminal oturumları: Tiha-Mon üzerinden (webssh, /webshell/) tahtalara açılan SSH oturumları
+-- Web terminal oturumları: Ankamon üzerinden (webssh, /webshell/) tahtalara açılan SSH oturumları
 -- — Oturumlar sayfası bunları greeter oturumlarıyla (board_sessions) birlikte listeler.
 --
 -- Satır üç adımda dolar:

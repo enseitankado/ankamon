@@ -5,7 +5,7 @@
 set -eu
 
 SPOOL=/var/spool/rsyslog
-QI="$SPOOL/tihamon_pg.qi"
+QI="$SPOOL/ankamon_pg.qi"
 
 qi_ok() {
     head -n 1 "$QI" | grep -q '^<OPB:1:qqueue:' && tail -n 2 "$QI" | head -n 1 | grep -q '^>End$'
@@ -14,8 +14,8 @@ qi_ok() {
 if [ -f "$QI" ] && ! qi_ok; then
     dir="$SPOOL/bozuk-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$dir"
-    mv "$SPOOL"/tihamon_pg.* "$dir"/
-    echo "tiha-mon: kuyruk konum dosyası okunamadı, kuyruk dosyaları $dir altına alındı"
+    mv "$SPOOL"/ankamon_pg.* "$dir"/
+    echo "ankamon: kuyruk konum dosyası okunamadı, kuyruk dosyaları $dir altına alındı"
 fi
 
 exec rsyslogd -n -i NONE -f /etc/rsyslog.conf

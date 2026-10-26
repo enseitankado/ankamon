@@ -1,6 +1,6 @@
-"""Tiha-Mon kancası: web terminal (webssh) oturumlarının gerçek açılış/kapanış zamanlarını
+"""Ankamon kancası: web terminal (webssh) oturumlarının gerçek açılış/kapanış zamanlarını
 webshell_sessions tablosuna yazar (bkz. db/migrations/011_webshell_sessions.sql). İmaja
-webssh/tihamon_hook.py olarak kopyalanır; çağrı noktalarını webssh-race-fix.py ekler:
+webssh/ankamon_hook.py olarak kopyalanır; çağrı noktalarını webssh-race-fix.py ekler:
   - handler.WsockHandler.open: WebSocket worker'a iliştiğinde → opened(worker)
   - worker.Worker.close: worker kapanınca → closed(worker)
 
@@ -20,8 +20,8 @@ except ImportError:  # pragma: no cover — imajda py3-psycopg kurulu
 _DSN = "host={} port={} dbname={} user={} password={} connect_timeout=2".format(
     os.environ.get("PG_HOST", "127.0.0.1"),
     os.environ.get("PG_PORT", "5432"),
-    os.environ.get("PG_DB", "tihamon"),
-    os.environ.get("PG_USER", "tihamon"),
+    os.environ.get("PG_DB", "ankamon"),
+    os.environ.get("PG_USER", "ankamon"),
     os.environ.get("PG_PASSWORD", ""),
 )
 
@@ -33,7 +33,7 @@ def _exec(sql, params=()):
         with psycopg.connect(_DSN, autocommit=True) as conn:
             conn.execute(sql, params)
     except Exception as exc:  # noqa: BLE001 — kanca webssh'i bozmamalı
-        logging.warning("tiha-mon webshell kancası: %s", exc)
+        logging.warning("ankamon webshell kancası: %s", exc)
 
 
 def opened(worker):

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 /** Kim, ne zaman, ne yaptı: yönetim işlemlerinin kaydı. */
 final class Audit

@@ -26,11 +26,11 @@ durum() {
 # başına kalıcı değildir. Paket dosyasına dokunmadan, yalnız lightdm kullanıcısının radyoyu
 # açıp kapatma yetkisi polkit ile reddedilir (root ve oturum açan kullanıcı etkilenmez).
 # "Wi-Fi'yi aç" bu kuralı kaldırır.
-KURAL=/etc/polkit-1/rules.d/49-tiha-mon-wifi-off.rules
+KURAL=/etc/polkit-1/rules.d/49-ankamon-wifi-off.rules
 kural_kur() {
     mkdir -p "${KURAL%/*}"
     cat > "$KURAL.tmp" <<'RULE'
-// Tiha-Mon "Wi-Fi'yi kapat": giriş ekranının (lightdm) Wi-Fi'yi zorla yeniden açmasını engeller.
+// Ankamon "Wi-Fi'yi kapat": giriş ekranının (lightdm) Wi-Fi'yi zorla yeniden açmasını engeller.
 // "Wi-Fi'yi aç" bu dosyayı siler.
 polkit.addRule(function(action, subject) {
     if (action.id == "org.freedesktop.NetworkManager.enable-disable-wifi" && subject.user == "lightdm") {
@@ -62,7 +62,7 @@ nmcli radio wifi off
 sleep 1
 if [ "$(nmcli radio wifi)" = "disabled" ]; then
     echo "Wi-Fi kapatıldı: kablosuz kart artık ağ taramıyor ve tahta yeniden başlasa da kapalı kalır."
-    echo "Kablolu bağlantı (ve Tiha-Mon erişimi) etkilenmedi. Geri açmak için \"Wi-Fi'yi aç\"."
+    echo "Kablolu bağlantı (ve Ankamon erişimi) etkilenmedi. Geri açmak için \"Wi-Fi'yi aç\"."
 else
     echo "Wi-Fi kapatılamadı: radyo hâlâ açık görünüyor." >&2
     exit 1

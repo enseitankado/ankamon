@@ -1,4 +1,4 @@
-"""Docker imajı derlenirken çalışır: webssh'e Tiha-Mon oturum kancasının (webssh/tihamon_hook.py,
+"""Docker imajı derlenirken çalışır: webssh'e Ankamon oturum kancasının (webssh/ankamon_hook.py,
 kaynağı docker/rootfs/webssh-hook.py) çağrı noktalarını ekler — web terminal oturumlarının gerçek
 açılış/kapanışı Oturumlar sayfasında listelensin diye (bkz. db/migrations/011_webshell_sessions.sql).
 """
@@ -20,17 +20,17 @@ patch(
     "handler.py",
     "                self.loop.add_handler(worker.fd, worker, IOLoop.READ)\n",
     "                self.loop.add_handler(worker.fd, worker, IOLoop.READ)\n"
-    "                tihamon_hook.opened(worker)  # tiha-mon\n",
+    "                ankamon_hook.opened(worker)  # ankamon\n",
 )
-patch("handler.py", "import tornado.web\n", "import tornado.web\nfrom webssh import tihamon_hook  # tiha-mon\n")
+patch("handler.py", "import tornado.web\n", "import tornado.web\nfrom webssh import ankamon_hook  # ankamon\n")
 
 # Worker kapanışı (pencere kapandı, exit, bağlantı koptu — hepsi buradan geçer).
 patch(
     "worker.py",
     "        self.closed = True\n",
     "        self.closed = True\n"
-    "        tihamon_hook.closed(self)  # tiha-mon\n",
+    "        ankamon_hook.closed(self)  # ankamon\n",
 )
-patch("worker.py", "import logging\n", "import logging\nfrom webssh import tihamon_hook  # tiha-mon\n")
+patch("worker.py", "import logging\n", "import logging\nfrom webssh import ankamon_hook  # ankamon\n")
 
-print("tiha-mon: webssh oturum kancası eklendi")
+print("ankamon: webssh oturum kancası eklendi")

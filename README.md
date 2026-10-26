@@ -1,4 +1,4 @@
-# Tiha-Mon
+# Ankamon
 
 Okuldaki akıllı tahtalar için merkezi log sunucusu, sensör izleme ve uzaktan yönetim merkezi.
 [TiHA](https://github.com/enseitankado/tiha) ile hazırlanmış tahtaların karşı tarafıdır: tahtalar loglarını
@@ -11,23 +11,23 @@ yalnız `data/` dizinindedir. Dışarıya yalnız iki port açılır: arayüz i�
 ## Kurulum
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/enseitankado/tiha-mon/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/enseitankado/ankamon/main/install.sh | sudo bash
 ```
 
 MEB filtreli okul ağında curl sertifika hatası verirse `curl -fsSLk …` kullanın; betik gerisini kendisi
 çözer (filtrenin HTTPS kesmesini tespit ederse MEB kök sertifikasını sistemin güven deposuna ekler).
 
-Betik Docker yoksa kurar, kaynak kodu `/opt/tiha-mon`'a indirir, `.env`'yi varsayılan ayarlar ve rastgele
+Betik Docker yoksa kurar, kaynak kodu `/opt/ankamon`'a indirir, `.env`'yi varsayılan ayarlar ve rastgele
 parolalarla üretir, imajı bu makinede derler, yığını başlatır ve sonunda arayüz adresini ve `etapadmin`
 parolasını yazar. Bağımlılıklar (temel imajlar, Alpine paketleri, npm kütüphaneleri, qooxdoo temaları,
-MAC üretici tablosu) derlemede kendi asıl adreslerinden indirilir; depoda yalnız Tiha-Mon'un kendi kodu vardır.
+MAC üretici tablosu) derlemede kendi asıl adreslerinden indirilir; depoda yalnız Ankamon'un kendi kodu vardır.
 
 Ayarlar `.env` dosyasındadır (açıklamalar için `.env.example`). Değişiklikten sonra: `docker compose up -d`.
 
 ### Güncelleme
 
 ```bash
-sudo /opt/tiha-mon/install.sh --update
+sudo /opt/ankamon/install.sh --update
 ```
 
 Sırasıyla: depodaki dosyalar sunucuda elle değiştirilmişse durur (hiçbir şeyi silmez) → çalışan sistemden
@@ -48,7 +48,7 @@ Hepsi tek konteynerde, supervisord ile yönetilir (bkz. `docker/rootfs/superviso
 | postgres | PostgreSQL 17 + TimescaleDB: bütün veriler | `data/postgres` |
 | rsyslog | Tahtalardan syslog alır (TCP/UDP 514), Postgres'e yazar | `data/rsyslog` (disk kuyruğu) |
 | telegraf | Tahtaların node_exporter ucunu (`:9100`) okur, Postgres'e yazar | — |
-| grafana | Sensör grafikleri; oturumu Tiha-Mon'dan devralır | `data/grafana`, Postgres |
+| grafana | Sensör grafikleri; oturumu Ankamon'dan devralır | `data/grafana`, Postgres |
 | backup | Rutin `pg_dump` yedekleri | `data/backups` |
 | dbinit | Açılışta bir kez: şema göçleri ve etapadmin hesabı | — |
 
@@ -63,8 +63,8 @@ backend/      PHP API — src/Core (altyapı), src/Api (uç başına bir sınıf
 db/           Şema göçleri (migrations/NNN_*.sql) ve her açılışta çalışan post.sql
 docker/rootfs/  Konteyner içi yapılandırma ve servis sarmalayıcıları (supervisord, entrypoint, services/*)
 docker/       rsyslog/telegraf/grafana yapılandırmaları ve yedek betiği
-frontend/     qooxdoo arayüzü — source/class/tihamon/page altında sayfa başına bir sınıf
-worker/       Python işçisi — tihamon/tasks (periyodik) ve tihamon/executor (Ansible ile görev yürütme)
+frontend/     qooxdoo arayüzü — source/class/ankamon/page altında sayfa başına bir sınıf
+worker/       Python işçisi — ankamon/tasks (periyodik) ve ankamon/executor (Ansible ile görev yürütme)
 data/         Çalışma verisi (depoya girmez)
 ```
 
@@ -88,10 +88,10 @@ data/         Çalışma verisi (depoya girmez)
 Geri yükleme (tam yedekten):
 
 ```bash
-C=tiha-mon
-docker compose exec -T $C psql -h 127.0.0.1 -U tihamon -d tihamon -c "SELECT timescaledb_pre_restore()"
-docker compose exec -T $C pg_restore -h 127.0.0.1 -U tihamon -d tihamon --clean --if-exists /dev/stdin < data/backups/full-….dump
-docker compose exec -T $C psql -h 127.0.0.1 -U tihamon -d tihamon -c "SELECT timescaledb_post_restore()"
+C=ankamon
+docker compose exec -T $C psql -h 127.0.0.1 -U ankamon -d ankamon -c "SELECT timescaledb_pre_restore()"
+docker compose exec -T $C pg_restore -h 127.0.0.1 -U ankamon -d ankamon --clean --if-exists /dev/stdin < data/backups/full-….dump
+docker compose exec -T $C psql -h 127.0.0.1 -U ankamon -d ankamon -c "SELECT timescaledb_post_restore()"
 docker compose restart
 ```
 (`PGPASSWORD` gerekiyorsa `.env` içindeki `POSTGRES_PASSWORD` ile verin.)
@@ -99,9 +99,9 @@ docker compose restart
 ## HTTPS ve ekran yansıtma
 
 Arayüz HTTPS'tedir (`HTTPS_PORT`, varsayılan 443); düz HTTP istekleri HTTPS'e yönlendirilir (yalnız
-`/api/health` ve CA indirme HTTP'de kalır). Okulda alan adı olmadığından Tiha-Mon kendi yerel CA'sını üretir
+`/api/health` ve CA indirme HTTP'de kalır). Okulda alan adı olmadığından Ankamon kendi yerel CA'sını üretir
 (`data/tls/ca.crt`, 10 yıl); sunucu sertifikası bu CA ile imzalanır ve sunucunun IP adresleri değişince
-açılışta kendiliğinden yenilenir. Tarayıcı uyarısını kaldırmak için `http://<sunucu>/tihamon-ca.crt`
+açılışta kendiliğinden yenilenir. Tarayıcı uyarısını kaldırmak için `http://<sunucu>/ankamon-ca.crt`
 dosyasını yönetici bilgisayarına bir kez "Güvenilen kök sertifika yetkilileri" deposuna kurun
 (Windows: dosyaya çift tık → Sertifika yükle → Yerel makine; Firefox: Ayarlar → Sertifikalar → İçe aktar).
 
@@ -121,7 +121,7 @@ hazır). Gerekenler:
 Sol menü **Ağ**: sunucunun bağlı olduğu her fiziksel ağ (alt düğüm) ve o ağda görülmüş bütün cihazlar —
 o an kapalı olanlar "Çevrim dışı" olarak kalır. Cihaz kimliği MAC adresidir.
 
-- Tarayıcı: supervisord `netscan` (`worker/tihamon/netscan/`). Varlık ARP ile (`arp-scan`, /21 ≈ 10 sn),
+- Tarayıcı: supervisord `netscan` (`worker/ankamon/netscan/`). Varlık ARP ile (`arp-scan`, /21 ≈ 10 sn),
   açık port/servis/OS tahmini `nmap -sV -O` ile cihaz cihaz (24 saatte bir; "Servisleri tara" ile hemen).
   En yaygın 1000 port taranır (`NETSCAN_TOP_PORTS`): bilgisayarların uzaktan masaüstü / sınıf yönetimi
   (NetSupport 5405, WinRM, VNC), veritabanı (MSSQL/PostgreSQL) ve alt-HTTP gibi servislerini yakalar.
@@ -130,10 +130,10 @@ o an kapalı olanlar "Çevrim dışı" olarak kalır. Cihaz kimliği MAC adresid
   Ayarlar: `NETSCAN_MIN_INTERVAL`, `NETSCAN_MAX_INTERVAL`, `NETSCAN_SERVICE_RESCAN_HOURS`, `NETSCAN_TOP_PORTS`.
 - Marka sütunu Wireshark `manuf` tablosundan (IEEE MA-L/MA-M/MA-S, ~58 bin kayıt). Depoda tutulmaz: imaj her
   derlendiğinde wireshark.org'dan güncel hâli indirilir (indirilemezse marka sütunu boş kalır). Cihaz türü
-  üretici + açık portlar + nmap cihaz sınıfı + Tiha-Mon tahta kaydından tahmin edilir; elle de seçilebilir.
+  üretici + açık portlar + nmap cihaz sınıfı + Ankamon tahta kaydından tahmin edilir; elle de seçilebilir.
 - Takma ad: her tarama sonunda boş takma adlar Tahtalar'daki adla ve `net_known_aliases` tablosundaki
   MAC → ad kayıtlarıyla (ör. eski envanterden aktarılmış) doldurulur; elle girilen ad ezilmez.
-- ETAP faz veritabanı (`worker/tihamon/netscan/etap_phase.py`): MAC'ten akıllı tahta modeli ve FATİH fazı.
+- ETAP faz veritabanı (`worker/ankamon/netscan/etap_phase.py`): MAC'ten akıllı tahta modeli ve FATİH fazı.
   `etap_prefixes.tsv` yalnız maskelenmiş önekler tutar (6–10 onaltılık hane, en dar 256 adres; tam MAC ve
   okul bilgisi yok) → anakart modeli; `etap_models.json` model → faz/marka/işlemci ve güven düzeyi (kaynaklı /
   veri / çıkarım — elle düzeltilebilir). Önekler ülke çapı ETAP envanterinden `scripts/build-etap-phases.py`
@@ -161,11 +161,11 @@ docker compose up -d --build          # imajı derle ve başlat
 docker compose logs -f                 # bütün süreçlerin günlükleri (supervisord)
 ```
 
-Yayın akışı: değişiklikleri commit'leyip `main`'e gönderin; kurulu sunucularda `sudo /opt/tiha-mon/install.sh
+Yayın akışı: değişiklikleri commit'leyip `main`'e gönderin; kurulu sunucularda `sudo /opt/ankamon/install.sh
 --update`. Kuruluma özel hiçbir şey (`.env`, `data/`, okul envanteri, erişim parolaları) depoya girmez —
 bkz. `.gitignore`; okul verisi arayüzden ya da veritabanından girilir.
 
-Topluluk temaları `frontend/themes-src/themes.txt`'teki sabit commit'lerden indirilir; tiha-mon yamaları
+Topluluk temaları `frontend/themes-src/themes.txt`'teki sabit commit'lerden indirilir; ankamon yamaları
 `<ad>.patch` dosyalarındadır (indirilen `frontend/themes/` düzenlenmez, depoda da tutulmaz). Arayüzü
 konteyner dışında derlemek için önce temaları indirin (host'ta node gerekmez):
 
@@ -176,7 +176,7 @@ docker run --rm -e OWNER="$(id -u):$(id -g)" -v "$PWD/frontend:/f" \
     apk add -q curl patch && sh /f/themes-src/fetch-themes.sh /f/themes-src /f/themes && chown -R "$OWNER" /f/themes'
 ```
 
-Tek konteynerde bir süreci yeniden başlatmak: `docker compose exec tiha-mon supervisorctl restart <ad>`
+Tek konteynerde bir süreci yeniden başlatmak: `docker compose exec ankamon supervisorctl restart <ad>`
 (adlar: postgres, rsyslog, telegraf, grafana, php-fpm, nginx, worker, runner, mediamtx, backup).
 
 Yeni şema değişikliği için `db/migrations/` altına sıradaki numarayla dosya ekleyin; uygulanmış dosyalar
@@ -185,8 +185,8 @@ değiştirilmez.
 ## Kaldırma
 
 ```bash
-cd /opt/tiha-mon && sudo docker compose down     # servisleri durdur (veriler data/ altında kalır)
-sudo rm -rf /opt/tiha-mon                          # veriler ve yedekler DAHİL her şeyi sil
+cd /opt/ankamon && sudo docker compose down     # servisleri durdur (veriler data/ altında kalır)
+sudo rm -rf /opt/ankamon                          # veriler ve yedekler DAHİL her şeyi sil
 ```
 
 Silmeden önce yedekleri saklamak için `data/backups/` dizinini başka bir yere kopyalayın.

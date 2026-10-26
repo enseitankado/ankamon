@@ -24,7 +24,7 @@ rapor() {
 }
 
 # "Wi-Fi'yi kapat"ın kurduğu, giriş ekranının Wi-Fi'yi açmasını engelleyen polkit kuralı kaldırılır.
-KURAL=/etc/polkit-1/rules.d/49-tiha-mon-wifi-off.rules
+KURAL=/etc/polkit-1/rules.d/49-ankamon-wifi-off.rules
 if [ -e "$KURAL" ]; then
     rm -f "$KURAL"
     echo "Wi-Fi'nin kapalı kalmasını sağlayan kural kaldırıldı."

@@ -4,13 +4,13 @@
 set -eu
 
 export PGDATA=/data/postgres
-PWFILE=/run/tiha-mon/pg-pw
+PWFILE=/run/ankamon/pg-pw
 
 if [ ! -s "$PGDATA/PG_VERSION" ]; then
-    echo "tiha-mon: PostgreSQL ilklendiriliyor…"
+    echo "ankamon: PostgreSQL ilklendiriliyor…"
     printf '%s' "$POSTGRES_PASSWORD" > "$PWFILE"
     chown postgres "$PWFILE"
-    su-exec postgres initdb --username=tihamon --pwfile="$PWFILE" \
+    su-exec postgres initdb --username=ankamon --pwfile="$PWFILE" \
         --data-checksums --encoding=UTF8 --locale=C
     rm -f "$PWFILE"
     {

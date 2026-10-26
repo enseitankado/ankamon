@@ -1,4 +1,4 @@
-# Tiha-Mon — tek konteyner. Bütün bileşenler (PostgreSQL+TimescaleDB, rsyslog, Telegraf, Grafana,
+# Ankamon — tek konteyner. Bütün bileşenler (PostgreSQL+TimescaleDB, rsyslog, Telegraf, Grafana,
 # nginx, PHP-FPM, Python worker+Ansible, MediaMTX) tek imajda; supervisord yönetir. Dışarı açık: 80/443
 # (arayüz), 514 (log), 8554 + 8189 (ekran yansıtma: tahtaların RTSP okuması, tarayıcının WebRTC medyası).
 
@@ -15,7 +15,7 @@ RUN cat /tmp/meb-ca.crt >> /etc/ssl/certs/ca-certificates.crt \
  && apk add --no-cache curl patch
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
-# Topluluk qooxdoo temaları (MIT): themes-src/themes.txt'teki sabit commit'lerden + tiha-mon yamaları.
+# Topluluk qooxdoo temaları (MIT): themes-src/themes.txt'teki sabit commit'lerden + ankamon yamaları.
 COPY frontend/themes-src ./themes-src
 RUN sh themes-src/fetch-themes.sh themes-src themes
 # Ağ envanterinin MAC üretici tablosu (Wireshark manuf). İndirilemezse boş kalır (üretici adı görünmez,
@@ -31,10 +31,10 @@ COPY ext ./ext
 RUN node ext-libs.js ext
 # Oturum zaman çizelgesi (ui.sessions.Timeline): vis-timeline'ın bağımlılıkları gömülü standalone
 # derlemesi qooxdoo kaynağı olarak eklenir; sekme ilk açıldığında yüklenir (bkz. @asset).
-RUN mkdir -p source/resource/tihamon/vis \
+RUN mkdir -p source/resource/ankamon/vis \
  && cp node_modules/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js \
        node_modules/vis-timeline/styles/vis-timeline-graph2d.min.css \
-       node_modules/vis-timeline/LICENSE.md source/resource/tihamon/vis/
+       node_modules/vis-timeline/LICENSE.md source/resource/ankamon/vis/
 # Sistem ▸ Yazılımlar için ön yüz kütüphanelerinin sürümleri ve MAC üretici tablosunun indirildiği gün.
 RUN node -e 'const v = p => require("/src/node_modules/" + p + "/package.json").version; \
       const fs = require("fs"); const m = fs.statSync("/out/manuf.gz"); \
@@ -62,7 +62,7 @@ FROM timescale/timescaledb:2.31.0-pg17
 # Okul ağındaki filtre HTTPS'i kendi sertifikasıyla keser; depolar HTTP üzerinden kullanılır
 # (paketler imzalı olduğundan bütünlük apk tarafından doğrulanır). pip/composer kullanılmaz.
 # apk upgrade: taban imajın kendi paketleri (ör. libexpat) imaj yeniden yayımlanana dek eski kalır.
-# Taban imajın eski Go ile derlenmiş, tiha-mon'un kullanmadığı araçları (gosu → su-exec kullanılır,
+# Taban imajın eski Go ile derlenmiş, ankamon'un kullanmadığı araçları (gosu → su-exec kullanılır,
 # timescaledb-tune/parallel-copy) silinir: güvenlik taramasındaki açıkların çoğu bunlardaydı.
 RUN sed -i 's|https://|http://|' /etc/apk/repositories \
  && apk upgrade --no-cache \
@@ -91,25 +91,25 @@ RUN python3 /tmp/webssh-race-fix.py && rm /tmp/webssh-race-fix.py
 COPY docker/rootfs/webssh-fontsize-patch.py /tmp/webssh-fontsize-patch.py
 RUN python3 /tmp/webssh-fontsize-patch.py && rm /tmp/webssh-fontsize-patch.py
 # Web terminal oturumlarının açılış/kapanışını webshell_sessions tablosuna yazan kanca (Oturumlar sayfası).
-COPY docker/rootfs/webssh-hook.py /usr/lib/python3.12/site-packages/webssh/tihamon_hook.py
+COPY docker/rootfs/webssh-hook.py /usr/lib/python3.12/site-packages/webssh/ankamon_hook.py
 COPY docker/rootfs/webssh-hook-patch.py /tmp/webssh-hook-patch.py
 RUN python3 /tmp/webssh-hook-patch.py && rm /tmp/webssh-hook-patch.py
 
 # noVNC (tarayıcıdaki VNC istemcisi, canlı tahta ekranı): yalnız istemci JS dosyaları alınır. Paketin
-# bağımlılığı websockify (+numpy…) gerekmez — akışı kendi SSH köprümüz taşır (worker/tihamon/screen).
+# bağımlılığı websockify (+numpy…) gerekmez — akışı kendi SSH köprümüz taşır (worker/ankamon/screen).
 RUN cd /tmp && apk fetch --no-cache -q novnc \
  && tar -xzf novnc-*.apk usr/share/novnc 2>/dev/null \
  && mkdir -p /var/www/screen/novnc \
  && cp -r usr/share/novnc/core usr/share/novnc/vendor /var/www/screen/novnc/ \
- && mkdir -p /opt/tiha-mon && ls novnc-*.apk | sed 's/^novnc-//; s/\.apk$//' > /opt/tiha-mon/novnc.version \
+ && mkdir -p /opt/ankamon && ls novnc-*.apk | sed 's/^novnc-//; s/\.apk$//' > /opt/ankamon/novnc.version \
  && rm -rf /tmp/novnc-*.apk /tmp/usr
 
 # Dosya yöneticisi (FileBrowser Quantum) ikili + derlenmiş arayüzü.
-COPY --from=filemanager --chmod=755 /home/filebrowser/filebrowser /opt/tiha-mon/filemanager/filebrowser
-COPY --from=filemanager /home/filebrowser/internal/web/dist /opt/tiha-mon/filemanager/dist
+COPY --from=filemanager --chmod=755 /home/filebrowser/filebrowser /opt/ankamon/filemanager/filebrowser
+COPY --from=filemanager /home/filebrowser/internal/web/dist /opt/ankamon/filemanager/dist
 
 # Ekran yansıtma aktarıcısı (bkz. docker/rootfs/services/mediamtx.sh).
-COPY --from=mediamtx --chmod=755 /mediamtx /opt/tiha-mon/mediamtx/mediamtx
+COPY --from=mediamtx --chmod=755 /mediamtx /opt/ankamon/mediamtx/mediamtx
 
 # Yapılandırmalar
 COPY docker/rootfs/nginx-default.conf /etc/nginx/http.d/default.conf
@@ -117,44 +117,44 @@ COPY docker/rootfs/multishell /var/www/multishell
 COPY docker/rootfs/screen /var/www/screen
 COPY docker/rootfs/cast /var/www/cast
 COPY docker/rootfs/filemanager-open /var/www/filemanager-open
-COPY docker/rootfs/filemanager/tihamon.css /opt/tiha-mon/filemanager/tihamon.css
-COPY docker/rootfs/filemanager/themes /opt/tiha-mon/filemanager/themes
+COPY docker/rootfs/filemanager/ankamon.css /opt/ankamon/filemanager/ankamon.css
+COPY docker/rootfs/filemanager/themes /opt/ankamon/filemanager/themes
 COPY docker/rootfs/php-fpm.conf /etc/php84/php-fpm.conf
-COPY docker/rootfs/php.ini /etc/php84/conf.d/zz-tihamon.ini
-COPY docker/rsyslog/rsyslog.conf /etc/tiha-mon/rsyslog.conf
-COPY docker/rootfs/telegraf.conf /etc/tiha-mon/telegraf.conf
-COPY docker/telegraf/reshape.star /etc/tiha-mon/reshape.star
-COPY docker/grafana/provisioning /etc/tiha-mon/grafana/provisioning
-COPY docker/grafana/dashboards /etc/tiha-mon/grafana/dashboards
-RUN sed -i 's#/etc/grafana/dashboards#/etc/tiha-mon/grafana/dashboards#' \
-      /etc/tiha-mon/grafana/provisioning/dashboards/tihamon.yml
+COPY docker/rootfs/php.ini /etc/php84/conf.d/zz-ankamon.ini
+COPY docker/rsyslog/rsyslog.conf /etc/ankamon/rsyslog.conf
+COPY docker/rootfs/telegraf.conf /etc/ankamon/telegraf.conf
+COPY docker/telegraf/reshape.star /etc/ankamon/reshape.star
+COPY docker/grafana/provisioning /etc/ankamon/grafana/provisioning
+COPY docker/grafana/dashboards /etc/ankamon/grafana/dashboards
+RUN sed -i 's#/etc/grafana/dashboards#/etc/ankamon/grafana/dashboards#' \
+      /etc/ankamon/grafana/provisioning/dashboards/ankamon.yml
 
 # Uygulama, worker, göçler, yedek, hazır işlemler
-COPY docker/rootfs/supervisord.conf /opt/tiha-mon/supervisord.conf
-COPY docker/rootfs/entrypoint.sh /opt/tiha-mon/entrypoint.sh
-COPY docker/rootfs/services /opt/tiha-mon/services
+COPY docker/rootfs/supervisord.conf /opt/ankamon/supervisord.conf
+COPY docker/rootfs/entrypoint.sh /opt/ankamon/entrypoint.sh
+COPY docker/rootfs/services /opt/ankamon/services
 # MEB filtresinin HTTPS kesme kökü (CN=fatihca → MEB-CERT-ACI): yalnız dış araç güncelleyicisi
-# (worker/tihamon/executor/tools.py) GitHub API bağlantısında kullanır; sistem güven deposuna eklenmez.
-COPY docker/rootfs/certs /opt/tiha-mon/certs
-COPY backend /opt/tiha-mon/app
-COPY actions /opt/tiha-mon/app/actions
-COPY worker /opt/tiha-mon/worker
+# (worker/ankamon/executor/tools.py) GitHub API bağlantısında kullanır; sistem güven deposuna eklenmez.
+COPY docker/rootfs/certs /opt/ankamon/certs
+COPY backend /opt/ankamon/app
+COPY actions /opt/ankamon/app/actions
+COPY worker /opt/ankamon/worker
 # Eklentilerin sunucu/worker kısımları (backend/, worker/); yoksa yalnız ext/README.md gelir.
-COPY ext /opt/tiha-mon/ext
-COPY --from=frontend /out/manuf.gz /opt/tiha-mon/worker/tihamon/netscan/manuf.gz
-COPY db /opt/tiha-mon/db
-COPY docker/backup /opt/tiha-mon/backup
-COPY --from=frontend /src/compiled/build /var/www/tihamon
+COPY ext /opt/ankamon/ext
+COPY --from=frontend /out/manuf.gz /opt/ankamon/worker/ankamon/netscan/manuf.gz
+COPY db /opt/ankamon/db
+COPY docker/backup /opt/ankamon/backup
+COPY --from=frontend /src/compiled/build /var/www/ankamon
 
-RUN chmod +x /opt/tiha-mon/entrypoint.sh /opt/tiha-mon/services/*.sh \
- && ln -sf /opt/tiha-mon/supervisord.conf /etc/supervisord.conf
+RUN chmod +x /opt/ankamon/entrypoint.sh /opt/ankamon/services/*.sh \
+ && ln -sf /opt/ankamon/supervisord.conf /etc/supervisord.conf
 
 # Sistem ▸ Yazılımlar: bileşen sürümleri imaj üretilirken bir kez toplanır (bkz. docker/rootfs/software-versions.py).
-COPY --from=frontend /out/frontend-versions.json /opt/tiha-mon/frontend-versions.json
+COPY --from=frontend /out/frontend-versions.json /opt/ankamon/frontend-versions.json
 COPY docker/rootfs/software-versions.py /tmp/software-versions.py
 RUN python3 /tmp/software-versions.py && rm /tmp/software-versions.py
 
 EXPOSE 80 443 514/tcp 514/udp 8554/tcp 8189/udp 8189/tcp
 VOLUME /data
 
-ENTRYPOINT ["/opt/tiha-mon/entrypoint.sh"]
+ENTRYPOINT ["/opt/ankamon/entrypoint.sh"]

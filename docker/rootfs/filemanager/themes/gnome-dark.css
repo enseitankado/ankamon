@@ -1,8 +1,8 @@
 /*
- * FileBrowser Quantum teması: tiha-mon "GNOME Koyu (Linux)" (gnome-dark) temasının renkleri — tiha-mon tarafındaki
+ * FileBrowser Quantum teması: ankamon "GNOME Koyu (Linux)" (gnome-dark) temasının renkleri — ankamon tarafındaki
  * Color*.js'in app-background, app-nav, surface, app-border, text-primary-on-surface, app-muted, primary
- * ve error değerleri (bkz. frontend/source/class/tihamon/theme/Derive.js). FileBrowser'ın açık/koyu kip
- * seçiminden bağımsız aynı görünsün diye değişkenler hem :root hem .dark-mode için tanımlanır. Tiha-Mon'da
+ * ve error değerleri (bkz. frontend/source/class/ankamon/theme/Derive.js). FileBrowser'ın açık/koyu kip
+ * seçiminden bağımsız aynı görünsün diye değişkenler hem :root hem .dark-mode için tanımlanır. Ankamon'da
  * kaydedilen tema dosya yöneticisi açılırken kendiliğinden uygulanır (bkz. filemanager-open/index.html).
  */
 :root,

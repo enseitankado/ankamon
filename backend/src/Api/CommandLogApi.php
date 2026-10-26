@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /**
  * Komut logları: tahtalarda çalıştırılan komutların kaydı; tahta/kullanıcı/zaman/metin ile süzülür.

@@ -1,12 +1,12 @@
 #!/bin/sh
-# Yedek dosyalarının özeti → /run/tiha-mon/backups.json. Yedek dizini bilerek root'a özel (700 —
+# Yedek dosyalarının özeti → /run/ankamon/backups.json. Yedek dizini bilerek root'a özel (700 —
 # dökümlerde parola özetleri var) olduğundan PHP (nobody) dizini okuyamaz; içerik yerine yalnız
 # ad/boyut/zaman listesi herkesin okuyabileceği bir dosyaya yazılır (bkz. backend DashboardApi::backups,
 # BackupStatsApi). Çağıranlar: backup.sh (her tur) ve storage-ops.sh (yedek sildikten sonra).
 set -u
 
 DIR="${BACKUP_DIR:-/data/backups}"
-SUMMARY=/run/tiha-mon/backups.json
+SUMMARY=/run/ankamon/backups.json
 
 {
     printf '{"updated":%s,"dir":"%s","keep_full":%s,"keep_config":%s,"full_at":"%s","config_every_hours":%s,"files":[' \

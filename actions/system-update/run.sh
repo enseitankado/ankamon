@@ -2,9 +2,9 @@
 # bağlantısı koparsa ya da görev zaman aşımına uğrarsa dpkg yarıda kesilmez (yarım kalan dpkg tahtayı
 # açılmaz hâle getirebilir). Bu betik birimi başlatır ve çıktısını, birim bitene dek canlı izler.
 set -eu
-UNIT=tihamon-sistem-guncelle
-DIR=/var/lib/tihamon
-LOG=/var/log/tihamon-sistem-guncelle.log
+UNIT=ankamon-sistem-guncelle
+DIR=/var/lib/ankamon
+LOG=/var/log/ankamon-sistem-guncelle.log
 RC="$DIR/sistem-guncelle.rc"
 REBOOT="${REBOOT:-hayir}"
 mkdir -p "$DIR"
@@ -16,7 +16,7 @@ else
 set -u
 export DEBIAN_FRONTEND=noninteractive
 # Çıkış kodu dosyaya yazılır: birim bittikten sonra izleyen betik sonucu buradan okur.
-trap 'echo $? > /var/lib/tihamon/sistem-guncelle.rc' EXIT
+trap 'echo $? > /var/lib/ankamon/sistem-guncelle.rc' EXIT
 # Kilit: başka bir apt/dpkg (ör. otomatik güncelleme) çalışıyorsa 10 dk'ya kadar beklenir.
 # Ayar dosyaları: yerel değişiklik varsa korunur (confold), yoksa paketin yenisi alınır (confdef) — soru sorulmaz.
 APT=(apt-get -y -q -o DPkg::Lock::Timeout=600 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
@@ -72,7 +72,7 @@ newest=$(ls /lib/modules 2>/dev/null | sort -V | tail -n 1)
 if [ -f /run/reboot-required ] || { [ -n "$newest" ] && [ "$newest" != "$(uname -r)" ]; }; then
     echo "Yeniden başlatma gerekiyor (çalışan çekirdek $(uname -r), kurulu en yeni $newest)."
     if [ "${REBOOT:-hayir}" = evet ]; then
-        shutdown -r +1 "Tiha-Mon: sistem güncellemesi sonrası 1 dakika içinde yeniden başlatılıyor." \
+        shutdown -r +1 "Ankamon: sistem güncellemesi sonrası 1 dakika içinde yeniden başlatılıyor." \
             && echo "Tahta 1 dakika içinde yeniden başlatılacak."
     else
         echo "Yeniden başlatma seçilmedi — değişiklikler tahta yeniden açılınca tam etkinleşir."

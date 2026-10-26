@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 /**
  * Yüklü eklentiler (ext/<ad>/) ve ayarları. Çekirdek hiçbir eklentiyi adıyla bilmez: her şey
@@ -9,7 +9,7 @@ namespace Tihamon\Core;
  *
  * Bir eklenti yapılandırılabilir ayarlarını isteğe bağlı bir ext/<ad>/extension.json ile bildirir:
  *   {"title": "...", "description": "...", "settings": [ <action.json "params" biçimi> ]}
- * Şema actions/<kimlik>/action.json "params" ile aynıdır; böylece arayüzde tihamon.ui.Form ve
+ * Şema actions/<kimlik>/action.json "params" ile aynıdır; böylece arayüzde ankamon.ui.Form ve
  * sunucuda Core\Actions::values doğrulaması yeniden kullanılır. Değerler settings tablosunda
  * "ext.<ad>.<key>" anahtarlarıyla durur; eklentiler kendi kodundan Extensions::setting(...) ile okur.
  */
@@ -17,7 +17,7 @@ final class Extensions
 {
     public static function dir(): string
     {
-        return getenv('EXT_DIR') ?: '/opt/tiha-mon/ext';
+        return getenv('EXT_DIR') ?: '/opt/ankamon/ext';
     }
 
     /**

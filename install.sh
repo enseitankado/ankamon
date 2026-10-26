@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Tiha-Mon kurulum ve güncelleme betiği.
+# Ankamon kurulum ve güncelleme betiği.
 #
-#   İlk kurulum : curl -fsSL https://raw.githubusercontent.com/enseitankado/tiha-mon/main/install.sh | sudo bash
-#   Güncelleme  : sudo /opt/tiha-mon/install.sh --update
+#   İlk kurulum : curl -fsSL https://raw.githubusercontent.com/enseitankado/ankamon/main/install.sh | sudo bash
+#   Güncelleme  : sudo /opt/ankamon/install.sh --update
 #                 (ya da: curl -fsSL …/install.sh | sudo bash -s -- --update)
 #   MEB ağında curl sertifika hatası verirse ilk komutta curl'e -k ekleyin (betik gerisini kendisi çözer).
 #
@@ -18,9 +18,9 @@ set -euo pipefail
 # alt süreçlerin stdin'i okuması betiğin kalanını kesemez. Blok dosyanın son satırında kapanır.
 {
 
-REPO_URL="${TIHA_MON_REPO:-https://github.com/enseitankado/tiha-mon.git}"
+REPO_URL="${TIHA_MON_REPO:-https://github.com/enseitankado/ankamon.git}"
 BRANCH="${TIHA_MON_BRANCH:-main}"
-INSTALL_DIR="${TIHA_MON_DIR:-/opt/tiha-mon}"
+INSTALL_DIR="${TIHA_MON_DIR:-/opt/ankamon}"
 COMPOSE_VERSION="v2.40.3"
 PRE_UPDATE_KEEP=3
 
@@ -48,7 +48,7 @@ done
 # geçici bir kopyadan yürütülür (kurulum dizini ortam değişkeniyle taşınır).
 if [ "$MODE" = update ] && [ -z "${TIHA_MON_REEXEC:-}" ] && [ -f "${BASH_SOURCE[0]:-}" ]; then
     self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    copy=$(mktemp /tmp/tiha-mon-install.XXXXXX)
+    copy=$(mktemp /tmp/ankamon-install.XXXXXX)
     cp "${BASH_SOURCE[0]}" "$copy"
     [ -f "$self_dir/docker-compose.yml" ] && export TIHA_MON_DIR="$self_dir"
     TIHA_MON_REEXEC=1 exec bash "$copy" "$@"
@@ -175,7 +175,7 @@ publish-aaaa-on-ipv4=no"
     [ "$have_now" = "$(printf '%s\n' "$want" | sort)" ] && return 0
 
     say "Avahi (mDNS): $(hostname).local yalnız fiziksel kartlardan ($ifaces) ve IPv4 ile duyurulacak…"
-    as_root cp -n "$conf" "$conf.bak-tihamon"
+    as_root cp -n "$conf" "$conf.bak-ankamon"
     local key
     for key in allow-interfaces use-ipv6 publish-aaaa-on-ipv4; do
         local line
@@ -194,13 +194,21 @@ configure_avahi || warn "Avahi ayarlanamadı; istemciler sunucuya IP adresiyle b
 # Sunucu tahta ağına ve idari ağa ayrı kartlarla bağlı olabilir; bu ağlar switch'te yalıtılmıştır ve
 # sunucu bu yalıtımı delmemelidir. Docker ip_forward'ı açar; bugün FORWARD zincirinin DROP politikası
 # (Docker'ın koyduğu) korur, ama buna güvenilmez: fiziksel kartlar arasında yönlendirme kendi nftables
-# tablomuzla açıkça düşürülür (Docker köprüleri — derleme/yardımcı konteynerler — muaf). Tiha-Mon host
+# tablomuzla açıkça düşürülür (Docker köprüleri — derleme/yardımcı konteynerler — muaf). Ankamon host
 # ağında çalıştığı için yönlendirmeye hiç ihtiyaç duymaz. Ayrıca: aynı ağdaki iki kart birbirinin IP'si
 # için ARP yanıtı vermesin (ARP flux) ve sunucu ICMP yönlendirme bildirimi (redirect) göndermesin.
-# Kaldırmak için: sudo systemctl disable --now tihamon-netguard
+# Kaldırmak için: sudo systemctl disable --now ankamon-netguard
 configure_netguard() {
-    local sysctl_conf=/etc/sysctl.d/90-tihamon-net.conf
-    local want_sysctl="# tiha-mon (install.sh): ARP yanıtı yalnız adresin sahibi karttan; ICMP redirect yok.
+    # Eski ad (tiha-mon) artıklarını temizle — yeniden adlandırma göçü; --update'te eski unit/tablo/dosya kalmasın.
+    if [ -e /etc/systemd/system/tihamon-netguard.service ] || [ -e /etc/tihamon/netguard.nft ] || [ -e /etc/sysctl.d/90-tihamon-net.conf ]; then
+        as_root systemctl disable --now tihamon-netguard 2>/dev/null || true
+        as_root rm -f /etc/systemd/system/tihamon-netguard.service /etc/tihamon/netguard.nft /etc/sysctl.d/90-tihamon-net.conf
+        as_root rmdir /etc/tihamon 2>/dev/null || true
+        [ -n "$(command -v nft || true)" ] && as_root nft delete table inet tihamon_guard 2>/dev/null || true
+        as_root systemctl daemon-reload 2>/dev/null || true
+    fi
+    local sysctl_conf=/etc/sysctl.d/90-ankamon-net.conf
+    local want_sysctl="# ankamon (install.sh): ARP yanıtı yalnız adresin sahibi karttan; ICMP redirect yok.
 net.ipv4.conf.all.arp_ignore = 1
 net.ipv4.conf.default.arp_ignore = 1
 net.ipv4.conf.all.arp_announce = 2
@@ -220,12 +228,12 @@ net.ipv4.conf.default.send_redirects = 0"
     fi
     [ -n "$nft" ] || { warn "nft bulunamadı; ağlar arası yönlendirme yalnız Docker'ın FORWARD politikasıyla engelli."; return 0; }
 
-    local rules=/etc/tihamon/netguard.nft unit=/etc/systemd/system/tihamon-netguard.service
-    local want_rules='# tiha-mon (install.sh): fiziksel ağ kartları arasında IP yönlendirmesi yok (tahta ağı <-> idari ağ).
+    local rules=/etc/ankamon/netguard.nft unit=/etc/systemd/system/ankamon-netguard.service
+    local want_rules='# ankamon (install.sh): fiziksel ağ kartları arasında IP yönlendirmesi yok (tahta ağı <-> idari ağ).
 # Docker köprüleri (docker0, br-*) muaf: derleme ve yardımcı konteynerler dışarı çıkabilsin.
-table inet tihamon_guard
-delete table inet tihamon_guard
-table inet tihamon_guard {
+table inet ankamon_guard
+delete table inet ankamon_guard
+table inet ankamon_guard {
     chain forward {
         type filter hook forward priority filter - 10; policy accept;
         iifname "docker0" accept
@@ -236,7 +244,7 @@ table inet tihamon_guard {
     }
 }'
     local want_unit="[Unit]
-Description=tiha-mon: ağ kartları arası yönlendirme engeli
+Description=ankamon: ağ kartları arası yönlendirme engeli
 After=network-pre.target
 Wants=network-pre.target
 
@@ -244,19 +252,19 @@ Wants=network-pre.target
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=$nft -f $rules
-ExecStop=$nft delete table inet tihamon_guard
+ExecStop=$nft delete table inet ankamon_guard
 
 [Install]
 WantedBy=multi-user.target"
     if [ "$(cat "$rules" 2>/dev/null)" != "$want_rules" ] || [ "$(cat "$unit" 2>/dev/null)" != "$want_unit" ]; then
-        say "Ağlar arası yalıtım: fiziksel kartlar arasında yönlendirme engelleniyor (tihamon-netguard)…"
-        as_root mkdir -p /etc/tihamon
+        say "Ağlar arası yalıtım: fiziksel kartlar arasında yönlendirme engelleniyor (ankamon-netguard)…"
+        as_root mkdir -p /etc/ankamon
         printf '%s\n' "$want_rules" | as_root tee "$rules" >/dev/null
         printf '%s\n' "$want_unit" | as_root tee "$unit" >/dev/null
         as_root systemctl daemon-reload
     fi
-    as_root systemctl enable tihamon-netguard >/dev/null 2>&1 || true
-    as_root systemctl restart tihamon-netguard || warn "tihamon-netguard başlatılamadı (bkz. journalctl -u tihamon-netguard)."
+    as_root systemctl enable ankamon-netguard >/dev/null 2>&1 || true
+    as_root systemctl restart ankamon-netguard || warn "ankamon-netguard başlatılamadı (bkz. journalctl -u ankamon-netguard)."
 }
 configure_netguard || warn "Ağlar arası yalıtım ayarlanamadı."
 
@@ -341,15 +349,15 @@ pre_update_backup() {
     local ts dir=/data/backups
     ts=$(date +%Y%m%d-%H%M%S)
     say "Güncelleme öncesi yedek alınıyor: data/backups/pre-update-$ts-*.dump"
-    compose exec -T tiha-mon sh -c "
+    compose exec -T ankamon sh -c "
         set -e
-        export PGHOST=127.0.0.1 PGUSER=tihamon PGPASSWORD=\"\$POSTGRES_PASSWORD\"
+        export PGHOST=127.0.0.1 PGUSER=ankamon PGPASSWORD=\"\$POSTGRES_PASSWORD\"
         mkdir -p $dir
-        pg_dump -Fc -Z 6 -d tihamon --exclude-table-data='_timescaledb_internal.*' -f $dir/pre-update-$ts-tihamon.dump.tmp
+        pg_dump -Fc -Z 6 -d ankamon --exclude-table-data='_timescaledb_internal.*' -f $dir/pre-update-$ts-ankamon.dump.tmp
         pg_dump -Fc -Z 6 -d grafana -f $dir/pre-update-$ts-grafana.dump.tmp
         for f in $dir/pre-update-$ts-*.dump.tmp; do chmod 600 \"\$f\"; mv \"\$f\" \"\${f%.tmp}\"; done
-        ls -1t $dir/pre-update-*-tihamon.dump | tail -n +$((PRE_UPDATE_KEEP + 1)) | while read -r f; do
-            rm -f \"\$f\" \"\${f%-tihamon.dump}-grafana.dump\"
+        ls -1t $dir/pre-update-*-ankamon.dump | tail -n +$((PRE_UPDATE_KEEP + 1)) | while read -r f; do
+            rm -f \"\$f\" \"\${f%-ankamon.dump}-grafana.dump\"
         done
     " || die "Güncelleme öncesi yedek alınamadı; güncelleme yapılmadı (sistem olduğu gibi çalışıyor)."
 }
@@ -419,7 +427,7 @@ fi
 
 ADDRESS=$( (hostname -I 2>/dev/null || ip -4 -o route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p') | awk '{print $1}' || true)
 URL="http://${ADDRESS:-localhost}$([ "$HTTP_PORT" = 80 ] || echo ":$HTTP_PORT")"
-CA_URL="$URL/tihamon-ca.crt"
+CA_URL="$URL/ankamon-ca.crt"
 [ "$HTTPS_PORT" = 0 ] || URL="https://${ADDRESS:-localhost}$([ "$HTTPS_PORT" = 443 ] || echo ":$HTTPS_PORT")"
 echo
 if [ "$MODE" = update ]; then
@@ -428,7 +436,7 @@ if [ "$MODE" = update ]; then
     echo "    Önceki yedek  : $INSTALL_DIR/data/backups/pre-update-*"
     exit 0
 fi
-say "Tiha-Mon hazır."
+say "Ankamon hazır."
 echo "    Arayüz        : $URL"
 if [ -f /etc/avahi/avahi-daemon.conf ] && [ "$HTTPS_PORT" != 0 ]; then
     echo "                    https://$(hostname).local$([ "$HTTPS_PORT" = 443 ] || echo ":$HTTPS_PORT")  (ağdaki bilgisayarlardan adla)"

@@ -1,18 +1,18 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Request;
-use Tihamon\Core\Storage;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Request;
+use Ankamon\Core\Storage;
 
 /**
  * rsyslog'un disk kuyruğu (Disk kullanımı penceresinin "Log kuyruğu" sekmesi) ve kalıcı silme.
  *
  * Tahtalardan gelen loglar veritabanı yazılamadığında /data/rsyslog'daki disk kuyruğunda bekler
- * (tihamon_pg.<parça> + konum dosyası tihamon_pg.qi; bkz. docker/rsyslog/rsyslog.conf). Kuyruk
+ * (ankamon_pg.<parça> + konum dosyası ankamon_pg.qi; bkz. docker/rsyslog/rsyslog.conf). Kuyruk
  * normalde boşa yakındır; büyüyorsa loglar Postgres'e ulaşmıyor demektir. Ayrıca rsyslog.sh açılışta
  * okunamayan (ör. elektrik kesintisinde yarım kalmış) kuyruğu bozuk-<zaman>/ klasörüne kenara alır.
  *
@@ -32,7 +32,7 @@ final class LogQueueStatsApi
         $quarantine = [];
         foreach (@scandir(self::SPOOL) ?: [] as $name) {
             $path = self::SPOOL . '/' . $name;
-            if (str_starts_with($name, 'tihamon_pg.') && is_file($path)) {
+            if (str_starts_with($name, 'ankamon_pg.') && is_file($path)) {
                 $live[] = self::file($name, $path);
             } elseif (preg_match(self::QUARANTINE, $name) && is_dir($path)) {
                 $files = array_map(

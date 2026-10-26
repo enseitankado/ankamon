@@ -5,7 +5,7 @@
 -- (Tahta silinince command_log.board_id NULL olur, board_name kalır — bkz. command_log_board_id_fkey.)
 --
 -- Sıradan terminal komutları (ls, rm …) syslog'a gitmez; burada yalnız yetki yükselten komutlar görünür.
--- Tetikleyiciyi çağıran root ise atlanır: tiha-mon'un kendi otomasyonu (ör. "root : … USER=ogretmen ;
+-- Tetikleyiciyi çağıran root ise atlanır: ankamon'un kendi otomasyonu (ör. "root : … USER=ogretmen ;
 -- COMMAND=/usr/bin/env DISPLAY=…", "(to x) root on none") kullanıcının yaptığı bir şey değil.
 -- status: 'ok' (çalıştı) ya da 'denied' (parola yanlış, sudoers'ta yok, polkit reddetti, su başarısız).
 

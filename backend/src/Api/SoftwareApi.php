@@ -1,24 +1,24 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
-use Tihamon\Core\Supervisor;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
+use Ankamon\Core\Supervisor;
 
 /**
  * Sistem ▸ Yazılımlar (yalnız yönetici): konteynerdeki kritik yazılımlar, sürümleri, durumları ve
- * Tiha-Mon'da hangi işlevi sağladıkları. Sürümler imaj üretilirken toplanır
- * (docker/rootfs/software-versions.py → /opt/tiha-mon/software-versions.json); veritabanı sunucusu ve
+ * Ankamon'da hangi işlevi sağladıkları. Sürümler imaj üretilirken toplanır
+ * (docker/rootfs/software-versions.py → /opt/ankamon/software-versions.json); veritabanı sunucusu ve
  * TimescaleDB eklentisinin sürümü canlı okunur (imaj güncellenip eklenti henüz yükseltilmediyse farkı
  * göstersin diye). Durum: bileşen bir supervisord servisiyse onun anlık durumu, değilse kurulu olup olmadığı.
  */
 final class SoftwareApi
 {
-    private const VERSIONS_FILE = '/opt/tiha-mon/software-versions.json';
+    private const VERSIONS_FILE = '/opt/ankamon/software-versions.json';
 
-    // [kategori, ad, Tiha-Mon'daki işlevi, sürüm anahtarı, servis (supervisord programı) ya da null, adres]
+    // [kategori, ad, Ankamon'daki işlevi, sürüm anahtarı, servis (supervisord programı) ya da null, adres]
     private const COMPONENTS = [
         ['Temel', 'Alpine Linux', 'Konteynerin işletim sistemi; paketler (PHP, nginx, Grafana…) onun deposundan gelir.',
             'alpine', null, 'https://alpinelinux.org'],

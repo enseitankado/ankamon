@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /**
  * Loglar grid'inden dışlanan mesajlar (log_exclusions — bkz. göç 013). Dışlama kayıt SİLMEZ; yalnız

@@ -3,9 +3,9 @@
 # oturum + "shell" yetkisiyle korunur. Yalnız 127.0.0.1 dinler; dışarı açılmaz.
 set -eu
 
-# Oturum kancası (webssh/tihamon_hook.py) açılışta veritabanına yazar — veritabanı hazır olmalı.
-. /opt/tiha-mon/services/wait-db.sh
-export PG_HOST=127.0.0.1 PG_PORT=5432 PG_DB=tihamon PG_USER=tihamon PG_PASSWORD="$POSTGRES_PASSWORD"
+# Oturum kancası (webssh/ankamon_hook.py) açılışta veritabanına yazar — veritabanı hazır olmalı.
+. /opt/ankamon/services/wait-db.sh
+export PG_HOST=127.0.0.1 PG_PORT=5432 PG_DB=ankamon PG_USER=ankamon PG_PASSWORD="$POSTGRES_PASSWORD"
 
 # --policy=autoadd: imajdan çıkan tahtaların anahtarları değiştiği için bilinmeyen anahtar eklenir.
 # --fbidhttp=False: parola HTTP üzerinden iletilebilir (okul iç ağı, TLS yok; nginx ardında).

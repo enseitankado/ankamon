@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /**
  * Bakım ▸ Ahenk: tahtaların son "Ahenk kontrol" raporları (hazır işlem actions/ahenk-check; rapor

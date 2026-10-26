@@ -1,13 +1,13 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Auth;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Auth;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /** Kullanıcı yönetimi — yalnız yönetici (etapadmin). */
 final class UsersApi

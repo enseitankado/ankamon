@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Db;
-use Tihamon\Core\Storage;
+use Ankamon\Core\Db;
+use Ankamon\Core\Storage;
 
 /**
  * Sensör grafikleri sayfasının yardım penceresi: sensör verisinin nasıl toplandığı, ne toplandığı,
@@ -15,10 +15,10 @@ use Tihamon\Core\Storage;
 final class MetricsInfoApi
 {
     private const TARGETS = '/data/telegraf/targets.conf';
-    private const TELEGRAF_CONF = '/etc/tiha-mon/telegraf.conf';
-    private const RESHAPE = '/etc/tiha-mon/reshape.star';
-    private const BOARD_STATUS = '/opt/tiha-mon/worker/tihamon/tasks/board_status.py';
-    private const DASHBOARDS = '/etc/tiha-mon/grafana/dashboards';
+    private const TELEGRAF_CONF = '/etc/ankamon/telegraf.conf';
+    private const RESHAPE = '/etc/ankamon/reshape.star';
+    private const BOARD_STATUS = '/opt/ankamon/worker/ankamon/tasks/board_status.py';
+    private const DASHBOARDS = '/etc/ankamon/grafana/dashboards';
 
     public function info(): array
     {

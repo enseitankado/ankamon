@@ -1,6 +1,6 @@
 {
   "title": "PAM log gürültüsünü süz",
-  "description": "Pardus pam_etap.py'nin her SSH/oturum girişinde bastığı \"pam_sm_open_session() / pam_sm_close_session() isn't defined.\" satırlarını tahtanın rsyslog'unda durdurur: merkezi log sunucusuna gönderilmez, /var/log/auth.log'a yazılmaz (journalctl'de kalır). Zararsız bir paket hatasıdır; tahta başına saatte yüzlerce satır üretir. TiHA'nın log ayarından ayrı dosyadadır (/etc/rsyslog.d/89-tihamon-pam-noise.conf), o ayar yeniden yazılsa da korunur.",
+  "description": "Pardus pam_etap.py'nin her SSH/oturum girişinde bastığı \"pam_sm_open_session() / pam_sm_close_session() isn't defined.\" satırlarını tahtanın rsyslog'unda durdurur: merkezi log sunucusuna gönderilmez, /var/log/auth.log'a yazılmaz (journalctl'de kalır). Zararsız bir paket hatasıdır; tahta başına saatte yüzlerce satır üretir. TiHA'nın log ayarından ayrı dosyadadır (/etc/rsyslog.d/89-ankamon-pam-noise.conf), o ayar yeniden yazılsa da korunur.",
   "category": "Loglar",
   "feature": "actions",
   "confirm": true,

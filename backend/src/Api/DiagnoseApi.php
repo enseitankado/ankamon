@@ -1,16 +1,16 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /**
  * Sorun tespiti raporları (frontend page/Diagnose.js). Taramalar "diagnose" türündeki görevlerdir —
  * elle ("Şimdi tara", bkz. JobsApi all_online) ya da worker'ın otomatik zamanlayıcısıyla (bkz.
- * worker/tihamon/tasks/diagnose_schedule.py; created_by boş) açılır. JobsApi::index yalnız kullanıcının
+ * worker/ankamon/tasks/diagnose_schedule.py; created_by boş) açılır. JobsApi::index yalnız kullanıcının
  * kendi görevlerini gösterdiğinden (yönetici hariç), raporlar 'diagnose' yetkisi olan HERKESE buradan sunulur.
  */
 final class DiagnoseApi

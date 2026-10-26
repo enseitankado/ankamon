@@ -1,14 +1,14 @@
 {
   "$schema": "https://qooxdoo.org/schema/Manifest-2-0-0.json",
   "info": {
-    "name": "tihamon",
-    "summary": "Tiha-Mon web arayüzü",
+    "name": "ankamon",
+    "summary": "Ankamon web arayüzü",
     "description": "Akıllı tahtalar için merkezi log, sensör ve uzaktan yönetim arayüzü.",
     "license": "GPL-3.0",
     "version": "0.1.0"
   },
   "provides": {
-    "namespace": "tihamon",
+    "namespace": "ankamon",
     "encoding": "utf-8",
     "class": "source/class",
     "resource": "source/resource",

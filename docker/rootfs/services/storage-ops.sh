@@ -2,18 +2,18 @@
 # Disk kullanımı penceresinin root yetkisi gerektiren kalıcı silmeleri (yedekler, rsyslog kuyruğu).
 #
 # PHP (nobody) bu dizinlere erişemez ve konteynerde sudo yoktur; bu yüzden API silinecekleri
-# /run/tiha-mon/storage-ops/<kimlik>.req dosyasına yazar, bu döngü (root) 2 sn'de bir okur, adları KATI
+# /run/ankamon/storage-ops/<kimlik>.req dosyasına yazar, bu döngü (root) 2 sn'de bir okur, adları KATI
 # desenlerle doğrular (yalnız bilinen dosya/klasör adları — yol, joker kabul edilmez), siler ve silinen
 # adedi <kimlik>.done'a yazar (bkz. backend Core\Storage::rootRequest). İstek biçimi:
 #   1. satır: hedef — "backups" ya da "logqueue"
 #   backups : satır başına dosya adı (config|full|grafana-YYYYMMDD-HHMMSS.dump), "*" (tümü) ya da
 #             "<tür>:*" (o türün tümü, ör. "full:*")
-#   logqueue: "live" (rsyslog'un bekleyen disk kuyruğu — rsyslog durdurulur, tihamon_pg.* silinir,
+#   logqueue: "live" (rsyslog'un bekleyen disk kuyruğu — rsyslog durdurulur, ankamon_pg.* silinir,
 #             yeniden başlatılır; parça parça silmek kuyruğun konum dosyasını bozar) ya da
 #             "bozuk-YYYYMMDD-HHMMSS" (rsyslog.sh'ın açılışta kenara aldığı bozuk kuyruk klasörü)
 set -u
 
-REQ=/run/tiha-mon/storage-ops
+REQ=/run/ankamon/storage-ops
 BACKUPS="${BACKUP_DIR:-/data/backups}"
 SPOOL=/data/rsyslog
 
@@ -40,7 +40,7 @@ delete_backups() {
         echo "$name" | grep -Eq '^(config|full|grafana)-[0-9]{8}-[0-9]{6}\.dump$' || continue
         [ -f "$BACKUPS/$name" ] && rm -f "$BACKUPS/$name" && n=$((n + 1)) && log "yedek silindi: $name" >&2
     done
-    sh /opt/tiha-mon/backup/summary.sh
+    sh /opt/ankamon/backup/summary.sh
     echo "$n"
 }
 
@@ -49,11 +49,11 @@ delete_logqueue() {
     n=0
     while read -r name; do
         if [ "$name" = live ]; then
-            set -- "$SPOOL"/tihamon_pg.*
+            set -- "$SPOOL"/ankamon_pg.*
             [ -e "$1" ] || continue
             # rsyslog SIGKILL ile durur (bkz. supervisord.conf) — kuyruk dosyalarını yazarken silinmesin.
             supervisorctl stop rsyslog >&2
-            for f in "$SPOOL"/tihamon_pg.*; do
+            for f in "$SPOOL"/ankamon_pg.*; do
                 [ -f "$f" ] && rm -f "$f" && n=$((n + 1))
             done
             supervisorctl start rsyslog >&2

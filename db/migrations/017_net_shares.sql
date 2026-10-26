@@ -1,5 +1,5 @@
 -- Ağ paylaşımları: NetBIOS/SMB portu (139/445) açık cihazlarda bulunan paylaşımlar (klasör/yazıcı).
--- Ayrı bir tarama kanalı (worker/tihamon/netscan _shares_loop) varlık/servis taramasıyla EŞ ZAMANLI
+-- Ayrı bir tarama kanalı (worker/ankamon/netscan _shares_loop) varlık/servis taramasıyla EŞ ZAMANLI
 -- çalışır; smbclient ile önce anonim (guest), olmazsa kayıtlı Samba kimliğiyle paylaşımları listeler.
 -- Arayüzde cihazın alt ağacında, portların yanında klasör simgesiyle gösterilir (bkz. page.Network).
 

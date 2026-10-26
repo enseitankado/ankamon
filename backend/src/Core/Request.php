@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 /** Gelen HTTP isteği: yol, sorgu ve JSON gövde. */
 final class Request

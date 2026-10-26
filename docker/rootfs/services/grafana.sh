@@ -3,11 +3,11 @@
 # Yapılandırmanın tamamı ortam değişkenleriyle (GF_*) verilir.
 set -eu
 
-. /opt/tiha-mon/services/wait-db.sh
+. /opt/ankamon/services/wait-db.sh
 
 export \
     GF_PATHS_DATA=/data/grafana \
-    GF_PATHS_PROVISIONING=/etc/tiha-mon/grafana/provisioning \
+    GF_PATHS_PROVISIONING=/etc/ankamon/grafana/provisioning \
     GF_SERVER_HTTP_ADDR=127.0.0.1 \
     GF_SERVER_HTTP_PORT=3000 \
     GF_SERVER_ROOT_URL="http://localhost/grafana/" \
@@ -36,7 +36,7 @@ export \
     GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false \
     GF_NEWS_NEWS_FEED_ENABLED=false \
     GF_PLUGINS_PREINSTALL_DISABLED=true \
-    GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/tiha-mon/grafana/dashboards/tahta-genel-bakis.json \
-    TIHAMON_RO_PASSWORD="$PG_READONLY_PASSWORD"
+    GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/ankamon/grafana/dashboards/tahta-genel-bakis.json \
+    ANKAMON_RO_PASSWORD="$PG_READONLY_PASSWORD"
 
 exec grafana server --homepath=/usr/share/grafana --config=/etc/grafana.ini

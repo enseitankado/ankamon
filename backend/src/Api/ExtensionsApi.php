@@ -1,14 +1,14 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Actions;
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Extensions;
-use Tihamon\Core\Request;
-use Tihamon\Core\Settings;
+use Ankamon\Core\Actions;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Extensions;
+use Ankamon\Core\Request;
+use Ankamon\Core\Settings;
 
 /**
  * Yüklü eklentiler ve ayarları — yalnız yönetici. Çekirdek eklentileri adıyla bilmez; EXT_DIR taranır

@@ -1,6 +1,6 @@
-// Eklentilerin arayüz kısmını derlemeye katar (bkz. ext/README.md, tihamon.ext.Extensions):
+// Eklentilerin arayüz kısmını derlemeye katar (bkz. ext/README.md, ankamon.ext.Extensions):
 // <ext dizini>/<ad>/frontend/Manifest.json olan her eklenti compile.json'a qooxdoo kütüphanesi olarak
-// eklenir ve "tihamonext.*" sınıfları pakete dahil edilir (çekirdek onları adıyla anmadığı için
+// eklenir ve "ankamonext.*" sınıfları pakete dahil edilir (çekirdek onları adıyla anmadığı için
 // qooxdoo kendiliğinden katmazdı). Eklenti yoksa compile.json değişmez.
 // Kullanım (Dockerfile "frontend" aşaması): node ext-libs.js <ext dizini>
 const fs = require("fs");
@@ -14,7 +14,7 @@ if (libs.length) {
   const config = JSON.parse(fs.readFileSync("compile.json", "utf8"));
   config.libraries.push(...libs);
   config.applications.forEach(app => {
-    app.include = [...(app.include || []), "tihamonext.*"];
+    app.include = [...(app.include || []), "ankamonext.*"];
   });
   fs.writeFileSync("compile.json", JSON.stringify(config, null, 2));
 }

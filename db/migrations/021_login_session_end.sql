@@ -1,4 +1,4 @@
--- Tiha-Mon oturum geçmişinin (login_sessions, göç 019) "oturum ne zaman bitti" kuralları — kullanıcı
+-- Ankamon oturum geçmişinin (login_sessions, göç 019) "oturum ne zaman bitti" kuralları — kullanıcı
 -- bildirdi: aynı kişinin saniyeler arayla onlarca "açık/boşta", saatler süren, işlemsiz kaydı; kapanmış
 -- tarayıcıların oturumları alt çubukta açık görünüyordu.
 --

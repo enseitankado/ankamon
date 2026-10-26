@@ -1,6 +1,6 @@
 {
   "title": "Fan/pil/anakart sensörlerini etkinleştir",
-  "description": "Anakarttaki donanım izleme yongasının (Super I/O: ITE it87, Nuvoton nct6775, Fintek f71882fg) çekirdek sürücüsünü yükler ve açılışta kendiliğinden yüklenmesini sağlar (/etc/modules-load.d/tiha-mon-sensors.conf). Böylece node_exporter fan devrini, CMOS pil gerilimini ve anakart sıcaklığını sunar. Yonga desteklenmiyorsa hiçbir şey kalıcı yazılmaz. Geri almak için dosyayı silip tahtayı yeniden başlatmak yeterlidir.",
+  "description": "Anakarttaki donanım izleme yongasının (Super I/O: ITE it87, Nuvoton nct6775, Fintek f71882fg) çekirdek sürücüsünü yükler ve açılışta kendiliğinden yüklenmesini sağlar (/etc/modules-load.d/ankamon-sensors.conf). Böylece node_exporter fan devrini, CMOS pil gerilimini ve anakart sıcaklığını sunar. Yonga desteklenmiyorsa hiçbir şey kalıcı yazılmaz. Geri almak için dosyayı silip tahtayı yeniden başlatmak yeterlidir.",
   "category": "Sensörler",
   "feature": "actions",
   "confirm": true,

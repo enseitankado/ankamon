@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 /** İstemciye olduğu gibi gösterilebilecek hata (HTTP durum koduyla). */
 final class ApiError extends \RuntimeException

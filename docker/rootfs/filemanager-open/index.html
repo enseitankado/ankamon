@@ -25,16 +25,16 @@
     fail("Eksik bağlantı bilgisi."); return;
   }
 
-  // Tiha-Mon'da kaydedilen tema dosya yöneticisine de uygulanır (kullanıcı isteği): kullanıcının
+  // Ankamon'da kaydedilen tema dosya yöneticisine de uygulanır (kullanıcı isteği): kullanıcının
   // FileBrowser hesabına (bkz. nginx-default.conf — hesap kullanıcıya özel) aynı anahtarlı tema yazılır.
-  // Anahtarlar services/filemanager.sh customThemes ile aynı; yalnız Tiha-Mon'un varsayılanı (blue-light)
+  // Anahtarlar services/filemanager.sh customThemes ile aynı; yalnız Ankamon'un varsayılanı (blue-light)
   // orada "default". Koyu temalar FileBrowser'ın koyu kipiyle birlikte kullanılır. Eşitlenemezse
   // (ağ/API hatası) dosya yöneticisi yine açılır — tema yalnız bir tercih.
   var DARK = ["blue-dark", "purple-dark", "qx-indigo-dark", "qx-tangible-dark", "fluent-dark",
               "darktheme", "bernstein", "macos-dark", "gnome-dark"];
   function syncTheme() {
     var json = function (r) { if (!r.ok) throw new Error(r.status); return r.json(); };
-    return fetch("/api/auth/me", { headers: { "X-Requested-With": "tihamon" } }).then(json).then(function (me) {
+    return fetch("/api/auth/me", { headers: { "X-Requested-With": "ankamon" } }).then(json).then(function (me) {
       var theme = (me.user || me).theme || "blue-light";
       var key = theme === "blue-light" ? "default" : theme;
       var dark = DARK.indexOf(theme) !== -1;
@@ -53,7 +53,7 @@
   // 1) Tahtayı bu makineye bağla (sshfs; idempotent — zaten bağlıysa anında döner).
   fetch("/filemanager-mount/mount/" + encodeURIComponent(board), {
     method: "POST",
-    headers: { "X-Requested-With": "tihamon" }
+    headers: { "X-Requested-With": "ankamon" }
   }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
     .then(function (res) {
       if (!res.ok || !res.data.ok) {

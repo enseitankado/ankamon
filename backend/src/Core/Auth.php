@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 /** Oturum (çerez + sessions tablosu) ve özellik yetkileri. */
 final class Auth
 {
-    public const COOKIE = 'tihamon_sid';
+    public const COOKIE = 'ankamon_sid';
     public const ADMIN_USERNAME = 'etapadmin';
     private const SESSION_HOURS = 12;
     /** Oturum geçmişi (login_sessions, göç 019) bu kadar gün tutulur. */

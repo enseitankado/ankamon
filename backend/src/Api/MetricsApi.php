@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\BoardSensors;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\BoardSensors;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /** Tahta listesindeki anlık göstergeler. Zaman serisi grafikleri Grafana'dadır. */
 final class MetricsApi

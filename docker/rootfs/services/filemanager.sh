@@ -3,22 +3,22 @@
 # kök dizin ağacını sunar. Yalnız 127.0.0.1:8893 dinler; nginx /filemanager/ ile oturum + "filemanager"
 # yetkisiyle vekiller ve sabit bir X-Auth-User başlığı geçirir — kimlik/yetki zaten nginx'te denetlendi,
 # bu uygulamanın kendi oturum açma ekranına hiç gerek yok (proxy kimlik doğrulaması, ilk istekte
-# kullanıcıyı kendiliğinden oluşturur). Veritabanı (tek paylaşılan "tihamon" hesabının tema/dil gibi
+# kullanıcıyı kendiliğinden oluşturur). Veritabanı (tek paylaşılan "ankamon" hesabının tema/dil gibi
 # tercihlerini tutar — kullanıcı isteği: bunlar container yeniden oluşturulsa da HATIRLANMALI) /data
 # altında kalıcıdır (bkz. /data/postgres, /data/grafana ile aynı yerleşim); önbellek (cacheDir) ise
 # sadece performans için, kaybı önemsiz olduğundan /run altında (ephemeral, disk tasarrufu) kalır.
 set -eu
 
-APP=/run/tiha-mon/filemanager-app
+APP=/run/ankamon/filemanager-app
 DATA=/data/filemanager
-THEMES=/opt/tiha-mon/filemanager/themes
-mkdir -p "$APP" "$APP/cache" "$DATA" /run/tiha-mon/filemanager
+THEMES=/opt/ankamon/filemanager/themes
+mkdir -p "$APP" "$APP/cache" "$DATA" /run/ankamon/filemanager
 # İkili, göreli yoldan (ör. "tmp/") yazdığı şeyleri çalışma dizinine göre konumlandırıyor; konteyner
 # imajının kendi dizinini (/opt) kirletmesin diye çalışma dizini de /run altında olsun. Arayüzü de
 # çalışma dizinindeki internal/web/dist'ten sunar (2.x imajında ikiliye gömülü değil).
 mkdir -p "$APP/internal/web"
-ln -sfn /opt/tiha-mon/filemanager/dist "$APP/internal/web/dist"
-ln -sf /opt/tiha-mon/filemanager/filebrowser "$APP/filebrowser"
+ln -sfn /opt/ankamon/filemanager/dist "$APP/internal/web/dist"
+ln -sf /opt/ankamon/filemanager/filebrowser "$APP/filebrowser"
 rm -f "$APP/http"
 # 1.5.x'in BoltDB'si (database.db) 2.x'te SQLite'a bir kez aktarılır: kullanıcılar, tema/koyu kip
 # tercihleri. migrateFrom yalnız SQLite henüz yokken verilir (yoksa dosya yokken açılış hata verir);
@@ -41,7 +41,7 @@ server:
   disableUpdateCheck: true
   numImageProcessors: 1
   sources:
-    - path: "/run/tiha-mon/filemanager"
+    - path: "/run/ankamon/filemanager"
       name: "tahtalar"
       config:
         private: true
@@ -60,11 +60,11 @@ frontend:
   disableDefaultLinks: true
   disablePWAInstall: true
   styling:
-    customCSS: "/opt/tiha-mon/filemanager/tihamon.css"
-    # tiha-mon Ayarlar'daki temaların karşılıkları (bkz. docker/rootfs/filemanager/themes/*.css —
+    customCSS: "/opt/ankamon/filemanager/ankamon.css"
+    # ankamon Ayarlar'daki temaların karşılıkları (bkz. docker/rootfs/filemanager/themes/*.css —
     # renkler o temaların qooxdoo paletinden). Seçim: dosya yöneticisi → Ayarlar → Profil → Tema;
     # tercih /data/filemanager veritabanında kalıcı. "default" anahtarı, hiç seçim yapılmamışken
-    # kullanılan temadır (tiha-mon'un varsayılanı "Açık (Mavi)"). Koyu temalar FileBrowser'ın kendi koyu
+    # kullanılan temadır (ankamon'un varsayılanı "Açık (Mavi)"). Koyu temalar FileBrowser'ın kendi koyu
     # kipiyle (kenar çubuğundaki ay simgesi) birlikte kullanılmalı: FileBrowser açık kipte pek çok bileşende
     # sabit beyaz zemin kullanıyor; bunları sürüme bağlı seçicilerle zorlamak güncellemede kırılırdı.
     customThemes:
@@ -93,9 +93,9 @@ frontend:
       filebrowser: { description: "FileBrowser (özgün)", css: "$THEMES/filebrowser.css" }
 auth:
   # 2.x açılışta bu adla yönetici hesabı açar; varsayılan "admin" proxy başlığıyla (X-Auth-User: admin)
-  # "admin" adlı bir Tiha-Mon kullanıcısına FileBrowser yöneticiliği verirdi. Hem bu ad hem eski "admin"
-  # Tiha-Mon tarafında dosya yöneticisine kapalıdır (bkz. backend AuthApi::filemanager).
-  adminUsername: "tihamon-fb-admin"
+  # "admin" adlı bir Ankamon kullanıcısına FileBrowser yöneticiliği verirdi. Hem bu ad hem eski "admin"
+  # Ankamon tarafında dosya yöneticisine kapalıdır (bkz. backend AuthApi::filemanager).
+  adminUsername: "ankamon-fb-admin"
   methods:
     password:
       enabled: false
@@ -104,10 +104,10 @@ auth:
       header: "X-Auth-User"
 userDefaults:
   # FileBrowser'ın kendi varsayılanı koyu tema (darkMode: true); sayfa her açılışta önce bu varsayılanla
-  # çizildiğinden kullanıcının açık mod tercihi "hatırlanmıyor" gibi görünüyordu. tiha-mon açık temalı.
+  # çizildiğinden kullanıcının açık mod tercihi "hatırlanmıyor" gibi görünüyordu. ankamon açık temalı.
   ui:
     darkMode: false
-    # Yeni oluşturulan (ilk kez açılan) hesap tiha-mon'un varsayılan temasıyla başlasın (customThemes.default).
+    # Yeni oluşturulan (ilk kez açılan) hesap ankamon'un varsayılan temasıyla başlasın (customThemes.default).
     customTheme: "default"
   # Dosya izinleri (görme/indirme/değiştirme…) 2.x'te kaynak başına: yukarıda defaultPermissions.
   account:
@@ -120,4 +120,7 @@ userDefaults:
 YAML
 
 cd "$APP"
+# Yeniden adlandırma göçü (bir kez, zararsız): eski 'tihamon-fb-admin' yöneticisini kaldırmayı dene.
+# Yeni proxy başlığı ankamon-fb-admin; eski hesap zaten atıl (yalnız proxy auth). Hata açılışı etkilemez.
+timeout 10 ./filebrowser -c "$APP/config.yaml" users rm tihamon-fb-admin >/dev/null 2>&1 || true
 exec ./filebrowser -c "$APP/config.yaml"

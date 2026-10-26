@@ -1,5 +1,5 @@
 -- Tahtaların AÇIK olduğu zaman aralıkları — loglardan önceden hesaplanır (bkz.
--- worker/tihamon/tasks/board_uptime.py), Oturumlar > Kullanıcılar zaman çizelgesi kapalı saatleri
+-- worker/ankamon/tasks/board_uptime.py), Oturumlar > Kullanıcılar zaman çizelgesi kapalı saatleri
 -- (ör. kurumun kapalı olduğu 18:00–08:00) her açılışta logları taramadan, bu küçük tablodan çizer.
 --
 -- Bir tahta açıkken sürekli log gönderir (boşluklar birkaç dakikayı geçmez); UPTIME_GAP'ten uzun log

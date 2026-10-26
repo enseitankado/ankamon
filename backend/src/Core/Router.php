@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 /**
  * Yol tablosunu (config/routes.php) isteğe eşler ve yetkiyi denetler.
@@ -42,7 +42,7 @@ final class Router
             return null;
         }
         // Çerez tabanlı oturumda siteler arası istek sahteciliğine karşı: tarayıcı formları bu başlığı koyamaz.
-        if ($request->method !== 'GET' && $request->header('X-Requested-With') !== 'tihamon') {
+        if ($request->method !== 'GET' && $request->header('X-Requested-With') !== 'ankamon') {
             throw ApiError::forbidden('Geçersiz istek kaynağı.');
         }
         $user = Auth::user();

@@ -1,14 +1,14 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Auth;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\Auth;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /**
- * Tiha-Mon'un KENDİ kullanıcılarının oturum geçmişi (login_sessions, göç 019) — tahtalardaki kullanıcı
+ * Ankamon'un KENDİ kullanıcılarının oturum geçmişi (login_sessions, göç 019) — tahtalardaki kullanıcı
  * oturumları (board_sessions, "sessions.*" yetkileri) DEĞİL. Kullanıcılar ▸ Oturumlar sekmesi ve alt
  * çubuktaki "oturum açmış kullanıcılar" göstergesi kullanır. Ayrıntı 'logins' yetkisi ister; alt çubuk
  * sayısı her oturum sahibine açıktır (bkz. active()).
@@ -16,7 +16,7 @@ use Tihamon\Core\Request;
 final class LoginSessionsApi
 {
     /**
-     * Bağlantı ölçütü: açık bir Tiha-Mon sekmesi alt çubuktan sürekli istek atar (saniyede bir; arka plandaki
+     * Bağlantı ölçütü: açık bir Ankamon sekmesi alt çubuktan sürekli istek atar (saniyede bir; arka plandaki
      * sekmeyi tarayıcı en çok dakikada bire kısar) ve Auth::user last_seen_at'i dakikada bir yazar. Son istek
      * bundan eskiyse tarayıcı kapanmış/sekme kapatılmış sayılır ("bağlantı kesildi") — belirteç hâlâ geçerli
      * olsa da (çıkış yapmadan kapatılan tarayıcı) oturum "açık" gösterilmez (göç 021).
@@ -119,7 +119,7 @@ final class LoginSessionsApi
                     (SELECT count(*) FROM audit_log a WHERE a.login_session_id = ls.id) AS actions,
                     (SELECT string_agg(DISTINCT a.action, ', ' ORDER BY a.action) FROM audit_log a
                       WHERE a.login_session_id = ls.id AND a.action NOT IN ('login', 'logout')) AS action_names,
-                    CASE WHEN ls.ip IN ('127.0.0.1', '::1') THEN 'Tiha-Mon sunucusu'
+                    CASE WHEN ls.ip IN ('127.0.0.1', '::1') THEN 'Ankamon sunucusu'
                          ELSE coalesce(pa.alias, pc.mac::text) END AS computer,
                     pc.mac::text AS computer_mac
              FROM login_sessions ls
@@ -149,7 +149,7 @@ final class LoginSessionsApi
      * olana liste. Liste kullanıcı+IP başına TEK satır (aynı tarayıcıdan çıkış yapmadan tekrar tekrar girilince
      * ipucu yüzlerce satıra uzamasın): son giriş, oturum sayısı, son etkinlik; şu an etkin olanlar üstte.
      *
-     * `?focused=0|1` (alt çubuk gönderir; göç 020): çağıran oturumun Tiha-Mon sekmesi görünür VE tarayıcı
+     * `?focused=0|1` (alt çubuk gönderir; göç 020): çağıran oturumun Ankamon sekmesi görünür VE tarayıcı
      * penceresi odakta mı. `active` = gruptaki bir oturum odakta ve bildirimi FOCUS_STALE_SECONDS'tan taze
      * (sekme kapanınca/ağ gidince bildirim kesilir, kendiliğinden düşer) → ipucunda yeşil "Aktif".
      * `?view=` (göç 024): oturumun o an açık sayfası/sekmesi/penceresi → ipucunda "Aktif"in sağında. Satırdaki
@@ -200,7 +200,7 @@ final class LoginSessionsApi
                     -- Gruptaki en son bildirilen görünüm (odaktaki oturum önce).
                     (array_agg(ls.view ORDER BY ls.focused AND ls.focus_at > now() - make_interval(secs => ?) DESC,
                                ls.focus_at DESC NULLS LAST) FILTER (WHERE ls.view IS NOT NULL))[1] AS view,
-                    CASE WHEN ls.ip IN ('127.0.0.1', '::1') THEN 'Tiha-Mon sunucusu' ELSE max(pa.alias) END AS computer
+                    CASE WHEN ls.ip IN ('127.0.0.1', '::1') THEN 'Ankamon sunucusu' ELSE max(pa.alias) END AS computer
              FROM sessions s
              JOIN login_sessions ls ON ls.session_hash = s.id
              LEFT JOIN users u ON u.id = ls.user_id" . self::COMPUTER_JOIN . "

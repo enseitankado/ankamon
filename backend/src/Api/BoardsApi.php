@@ -1,14 +1,14 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
-use Tihamon\Core\Settings;
-use Tihamon\Core\Storage;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
+use Ankamon\Core\Settings;
+use Ankamon\Core\Storage;
 
 /** Tahta envanteri. Kayıtlar çoğunlukla worker tarafından (log göndereni / ağ taraması) kendiliğinden oluşur. */
 final class BoardsApi
@@ -144,7 +144,7 @@ final class BoardsApi
     /**
      * Dosya yöneticisi bağlantı bilgisi (yalnız "filemanager" yetkisi) — açılış köprüsü
      * (/filemanager-open/) bununla tahtayı sshfs ile bağlar. Oturum açılışı, bağlama gerçekten
-     * başarılı olunca komut loguna işlenir (bkz. worker/tihamon/filemanager) — burada değil,
+     * başarılı olunca komut loguna işlenir (bkz. worker/ankamon/filemanager) — burada değil,
      * başarısız denemeler log'u kirletmesin diye (screen() ile aynı desen).
      */
     public function filemanager(Request $request): array
@@ -159,7 +159,7 @@ final class BoardsApi
             throw ApiError::badRequest('SSH parolası tanımlı değil (Ayarlar → SSH erişimi).');
         }
 
-        // Kimlik bilgisi bilerek DÖNMEZ: bağlama köprüsü (worker/tihamon/filemanager) onu kendisi
+        // Kimlik bilgisi bilerek DÖNMEZ: bağlama köprüsü (worker/ankamon/filemanager) onu kendisi
         // veritabanından okur. Tarayıcıya (iframe URL'si) giden root parolası "filemanager" yetkisini
         // fiilen "shell"e çeviriyordu.
         return [

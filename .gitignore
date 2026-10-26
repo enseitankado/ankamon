@@ -9,7 +9,7 @@
 /frontend/compiled/
 /frontend/.qooxdoo/
 /frontend/themes/
-/worker/tihamon/netscan/manuf.gz
+/worker/ankamon/netscan/manuf.gz
 __pycache__/
 *.pyc
 # Eklentiler (bkz. ext/README.md): her ext/<ad>/ kendi (ör. private) deposudur, bu depoya GİRMEZ.

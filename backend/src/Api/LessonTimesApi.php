@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Request;
-use Tihamon\Core\Settings;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Request;
+use Ankamon\Core\Settings;
 
 /**
  * Okulun ders saatleri (Ayarlar ▸ Ders saatleri — yalnız yönetici yazar). Okuma her oturum açmış

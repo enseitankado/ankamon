@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /**
  * Tahtaların açık olduğu aralıklar (Oturumlar > Kullanıcılar zaman çizelgesi; aralıkların tümleyeni
@@ -16,7 +16,7 @@ use Tihamon\Core\Request;
  */
 final class UptimeApi
 {
-    /** worker/tihamon/tasks/board_uptime.py GAP ile aynı: son log bundan yeniyse aralık "sürüyor". */
+    /** worker/ankamon/tasks/board_uptime.py GAP ile aynı: son log bundan yeniyse aralık "sürüyor". */
     private const GAP_SECONDS = 900;
 
     public function index(Request $request): array

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 /**
  * Tahta sensörlerini (node_exporter hwmon + smartmon/nvme textfile) anlamlı göstergelere indirger:

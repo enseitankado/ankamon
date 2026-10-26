@@ -1,7 +1,7 @@
 # Topluluk qooxdoo temaları (hepsi MIT) — derlemede kendi GitHub depolarından, SABİT commit'ten indirilir
 # (bkz. fetch-themes.sh, Dockerfile "frontend" aşaması). Depoya gömülmez.
 # Sütunlar: ad  depo  commit  alınacak-yollar (source/ altına göre, virgülle)
-# <ad>.patch varsa indirildikten sonra uygulanır (tiha-mon yamaları).
+# <ad>.patch varsa indirildikten sonra uygulanır (ankamon yamaları).
 bernstein   goldim/Bernstein          3b3ea15bdfd900c85816c00fca31d7ba087322ce  class/bernstein,resource/bernstein
 darktheme   goldim/DarkTheme          666fd81c34d82674d55041a98aa4e9bc28affae7  class/darktheme,resource/darktheme
 fluent      sqville/ville.Fluent      8399a430147dc6fa11d44f1cc0d42ffe1e79d1fc  class/ville/decoration,class/ville/global,class/ville/theme,resource/ville/theme

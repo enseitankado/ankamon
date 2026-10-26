@@ -7,12 +7,12 @@ ALTER ROLE grafana PASSWORD :'grafana_password';
 SELECT 'CREATE DATABASE grafana OWNER grafana' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'grafana') \gexec
 
 -- Grafana veri kaynağı için salt-okunur rol: yalnız izleme verisi, kullanıcı/oturum/ayar tabloları değil.
-SELECT 'CREATE ROLE tihamon_ro LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'tihamon_ro') \gexec
-ALTER ROLE tihamon_ro PASSWORD :'readonly_password';
-GRANT CONNECT ON DATABASE tihamon TO tihamon_ro;
-GRANT USAGE ON SCHEMA public TO tihamon_ro;
+SELECT 'CREATE ROLE ankamon_ro LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ankamon_ro') \gexec
+ALTER ROLE ankamon_ro PASSWORD :'readonly_password';
+GRANT CONNECT ON DATABASE ankamon TO ankamon_ro;
+GRANT USAGE ON SCHEMA public TO ankamon_ro;
 GRANT SELECT ON logs, metrics, metrics_tag, metrics_5m, metrics_1h,
-                v_metrics, v_metrics_5m, v_metrics_1h, v_boards TO tihamon_ro;
+                v_metrics, v_metrics_5m, v_metrics_1h, v_boards TO ankamon_ro;
 
 -- Saklama süreleri: ham veri → 5 dk özet → saatlik özet; loglar.
 SELECT remove_retention_policy('metrics', if_exists => TRUE);

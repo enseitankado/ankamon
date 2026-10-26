@@ -1,7 +1,7 @@
 # TiHA m06 (Merkezi log sunucusu) ile aynı dosyayı aynı biçimde yazar; TiHA formu bu ayarı okuyabilir.
 set -eu
 
-# Adres verilmediyse: bu SSH bağlantısının geldiği adres, yani Tiha-Mon sunucusu.
+# Adres verilmediyse: bu SSH bağlantısının geldiği adres, yani Ankamon sunucusu.
 HOST="${HOST:-${SSH_CONNECTION%% *}}"
 [ -n "$HOST" ] || { echo "Log sunucusu adresi belirlenemedi." >&2; exit 2; }
 
@@ -24,7 +24,7 @@ BACKUP=
 {
     cat <<CONF_EOF
 # TiHA - Dayanıklı merkezi log iletimi
-# Profil: $PROFILE (Tiha-Mon tarafından yazıldı)
+# Profil: $PROFILE (Ankamon tarafından yazıldı)
 # TIHA_PROFILE=$PROFILE
 #
 # Uzak sunucu offline olduğunda loglar kaybolmaz - diskte sıralanır.

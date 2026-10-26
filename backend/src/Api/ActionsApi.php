@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Actions;
-use Tihamon\Core\Auth;
-use Tihamon\Core\Request;
+use Ankamon\Core\Actions;
+use Ankamon\Core\Auth;
+use Ankamon\Core\Request;
 
 final class ActionsApi
 {

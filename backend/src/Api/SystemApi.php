@@ -1,21 +1,21 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
 /**
  * Konteynerin anlık kaynak kullanımı (StatusBar'ın üst çubuğu, 1 sn'de bir yoklanır).
  *
  * Oranlar (CPU, disk, ağ) iki ardışık istek arasındaki farktan hesaplanır; bu yüzden önceki
- * örnek /run/tiha-mon/sysstat-prev.json'da tutulur (PHP-FPM istekler arası durum tutmaz).
+ * örnek /run/ankamon/sysstat-prev.json'da tutulur (PHP-FPM istekler arası durum tutmaz).
  * Veriler cgroup v2'den okunur (Docker varsayılanı) — konteynerin KENDİ kullanımıdır, host'un
  * tamamı değil. Ağ yalnız gerçek arabirimleri sayar (lo/docker/br-/veth hariç); host ağı
  * kullanıldığından (network_mode: host) bu host'un fiziksel arabirimleriyle aynıdır.
  */
 final class SystemApi
 {
-    // /run/tiha-mon/php: FPM havuzunun ("nobody") yazabildiği tek alt dizin (bkz. services/php-fpm.sh).
-    private const STATE_FILE = '/run/tiha-mon/php/sysstat-prev.json';
+    // /run/ankamon/php: FPM havuzunun ("nobody") yazabildiği tek alt dizin (bkz. services/php-fpm.sh).
+    private const STATE_FILE = '/run/ankamon/php/sysstat-prev.json';
     // Önceki örnek bundan daha eskiyse oran hesaplanmaz (sayfa yeni açıldı ya da uzun duraklama).
     private const MAX_GAP_SECONDS = 10.0;
 

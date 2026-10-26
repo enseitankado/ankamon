@@ -1,6 +1,6 @@
 set -eu
 
-CONF=/etc/modules-load.d/tiha-mon-sensors.conf
+CONF=/etc/modules-load.d/ankamon-sensors.conf
 # Sürücü → hwmon "name" öneki. Sıra önemli değil: desteklemeyen sürücü yüklenmez (ENODEV).
 MODULES="it87:it87 nct6775:nct67 f71882fg:f71"
 
@@ -36,7 +36,7 @@ if [ -z "$found" ]; then
 fi
 
 {
-    echo "# Tiha-Mon \"Fan/pil/anakart sensörlerini etkinleştir\": donanım izleme yongası sürücüsü."
+    echo "# Ankamon \"Fan/pil/anakart sensörlerini etkinleştir\": donanım izleme yongası sürücüsü."
     for mod in $found; do echo "$mod"; done
 } > "$CONF.tmp"
 chmod 644 "$CONF.tmp"

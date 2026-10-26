@@ -32,7 +32,7 @@ jobs:
           persist-credentials: false
 
       - name: İmajı önbelleksiz derle
-        run: docker build --pull --no-cache -t tiha-mon:scan .
+        run: docker build --pull --no-cache -t ankamon:scan .
 
       - name: Trivy ile tara
         id: trivy
@@ -44,7 +44,7 @@ jobs:
               -v "$PWD/trivy-cache:/root/.cache/trivy" -v "$PWD/out:/out" trivy-pinned "$@"
           }
           common="image --scanners vuln --ignore-unfixed --severity $SEVERITY --no-progress --timeout 30m --skip-version-check"
-          trivy $common --format json --output /out/trivy.json tiha-mon:scan
+          trivy $common --format json --output /out/trivy.json ankamon:scan
           trivy convert --format table --output /out/trivy.txt /out/trivy.json
           count=$(jq '[.Results[]?.Vulnerabilities[]?] | length' out/trivy.json)
           echo "count=$count" >> "$GITHUB_OUTPUT"

@@ -1,18 +1,18 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /**
  * Ekran yansıtma penceresinin canlı tüketim tablosu (docker/rootfs/cast/index.html): bir yayını okuyan
  * tahtaların sunucudan çektiği veri miktarı. MediaMTX denetim API'si (yalnız 127.0.0.1, bkz.
  * docker/rootfs/services/mediamtx.sh) tahta başına bir RTSP oturumu verir; uzak adres boards.ip ile
  * eşleştirilir. Hız (Mbit/sn) pencerede iki örnek arasındaki farktan hesaplanır. CPU/RAM ayrı kanaldan
- * gelir (nginx /cast/ws/perf/, worker/tihamon/screen/perf.py).
+ * gelir (nginx /cast/ws/perf/, worker/ankamon/screen/perf.py).
  */
 final class CastApi
 {

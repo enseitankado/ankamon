@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /** Arka plan etkinlik akışı (durum çubuğu). `after` ile yalnız yeni kayıtlar istenir. */
 final class ActivityApi

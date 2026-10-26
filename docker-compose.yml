@@ -1,12 +1,12 @@
-# Tiha-Mon — her şey tek konteynerde (supervisord). Kalıcı veri yalnız ${DATA_DIR} altındadır.
-name: tiha-mon
+# Ankamon — her şey tek konteynerde (supervisord). Kalıcı veri yalnız ${DATA_DIR} altındadır.
+name: ankamon
 
 services:
-  tiha-mon:
+  ankamon:
     build:
       context: .
       dockerfile: Dockerfile
-    image: tiha-mon
+    image: ankamon
     restart: always
     environment:
       TZ: ${TZ:-Europe/Istanbul}
@@ -37,7 +37,7 @@ services:
       BACKUP_FULL_AT: ${BACKUP_FULL_AT:-03:30}
       BACKUP_KEEP_CONFIG: ${BACKUP_KEEP_CONFIG:-28}
       BACKUP_KEEP_FULL: ${BACKUP_KEEP_FULL:-7}
-    # Host ağı doğrudan kullanılır (bridge değil): Wake-on-LAN sihirli paketi (bkz. worker/tihamon/
+    # Host ağı doğrudan kullanılır (bridge değil): Wake-on-LAN sihirli paketi (bkz. worker/ankamon/
     # executor/wol.py) bir UDP yayınıdır (broadcast) ve Docker'ın köprü ağından fiziksel LAN'a asla
     # çıkamaz (yalnızca köprünün kendi izole alt ağında kalır) — çekirdek, yönlendirilmiş (subnet)
     # yayınları da güvenlik nedeniyle arayüzler arası iletmez. Host ağında konteyner doğrudan host'un
@@ -46,7 +46,7 @@ services:
     # portu olarak kullanır (bkz. services/nginx.sh, services/rsyslog.sh). İç servisler (postgres,
     # grafana, php-fpm, webssh) zaten 127.0.0.1'e bağlı olduğundan host ağında yeni bir şey dışa açılmaz.
     network_mode: host
-    # Dosya yöneticisi (bkz. worker/tihamon/filemanager) tahtanın dosya sistemini sshfs ile bağlar;
+    # Dosya yöneticisi (bkz. worker/ankamon/filemanager) tahtanın dosya sistemini sshfs ile bağlar;
     # FUSE bağlama SYS_ADMIN + /dev/fuse ister, Docker'ın varsayılan AppArmor profili de FUSE bağlamayı
     # engellediğinden kapatılır (yalnızca bağlama syscall'ı için — konteynerin ağ/erişim sınırlarını
     # değiştirmez, zaten root SSH kimlik bilgilerini tutan tek konteynerin blast radius'unu artırmaz).

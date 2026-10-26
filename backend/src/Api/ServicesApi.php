@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Request;
-use Tihamon\Core\Supervisor;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Request;
+use Ankamon\Core\Supervisor;
 
 /**
  * Sistem sayfası → "Servisler": konteynerdeki arka plan bileşenleri (supervisord programları; bkz.

@@ -19,4 +19,4 @@ alan; API yanıtlarına ve denetim kaydına `***` yazılır, değer görev bitin
 
 `tools` (ör. `["eta-112"]`): işlemden önce tahtaya taşınacak dış araçlar — sunucuda `/data/tools/<ad>/`
 altında tutulur, günün ilk kullanımında GitHub'da yeni sürüm denetlenir, tahtaya yalnız değişmişse SFTP
-ile kopyalanır (bkz. `worker/tihamon/executor/tools.py`; eta-112 tahtada `/opt/eta-112/`).
+ile kopyalanır (bkz. `worker/ankamon/executor/tools.py`; eta-112 tahtada `/opt/eta-112/`).

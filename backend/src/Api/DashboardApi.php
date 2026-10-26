@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Auth;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\Auth;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 /** Genel bakış sayfasının özet verisi. */
 final class DashboardApi
@@ -54,8 +54,8 @@ final class DashboardApi
                     [(bool) $user['is_admin'], $user['id']]
                 )
             ),
-            'database_bytes' => (int) Db::value("SELECT pg_database_size('tihamon')"),
-            // Sensör verisinin miktarı ve boyutu (worker.tihamon.tasks.telegraf_targets'ın
+            'database_bytes' => (int) Db::value("SELECT pg_database_size('ankamon')"),
+            // Sensör verisinin miktarı ve boyutu (worker.ankamon.tasks.telegraf_targets'ın
             // Telegraf'a sürekli yazdırdığı metrics hypertable'ı — bkz. db/migrations/001_core.sql).
             // Satır sayısı approximate_row_count ile alınır: büyük hypertable'larda tam count(*)
             // tam tablo taraması gerektirir, bu TimescaleDB fonksiyonu istatistiklerden anında döner.
@@ -137,7 +137,7 @@ final class DashboardApi
         ];
     }
 
-    private const BACKUP_SUMMARY = '/run/tiha-mon/backups.json';
+    private const BACKUP_SUMMARY = '/run/ankamon/backups.json';
 
     /**
      * rsyslog'un disk kuyruğu (bkz. docker/rootfs/services/rsyslog.sh, SPOOL): veritabanı

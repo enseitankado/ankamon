@@ -1,5 +1,5 @@
 -- Ağ envanteri: bu sunucunun bağlı olduğu fiziksel ağlar ve o ağlarda görülen (çevrimiçi/çevrimdışı)
--- bütün cihazlar. Tarayan: worker/tihamon/netscan (supervisord "netscan"). Arayüz: sol menü "Ağ".
+-- bütün cihazlar. Tarayan: worker/ankamon/netscan (supervisord "netscan"). Arayüz: sol menü "Ağ".
 --
 -- Cihazın kimliği MAC adresidir (IP değişebilir): aynı ağda aynı MAC tek kayıttır. Cihaz bir daha
 -- görülmese de kayıt silinmez — "çevrimdışı" olarak kalır (envanter); yalnız kullanıcı siler.

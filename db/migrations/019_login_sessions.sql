@@ -1,4 +1,4 @@
--- Tiha-Mon oturum geçmişi (Kullanıcılar ▸ Oturumlar sekmesi, alt çubuktaki "oturum açmış kullanıcılar").
+-- Ankamon oturum geçmişi (Kullanıcılar ▸ Oturumlar sekmesi, alt çubuktaki "oturum açmış kullanıcılar").
 -- `sessions` yalnız GEÇERLİ oturumları tutar ve çıkışta/süre dolunca satır silinir; geçmiş burada kalır.
 -- Bakımı tetikleyiciler yapar: sessions'a eklenen/uzatılan/silinen her satır buraya yansır — oturumu
 -- silen her yol (çıkış, parola değişimi, kullanıcıyı pasifleştirme, süre dolmuşların temizliği) kapsanır.

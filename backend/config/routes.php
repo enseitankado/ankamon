@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-use Tihamon\Api;
+use Ankamon\Api;
 
 // [METOD, yol, [sınıf, metot], erişim] — erişim için bkz. Core\Router.
 return [
@@ -36,7 +36,7 @@ return [
     ['GET',    '/api/boards/{id}/shell', [Api\BoardsApi::class, 'shell'],      'shell'],
     ['GET',    '/api/boards/{id}/filemanager', [Api\BoardsApi::class, 'filemanager'], 'filemanager'],
 
-    // Ağ envanteri (sol menü "Ağ") — bkz. NetworkApi, worker/tihamon/netscan.
+    // Ağ envanteri (sol menü "Ağ") — bkz. NetworkApi, worker/ankamon/netscan.
     ['GET',    '/api/network',               [Api\NetworkApi::class, 'index'],          'network'],
     ['GET',    '/api/network/state',         [Api\NetworkApi::class, 'state'],          'network'],
     ['GET',    '/api/network/devices',       [Api\NetworkApi::class, 'devices'],        'network'],
@@ -115,7 +115,7 @@ return [
     ['GET',    '/api/lesson-times',      [Api\LessonTimesApi::class, 'show'],   'user'],
     ['PUT',    '/api/lesson-times',      [Api\LessonTimesApi::class, 'update'], 'admin'],
     ['GET',    '/api/audit',             [Api\AuditApi::class, 'index'],       'admin'],
-    // Tiha-Mon oturum geçmişi (Kullanıcılar ▸ Oturumlar); /active alt çubuk içindir (sayı herkese, liste 'logins'e).
+    // Ankamon oturum geçmişi (Kullanıcılar ▸ Oturumlar); /active alt çubuk içindir (sayı herkese, liste 'logins'e).
     ['GET',    '/api/login-sessions',    [Api\LoginSessionsApi::class, 'index'],   'logins'],
     ['GET',    '/api/login-sessions/active', [Api\LoginSessionsApi::class, 'active'], 'user'],
     ['GET',    '/api/login-sessions/{id}/actions', [Api\LoginSessionsApi::class, 'actions'], 'logins'],

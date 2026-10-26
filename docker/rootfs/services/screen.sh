@@ -3,10 +3,10 @@
 # oturum + "screen" yetkisiyle korunur. Yalnız 127.0.0.1:8890 dinler; dışarı açılmaz.
 set -eu
 
-. /opt/tiha-mon/services/wait-db.sh
+. /opt/ankamon/services/wait-db.sh
 
-export PG_HOST=127.0.0.1 PG_PORT=5432 PG_DB=tihamon PG_USER=tihamon PG_PASSWORD="$POSTGRES_PASSWORD"
+export PG_HOST=127.0.0.1 PG_PORT=5432 PG_DB=ankamon PG_USER=ankamon PG_PASSWORD="$POSTGRES_PASSWORD"
 export PYTHONUNBUFFERED=1
 
-cd /opt/tiha-mon/worker
-exec python3 -m tihamon.screen
+cd /opt/ankamon/worker
+exec python3 -m ankamon.screen

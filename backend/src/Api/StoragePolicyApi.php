@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
-use Tihamon\Core\Storage;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
+use Ankamon\Core\Storage;
 
 /**
  * Disk kullanımı sekmelerinin "?" yardım penceresi için CANLI saklama bilgisi (bkz. frontend
@@ -20,8 +20,8 @@ final class StoragePolicyApi
         'BACKUP_CONFIG_EVERY_HOURS', 'BACKUP_FULL_AT', 'BACKUP_KEEP_CONFIG', 'BACKUP_KEEP_FULL', 'DIAGNOSE_INTERVAL_DAYS',
     ];
 
-    // Şablon (parolasız) — çalışan kopya /run/tiha-mon/rsyslog.conf'a yalnız sunucu adı/dizin işlenir.
-    private const RSYSLOG_CONF = '/etc/tiha-mon/rsyslog.conf';
+    // Şablon (parolasız) — çalışan kopya /run/ankamon/rsyslog.conf'a yalnız sunucu adı/dizin işlenir.
+    private const RSYSLOG_CONF = '/etc/ankamon/rsyslog.conf';
 
     public function policy(Request $request): array
     {

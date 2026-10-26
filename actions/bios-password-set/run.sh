@@ -1,5 +1,5 @@
 # eta-112 ile BIOS parolası ayarlar. Araç runner tarafından /opt/eta-112'ye kopyalanmıştır
-# (bkz. worker/tihamon/executor/tools.py). Parolalar çıktıya YAZILMAZ.
+# (bkz. worker/ankamon/executor/tools.py). Parolalar çıktıya YAZILMAZ.
 set -u
 T=/opt/eta-112/eta-112.py
 [ -f "$T" ] || { echo "eta-112 tahtada bulunamadı ($T)." >&2; exit 1; }

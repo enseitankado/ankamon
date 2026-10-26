@@ -1,19 +1,19 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
-use Tihamon\Core\Storage;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
+use Ankamon\Core\Storage;
 
 /**
  * Oturumlar — iki tür, tek listede (her satırda `kind`):
- *  - "board": tahta (greeter) oturumları — worker/tihamon/tasks/board_sessions.py'nin lightdm PAM
+ *  - "board": tahta (greeter) oturumları — worker/ankamon/tasks/board_sessions.py'nin lightdm PAM
  *    loglarından çıkardığı gerçek kullanıcı oturum açma/kapama kayıtları (bkz. 007_board_sessions.sql).
- *  - "webshell": Tiha-Mon üzerinden açılan web terminal (SSH) oturumları; username Tiha-Mon
+ *  - "webshell": Ankamon üzerinden açılan web terminal (SSH) oturumları; username Ankamon
  *    kullanıcısıdır (bkz. 011_webshell_sessions.sql, docker/rootfs/webssh-hook.py).
  * Silmede kimlikler türe göre ayrı gelir (ids / webshell_ids) — iki tablonun kimlikleri çakışabilir.
  * Arayüz tüm satırları tek seferde çekip (Tahtalar grid'iyle aynı desen) sütun bazlı filtre + yerleşik

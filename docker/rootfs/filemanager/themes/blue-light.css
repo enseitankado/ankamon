@@ -1,6 +1,6 @@
 /*
- * FileBrowser Quantum teması: tiha-mon "Açık (Mavi)" (blue-light) temasının renkleri.
- * Renkler, tiha-mon arayüzünde bu tema seçiliyken qooxdoo renk yöneticisinin çözdüğü değerlerden alındı
+ * FileBrowser Quantum teması: ankamon "Açık (Mavi)" (blue-light) temasının renkleri.
+ * Renkler, ankamon arayüzünde bu tema seçiliyken qooxdoo renk yöneticisinin çözdüğü değerlerden alındı
  * (app-background, app-nav, surface, app-border, text-primary-on-surface, app-muted, primary, error).
  * FileBrowser'ın açık/koyu kip seçiminden bağımsız aynı görünsün diye değişkenler hem :root hem
  * .dark-mode için tanımlanır. Seçim: dosya yöneticisi → Ayarlar → Profil → Tema (bkz. filemanager.sh).
@@ -28,7 +28,7 @@
 }
 
 /* Üst çubuk, kenar çubuğu ve durum çubuğu: FileBrowser zemin üstüne sabit yarı saydam bir ton bindiriyor
-   (header[data-v-…], #sidebar, #status-bar — !important ile); tiha-mon'un sol menüsü gibi temanın gezinme
+   (header[data-v-…], #sidebar, #status-bar — !important ile); ankamon'un sol menüsü gibi temanın gezinme
    rengini (app-nav) alsınlar. :not(#tm…) yalnız özgüllüğü artırır — bileşen hash'ine (data-v-…) bağlı
    kalınmasın, FileBrowser sürümü değişince de çalışsın diye. */
 body {

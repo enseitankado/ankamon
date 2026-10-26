@@ -1,8 +1,8 @@
 {
-  "name": "tihamon-frontend",
+  "name": "ankamon-frontend",
   "version": "0.1.0",
   "private": true,
-  "description": "Tiha-Mon web arayüzü (qooxdoo)",
+  "description": "Ankamon web arayüzü (qooxdoo)",
   "scripts": {
     "build": "qx compile --target=build",
     "watch": "qx compile --watch"

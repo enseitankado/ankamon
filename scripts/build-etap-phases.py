@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""tiha-mon ETAP faz veritabanını (maskelenmiş MAC önekleri → anakart modeli) üretir.
+"""ankamon ETAP faz veritabanını (maskelenmiş MAC önekleri → anakart modeli) üretir.
 
 Girdi: ETAP arka ucundan alınmış tahta envanteri (all_boards.json[.gz] + motherboard_catalog.json) —
 okul adları ve tam MAC'ler içerdiğinden DEPOYA GİRMEZ; bu betik yalnız yerelde çalıştırılır.
-Çıktı (depoya girer): worker/tihamon/netscan/etap_prefixes.tsv — her satır
+Çıktı (depoya girer): worker/ankamon/netscan/etap_prefixes.tsv — her satır
     <hex önek>\t<model anahtarı>\t<öneğin altındaki envanter tahtası sayısı>
 Önek, MAC'in ilk 6–10 onaltılık hanesidir (24–40 bit): HİÇBİR tam MAC saklanmaz; en dar önek 256 adres
-kapsar. Model anahtarının fazı/markası worker/tihamon/netscan/etap_models.json'da (elle bakılır).
+kapsar. Model anahtarının fazı/markası worker/ankamon/netscan/etap_models.json'da (elle bakılır).
 
 Önek seçimi (hex haneli önek ağacında yukarıdan aşağı): bir düğüm şu koşullarda tek önek olarak
 yazılır, yoksa alt düğümlere inilir —
@@ -142,7 +142,7 @@ def main() -> None:
     print(f"önek: {len(table)} | kapsanan adres: {space:,} | uzunluk dağılımı: "
           f"{dict(sorted(collections.Counter(len(p) for p, _, _ in table).items()))}", file=sys.stderr)
     with open(out_path, "w") as fh:
-        fh.write("# tiha-mon ETAP faz veritabanı — maskelenmiş MAC öneki → anakart modeli (bkz. etap_models.json).\n")
+        fh.write("# ankamon ETAP faz veritabanı — maskelenmiş MAC öneki → anakart modeli (bkz. etap_models.json).\n")
         fh.write("# Üretici: scripts/build-etap-phases.py (envanterin kendisi depoda yoktur). Sütunlar: önek, model, tahta sayısı\n")
         for prefix, model, n in table:
             fh.write(f"{prefix}\t{model}\t{n}\n")

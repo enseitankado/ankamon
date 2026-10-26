@@ -3,12 +3,12 @@ declare(strict_types=1);
 
 // Konteyner her başladığında çalışır: etapadmin hesabını ve tahta erişim ayarını (yalnız yoksa) oluşturur.
 
-use Tihamon\Core\Auth;
-use Tihamon\Core\Db;
-use Tihamon\Core\Settings;
+use Ankamon\Core\Auth;
+use Ankamon\Core\Db;
+use Ankamon\Core\Settings;
 
 spl_autoload_register(static function (string $class): void {
-    if (str_starts_with($class, 'Tihamon\\')) {
+    if (str_starts_with($class, 'Ankamon\\')) {
         require dirname(__DIR__) . '/src/' . str_replace('\\', '/', substr($class, 8)) . '.php';
     }
 });

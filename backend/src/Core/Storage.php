@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Core;
+namespace Ankamon\Core;
 
 /**
  * Disk kullanımı penceresinin (log / sensör / görev sekmeleri) ortak yardımcıları.
@@ -53,7 +53,7 @@ final class Storage
         ];
     }
 
-    private const ROOT_REQUESTS = '/run/tiha-mon/storage-ops';
+    private const ROOT_REQUESTS = '/run/ankamon/storage-ops';
     private const ROOT_WAIT_SECONDS = 20;
 
     /**

@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Request;
-use Tihamon\Core\Storage;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Request;
+use Ankamon\Core\Storage;
 
 /**
  * Yedek dosyaları (Disk kullanımı penceresinin "Yedekler" sekmesi) ve kalıcı silme.
@@ -18,7 +18,7 @@ use Tihamon\Core\Storage;
  */
 final class BackupStatsApi
 {
-    private const SUMMARY = '/run/tiha-mon/backups.json';
+    private const SUMMARY = '/run/ankamon/backups.json';
     private const NAME = '/^(config|full|grafana)-[0-9]{8}-[0-9]{6}\.dump$/';
     private const KINDS = ['full', 'config', 'grafana'];
 

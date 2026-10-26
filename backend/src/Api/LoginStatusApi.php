@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\Db;
+use Ankamon\Core\Db;
 
 /**
  * Giriş ekranının durum satırı (frontend ui/Login.js): oturum açmadan görülür, bu yüzden YALNIZ

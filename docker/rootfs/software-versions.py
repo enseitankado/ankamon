@@ -1,5 +1,5 @@
 """Derleme sırasında (Dockerfile'ın son adımı) konteynerdeki bileşenlerin sürümlerini toplar ve
-/opt/tiha-mon/software-versions.json'a yazar: Sistem ▸ Yazılımlar sayfası bunu okur (bkz. backend
+/opt/ankamon/software-versions.json'a yazar: Sistem ▸ Yazılımlar sayfası bunu okur (bkz. backend
 Api/SoftwareApi.php — bileşen listesi, açıklamalar ve canlı durum orada). Sürüm her istekte komut
 çalıştırılarak değil, imaj üretilirken bir kez belirlenir: imaj değişmeden sürüm de değişmez.
 
@@ -13,7 +13,7 @@ import re
 import subprocess
 import time
 
-OUT = "/opt/tiha-mon/software-versions.json"
+OUT = "/opt/ankamon/software-versions.json"
 APK = ["nginx", "php84", "php84-fpm", "grafana", "telegraf", "rsyslog", "python3", "py3-psycopg", "py3-tornado",
        "ansible-core", "openssh-client-default", "sshpass", "sshfs", "openssl", "arp-scan", "nmap", "samba-client",
        "supervisor", "bash", "curl"]
@@ -48,16 +48,16 @@ except OSError:
     pass
 versions["postgres"] = first_version(run("postgres", "--version"))
 versions["webssh"] = run("python3", "-c", "import importlib.metadata as m; print(m.version('webssh'))").strip()
-versions["mediamtx"] = first_version(run("/opt/tiha-mon/mediamtx/mediamtx", "--version"))
-fb = "/opt/tiha-mon/filemanager/filebrowser"
+versions["mediamtx"] = first_version(run("/opt/ankamon/mediamtx/mediamtx", "--version"))
+fb = "/opt/ankamon/filemanager/filebrowser"
 versions["filebrowser"] = first_version(run(fb, "version") or "") or first_version(run(fb, "--version"))
 try:  # noVNC kurulmaz, yalnız istemci dosyaları açılır; sürüm paket adından (bkz. Dockerfile)
-    with open("/opt/tiha-mon/novnc.version") as f:
+    with open("/opt/ankamon/novnc.version") as f:
         versions["novnc"] = f.read().strip()
 except OSError:
     pass
 try:
-    with open("/opt/tiha-mon/frontend-versions.json") as f:
+    with open("/opt/ankamon/frontend-versions.json") as f:
         versions.update(json.load(f))
 except (OSError, ValueError):
     pass

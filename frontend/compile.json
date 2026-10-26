@@ -10,10 +10,10 @@
   "environment": { "qx.icontheme": "Tango" },
   "applications": [
     {
-      "class": "tihamon.Application",
-      "theme": "tihamon.theme.Theme",
-      "name": "tihamon",
-      "title": "Tiha-Mon",
+      "class": "ankamon.Application",
+      "theme": "ankamon.theme.Theme",
+      "name": "ankamon",
+      "title": "Ankamon",
       "bootPath": "source/boot"
     }
   ]

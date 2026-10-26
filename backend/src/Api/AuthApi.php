@@ -1,19 +1,19 @@
 <?php
 declare(strict_types=1);
 
-namespace Tihamon\Api;
+namespace Ankamon\Api;
 
-use Tihamon\Core\ApiError;
-use Tihamon\Core\Audit;
-use Tihamon\Core\Auth;
-use Tihamon\Core\Db;
-use Tihamon\Core\Request;
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
+use Ankamon\Core\Auth;
+use Ankamon\Core\Db;
+use Ankamon\Core\Request;
 
 final class AuthApi
 {
     private const MAX_FAILURES = 8;   // 10 dakikada, kullanıcı adı ya da adres başına
 
-    /** frontend/source/class/tihamon/theme/Registry.js ile birebir eşleşmeli anahtarlar. */
+    /** frontend/source/class/ankamon/theme/Registry.js ile birebir eşleşmeli anahtarlar. */
     private const THEMES = [
         'blue-light', 'blue-dark', 'green-light', 'purple-dark',
         'qx-classic', 'qx-modern', 'qx-simple', 'qx-indigo', 'qx-indigo-dark',
@@ -270,11 +270,11 @@ final class AuthApi
         }
         // FileBrowser 2.x'in yönetici hesap adları (varsayılan "admin" + services/filemanager.sh
         // auth.adminUsername): bu adla gelen proxy başlığı FileBrowser'da yönetici oturumu açar. Aynı adlı
-        // bir Tiha-Mon kullanıcısı dosya yöneticisine (FileBrowser hesabıyla) giremez.
-        if (in_array(strtolower((string) $user['username']), ['admin', 'tihamon-fb-admin'], true)) {
+        // bir Ankamon kullanıcısı dosya yöneticisine (FileBrowser hesabıyla) giremez.
+        if (in_array(strtolower((string) $user['username']), ['admin', 'ankamon-fb-admin'], true)) {
             throw ApiError::forbidden('Bu kullanıcı adı dosya yöneticisinde ayrılmıştır; başka adlı bir kullanıcıyla girin.');
         }
-        // Kim bağladı: köprü bunu başarılı bağlamada komut loguna yazar (bkz. worker/tihamon/filemanager).
+        // Kim bağladı: köprü bunu başarılı bağlamada komut loguna yazar (bkz. worker/ankamon/filemanager).
         header('X-Auth-User: ' . $user['username']);
         return ['ok' => true];
     }

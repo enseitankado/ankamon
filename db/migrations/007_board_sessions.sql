@@ -1,5 +1,5 @@
 -- Tahta oturumları: greeter (lightdm) loglarından çıkarılan gerçek kullanıcı oturum açma/kapama
--- kayıtları (bkz. worker/tihamon/tasks/board_sessions.py). logs tablosunda satır kimliği yoktur
+-- kayıtları (bkz. worker/ankamon/tasks/board_sessions.py). logs tablosunda satır kimliği yoktur
 -- (hypertable, PK yok); worker bu yüzden task_cursors ile "buraya kadar işlendi" zaman damgasını
 -- tutar, aynı satırı iki kez işlemez.
 --
