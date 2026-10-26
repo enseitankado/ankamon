@@ -1,6 +1,6 @@
 /**
  * Giriş ekranında logo seçim galerisi (geçici: logo seçilince kaldırılacak).
- * 20 aday (hepsi anka kuşlu) 4 sütunda; tıklanan "select" olayıyla bildirilir, seçim tarayıcıda hatırlanır.
+ * Adaylar (hepsi anka kuşlu) 4 sütunda; tıklanan "select" olayıyla bildirilir, seçim tarayıcıda hatırlanır.
  */
 qx.Class.define("ankamon.ui.LogoGallery", {
   extend: qx.ui.container.Composite,
