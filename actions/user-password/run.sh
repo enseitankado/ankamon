@@ -1,11 +1,25 @@
 set -u
 
 # Kullanıcı adları API'de action.json "pattern" ile doğrulandı; burada yine tek tek denetlenir. Parola
-# yalnız ortam değişkeninde gelir (betik dosyasına gömülü, komut satırında görünmez) ve chpasswd'ye
-# standart girdiden verilir; hiçbir yere yazdırılmaz. etapadmin/root için ayrı yetkiyi API denetler.
+# yalnız ortam değişkeninde gelir (betik dosyasına gömülü, komut satırında görünmez), hiçbir yere
+# yazdırılmaz. etapadmin/root için ayrı yetkiyi API denetler.
+#
+# Düz "chpasswd" ETAP'ta çalışmaz: PAM zinciri (common-password: pam_script + pam_unix use_authtok)
+# etkileşimsiz değişikliği "Yetkilendirme anahtarı manipülasyon hatası" ile reddeder. Bu yüzden parola
+# burada SHA-512 ile özetlenir (girdi stdin'den) ve "chpasswd -e" ile yazılır — PAM'e uğramaz;
+# ETAP'ın pam_script'inin parola kancası yok (yalnız oturum aç/kapa), atlanan bir eşitleme olmaz.
 ADLAR=$(printf '%s' "${KULLANICILAR:-}" | tr ',' ' ')
 [ -n "$(printf '%s' "$ADLAR" | tr -d ' ')" ] || { echo "Kullanıcı verilmedi." >&2; exit 2; }
 [ -n "${PAROLA:-}" ] || { echo "Parola verilmedi." >&2; exit 2; }
+if command -v openssl >/dev/null 2>&1; then
+    OZET=$(printf '%s\n' "$PAROLA" | openssl passwd -6 -stdin 2>/dev/null)
+elif command -v mkpasswd >/dev/null 2>&1; then
+    OZET=$(printf '%s\n' "$PAROLA" | mkpasswd -m sha-512 --stdin 2>/dev/null)
+fi
+case "${OZET:-}" in
+    '$6$'*) ;;
+    *) echo "Parola özetlenemedi (tahtada openssl ya da mkpasswd yok)." >&2; exit 3 ;;
+esac
 
 ayarlanan=0
 atlanan=0
@@ -31,7 +45,7 @@ for U in $ADLAR; do
         hata=$((hata + 1))
         continue
     fi
-    if out=$(printf '%s:%s\n' "$U" "$PAROLA" | chpasswd 2>&1); then
+    if out=$(printf '%s:%s\n' "$U" "$OZET" | chpasswd -e 2>&1); then
         echo "✓ $U: parola ayarlandı"
         ayarlanan=$((ayarlanan + 1))
     else
