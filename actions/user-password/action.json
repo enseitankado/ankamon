@@ -1,0 +1,16 @@
+{
+  "title": "Kullanıcı parolası ayarla",
+  "description": "Tahtadaki yerel kullanıcı hesaplarının (Linux oturum) parolasını ayarlar; tüm seçili hesaplara aynı parola verilir. Hesabın açık oturumu kapanmaz. Tahtada olmayan kullanıcı atlanır; sistem hesapları (UID 1000'in altı) değiştirilmez. Yönetici hesapları etapadmin ve root için ayrı yetki gerekir (Kullanıcılar ▸ yetkiler). Dikkat: Ankamon tahtalara root ile bağlanır; root parolası değişen tahtaya Ayarlar'daki SSH parolası da aynı yapılmadıkça erişilemez. Samba parolası değişmez.",
+  "category": "Kullanıcılar",
+  "feature": "boards.passwords",
+  "confirm": true,
+  "timeout": 120,
+  "params": [
+    {"key": "KULLANICILAR", "label": "Kullanıcı adları (boşluk ya da virgülle)", "type": "text", "default": "",
+     "required": true,
+     "pattern": "^[a-z_][a-z0-9_.-]{0,31}([ ,]+[a-z_][a-z0-9_.-]{0,31})*[ ,]*$",
+     "pattern_error": "kullanıcı adları küçük harf, rakam, _ . - içerebilir; boşluk ya da virgülle ayrılır"},
+    {"key": "PAROLA", "label": "Yeni parola", "type": "password", "required": true,
+     "pattern": "^.{1,128}$", "pattern_error": "en çok 128 karakter olmalı"}
+  ]
+}

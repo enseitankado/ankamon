@@ -84,7 +84,7 @@ qx.Class.define("ankamon.page.Network", {
     this.__table = this._createTable(this.__columns, { checkable: true, storageKey: "network.columns", model: this.__model });
     // Servis/paylaşım (alt) satırları temaya uyumlu farklı zeminle (bkz. ui.table.GroupRowRenderer).
     this.__table.setDataRowRenderer(new ankamon.ui.table.GroupRowRenderer(row => typeof row[0] !== "number"));
-    // "Durum" sütunu: çevrim içi cihazın soluna küçük yeşil yuvarlak (bkz. ui.table.StatusRenderer).
+    // "Durum" sütunu: çevrim içi yeşil, çevrim dışı kırmızı (bkz. ui.table.StatusRenderer).
     // Sütun indeksi: id + onay kutusu (2) + "exp" (0) + "status" (1) = 3.
     this.__table.getTableColumnModel().setDataCellRenderer(3, new ankamon.ui.table.StatusRenderer());
     // "Cihaz türü" hücresine türe özgü minik ikon (bkz. ui.table.DeviceTypeRenderer).

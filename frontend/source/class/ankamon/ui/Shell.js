@@ -111,7 +111,7 @@ qx.Class.define("ankamon.ui.Shell", {
     ICON: {
       dashboard: "◈", boards: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
-      info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", bulk: "⇄", wakeScreen: "☀", cast: "⇪", logout: "⏏", lock: "🔒", diagnose: "⚕", system: "⚒", diskusage: "⛁", software: "⬢",
+      info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", bulk: "⇄", wakeScreen: "☀", cast: "⇪", logout: "⏏", lock: "🔒", password: "🔑", diagnose: "⚕", system: "⚒", diskusage: "⛁", software: "⬢",
       network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "⚠"
     },
 

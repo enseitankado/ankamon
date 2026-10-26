@@ -181,7 +181,7 @@ qx.Class.define("ankamon.page.Ahenk", {
           lines.push("Bu tahtada henüz Ahenk kontrolü yapılmadı.");
         }
         return lines.join("\n");
-      }, info => (info.value === "Çevrim içi" ? "#2fa84a" : "#9aa0a6"));
+      }, info => ankamon.ui.table.StatusRenderer.colorOf(info.value));
     },
 
     /** "Son kontrol" gerçek zamana göre sıralanır (metin "3 dk önce" değil); sıralama kullanıcıya kaydedilir. */

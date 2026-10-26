@@ -136,11 +136,24 @@ final class JobsApi
                 throw ApiError::forbidden();
             }
         } elseif ($type === 'accounts') {
-            if (!Auth::can($user, 'boards.login') && !Auth::can($user, 'boards.backup')) {
+            // Hesap listesi: Oturum aç, Yedekle, Kullanıcı sil ve Parola ayarla pencerelerini besler.
+            $any = array_filter(['boards.login', 'boards.backup', 'boards.users', 'boards.passwords'],
+                static fn(string $f) => Auth::can($user, $f));
+            if (!$any) {
                 throw ApiError::forbidden();
             }
         } elseif (!Auth::can($user, $feature)) {
             throw ApiError::forbidden();
+        }
+        // Parola ayarlama: tahtanın yönetici hesapları (etapadmin, root) ayrı yetki ister — sağ menü penceresi,
+        // Komut çalıştır listesi ya da doğrudan API, hangi yoldan gelirse gelsin (bkz. actions/user-password).
+        if ($type === 'action' && $params['action'] === 'user-password') {
+            $names = preg_split('/[\s,]+/', strtolower((string) $params['values']['KULLANICILAR']), -1, PREG_SPLIT_NO_EMPTY);
+            foreach (self::ADMIN_ACCOUNTS as $account) {
+                if (in_array($account, $names, true) && !Auth::can($user, "boards.passwords.$account")) {
+                    throw ApiError::forbidden("$account parolasını ayarlama yetkiniz yok.");
+                }
+            }
         }
 
         $boardIds = array_values(array_unique(array_map('intval', (array) $request->input('board_ids', []))));
@@ -182,6 +195,9 @@ final class JobsApi
 
     /** "Kullanıcı sil" ile asla silinmeyen tahta hesapları (bkz. actionJob, actions/user-delete/run.sh). */
     private const UNDELETABLE_USERS = ['etapadmin', 'root'];
+
+    /** Parolası ayrı yetkiyle ("boards.passwords.<hesap>") ayarlanabilen tahta hesapları (bkz. create). */
+    private const ADMIN_ACCOUNTS = ['etapadmin', 'root'];
 
     private function actionJob(Request $request): array
     {

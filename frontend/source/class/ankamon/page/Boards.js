@@ -107,6 +107,9 @@ qx.Class.define("ankamon.page.Boards", {
     // storageKey: sütun genişliği + görünürlüğü localStorage'da kalıcı olur, sütun görünürlüğü
     // menüsü açılır (bkz. Base.js _createTable).
     this.__table = this._createTable(this.__columns, { checkable: true, storageKey: "boards.columns" });
+    // "Durum" sütunu: Çevrimiçi yeşil, Kapalı kırmızı (bkz. ui.table.StatusRenderer).
+    this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "status"),
+      new ankamon.ui.table.StatusRenderer());
     // Hiç tahta işaretli değilken tekli/çoklu işlem düğmeleri (Düzenle, Sil, Web terminal, İşlem
     // çalıştır, Kapat, Uyandır) devre dışı kalır; Düzenle yalnız tam 1 işaretliyken etkinleşir;
     // diğerleri 1 ya da daha fazla işaretli olunca etkinleşir — bkz. __updateActionState.

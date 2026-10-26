@@ -653,6 +653,11 @@ qx.Class.define("ankamon.ui.BoardOps", {
             (sessionOps ? sessionOps.query(online) : this.__job({ type: "whoami", board_ids: online.map(b => b.id) }, "Oturumları sorgula")));
         }
         sessionHistory(sessions);
+        // Parola ayarla…: bir ya da birçok hesaba ortak parola; etapadmin/root ayrı bölümde, kendi
+        // parolasıyla ve ayrı yetkiyle (bkz. setPasswords; işi hazır işlem "user-password" yapar).
+        if (can("boards.passwords")) {
+          subAdd(sessions, ICON.password, "Parola ayarla…" + count, () => this.setPasswords(online, user));
+        }
         // Kullanıcı sil…: hesap(lar) seçilir, dosyaları silme varsayılan açık (bkz. deleteUsers; işi
         // hazır işlem "user-delete" yapar — Komut çalıştır listesinde de var).
         if (can("boards.users")) {
@@ -779,6 +784,217 @@ qx.Class.define("ankamon.ui.BoardOps", {
           type: "action", action: "user-delete", board_ids: boards.map(b => b.id),
           values: { KULLANICILAR: names.join(" "), DOSYALAR: files ? "tum" : "koru" }
         }, `Kullanıcı sil — ${names.join(", ")}`);
+      });
+    },
+
+    /**
+     * Kullanıcılar ▸ Parola ayarla…: seçili (çevrimiçi) tahtalardaki hesaplar tek listede (bkz. deleteUsers);
+     * işaretlenen hesaplara ortak bir parola verilir. Tahtanın yönetici hesapları (etapadmin, root) bu
+     * listede YOKTUR — gözden kaçıp öğrenci hesaplarıyla aynı parolayı almasınlar diye ayrı bir bölümde,
+     * varsayılan kapalı, her biri kendi parolasıyla ve kendi yetkisiyle ("boards.passwords.<hesap>")
+     * ayarlanır. Her parola iki kutuya yazılır; sonunda onay alınır. Her parola grubu ayrı bir görevdir
+     * (hazır işlem "user-password"; parola görev bitince sunucudan silinir, denetim kaydına maskeli yazılır).
+     */
+    async setPasswords(boards, user) {
+      if (!boards.length) {
+        ankamon.ui.Dialog.alert("Çevrimiçi tahta yok.");
+        return;
+      }
+      const esc = qx.bom.String.escape;
+      const can = feature => user.is_admin || user.features.includes(feature);
+      const ADMIN = ["etapadmin", "root"];
+      const where = boards.length > 1 ? `${boards.length} tahta` : esc(boards[0].label || boards[0].hostname || boards[0].ip);
+      const win = ankamon.ui.Dialog.window(`Parola ayarla — ${where}`, 520);
+
+      // Çift kutulu parola girişi: iki kutu ve anlık eşleşme notu. check() → hata metni ya da null.
+      const pairs = [];
+      const pairBox = () => {
+        const box = new qx.ui.container.Composite(new qx.ui.layout.Grid(8, 6));
+        box.getLayout().setColumnFlex(1, 1);
+        const first = new qx.ui.form.PasswordField().set({ placeholder: "Yeni parola", liveUpdate: true });
+        const second = new qx.ui.form.PasswordField().set({ placeholder: "Yeni parola (tekrar)", liveUpdate: true });
+        const note = new qx.ui.basic.Label("").set({ rich: true });
+        box.add(new qx.ui.basic.Label("Parola:"), { row: 0, column: 0 });
+        box.add(first, { row: 0, column: 1 });
+        box.add(new qx.ui.basic.Label("Tekrar:"), { row: 1, column: 0 });
+        box.add(second, { row: 1, column: 1 });
+        box.add(note, { row: 2, column: 1 });
+        const pair = {
+          box, first, second,
+          value: () => first.getValue() || "",
+          check() {
+            const a = first.getValue() || "";
+            const b = second.getValue() || "";
+            if (!a) {
+              return "Parola boş.";
+            }
+            if (a.length > 128) {
+              return "Parola en çok 128 karakter olabilir.";
+            }
+            // Sunucu baştaki/sondaki boşlukları kırpar; kullanıcı bilmeden farklı bir parola almasın.
+            if (a !== a.trim()) {
+              return "Parola boşlukla başlayıp bitemez.";
+            }
+            if (/[\x00-\x1f\x7f]/.test(a)) {
+              return "Parola denetim karakteri içeremez.";
+            }
+            return a === b ? null : "İki kutudaki parolalar aynı değil.";
+          },
+          showNote() {
+            const err = (first.getValue() || second.getValue()) ? this.check() : null;
+            note.setValue(err ? `<span style="color:#c42b1c">${esc(err)}</span>`
+              : first.getValue() ? '<span style="color:#2fa84a">✓ Parolalar eşleşiyor</span>' : "");
+          }
+        };
+        [first, second].forEach(f => f.addListener("changeValue", () => {
+          pair.showNote();
+          update();
+        }));
+        pairs.push(pair);
+        return pair;
+      };
+
+      // 1) Kullanıcı hesapları: süzme kutusu + işaretlenebilir liste + ortak parola.
+      const status = new qx.ui.basic.Label("Hesaplar yükleniyor…").set({ rich: true, wrap: true, textColor: "app-muted" });
+      win.add(status);
+      const filter = new qx.ui.form.TextField().set({ placeholder: "Süz… (kullanıcı adı ya da tam ad)", liveUpdate: true });
+      const all = new qx.ui.form.CheckBox("Görünenlerin tümü");
+      const top = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" }));
+      top.add(filter, { flex: 1 });
+      top.add(all);
+      win.add(top);
+      const list = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
+      const scroll = new qx.ui.container.Scroll(list).set({ height: 60 });
+      win.add(scroll, { flex: 1 });
+      const users = pairBox();
+      win.add(users.box);
+
+      // 2) Yönetici hesapları: yalnız yetkisi olanlar; her biri ayrı onay kutusu ve ayrı çift kutulu parola.
+      const admins = ADMIN.filter(name => can("boards.passwords." + name)).map(name => {
+        const group = new qx.ui.groupbox.GroupBox(name === "root" ? "⚠ root (sistem yöneticisi)" : "⚠ etapadmin (tahtanın yönetici hesabı)")
+          .set({ layout: new qx.ui.layout.VBox(6) });
+        const box = new qx.ui.form.CheckBox(`<b>${name}</b> parolasını da ayarla (ayrı parola)`).set({ rich: true });
+        group.add(box);
+        if (name === "root") {
+          group.add(new qx.ui.basic.Label('<span style="color:#c42b1c">Ankamon tahtalara root ile bağlanır. root parolası ' +
+            "değişen tahtaya, Ayarlar ▸ Tahta erişimi'ndeki SSH parolası da aynı yapılmadıkça erişilemez.</span>")
+            .set({ rich: true, wrap: true }));
+        }
+        const pair = pairBox();
+        pair.box.setVisibility("excluded");
+        group.add(pair.box);
+        box.addListener("changeValue", e => {
+          pair.box.setVisibility(e.getData() ? "visible" : "excluded");
+          update();
+          qx.ui.core.queue.Manager.flush(); // pencere uzadı/kısaldı: ekranda kalsın
+          win.center();
+        });
+        win.add(group);
+        return { name, box, pair };
+      });
+
+      // Düğme neden kapalı: eksik/hatalı olan her şey düğmelerin üstünde, canlı.
+      const problems = new qx.ui.basic.Label("").set({ rich: true, wrap: true });
+      win.add(problems);
+      const apply = new qx.ui.form.Button("Parolayı ayarla").set({ enabled: false });
+      ankamon.ui.Dialog.buttons(win, [apply]);
+      const boxes = [];
+      const chosen = () => boxes.filter(b => b.getValue()).map(b => b.getModel());
+      // Bir şey seçildiyse ve seçilen her grubun parolası geçerliyse etkin.
+      const errors = () => {
+        const out = [];
+        const names = chosen();
+        if (names.length && users.check()) {
+          out.push("Kullanıcılar: " + users.check());
+        }
+        admins.filter(a => a.box.getValue()).forEach(a => {
+          const err = a.pair.check();
+          if (err) {
+            out.push(`${a.name}: ${err}`);
+          } else if (names.length && a.pair.value() === users.value()) {
+            // Gözden kaçmaya karşı: yönetici hesabı öğrenci hesaplarıyla aynı parolayı alamaz.
+            out.push(`${a.name}: parolası kullanıcı hesaplarınınkiyle aynı olamaz.`);
+          }
+        });
+        if (!names.length && !admins.some(a => a.box.getValue())) {
+          out.push("Parolası ayarlanacak bir hesap seçin.");
+        }
+        return out;
+      };
+      const update = () => {
+        users.box.setEnabled(boxes.some(b => b.getValue()));
+        const errs = errors();
+        apply.setEnabled(!errs.length);
+        problems.setValue(errs.map(e => `<span style="color:#c42b1c">• ${esc(e)}</span>`).join("<br>"));
+      };
+      win.open();
+
+      const results = await Promise.allSettled(boards.map(b => this.__accounts(b)));
+      const merged = new Map();
+      results.forEach(r => (r.status === "fulfilled" ? r.value : []).forEach(acc => {
+        const hit = merged.get(acc.name) || { acc, n: 0 };
+        hit.n++;
+        merged.set(acc.name, hit);
+      }));
+      const failed = results.filter(r => r.status === "rejected").length;
+      [...merged.values()].filter(({ acc }) => !ADMIN.includes(acc.name)).forEach(({ acc, n }) => {
+        const label = (acc.full_name && acc.full_name !== acc.name ? `${esc(acc.full_name)} (${esc(acc.name)})` : esc(acc.name)) +
+          (boards.length > 1 ? ` <span style="opacity:.7">— ${n}/${boards.length} tahtada</span>` : "");
+        const box = new qx.ui.form.CheckBox(label).set({ model: acc.name, rich: true });
+        box.addListener("changeValue", update);
+        box.setUserData("search", `${acc.name} ${acc.full_name || ""}`.toLocaleLowerCase("tr"));
+        boxes.push(box);
+        list.add(box);
+      });
+      const visible = () => boxes.filter(b => b.getVisibility() === "visible");
+      all.addListener("execute", () => visible().forEach(b => b.setValue(all.getValue())));
+      filter.addListener("changeValue", () => {
+        const q = (filter.getValue() || "").trim().toLocaleLowerCase("tr");
+        boxes.forEach(b => b.setVisibility(!q || b.getUserData("search").includes(q) ? "visible" : "excluded"));
+        all.setValue(visible().length > 0 && visible().every(b => b.getValue()));
+      });
+      // Liste en çok ~13 satır; pencere ekrandan uzun olamaz — yönetici bölümü açılınca küçülen liste olur
+      // (Scroll esnek: VBox fazlayı ondan keser).
+      const rootHeight = (qx.core.Init.getApplication().getRoot().getBounds() || { height: 800 }).height;
+      win.setMaxHeight(rootHeight - 20);
+      scroll.set({ minHeight: 96, height: Math.min(boxes.length * 24 + 8, 320) });
+      qx.ui.core.queue.Manager.flush();
+      win.center();
+      status.setValue((boxes.length
+        ? "Parolası ayarlanacak kullanıcıları işaretleyin; işaretlenenlerin hepsine aynı parola verilir."
+        : "Listelenecek kullanıcı hesabı bulunamadı" + (failed ? " (hesaplar okunamadı)." : ".")) +
+        (failed && boxes.length ? ` <span style="color:#c42b1c">${failed} tahtanın hesapları okunamadı.</span>` : ""));
+      update();
+
+      apply.addListener("execute", async () => {
+        const errs = errors();
+        if (errs.length) {
+          ankamon.ui.Dialog.alert(errs.map(esc).join("<br>"));
+          return;
+        }
+        const names = chosen();
+        const picked = admins.filter(a => a.box.getValue());
+        const lines = [];
+        if (names.length) {
+          lines.push(`${names.length} kullanıcı (aynı parola): ` + names.map(esc).join(", "));
+        }
+        picked.forEach(a => lines.push(`<b style="color:#c42b1c">${a.name}</b> — ayrı parola` +
+          (a.name === "root" ? ' <span style="color:#c42b1c">(Ankamon\'un SSH erişimi etkilenir)</span>' : "")));
+        const ok = await ankamon.ui.Dialog.confirm(
+          `<b>${where}</b> üzerinde şu hesapların parolası değiştirilsin mi?<br><br>${lines.map(l => "• " + l).join("<br>")}` +
+          "<br><br>Açık oturumlar kapanmaz; yeni parola bir sonraki girişte geçerli olur.", "Parolayı ayarla");
+        if (!ok) {
+          return;
+        }
+        win.close();
+        const job = (accounts, password, caption) => this.__job({
+          type: "action", action: "user-password", board_ids: boards.map(b => b.id),
+          values: { KULLANICILAR: accounts.join(" "), PAROLA: password }
+        }, caption);
+        if (names.length) {
+          job(names, users.value(), `Parola ayarla — ${names.length > 3 ? names.length + " kullanıcı" : names.join(", ")}`);
+        }
+        picked.forEach(a => job([a.name], a.pair.value(), `Parola ayarla — ${a.name}`));
       });
     },
 
