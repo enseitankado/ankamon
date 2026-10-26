@@ -1,13 +1,14 @@
 /**
- * Anomaliler (Tahtalar altında): ağdaki bilgisayarlarda işletim sistemi, donanım ve kullanıcı
+ * Anomaliler (Tahtalar ▸ Bakım altında): ağdaki bilgisayarlarda işletim sistemi, donanım ve kullanıcı
  * davranışına dair sıra dışı durumlar. Veriyi worker'ın kuralları ön hesaplar (bkz.
- * worker/ankamon/anomaly, backend AnomaliesApi); ilk kural "Oturumsuz açık" (tahta 15 dk'dır açık,
- * oturum açılmamış).
+ * worker/ankamon/anomaly, backend AnomaliesApi). Kurallar: "Oturumsuz açık" (tahta 15 dk'dır açık,
+ * oturum açılmamış), "NTP eşitlenmemiş" (saat 15 dk'dır NTP ile eşitlenmiyor ya da sunucudan sapmış).
  *
- * Üç sekme, tek veri (sayfa /anomalies'i dönemle çeker, sekmelere verir):
+ * Dört sekme; ilk üçü tek veri (sayfa /anomalies'i dönemle çeker, sekmelere verir):
  *  - "Anlık" (ui.anomaly.Live): şu an süren anomaliler (dönemden bağımsız).
  *  - "Geçmiş" (ui.anomaly.History): dönemle örtüşen tüm kayıtlar, sütun süzgeçli.
  *  - "Tahta özeti" (ui.anomaly.Summary): tahta başına sayı/süre; çift tık → o tahtanın Geçmiş'i.
+ *  - "Tarama" (ui.anomaly.Scan): seçilen tahtalarda seçilen anomaliler o an yoklanır ("anomaly_scan" görevi).
  * Kayıtlar tahta silinse ya da logları silinse de kalır (bkz. 033_anomalies.sql).
  */
 qx.Class.define("ankamon.page.Anomalies", {
@@ -34,7 +35,8 @@ qx.Class.define("ankamon.page.Anomalies", {
     this.__live = new ankamon.ui.anomaly.Live(this);
     this.__history = new ankamon.ui.anomaly.History(this);
     this.__summary = new ankamon.ui.anomaly.Summary(this);
-    [this.__live, this.__history, this.__summary].forEach(tab => this.__tabs.add(tab));
+    this.__scan = new ankamon.ui.anomaly.Scan(this);
+    [this.__live, this.__history, this.__summary, this.__scan].forEach(tab => this.__tabs.add(tab));
     this._rememberTab(this.__tabs, "anomalies");
     this.add(this.__tabs, { flex: 1 });
 
@@ -57,6 +59,16 @@ qx.Class.define("ankamon.page.Anomalies", {
           : "Açılıştan beri oturum açılmadı";
         return after;
       }
+      if (a.kind === "ntp_unsynced") {
+        const parts = [];
+        if (d.unsynced) {
+          parts.push("Saat NTP ile eşitlenmemiş");
+        }
+        if (d.offset_max_s !== null && d.offset_max_s !== undefined && Math.abs(d.offset_max_s) > 1) {
+          parts.push(`sunucuya göre en çok ${Math.round(Math.abs(d.offset_max_s))} sn sapma`);
+        }
+        return parts.join("; ") || "Saat eşitlenmemiş";
+      }
       return "";
     }
   },
@@ -75,6 +87,7 @@ qx.Class.define("ankamon.page.Anomalies", {
     __live: null,
     __history: null,
     __summary: null,
+    __scan: null,
 
     async _refresh() {
       const days = this.__period.getSelection()[0].getModel();
@@ -88,6 +101,7 @@ qx.Class.define("ankamon.page.Anomalies", {
       this.__live.setData(rows.filter(a => a.ended_at === null), data.kinds);
       this.__history.setData(rows);
       this.__summary.setData(rows, from);
+      this.__scan.setKinds(data.kinds, data.last_scan_job);
     },
 
     /** Tahta özeti → o tahtanın Geçmiş'i (çift tık). */

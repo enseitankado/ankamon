@@ -10,17 +10,20 @@ Kapsam dışındaki eski kayıtlara dokunulmaz: kaynak veriler (loglar) silinse 
 
 İlk çalışmada (imleç yok) tüm geçmiş taranır (geçmişe dönük rapor); sonra her turda son gün ve
 sürmekte olan anomalilerin başından itibaren. Yeni kural: modülü yazıp RULES'a ekleyin.
+
+Kural ayrıca PROBE (tahtada çalışan kabuk parçası) ve evaluate(values, ctx) tanımlarsa Anomaliler ▸ Tarama'da
+seçilen tahtalarda anlık taranabilir (bkz. anomaly.scan).
 """
 
 import datetime
 import json
 import logging
 
-from . import no_login
+from . import no_login, ntp_unsynced
 
 log = logging.getLogger(__name__)
 
-RULES = [no_login]
+RULES = [no_login, ntp_unsynced]
 
 # Her turda yeniden hesaplanan geriye dönük pencere (geç gelen loglar/oturum kayıtları için).
 WINDOW = datetime.timedelta(days=1)
@@ -35,11 +38,13 @@ def run(conn) -> None:
             log.exception("Anomali kuralı çalışmadı: %s", rule.KIND)
 
 
-def _since(conn, kind: str) -> datetime.datetime:
+def _since(conn, rule) -> datetime.datetime:
+    kind = rule.KIND
     cursor = conn.execute("SELECT value FROM task_cursors WHERE name = %s", ("anomaly." + kind,)).fetchone()
     if not cursor:
         return _EPOCH  # ilk çalışma: tüm geçmiş
-    since = cursor["value"] - WINDOW
+    # Kural kendi penceresini verebilir (ör. ölçümler geç gelmez — her turda bir günü taramaya gerek yok).
+    since = cursor["value"] - getattr(rule, "WINDOW", WINDOW)
     oldest_open = conn.execute(
         "SELECT min(started_at) AS at FROM anomalies WHERE kind = %s AND ended_at IS NULL", (kind,)).fetchone()["at"]
     return min(since, oldest_open) if oldest_open else since
@@ -47,7 +52,7 @@ def _since(conn, kind: str) -> datetime.datetime:
 
 def _apply(conn, rule) -> None:
     kind = rule.KIND
-    found, scopes = rule.detect(conn, _since(conn, kind))
+    found, scopes = rule.detect(conn, _since(conn, rule))
     keep = {}
     for a in found:
         keep.setdefault(a["host"], []).append(a["started_at"])

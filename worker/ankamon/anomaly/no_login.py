@@ -88,3 +88,44 @@ def detect(conn, since):
         if cursor < end:
             add(cursor, end, detail, is_open=ongoing and not live_session)
     return found, scopes
+
+
+# --- Anlık tarama (bkz. anomaly.scan) ----------------------------------------------------------------------
+# Açık kullanıcı oturumları whoami ile aynı ölçütle (uid 1000 < uid < 60000 süreci olan kullanıcılar; kilitli
+# oturum da açık sayılır) ve açılıştan beri geçen süre.
+PROBE = r"""
+echo "users=$(LC_ALL=C ps -eo uid=,user:64= | awk '$1 > 1000 && $1 < 60000 { u[$2] = 1 } END { for (k in u) printf "%s ", k }')"
+echo "uptime=$(cut -d' ' -f1 /proc/uptime)"
+"""
+
+_LAST_LOGOUT = """
+SELECT extract(epoch FROM max(ended_at)) AS at FROM board_sessions
+WHERE lower(host) = lower(%s) AND ended_at IS NOT NULL
+"""
+
+
+def evaluate(values: dict, ctx: dict) -> dict:
+    """PROBE çıktısı → {"anomaly", "summary", "detail"}. Oturum yoksa boşta geçen süre: açılıştan ya da
+    (açılıştan sonraysa) son oturumun kapanışından beri (board_sessions)."""
+    users = values.get("users", "").split()
+    try:
+        uptime = float(values.get("uptime", ""))
+    except ValueError:
+        return {"anomaly": None, "summary": "Açık kalma süresi okunamadı", "detail": {}}
+    threshold = int(THRESHOLD.total_seconds() // 60)
+    if users:
+        return {"anomaly": False, "summary": "Oturum açık: " + ", ".join(sorted(users)),
+                "detail": {"users": sorted(users)}}
+    now = ctx["t1"]
+    idle_since, reason = now - uptime, "boot"
+    host = (ctx.get("board") or {}).get("hostname")
+    if host and ctx.get("conn") is not None:
+        row = ctx["conn"].execute(_LAST_LOGOUT, (host,)).fetchone()
+        if row and row["at"] is not None and float(row["at"]) > idle_since:
+            idle_since, reason = float(row["at"]), "logout"
+    idle_min = int((now - idle_since) // 60)
+    since = "açılıştan beri" if reason == "boot" else "son oturum kapandıktan sonra"
+    detail = {"reason": reason, "idle_min": idle_min, "threshold_min": threshold}
+    if idle_min >= threshold:
+        return {"anomaly": True, "summary": f"Oturum yok: {since} {idle_min} dk açık", "detail": detail}
+    return {"anomaly": False, "summary": f"Oturum yok, {since} {idle_min} dk (eşik {threshold} dk)", "detail": detail}

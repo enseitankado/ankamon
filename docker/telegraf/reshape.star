@@ -33,6 +33,8 @@ KEEP = {
     "node_time_seconds": True,
     "node_procs_running": True,
     "node_timex_offset_seconds": True,
+    # Çekirdeğin saat eşitleme bayrağı (1 = NTP ile eşitli) — Anomaliler "NTP eşitlenmemiş" kuralı.
+    "node_timex_sync_status": True,
 }
 
 KEEP_TAGS = ["board_id", "cpu", "mode", "device", "mountpoint", "fstype", "chip", "sensor", "type", "zone"]

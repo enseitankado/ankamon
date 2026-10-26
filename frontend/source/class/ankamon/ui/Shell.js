@@ -142,9 +142,11 @@ qx.Class.define("ankamon.ui.Shell", {
       { id: "diagnose", label: "Bakım", features: ["diagnose", "metrics"], parent: "boards", create: u => new ankamon.page.Maintenance(u),
         tabs: () => [{ key: "diagnose", label: "Bakım", feature: "diagnose" }, { key: "metrics", label: "Sensörler", feature: "metrics" }]
           .concat(ankamon.ext.Extensions.maintenanceTabs().map(t => ({ key: t.key, label: t.label, feature: t.feature }))) },
-      // Anomaliler: sıra dışı durumlar (ör. açık ama oturumsuz tahta) — anlık + geçmiş rapor (bkz. page.Anomalies).
-      { id: "anomalies", label: "Anomaliler", feature: "anomalies", parent: "boards", create: u => new ankamon.page.Anomalies(u),
-        tabs: ["Anlık", "Geçmiş", "Tahta özeti"].map(label => ({ key: label, label })) },
+      // Anomaliler: sıra dışı durumlar (ör. açık ama oturumsuz tahta, NTP eşitlenmemiş saat) — anlık + geçmiş
+      // rapor + seçilen tahtalarda tarama (bkz. page.Anomalies). Bakım'ın altında (kullanıcı isteği); Bakım
+      // kapalı kullanıcıda Tahtalar'ın altında (bkz. __createTree).
+      { id: "anomalies", label: "Anomaliler", feature: "anomalies", parent: "diagnose", create: u => new ankamon.page.Anomalies(u),
+        tabs: ["Anlık", "Geçmiş", "Tahta özeti", "Tarama"].map(label => ({ key: label, label })) },
       // Loglar Tahtalar'ın altında EN SONDA (kullanıcı isteği).
       { id: "logs", label: "Loglar", feature: "logs", parent: "boards", create: u => new ankamon.page.Logs(u),
         tabs: () => ankamon.ui.Shell.LOG_KINDS.map(kind => ({ key: kind.mode, label: kind.label })) },
@@ -268,9 +270,21 @@ qx.Class.define("ankamon.ui.Shell", {
       // üstlerinin altında PAGES'teki sabit sırayla durur; sıralanamaz.
       this.__nodes = [];
       const allowed = ankamon.ui.Shell.PAGES.filter(page => this.__allowed(page));
-      const nested = page => !!page.parent && allowed.some(p => p.id === page.parent);
-      this.__orderedPages(allowed.filter(page => !nested(page))).forEach(page => {
-        const node = this.__buildNode(page, allowed.filter(child => nested(child) && child.parent === page.id));
+      // Üst sayfa kullanıcıya kapalıysa bir üstündekinin altına (ör. Bakım kapalı → Anomaliler Tahtalar'ın
+      // altında); hiçbiri açık değilse kökte.
+      const parentOf = page => {
+        for (let id = page.parent; id;) {
+          if (allowed.some(p => p.id === id)) {
+            return id;
+          }
+          const up = ankamon.ui.Shell.PAGES.find(p => p.id === id);
+          id = up && up.parent;
+        }
+        return null;
+      };
+      const childrenOf = id => allowed.filter(child => parentOf(child) === id);
+      this.__orderedPages(allowed.filter(page => !parentOf(page))).forEach(page => {
+        const node = this.__buildNode(page, childrenOf);
         root.add(node);
         this.__nodes.push(node);
       });
@@ -340,8 +354,13 @@ qx.Class.define("ankamon.ui.Shell", {
       }
     },
 
-    /** Bir sayfanın ağaç düğümü: alt sayfaları varsa klasör (kendisine tıklamak yine sayfayı açar). */
-    __buildNode(page, children) {
+    /**
+     * Bir sayfanın ağaç düğümü: alt sayfaları varsa klasör (kendisine tıklamak yine sayfayı açar). Alt sayfalar
+     * sekme yapraklarından SONRA, kendi alt sayfalarıyla (iç içe — ör. Tahtalar ▸ Bakım ▸ Anomaliler).
+     * @param childrenOf {Function} sayfa id → ağaçta altında duracak sayfalar
+     */
+    __buildNode(page, childrenOf) {
+      const children = childrenOf(page.id);
       if (page.id === "network") {
         return this.__buildNetworkNode(page);
       }
@@ -363,7 +382,7 @@ qx.Class.define("ankamon.ui.Shell", {
         node.add(leaf);
       });
       if (children.length) {
-        children.forEach(child => node.add(this.__buildNode(child, [])));
+        children.forEach(child => node.add(this.__buildNode(child, childrenOf)));
       }
       if (children.length || tabs.length) {
         this.__rememberOpen(node, page.id);

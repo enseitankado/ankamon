@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import activity, db
 from ..executor import accounts, backup, cast, diagnose, display, hwfacts, session_probe, tools, whoami, wol
+from ..anomaly import scan as anomaly_scan_mod
 from ..executor.jobs import _action_dir, _board_access, _claim, _targets, _write_one, _write_results
 from . import stream
 
@@ -222,6 +223,35 @@ def _run_job(job) -> None:
                         _board_event(conn, job["id"], t["board_id"], "ok", "Açık kullanıcı oturumu yok (tahta giriş ekranında).")
                     if result["status"] == "ok":   # grid'in "Oturum" sütunu (kilidi `who` bilmez: None)
                         session_probe.store(conn, t["board_id"], result["output"], None)
+        elif job["type"] == "anomaly_scan":
+            # Anomaliler ▸ Tarama (bkz. anomaly/scan.py): seçilen kurallar seçilen tahtalarda anlık yoklanır.
+            # whoami/facts deseni: tahtalar PARALEL (dinamik eşzamanlılık); her iş parçacığı evaluate'in
+            # okumaları için kendi bağlantısını açar, job_targets'a yazmak ana iş parçacığında sırayla.
+            user, password = _board_access(conn)
+            if not password:
+                raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
+            kinds = list((job["params"] or {}).get("kinds") or [])
+            hostnames = {r["id"]: r["hostname"] for r in conn.execute(
+                "SELECT id, hostname FROM boards WHERE id = ANY(%s)", ([t["board_id"] for t in targets],)).fetchall()}
+
+            def anomaly_scan(t):
+                wconn = db.connect()
+                try:
+                    return anomaly_scan_mod.run(wconn, dict(t, hostname=hostnames.get(t["board_id"])), kinds, user, password)
+                except Exception as e:  # noqa: BLE001 — bir tahtanın hatası diğerlerini düşürmesin
+                    log.exception("anomali taraması: tahta %s", t["board_id"])
+                    return {"status": "failed", "rc": None, "output": f"Hata: {e}"}
+                finally:
+                    wconn.close()
+
+            n = whoami.dynamic_concurrency()
+            with ThreadPoolExecutor(max_workers=max(1, min(n, len(targets)))) as pool:
+                futures = {pool.submit(anomaly_scan, t): t for t in targets}
+                for future in as_completed(futures):
+                    t = futures[future]
+                    result = future.result()
+                    _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
+                    results[t["board_id"]] = result
         elif job["type"] == "facts":
             # "Bilgi kartı": tahta başına 60dk önbellek (bkz. hwfacts.CACHE_SECONDS) — önbellekte
             # taze bir değer varsa SSH'a hiç gidilmez, hemen o değer yazılır. Geri kalanlar whoami ile

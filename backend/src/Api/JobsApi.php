@@ -129,6 +129,8 @@ final class JobsApi
             // Yansıtma penceresindeki "Tahta ses düzeyi" kaydırıcısı: sesli yansıtma sürerken tahta çıkışının
             // düzeyi (asıl düzey cast_start'ta kaydedildi, cast_stop geri yükler — bkz. executor/cast.py).
             'cast_volume' => $this->castVolumeJob($request),
+            // Anomaliler ▸ Tarama (bkz. worker/ankamon/anomaly/scan.py): seçilen kurallar seçilen tahtalarda anlık.
+            'anomaly_scan' => $this->anomalyScanJob($request),
             default => throw ApiError::badRequest('Bilinmeyen görev türü.'),
         };
         if ($type === 'facts') {
@@ -271,6 +273,19 @@ final class JobsApi
         }
         $volume = max(0, min(100, (int) $volume));
         return ['cast', "Yansıtma ses düzeyi: %$volume", ['volume' => $volume], true];
+    }
+
+    /** Taranacak anomali türleri: yalnız anlık taranabilenler (AnomaliesApi::scannable). */
+    private function anomalyScanJob(Request $request): array
+    {
+        $known = AnomaliesApi::scannable();
+        $kinds = array_values(array_intersect(array_keys($known),
+            array_map('strval', (array) $request->input('kinds', []))));
+        if (!$kinds) {
+            throw ApiError::badRequest('En az bir anomali türü seçin.');
+        }
+        $labels = implode(', ', array_map(static fn(string $k) => $known[$k]['label'], $kinds));
+        return ['anomalies', "Anomali taraması: $labels", ['kinds' => $kinds], true];
     }
 
     /** Kullanıcı adı tahtada betiğe gömülür: loginJob ve worker accounts.USERNAME_RE ile AYNI kural. */

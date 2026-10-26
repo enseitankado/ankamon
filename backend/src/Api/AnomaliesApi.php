@@ -10,21 +10,36 @@ use Ankamon\Core\Request;
  * Anomaliler (Tahtalar ▸ Anomaliler): worker'ın kurallarla ön hesapladığı sıra dışı durum aralıkları
  * (bkz. db/migrations/033_anomalies.sql, worker/ankamon/anomaly). İstek başına hesap yapılmaz.
  *
- * Yanıt: {"kinds": {tür: {label, description}}, "anomalies": [{id, kind, board_id, board, host,
- * started_at, ended_at|null, detail}], "computed_at"} — sürenlerin TÜMÜ + [from, to] aralığıyla
+ * Yanıt: {"kinds": {tür: {label, description, scan}}, "anomalies": [{id, kind, board_id, board, host,
+ * started_at, ended_at|null, detail}], "computed_at", "last_scan_job"} — sürenlerin TÜMÜ + [from, to] aralığıyla
  * örtüşen bitmişler (epoch saniye). board: tahtanın güncel adı; tahta silindiyse kayıttaki ad.
  */
 final class AnomaliesApi
 {
-    /** Tür adları ve açıklamaları — arayüz metni tek yerde (worker yalnız kind yazar). */
+    /**
+     * Tür adları ve açıklamaları — arayüz metni tek yerde (worker yalnız kind yazar). scan: Anomaliler ▸
+     * Tarama'da seçilen tahtalarda anlık taranabilir (kuralın PROBE'u var — bkz. worker anomaly/scan.py).
+     */
     private const KINDS = [
         'no_login' => [
             'label' => 'Oturumsuz açık',
             'description' => 'Tahta en az 15 dakikadır açık ve kimse oturum açmamış (açılıştan beri ya da son oturum kapandıktan sonra).',
+            'scan' => true,
+        ],
+        'ntp_unsynced' => [
+            'label' => 'NTP eşitlenmemiş',
+            'description' => 'Tahtanın saati en az 15 dakikadır NTP sunucusuyla eşitlenmiyor (eşitleme kapalı, sunucuya ulaşılamıyor) ya da saati Ankamon sunucusundan 30 sn\'den fazla sapıyor.',
+            'scan' => true,
         ],
     ];
 
-    public function index(Request $request): array
+    /** Anlık taranabilen türler (JobsApi "anomaly_scan" doğrulaması). */
+    public static function scannable(): array
+    {
+        return array_filter(self::KINDS, static fn(array $k) => !empty($k['scan']));
+    }
+
+    public function index(Request $request, array $user): array
     {
         $now = time();
         $to = $request->queryInt('to', $now, 0, $now + 86400);
@@ -48,10 +63,17 @@ final class AnomaliesApi
         $computed = Db::value(
             "SELECT extract(epoch FROM max(value))::bigint FROM task_cursors WHERE name LIKE 'anomaly.%'"
         );
+        // Tarama sekmesi açılınca son taramanın sonuçlarını gösterir: kullanıcının kendi son taraması (görev
+        // ayrıntısını JobsApi::show yalnız başlatana ve yöneticiye verir); yöneticide herkesinki.
+        $lastScan = Db::value(
+            "SELECT max(id) FROM jobs WHERE type = 'anomaly_scan' AND (created_by = ? OR ?::boolean)",
+            [$user['id'], $user['is_admin'] ? 'true' : 'false']
+        );
         return [
             'kinds' => self::KINDS,
             'anomalies' => $rows,
             'computed_at' => $computed === null ? null : (int) $computed,
+            'last_scan_job' => $lastScan === null ? null : (int) $lastScan,
         ];
     }
 }
