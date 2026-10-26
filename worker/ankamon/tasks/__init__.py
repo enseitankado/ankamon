@@ -1,5 +1,6 @@
 """Periyodik görevler. Yeni görev: run(conn) tanımlayan bir modül ekleyip TASKS'a yazın."""
 
+from .. import anomaly
 from . import diagnose_schedule, board_identity, board_sessions, board_uptime, boards_from_logs, board_status, session_end, telegraf_targets
 
 # Sıra önemlidir: önce kayıt, sonra durum, oturumlar (board_status'ın güncellediği "online"a bakar),
@@ -15,11 +16,13 @@ from . import diagnose_schedule, board_identity, board_sessions, board_uptime, b
 # tekrar tetiklenmesi zararsızdır).
 # board_uptime: tahtaların açık aralıklarını loglardan artımlı çıkarır (Oturumlar zaman çizelgesindeki
 # kapalı saat gölgeleri için; dakikalık doğruluk yeter, hızlı döngüde değil).
+# anomaly: anomali kuralları (Tahtalar ▸ Anomaliler) — board_uptime ve session_end'in ardından (onların
+# güncellediği aralıklar/oturumlar üzerinden hesaplar; bkz. ankamon/anomaly).
 # diagnose_schedule: haftalık otomatik sorun tespiti — kaynaklar müsaitken görev kuyruğa yazar (bkz. o dosya).
 # session_end: tahtası yeniden erişilebilir olan "tahta çevrimdışı oldu" kapanışlarını tahtanın açılış günlüğüne
 # bakıp netleştirir (düzenli kapatma / ETAP otomatik kapanma / elektrik kesintisi …; bkz. o dosya).
 TASKS = [boards_from_logs, board_status, board_sessions, board_identity, telegraf_targets, board_uptime, session_end,
-         diagnose_schedule]
+         anomaly, diagnose_schedule]
 
 
 def _extension_tasks() -> list:

@@ -20,6 +20,7 @@ return [
     'taskmgr' => 'Görev yöneticisi: tahtadaki işlemleri, performansı, hizmetleri, başlangıç uygulamalarını ve oturumları canlı görme; işlem sonlandırma, öncelik, hizmet başlatma/durdurma, yeni görev çalıştırma (tahtada root yetkisiyle)',
     'filemanager' => 'Tahtanın tüm dosya sistemine (root) web üzerinden erişim — gezinme, indirme, yükleme',
     'boards.backup' => 'Tahtadaki bir hesabın ev dizinini (kişisel dosyalar dahil) yedekleyip indirme (sağ menü "Yedekle")',
+    'anomalies' => 'Anomaliler: tahtalardaki sıra dışı durumları (ör. açık ama oturum açılmamış tahta) anlık izleme ve geçmişe dönük raporlama',
     'diagnose' => 'Bakım (sorun tespiti): seçili tahtalarda donanım, disk sağlığı (SMART), sıcaklık ve sistem denetimi çalıştırma',
     'boards.users' => 'Tahtadaki kullanıcı hesaplarını silme, isteğe bağlı tüm dosyalarıyla (sağ menü "Kullanıcılar ▸ Kullanıcı sil…" ve hazır işlem "Kullanıcı sil") — geri alınamaz',
     'boards.login' =>'Tahtada seçilen hesapla parolasız oturum açma (sağ menü "Oturum aç" — açık oturum kapanır)',

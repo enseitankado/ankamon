@@ -18,6 +18,7 @@ return [
     'boards.backup' => 'boards',
     'boards.login' => 'boards',
     'boards.users' => 'boards',
+    'anomalies' => 'boards',
     'logs.manage' => 'logs',
     'logs.exclude' => 'logs',
     'sessions.manage' => 'logs',

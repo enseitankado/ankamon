@@ -112,7 +112,7 @@ qx.Class.define("ankamon.ui.Shell", {
       dashboard: "◈", boards: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
       info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", bulk: "⇄", wakeScreen: "☀", cast: "⇪", logout: "⏏", lock: "🔒", diagnose: "⚕", system: "⚒", diskusage: "⛁", software: "⬢",
-      network: "⇆", subnet: "▫", taskmgr: "☷"
+      network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "⚠"
     },
 
     // Uzaktan işlemler kaldırıldı; işlevi Tahtalar sayfasına ve ağaç sağ menülerine taşındı.
@@ -127,7 +127,10 @@ qx.Class.define("ankamon.ui.Shell", {
       { id: "boards", label: "Tahtalar", feature: "boards", create: u => new ankamon.page.Boards(u) },
       // parent: ağaçta o sayfanın düğümünün ALTINDA (kullanıcı isteği: tahtalarla ilgili sayfalar
       // "Tahtalar"ın altında). Üst sayfa kullanıcıya kapalıysa kökte gösterilir — bkz. __createTree.
-      { id: "sessions", label: "Oturumlar", feature: "logs", parent: "boards", create: u => new ankamon.page.Sessions(u) },
+      // Sekmeleri ağaçta da (kullanıcı isteği: "Kullanıcılar" zaman çizelgesi sol menüden açılsın); key =
+      // sekme etiketi (page.Sessions sekmelerinde userData "key" yok).
+      { id: "sessions", label: "Oturumlar", feature: "logs", parent: "boards", create: u => new ankamon.page.Sessions(u),
+        tabs: ["Oturumlar", "Kullanıcılar"].map(label => ({ key: label, label })) },
       // Bakım: "Bakım" (sorun tespiti) + "Sensörler" (Grafana) sekmeleri — bkz. page.Maintenance. features:
       // herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı
       // isteği); eski {page: "metrics"} bağlantıları __openPage'de buraya yönlenir. id "diagnose" kalır
@@ -139,6 +142,9 @@ qx.Class.define("ankamon.ui.Shell", {
       { id: "diagnose", label: "Bakım", features: ["diagnose", "metrics"], parent: "boards", create: u => new ankamon.page.Maintenance(u),
         tabs: [{ key: "diagnose", label: "Bakım", feature: "diagnose" }, { key: "metrics", label: "Sensörler", feature: "metrics" },
           { key: "ahenk", label: "Ahenk", feature: "diagnose" }] },
+      // Anomaliler: sıra dışı durumlar (ör. açık ama oturumsuz tahta) — anlık + geçmiş rapor (bkz. page.Anomalies).
+      { id: "anomalies", label: "Anomaliler", feature: "anomalies", parent: "boards", create: u => new ankamon.page.Anomalies(u),
+        tabs: ["Anlık", "Geçmiş", "Tahta özeti"].map(label => ({ key: label, label })) },
       // Loglar Tahtalar'ın altında EN SONDA (kullanıcı isteği).
       { id: "logs", label: "Loglar", feature: "logs", parent: "boards", create: u => new ankamon.page.Logs(u),
         tabs: () => ankamon.ui.Shell.LOG_KINDS.map(kind => ({ key: kind.mode, label: kind.label })) },

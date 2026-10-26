@@ -51,6 +51,8 @@ return [
     ['GET',    '/api/command-logs',      [Api\CommandLogApi::class, 'index'],  'logs'],
     ['GET',    '/api/board-sessions',    [Api\SessionsApi::class, 'index'],    'logs'],
     ['GET',    '/api/board-uptime',      [Api\UptimeApi::class, 'index'],      'logs'],
+    // Tahtalar ▸ Anomaliler (bkz. AnomaliesApi, worker/ankamon/anomaly).
+    ['GET',    '/api/anomalies',         [Api\AnomaliesApi::class, 'index'],   'anomalies'],
     ['DELETE', '/api/board-sessions',    [Api\SessionsApi::class, 'delete'],   'sessions.manage'],
     ['DELETE', '/api/board-hosts',       [Api\SessionsApi::class, 'deleteHost'], 'sessions.hosts'],
     ['GET',    '/api/logs/stats',        [Api\LogStatsApi::class, 'stats'],    'logs'],
