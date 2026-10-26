@@ -1,6 +1,6 @@
 # Ankamon
 
-Okuldaki akıllı tahtalar için merkezi log sunucusu, sensör izleme ve uzaktan yönetim merkezi.
+**Pardus İzleme ve Yönetim Merkezi** — okuldaki akıllı tahtalar için merkezi log sunucusu, sensör izleme ve uzaktan yönetim.
 [TiHA](https://github.com/enseitankado/tiha) ile hazırlanmış tahtaların karşı tarafıdır: tahtalar loglarını
 buraya gönderir, sensör verileri buradan okunur.
 

@@ -19,11 +19,13 @@ qx.Class.define("ankamon.ui.Login", {
       decorator: new qx.ui.decoration.Decorator().set({ radius: 10, width: 1, color: "app-border" })
     });
 
-    card.add(new qx.ui.basic.Label(ankamon.ui.Logo.svg(60)).set({ rich: true, textColor: "text" }));
-    card.add(new qx.ui.basic.Label("Akıllı tahta izleme ve yönetim merkezi").set({ textColor: "app-muted" }));
-    // Oturum açmadan görülen durum satırı: çevrim içi / çevrim dışı tahta ve son otomatik taramalarda
+    card.add(new qx.ui.basic.Label(ankamon.ui.Logo.svg(60)).set({ rich: true, textColor: "text", alignX: "center" }));
+    card.add(new qx.ui.basic.Label(ankamon.ui.Login.SLOGAN).set({ textColor: "app-muted", alignX: "center" }));
+    // Oturum açmadan görülen durum şeridi: çevrim içi / çevrim dışı tahta ve son otomatik taramalarda
     // acil sorunlu tahta sayısı (yalnız sayılar — bkz. backend LoginStatusApi).
-    this.__status = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true, visibility: "excluded" });
+    this.__status = new qx.ui.basic.Label("").set({
+      rich: true, wrap: true, allowGrowX: true, visibility: "excluded", textColor: "text", marginBottom: 6
+    });
     card.add(this.__status);
 
     this.__username = new qx.ui.form.TextField().set({ placeholder: "Kullanıcı adı" });
@@ -61,32 +63,39 @@ qx.Class.define("ankamon.ui.Login", {
   },
 
   statics: {
-    /** Durum maddelerinin simgeleri (24×24 çizgi SVG, rengi kutunun currentColor'ından). */
+    /** Giriş ekranındaki slogan (logonun altında). */
+    SLOGAN: "Pardus İzleme ve Yönetim Merkezi",
+
+    /** Sorun hücresinin ince çizgi simgeleri (24×24, rengi currentColor'dan). */
     ICON: {
-      online: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M8.5 10l2.5 2.5 4.5-5"/>',
-      offline: '<path d="M12 3v8"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/>',
-      urgent: '<path d="M12 3.5L2.5 20h19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/>',
-      ok: '<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>'
+      ok: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+      urgent: '<path d="M12 4.5L3 19.5h18z"/><path d="M12 10.5v4"/><path d="M12 17.2v.1"/>'
     },
 
     /**
-     * Giriş ekranı durum maddesi (alt alta, belirgin): renkli zeminde simge + büyük sayı + açıklama,
-     * isteğe bağlı küçük alt satır. count null ise sayı gösterilmez (ör. "Acil sorun yok"). Renkler yarı saydam zemin + temadan gelen yazı rengiyle açık/koyu
-     * temalarda okunur kalır.
+     * Durum şeridinin bir hücresi: üstte küçük renk noktası (ya da ince simge) + sayı, altta soluk küçük
+     * açıklama. Yazı temanın rengini alır; renk yalnız nokta/simgede (ve acil sorunda sayıda) — narin
+     * görünüm, açık/koyu temalarda okunur.
      */
-    statusItem(color, icon, count, label, sub, title) {
+    statusCell(color, count, label, title, icon) {
       const esc = qx.bom.String.escape;
-      return `<div title="${esc(title)}" style="display:flex;align-items:center;gap:12px;padding:8px 12px;` +
-        `margin:0 0 8px;border-radius:8px;background:${color}14;border:1px solid ${color}40">` +
-        `<span style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:34px;` +
-        `height:34px;border-radius:8px;background:${color};color:#fff">` +
-        `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ` +
-        `stroke-linecap="round" stroke-linejoin="round">${icon}</svg></span>` +
-        `<span style="line-height:1.25">` +
-        (count === null ? "" : `<b style="font-size:20px;color:${color};margin-right:6px">${count}</b>`) +
-        `<span style="font-size:14px${count === null ? `;font-weight:bold;color:${color}` : ""}">${esc(label)}</span>` +
-        (sub ? `<br><span style="font-size:11px;opacity:.7">${esc(sub)}</span>` : "") +
-        "</span></div>";
+      const mark = icon
+        ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" ` +
+          `stroke-linecap="round" stroke-linejoin="round">${icon}</svg>`
+        : `<span style="width:7px;height:7px;border-radius:50%;background:${color};box-shadow:0 0 0 3px ${color}26"></span>`;
+      return `<div title="${esc(title)}" style="flex:1 1 0;min-width:0;padding:9px 6px;text-align:center">` +
+        `<div style="display:flex;align-items:center;justify-content:center;gap:7px;height:22px">${mark}` +
+        (count === null ? "" : `<span style="font-size:19px;font-weight:500;line-height:1;` +
+          `font-variant-numeric:tabular-nums${icon ? `;color:${color}` : ""}">${count}</span>`) +
+        `</div><div style="font-size:11px;opacity:.6;margin-top:3px;white-space:nowrap">${esc(label)}</div></div>`;
+    },
+
+    /** Hücreleri ince çerçeveli tek şeritte, aralarında saç çizgisiyle; altında isteğe bağlı dipnot. */
+    statusStrip(cells, note) {
+      const line = "rgba(128,128,128,.22)";
+      return `<div style="display:flex;border:1px solid ${line};border-radius:10px">` +
+        cells.join(`<div style="flex:none;width:1px;margin:10px 0;background:${line}"></div>`) + "</div>" +
+        (note ? `<div style="font-size:10.5px;opacity:.5;text-align:center;margin-top:6px">${qx.bom.String.escape(note)}</div>` : "");
     }
   },
 
@@ -109,13 +118,12 @@ qx.Class.define("ankamon.ui.Login", {
       const S = ankamon.ui.Login;
       const when = d.scanned_at ? "son otomatik tarama: " + ankamon.util.Format.dateTime(d.scanned_at * 1000) : "";
       const urgent = d.urgent > 0;
-      this.__status.setValue(
-        S.statusItem("#1e8e3e", S.ICON.online, d.online, "tahta çevrim içi", "", "Şu an açık ve yanıt veren tahtalar") +
-        S.statusItem("#80868b", S.ICON.offline, d.offline, "tahta çevrim dışı", "", "Kapalı ya da yanıt vermeyen tahtalar") +
-        S.statusItem(urgent ? "#d93025" : "#1e8e3e", urgent ? S.ICON.urgent : S.ICON.ok, urgent ? d.urgent : null,
-          urgent ? "tahtada acil sorun" : "Acil sorun yok", when,
-          "Son otomatik sorun tespiti taramasında acil sorun bulunan tahta sayısı")
-      );
+      this.__status.setValue(S.statusStrip([
+        S.statusCell("#1e8e3e", d.online, "çevrim içi tahta", "Şu an açık ve yanıt veren tahtalar"),
+        S.statusCell("#9aa0a6", d.offline, "çevrim dışı tahta", "Kapalı ya da yanıt vermeyen tahtalar"),
+        S.statusCell(urgent ? "#d93025" : "#1e8e3e", urgent ? d.urgent : null, urgent ? "acil sorunlu tahta" : "acil sorun yok",
+          "Son otomatik sorun tespiti taramasında acil sorun bulunan tahta sayısı", urgent ? S.ICON.urgent : S.ICON.ok)
+      ], when));
       this.__status.show();
     },
 

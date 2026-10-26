@@ -3,7 +3,7 @@
   "info": {
     "name": "ankamon",
     "summary": "Ankamon web arayüzü",
-    "description": "Akıllı tahtalar için merkezi log, sensör ve uzaktan yönetim arayüzü.",
+    "description": "Pardus İzleme ve Yönetim Merkezi — akıllı tahtalar için merkezi log, sensör ve uzaktan yönetim arayüzü.",
     "license": "GPL-3.0",
     "version": "0.1.0"
   },
