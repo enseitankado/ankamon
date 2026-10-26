@@ -113,6 +113,7 @@ COPY --from=mediamtx --chmod=755 /mediamtx /opt/ankamon/mediamtx/mediamtx
 
 # Yapılandırmalar
 COPY docker/rootfs/nginx-default.conf /etc/nginx/http.d/default.conf
+COPY docker/rootfs/nginx-filemanager-proxy.conf /etc/nginx/filemanager-proxy.conf
 COPY docker/rootfs/multishell /var/www/multishell
 COPY docker/rootfs/screen /var/www/screen
 COPY docker/rootfs/cast /var/www/cast

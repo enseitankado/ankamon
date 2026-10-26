@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import posixpath
 import re
 import subprocess
 import time
@@ -25,6 +26,8 @@ import tornado.web
 
 from .. import activity, db
 from ..executor.jobs import _board_access
+from . import writes
+from .ownership import Fixer
 
 log = logging.getLogger("ankamon.filemanager")
 
@@ -180,6 +183,25 @@ class MountHandler(tornado.web.RequestHandler):
         self.write({"ok": True, "path": os.path.basename(res) + "/"})
 
 
+def _locate(fb_path: str):
+    """FileBrowser yolu ("/<bağlama dizini>/home/…") → (tahta id, tahtadaki yol, bu makinedeki yol)."""
+    name, _, rest = fb_path.lstrip("/").partition("/")
+    for board_id, path in _mount_paths.items():
+        if os.path.basename(path) == name:
+            _last_used[board_id] = time.monotonic()
+            remote = posixpath.normpath("/" + rest)
+            return board_id, remote, os.path.join(path, remote.lstrip("/"))
+    return None
+
+
+async def _access(board_id: int):
+    looked_up = await asyncio.to_thread(_lookup, board_id)
+    if looked_up is None or not looked_up[2]:
+        return None
+    board, ssh_user, password = looked_up
+    return {"ip": board["ip"], "user": ssh_user, "password": password}
+
+
 def _cleanup_stale() -> None:
     """Önceki süreçten kalan (çoğu zaman kopuk) bağları ve dizinleri temizler: ad eşlemesi
     (_mount_paths) yalnız bellekte tutulduğundan bunlar FileBrowser'da sahipsiz klasör olarak kalırdı."""
@@ -197,11 +219,20 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     os.makedirs(ROOT, exist_ok=True)
     _cleanup_stale()
-    app = tornado.web.Application([(r"/mount/(\d+)", MountHandler)])
-    app.listen(PORT, address="127.0.0.1")
+    fixer = Fixer(_access)
+    proxy = {"locate": _locate, "fixer": fixer}
+    # FileBrowser yazmaları (sahiplik düzeltmesi, bkz. writes.py) — yollar nginx'teki /filemanager/ ile aynı.
+    app = tornado.web.Application([
+        (r"/mount/(\d+)", MountHandler),
+        (r"/filemanager/api/resources", writes.ResourcesProxy, proxy),
+        (r"/filemanager/api/resources/(archive|unarchive)", writes.ResourcesProxy, proxy),
+    ])
+    # Düzenleyiciden kaydedilen dosyalar (PUT) gövdeyle gelir; büyük yüklemeler köprüden geçmez.
+    app.listen(PORT, address="127.0.0.1", max_body_size=256 * 1024 * 1024)
     log.info("dosya yöneticisi köprüsü 127.0.0.1:%d (boşta %d dk sonra ayrılır)", PORT, IDLE_MINUTES)
     loop = asyncio.get_event_loop()
     loop.create_task(_sweep())
+    loop.run_until_complete(writes.listen_uploads(_locate, fixer))
     loop.run_forever()
 
 
