@@ -1,6 +1,6 @@
 /**
  * Giriş ekranında logo seçim galerisi (geçici: logo seçilince kaldırılacak).
- * 10 aday 2 sütunda; tıklanan "select" olayıyla bildirilir, seçim tarayıcıda hatırlanır.
+ * 20 aday (hepsi anka kuşlu) 4 sütunda; tıklanan "select" olayıyla bildirilir, seçim tarayıcıda hatırlanır.
  */
 qx.Class.define("ankamon.ui.LogoGallery", {
   extend: qx.ui.container.Composite,
@@ -25,10 +25,10 @@ qx.Class.define("ankamon.ui.LogoGallery", {
     this.__tiles = ankamon.ui.Logos.LIST.map((L, i) => {
       const tile = new qx.ui.basic.Label(
         `<div style="font-size:11px;opacity:.65;margin-bottom:2px">${i + 1}. ${qx.bom.String.escape(L.name)}</div>` +
-        ankamon.ui.Logos.svg(i, 48)
+        ankamon.ui.Logos.svg(i, 44)
       ).set({ rich: true, padding: [6, 10], cursor: "pointer", textColor: "text" });
       tile.addListener("tap", () => this.setSelected(i));
-      grid.add(tile, { row: i >> 1, column: i & 1 });
+      grid.add(tile, { row: i >> 2, column: i & 3 });
       return tile;
     });
     this.add(grid);
