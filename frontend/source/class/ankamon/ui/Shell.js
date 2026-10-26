@@ -625,6 +625,8 @@ qx.Class.define("ankamon.ui.Shell", {
         this.__navPane.setVisibility(this.__navPane.isVisible() ? "excluded" : "visible");
       });
       header.add(fold);
+      // Logo simgesi: ekran çerçevesi başlık yazısının renginde (temaların koyu/mavi başlık zemininde seçilsin).
+      header.add(new qx.ui.basic.Label(ankamon.ui.Logo.icon(32, "currentColor")).set({ rich: true, textColor: "app-header-text" }));
       header.add(new qx.ui.basic.Label("Ankamon").set({ font: "app-title", textColor: "app-header-text" }));
       header.add(new qx.ui.core.Spacer(), { flex: 1 });
       header.add(new qx.ui.basic.Label(this.__user.full_name || this.__user.username).set({ textColor: "app-header-text" }));

@@ -19,9 +19,7 @@ qx.Class.define("ankamon.ui.Login", {
       decorator: new qx.ui.decoration.Decorator().set({ radius: 10, width: 1, color: "app-border" })
     });
 
-    // Logo (galeride seçilen aday; seçim kesinleşince galeri kalkar, logo sabitlenir).
-    const logo = new qx.ui.basic.Label("").set({ rich: true, textColor: "text" });
-    card.add(logo);
+    card.add(new qx.ui.basic.Label(ankamon.ui.Logo.svg(60)).set({ rich: true, textColor: "text" }));
     card.add(new qx.ui.basic.Label("Akıllı tahta izleme ve yönetim merkezi").set({ textColor: "app-muted" }));
     // Oturum açmadan görülen durum satırı: çevrim içi / çevrim dışı tahta ve son otomatik taramalarda
     // acil sorunlu tahta sayısı (yalnız sayılar — bkz. backend LoginStatusApi).
@@ -38,10 +36,6 @@ qx.Class.define("ankamon.ui.Login", {
     card.add(this.__message);
     card.add(this.__button);
     this.add(card);
-    const gallery = new ankamon.ui.LogoGallery();
-    gallery.addListener("select", e => logo.setValue(ankamon.ui.Logos.svg(e.getData(), 60)));
-    gallery.setSelected(ankamon.ui.LogoGallery.stored());
-    this.add(gallery);
 
     this.__button.addListener("execute", this.__submit, this);
     [this.__username, this.__password].forEach(field => {
