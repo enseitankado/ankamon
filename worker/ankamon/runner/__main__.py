@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import activity, db
 from ..executor import accounts, backup, cast, diagnose, display, hwfacts, session_probe, tools, whoami, wol
-from ..executor.jobs import ACTIONS_DIR, _board_access, _claim, _targets, _write_one, _write_results
+from ..executor.jobs import _action_dir, _board_access, _claim, _targets, _write_one, _write_results
 from . import stream
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -54,7 +54,7 @@ def _job_text(job) -> tuple[str, dict | None, int]:
     params = job["params"] or {}
     if job["type"] == "command":
         return params["command"], None, 120
-    action_dir = os.path.join(ACTIONS_DIR, params["action"])
+    action_dir = _action_dir(params["action"])  # çekirdek ya da eklenti (ext/<ad>/actions)
     with open(os.path.join(action_dir, "action.json"), encoding="utf-8") as f:
         timeout = int(json.load(f).get("timeout", 120))
     with open(os.path.join(action_dir, "run.sh"), encoding="utf-8") as f:
@@ -66,7 +66,7 @@ def _action_def(job) -> dict:
     """Hazır işlemin action.json tanımı (command görevlerinde boş)."""
     if job["type"] != "action":
         return {}
-    with open(os.path.join(ACTIONS_DIR, (job["params"] or {})["action"], "action.json"), encoding="utf-8") as f:
+    with open(os.path.join(_action_dir((job["params"] or {})["action"]), "action.json"), encoding="utf-8") as f:
         return json.load(f)
 
 
