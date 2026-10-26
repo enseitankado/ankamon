@@ -27,6 +27,16 @@ final class ExtensionsApi
         return ['extensions' => $out];
     }
 
+    /** Eklentilerin etkin/pasif durumu (ad → bool); 'user' erişimi — frontend sekmeleri buna göre gösterir. */
+    public function active(Request $request, array $user): array
+    {
+        $out = [];
+        foreach (Extensions::all() as $name => $ext) {
+            $out[$name] = Extensions::setting($name, 'enabled', true) !== false;
+        }
+        return ['active' => (object) $out];
+    }
+
     public function saveSettings(Request $request, array $user): array
     {
         $name = (string) $request->input('name');

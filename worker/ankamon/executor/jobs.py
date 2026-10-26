@@ -110,9 +110,21 @@ def _dispatch(conn, job, params, targets) -> dict[int, dict]:
     raise RuntimeError(f"Bilinmeyen görev türü: {job['type']}")
 
 
+def _action_dir(action_id: str) -> str:
+    """Hazır işlem dizini: önce çekirdek ACTIONS_DIR, sonra eklentiler (ext/<ad>/actions/<kimlik>)."""
+    core = os.path.join(ACTIONS_DIR, action_id)
+    if os.path.isdir(core):
+        return core
+    import glob
+    for ext in glob.glob("/opt/ankamon/ext/*/actions/" + action_id):
+        if os.path.isdir(ext):
+            return ext
+    return core
+
+
 def _run_action(hosts, user, password, params, on_result) -> dict[int, dict]:
     action_id = params["action"]
-    action_dir = os.path.join(ACTIONS_DIR, action_id)
+    action_dir = _action_dir(action_id)
     with open(os.path.join(action_dir, "action.json"), encoding="utf-8") as f:
         timeout = int(json.load(f).get("timeout", 120))
     with open(os.path.join(action_dir, "run.sh"), encoding="utf-8") as f:

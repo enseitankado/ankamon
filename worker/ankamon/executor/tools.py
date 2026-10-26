@@ -42,18 +42,23 @@ TOOLS = {
         "file": "eta-112.py",
         "remote_dir": "/opt/eta-112",
     },
-    # Ahenk kayıt/bağlantı teşhis aracı (hazır işlem "Ahenk kontrol", actions/ahenk-check). Sık güncellendiği
-    # için GitHub'daki son commit HER çalıştırmada denetlenir (tek küçük API isteği); dosya yalnız commit
-    # değişince indirilir, tahtaya da yalnız sha256 farklıysa kopyalanır.
-    "ahenk-debug": {
-        "title": "ahenk-debug",
-        "repo": "enseitankado/ahenk-debug",
-        "branch": "main",
-        "file": "ahenk_debug.py",
-        "remote_dir": "/opt/ahenk-debug",
-        "check_every_run": True,
-    },
 }
+
+
+# Eklentiler kendi dış araçlarını ext/<ad>/worker/tools.json ile ekleyebilir (çekirdek hiçbir eklentiyi
+# adıyla bilmez). Biçim: {"<araç-adı>": {title, repo, branch, file, remote_dir, check_every_run?}}.
+def _load_ext_tools() -> None:
+    import glob
+    for path in glob.glob("/opt/ankamon/ext/*/worker/tools.json"):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                for name, spec in (json.load(fh) or {}).items():
+                    TOOLS.setdefault(name, spec)
+        except (OSError, ValueError):
+            pass
+
+
+_load_ext_tools()
 
 _SSH_OPTS = [
     "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",

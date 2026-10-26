@@ -11,12 +11,39 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import activity, db
-from ..executor import accounts, ahenk, backup, cast, diagnose, display, hwfacts, session_probe, tools, whoami, wol
+from ..executor import accounts, backup, cast, diagnose, display, hwfacts, session_probe, tools, whoami, wol
 from ..executor.jobs import ACTIONS_DIR, _board_access, _claim, _targets, _write_one, _write_results
 from . import stream
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("ankamon.runner")
+
+
+def _load_job_done_hooks() -> dict:
+    """Eklentilerin iş-bitiş kancaları: ext/<ad>/worker/job_hooks.py içindeki JOB_DONE = {action_id: fn}.
+    fn(conn, board, user, password, job_id, events) — ilgili işlem 'ok' bitince çağrılır. Çekirdek hiçbir
+    eklentiyi adıyla bilmez; bir action id için kayıtlı callback varsa çalıştırır (ör. rapor okuyup yazma).
+    """
+    import glob
+    import importlib.util
+    import sys
+    hooks: dict = {}
+    for path in glob.glob("/opt/ankamon/ext/*/worker/job_hooks.py"):
+        worker_dir = os.path.dirname(path)
+        if worker_dir not in sys.path:
+            sys.path.insert(0, worker_dir)
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "ext_job_hooks_" + os.path.basename(os.path.dirname(worker_dir)), path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            hooks.update(getattr(mod, "JOB_DONE", {}) or {})
+        except Exception:
+            log.exception("eklenti iş-bitiş kancası yüklenemedi: %s", path)
+    return hooks
+
+
+_JOB_DONE_HOOKS = _load_job_done_hooks()
 
 JOB_THREADS = int(os.environ.get("RUNNER_JOB_THREADS", "8"))  # aynı anda çalışan görev
 POLL_SECONDS = 3
@@ -130,9 +157,14 @@ def _run_job(job) -> None:
                                     break
                             if result is None:
                                 result = stream.run(t, user, password, body=body, env=env, timeout=timeout, events=ev)
-                                # Ahenk kontrol: JSON rapor tahtada dosyada — okunup Bakım ▸ Ahenk tablosuna yazılır.
-                                if action == ahenk.ACTION and result["status"] == "ok":
-                                    ahenk.fetch_and_store(wconn, t, user, password, job["id"], ev)
+                                # İşlem bitiş kancaları (eklenti-farkında): bir eklenti worker'ı bir action id
+                                # için callback kaydettiyse 'ok' bitişte çalıştırılır (ör. rapor okuyup tabloya
+                                # yazma). Çekirdek hiçbir eklentiyi adıyla bilmez (bkz. _JOB_DONE_HOOKS).
+                                if result["status"] == "ok" and action in _JOB_DONE_HOOKS:
+                                    try:
+                                        _JOB_DONE_HOOKS[action](wconn, t, user, password, job["id"], ev)
+                                    except Exception:
+                                        log.exception("işlem bitiş kancası hatası: %s", action)
                     except Exception as e:  # tek tahtanın beklenmedik hatası diğerlerini durdurmasın
                         log.exception("görev #%s tahta %s", job["id"], t["board_id"])
                         ev.add("fail", f"Beklenmeyen hata: {e}")

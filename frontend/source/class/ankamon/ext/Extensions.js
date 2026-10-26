@@ -20,17 +20,26 @@ qx.Class.define("ankamon.ext.Extensions", {
   statics: {
     __handlers: {},
     __started: false,
+    __enabled: {},          // {eklenti-adı: etkin mi} — start()'ta GET /extensions/active'ten
+    __maintenanceTabs: [],  // eklentilerin Bakım sekmeleri (bkz. addMaintenanceTab)
 
     /**
-     * Oturum açıldığında bir kez (bkz. ankamon.Application). Bir eklentinin hatası ötekileri ve
-     * uygulamayı durdurmaz.
+     * Oturum açıldığında BİR KEZ, Shell oluşturulmadan ÖNCE (bkz. ankamon.Application): önce eklentilerin
+     * etkin/pasif durumu alınır, sonra her "ankamonext.<ad>.Extension" sınıfının init(context)'i çağrılır
+     * (sekme/kanca kaydı için; eklenti yalnız etkinse sekme kaydetmeli). Bir eklentinin hatası ötekileri
+     * ve uygulamayı durdurmaz.
      * @param context {Map} { user, app }
      */
-    start(context) {
+    async start(context) {
       if (this.__started) {
         return;
       }
       this.__started = true;
+      try {
+        this.__enabled = (await ankamon.io.Api.get("/extensions/active")).active || {};
+      } catch (e) {
+        this.__enabled = {}; // ulaşılamazsa hepsi etkin sayılır (enabled varsayılanı: evet)
+      }
       Object.keys(qx.Class.$$registry)
         .filter(name => /^ankamonext\.[A-Za-z0-9_]+\.Extension$/.test(name))
         .forEach(name => {
@@ -40,6 +49,22 @@ qx.Class.define("ankamon.ext.Extensions", {
             qx.log.Logger.error(this, `Eklenti başlatılamadı: ${name}: ${e}`);
           }
         });
+    },
+
+    /** @return {Boolean} eklenti etkin mi (varsayılan evet; yalnız açıkça false ise pasif). */
+    enabled(name) {
+      return this.__enabled[name] !== false;
+    },
+
+    /** Bir eklenti Bakım (Tahtalar ▸ Bakım) sayfasına sekme ekler: {key, label, feature, create(user)}.
+     * init() içinde yalnız enabled(ad) ise çağrılmalı. Hem sayfadaki sekme çubuğu hem sol ağaç bunu okur. */
+    addMaintenanceTab(spec) {
+      this.__maintenanceTabs.push(spec);
+    },
+
+    /** @return {Array} kayıtlı Bakım sekmesi tanımları ({key,label,feature,create}). */
+    maintenanceTabs() {
+      return this.__maintenanceTabs;
     },
 
     /** @param name {String} kanca adı  @param handler {Function} true dönerse olay işlendi sayılır */

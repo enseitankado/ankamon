@@ -14,7 +14,12 @@ final class Actions
     {
         $dir = getenv('ACTIONS_DIR') ?: '/app/actions';
         $actions = [];
-        foreach (glob($dir . '/*/action.json') ?: [] as $file) {
+        // Çekirdek işlemleri + eklenti işlemleri (ext/<ad>/actions/<kimlik>; çekirdek eklenti adlarını bilmez).
+        $files = array_merge(
+            glob($dir . '/*/action.json') ?: [],
+            glob(Extensions::dir() . '/*/actions/*/action.json') ?: []
+        );
+        foreach ($files as $file) {
             $action = json_decode((string) file_get_contents($file), true);
             if (!is_array($action)) {
                 error_log("ankamon: okunamayan işlem tanımı: $file");

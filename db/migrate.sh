@@ -19,6 +19,21 @@ for f in "$DB_DIR"/migrations/*.sql; do
     $PSQL -c "INSERT INTO schema_migrations (name) VALUES ('$name')"
 done
 
+# Eklenti göçleri: ext/<ad>/db/migrations/*.sql — çekirdek numaralarından bağımsız; schema_migrations'a
+# "ext:<ad>:<dosya>" olarak izlenir (çakışmasın diye). Eklentiler idempotent DDL (IF NOT EXISTS) yazmalı.
+for extmig in /opt/ankamon/ext/*/db/migrations; do
+    [ -d "$extmig" ] || continue
+    ext=$(basename "$(dirname "$(dirname "$extmig")")")
+    for f in "$extmig"/*.sql; do
+        [ -f "$f" ] || continue
+        name="ext:$ext:$(basename "$f")"
+        [ "$($PSQL -At -c "SELECT 1 FROM schema_migrations WHERE name = '$name'")" = "1" ] && continue
+        echo "eklenti göçü uygulanıyor: $name"
+        $PSQL -f "$f" > /dev/null
+        $PSQL -c "INSERT INTO schema_migrations (name) VALUES ('$name')"
+    done
+done
+
 $PSQL \
     -v grafana_password="$PG_GRAFANA_PASSWORD" \
     -v readonly_password="$PG_READONLY_PASSWORD" \

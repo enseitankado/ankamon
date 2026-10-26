@@ -140,8 +140,8 @@ qx.Class.define("ankamon.ui.Shell", {
       // key = sekmenin kimliği — sayfadaki sekmenin userData "key"i ya da etiketiyle AYNI olmalı; feature /
       // admin: o sekmenin yetkisi (sayfanın kendi sekme yetkisiyle aynı). Fonksiyon da olabilir (dinamik liste).
       { id: "diagnose", label: "Bakım", features: ["diagnose", "metrics"], parent: "boards", create: u => new ankamon.page.Maintenance(u),
-        tabs: [{ key: "diagnose", label: "Bakım", feature: "diagnose" }, { key: "metrics", label: "Sensörler", feature: "metrics" },
-          { key: "ahenk", label: "Ahenk", feature: "diagnose" }] },
+        tabs: () => [{ key: "diagnose", label: "Bakım", feature: "diagnose" }, { key: "metrics", label: "Sensörler", feature: "metrics" }]
+          .concat(ankamon.ext.Extensions.maintenanceTabs().map(t => ({ key: t.key, label: t.label, feature: t.feature }))) },
       // Anomaliler: sıra dışı durumlar (ör. açık ama oturumsuz tahta) — anlık + geçmiş rapor (bkz. page.Anomalies).
       { id: "anomalies", label: "Anomaliler", feature: "anomalies", parent: "boards", create: u => new ankamon.page.Anomalies(u),
         tabs: ["Anlık", "Geçmiş", "Tahta özeti"].map(label => ({ key: label, label })) },

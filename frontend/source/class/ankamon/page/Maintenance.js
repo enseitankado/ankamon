@@ -15,20 +15,21 @@ qx.Class.define("ankamon.page.Maintenance", {
     super(user, null);
     this._actions.exclude();
     this.__tabs = new qx.ui.tabview.TabView();
-    const add = (key, label, feature, Page) => {
+    const add = (key, label, feature, create) => {
       if (!this._can(feature)) {
         return;
       }
       const tab = new qx.ui.tabview.Page(label).set({ layout: new qx.ui.layout.Grow(), padding: 8 });
       tab.setUserData("key", key);
-      tab.setUserData("page", new Page(user));
+      tab.setUserData("page", create(user));
       tab.add(tab.getUserData("page"));
       this.__tabs.add(tab);
     };
-    add("diagnose", "Bakım", "diagnose", ankamon.page.Diagnose);
-    add("metrics", "Sensörler", "metrics", ankamon.page.Metrics);
-    // Ahenk kontrol sonuçları (hazır işlem "Ahenk kontrol" — bkz. page.Ahenk).
-    add("ahenk", "Ahenk", "diagnose", ankamon.page.Ahenk);
+    add("diagnose", "Bakım", "diagnose", u => new ankamon.page.Diagnose(u));
+    add("metrics", "Sensörler", "metrics", u => new ankamon.page.Metrics(u));
+    // Eklentiler Bakım'a sekme ekleyebilir (bkz. ankamon.ext.Extensions.addMaintenanceTab). Ahenk artık bir
+    // eklenti (ext/ankamon-ahenk) ve kendi init'inde etkinse bu sekmeyi kaydeder; burada yalnız yetki bakılır.
+    ankamon.ext.Extensions.maintenanceTabs().forEach(t => add(t.key, t.label, t.feature, t.create));
     this._rememberTab(this.__tabs, "maintenance"); // son seçili sekme (dinleyiciden önce: activate tetiklenmesin)
     this.__tabs.addListener("changeSelection", () => {
       const page = this.__current();

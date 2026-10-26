@@ -93,9 +93,6 @@ return [
     ['GET',    '/api/actions',           [Api\ActionsApi::class, 'index'],     'user'],
     ['GET',    '/api/diagnose',          [Api\DiagnoseApi::class, 'runs'],    'diagnose'],
     ['GET',    '/api/diagnose/{id}',     [Api\DiagnoseApi::class, 'show'],    'diagnose'],
-    // Bakım ▸ Ahenk: tahtaların son Ahenk kontrol raporları (hazır işlem actions/ahenk-check).
-    ['GET',    '/api/ahenk',             [Api\AhenkApi::class, 'index'],    'diagnose'],
-    ['GET',    '/api/ahenk/{id}',        [Api\AhenkApi::class, 'show'],     'diagnose'],
     ['GET',    '/api/jobs',              [Api\JobsApi::class, 'index'],        'user'],
     ['POST',   '/api/jobs',              [Api\JobsApi::class, 'create'],       'user'],
     ['GET',    '/api/jobs/{id}',         [Api\JobsApi::class, 'show'],         'user'],
@@ -113,6 +110,7 @@ return [
     // Eklentiler (ext/<ad>): çekirdek adlarını bilmez, EXT_DIR taranır (bkz. Core\Extensions). Ad gövdede
     // taşınır; Router'daki {id} yalnız rakam eşlediğinden yola konmaz.
     ['GET',    '/api/extensions',          [Api\ExtensionsApi::class, 'list'],         'admin'],
+    ['GET',    '/api/extensions/active',   [Api\ExtensionsApi::class, 'active'],       'user'],
     ['PUT',    '/api/extensions/settings', [Api\ExtensionsApi::class, 'saveSettings'], 'admin'],
     ['GET',    '/api/lesson-times',      [Api\LessonTimesApi::class, 'show'],   'user'],
     ['PUT',    '/api/lesson-times',      [Api\LessonTimesApi::class, 'update'], 'admin'],
