@@ -56,11 +56,15 @@ qx.Class.define("ankamon.ui.StatusBar", {
     head.add(this.__dock);
     head.add(new qx.ui.core.Spacer(), { flex: 1 });
     // Oturum açmış Ankamon kullanıcıları (kullanıcı isteği): sayı + üzerine gelince ayrıntı (bkz. __pollUsers).
+    // Varsayılan gizli; bir eklenti "statusBar.usersVisible" kancasıyla açar (bkz. ext.Extensions). Gizliyken
+    // de yoklama sürer: bu oturumun durumu (odak, açık sayfa) göstergeyi gören başkalarına bildirilir.
     this.__usersTip = new qx.ui.tooltip.ToolTip("").set({ rich: true, showTimeout: 300, hideTimeout: 30000 });
     this.__usersLabel = new qx.ui.basic.Label("").set({
       font: "app-mono", textColor: "app-muted", rich: true, toolTip: this.__usersTip, marginRight: 12
     });
     head.add(this.__usersLabel);
+    this.__updateUsersVisibility();
+    qx.event.message.Bus.subscribe(ankamon.ext.Extensions.CHANGED, this.__updateUsersVisibility, this);
     // Sunucu durumu: CPU/RAM/disk/ağ, sağa hizalı, 1 sn'de bir güncellenir (bkz. __pollStats).
     this.__stats = new qx.ui.basic.Label("").set({ font: "app-mono", textColor: "app-muted", rich: true });
     head.add(this.__stats);
@@ -119,6 +123,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
   },
 
   destruct() {
+    qx.event.message.Bus.unsubscribe(ankamon.ext.Extensions.CHANGED, this.__updateUsersVisibility, this);
     if (this.__timer) {
       this.__timer.stop();
       this.__timer.dispose();
@@ -196,6 +201,15 @@ qx.Class.define("ankamon.ui.StatusBar", {
         view += (view ? " · " : "") + text(win.getCaption());
       }
       return view.slice(0, 200);
+    },
+
+    /** Kullanıcılar göstergesi yalnız bir eklenti "statusBar.usersVisible" kancasını üstlenirse görünür. */
+    __updateUsersVisibility() {
+      const visible = ankamon.ext.Extensions.handle("statusBar.usersVisible");
+      this.__usersLabel.setVisibility(visible ? "visible" : "excluded");
+      if (!visible) {
+        this.__usersTip.hide();
+      }
     },
 
     /** Ankamon sekmesi görünür VE tarayıcı penceresi odakta mı (iç çerçevelerdeki odak dahil). */

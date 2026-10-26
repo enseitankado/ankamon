@@ -31,6 +31,8 @@ ext/<ad>/
   Oturum açılınca `ankamonext.<ad>.Extension.init({ user, app })` bir kez çağrılır.
   Çekirdeğe `ankamon.ext.Extensions.on(kanca, işleyici)` ile bağlanılır; kancaların listesi o sınıfın
   belgesindedir. İşleyici `true` döndürürse çekirdek kendi varsayılan davranışını atlar.
+  Eklentinin durumu değişip kanca yanıtları farklılaşınca `ankamon.ext.Extensions.changed()` çağrılır;
+  sürekli görünen öğeler (ör. alt çubuk) kancaları yeniden sorar.
 - **API:** `backend/routes.php` rotaları çekirdek rotalarının ardına eklenir; erişim düzeyleri aynıdır
   (bkz. `Core\Router`). Yetki denetimi sunucuda yapılır, arayüzde gizlemek koruma değildir.
 - **Worker:** `worker/tasks.py`'deki görevler çekirdek periyodik görevleriyle aynı turda çalışır.

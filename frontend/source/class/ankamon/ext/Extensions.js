@@ -13,11 +13,19 @@
  *    İşlendi ise kutu temizlenir, süzme yapılmaz.
  *  - "settings.extensionHidden" (eklenti adı): Ayarlar ▸ Eklentiler listesi. İşlendi ise (true) o eklentinin
  *    bölümü gösterilmez (yalnız arayüz; API yönetici yetkisiyle yine erişilebilir).
+ *  - "statusBar.usersVisible" (): alt çubuktaki oturum açmış kullanıcılar göstergesi (👤 + ipucu).
+ *    Varsayılan gizli; işlendi ise (true) görünür.
+ *
+ * Bir eklentinin durumu değişip kanca yanıtları farklılaşınca changed() çağrılır (CHANGED mesajı): kancayı
+ * sürekli gösterilen bir öğe için soran çekirdek bileşenleri (ör. alt çubuk) yanıtı yeniden değerlendirir.
  */
 qx.Class.define("ankamon.ext.Extensions", {
   type: "static",
 
   statics: {
+    /** Mesaj veriyolu adı: eklenti durumu değişti, kancalar yeniden sorulmalı (bkz. changed). */
+    CHANGED: "ankamon.ext.changed",
+
     __handlers: {},
     __started: false,
     __enabled: {},          // {eklenti-adı: etkin mi} — start()'ta GET /extensions/active'ten
@@ -70,6 +78,11 @@ qx.Class.define("ankamon.ext.Extensions", {
     /** @param name {String} kanca adı  @param handler {Function} true dönerse olay işlendi sayılır */
     on(name, handler) {
       (this.__handlers[name] = this.__handlers[name] || []).push(handler);
+    },
+
+    /** Eklentinin kanca yanıtları değişti: CHANGED mesajını dinleyenler ilgili kancaları yeniden sorar. */
+    changed() {
+      qx.event.message.Bus.dispatchByName(this.CHANGED);
     },
 
     /** @return {Boolean} bir işleyici olayı üstlendi mi */
