@@ -11,6 +11,24 @@
 qx.Class.define("ankamon.page.Settings", {
   extend: ankamon.page.Base,
 
+  statics: {
+    /**
+     * Ağ rolleri değiştiyse kayıt onayına eklenir: ayar yeniden başlatmasız geçerlidir ama her iş onu kendi
+     * sonraki çalışmasında okur (bkz. worker/ankamon/netroles.py ve netscan döngüleri).
+     */
+    NET_ROLES_NOTICE:
+      "<br><br><b>Ağ arabirimi seçimi</b> yeniden başlatma gerekmeden geçerli; işler yeni seçimi kendi " +
+      "sonraki çalışmalarında kullanır:" +
+      "<ul style='margin:6px 0 8px;padding-left:18px'>" +
+      "<li>Servis, paylaşım, etkinlik ve ad taramaları: hemen (o an taranan cihaz eski seçimle biter)</li>" +
+      "<li>Görülen akış gözlemi: en geç ~35 sn</li>" +
+      "<li>Loglardan tahta kaydı ve IP güncellemesi: en geç 1 dk</li>" +
+      "<li>Ağ taraması: bir sonraki taramada (yüke göre 30 sn – 5 dk); hemen başlatmak için " +
+      "Ağ ▸ <i>Şimdi tara</i></li>" +
+      "</ul>" +
+      "Artık tahta ağı sayılmayan ağlarda önceden bulunan cihazlar Ağ listesinde kalır, yalnız taranmaz."
+  },
+
   construct(user) {
     super(user, "Ayarlar");
     this.__body = new qx.ui.container.Composite(new qx.ui.layout.VBox(12)).set({ maxWidth: 620 });
@@ -104,17 +122,20 @@ qx.Class.define("ankamon.page.Settings", {
       const save = new qx.ui.form.Button("Kaydet").set({ allowGrowX: false, marginTop: 12 });
       save.addListener("execute", async () => {
         try {
+          const newRoles = {
+            board_iface: boardIface.getSelection()[0].getModel(),
+            admin_iface: adminIface.getSelection()[0].getModel()
+          };
           await ankamon.io.Api.put("/settings", {
             ssh_access: ssh.values(),
             samba_access: samba.values(),
             screen_vnc_autoinstall: vncAuto.getValue(),
-            network_roles: {
-              board_iface: boardIface.getSelection()[0].getModel(),
-              admin_iface: adminIface.getSelection()[0].getModel()
-            }
+            network_roles: newRoles
           });
           await ankamon.io.Api.put("/lesson-times", lessons.getValue());
-          ankamon.ui.Dialog.alert("Ayarlar kaydedildi.");
+          const rolesChanged = newRoles.board_iface !== (roles.board_iface || "") ||
+            newRoles.admin_iface !== (roles.admin_iface || "");
+          ankamon.ui.Dialog.alert("Ayarlar kaydedildi." + (rolesChanged ? ankamon.page.Settings.NET_ROLES_NOTICE : ""));
           this.refresh();
         } catch (e) {
           ankamon.ui.Dialog.error(e);
