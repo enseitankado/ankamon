@@ -60,5 +60,27 @@ PG_GRAFANA_PASSWORD="$PG_GRAFANA_PASSWORD" PG_READONLY_PASSWORD="$PG_READONLY_PA
 PG_HOST=127.0.0.1 PG_PORT=5432 PG_DB=ankamon PG_USER=ankamon PG_PASSWORD="$POSTGRES_PASSWORD" \
     php /opt/ankamon/app/bin/bootstrap.php
 
+# --- Eski ad artıkları (tihamon -> ankamon; yeniden çalıştırılabilir, artık yoksa bir şey yapmaz) ---
+# Grafana'nın eski veri kaynağı (uid tihamon, ad TihaMon): provisioning aynı adla uid ankamon isteyince
+# Grafana "data source not found" ile açılmaz. Grafana başlamadan (db-ready'yi bekler) eski kayıt, izinleri
+# ve şifreli parolası silinir; provisioning "Ankamon" veri kaynağını yeniden kurar. Eski panolar (sağlayıcı
+# "tiha-mon") Grafana'nın sahipsiz provisioning temizliğiyle gider; boş kalan klasör grafana.sh'de silinir.
+if [ "$(psql -d grafana -tAc "SELECT 1 FROM data_source WHERE uid = 'tihamon'" 2>/dev/null)" = "1" ]; then
+    echo "ankamon: Grafana'daki eski 'tihamon' veri kaynağı kaldırılıyor…"
+    psql -d grafana -q -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+DELETE FROM permission WHERE scope = 'datasources:uid:tihamon';
+DELETE FROM secrets WHERE type = 'datasource' AND namespace = 'TihaMon';
+DELETE FROM data_source WHERE uid = 'tihamon';
+COMMIT;
+SQL
+fi
+# Ara sürümde (ad değişmeden önce) uid ankamon "TihaMon" adıyla kurulmuş olabilir: provisioning veri
+# kaynağını adıyla arar; bulamayıp aynı uid'le yenisini eklemeye kalkmasın diye ad önceden düzeltilir.
+psql -d grafana -q -c "UPDATE secrets SET namespace = 'Ankamon' WHERE type = 'datasource' AND namespace = 'TihaMon';
+    UPDATE data_source SET name = 'Ankamon' WHERE uid = 'ankamon' AND name <> 'Ankamon'" 2>/dev/null || true
+# Ağ envanterinde sunucunun kendi kaydı (otomatik tür) eski adla kalmasın.
+psql -d ankamon -q -c "UPDATE net_devices SET type_auto = 'Ankamon sunucusu' WHERE type_auto = 'Tiha-Mon sunucusu'"
+
 touch /run/ankamon/db-ready
 echo "ankamon: veritabanı hazır."

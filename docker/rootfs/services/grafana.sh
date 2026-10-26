@@ -39,4 +39,28 @@ export \
     GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/ankamon/grafana/dashboards/tahta-genel-bakis.json \
     ANKAMON_RO_PASSWORD="$PG_READONLY_PASSWORD"
 
+# Eski ad artığı (tihamon -> ankamon): eski panolar sahipsiz provisioning temizliğiyle silinince "Tiha-Mon"
+# klasörü boş kalır; Grafana açıldıktan sonra boşsa kaldırılır (içinde kullanıcı panosu varsa dokunulmaz).
+# Klasör yoksa hiçbir şey yapmaz. Kimlik: auth proxy başlığı (yalnız 127.0.0.1'den erişilebilir).
+python3 - <<'PY' >/dev/null 2>&1 &
+import json, time, urllib.request
+API = "http://127.0.0.1:3000/api"
+def call(path, method="GET"):
+    req = urllib.request.Request(API + path, method=method, headers={"X-WEBAUTH-USER": "etapadmin"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return json.loads(r.read() or b"null")
+for _ in range(20):
+    time.sleep(15)
+    try:
+        old = [f for f in call("/folders") if f.get("title") == "Tiha-Mon"]
+        if not old:
+            break
+        if all(not call("/search?folderUIDs=" + f["uid"]) for f in old):
+            for f in old:
+                call("/folders/" + f["uid"], "DELETE")
+            break
+    except Exception:
+        pass
+PY
+
 exec grafana server --homepath=/usr/share/grafana --config=/etc/grafana.ini

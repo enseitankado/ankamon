@@ -1,7 +1,7 @@
 apiVersion: 1
 
 datasources:
-  - name: TihaMon
+  - name: Ankamon
     uid: ankamon
     type: grafana-postgresql-datasource
     access: proxy
