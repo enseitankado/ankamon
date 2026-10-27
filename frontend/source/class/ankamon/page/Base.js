@@ -317,11 +317,40 @@ qx.Class.define("ankamon.page.Base", {
           }
           toggles = [];
         });
+        // Başlıkta onay kutusu (kullanıcı isteği): gösterilen (süzülmüş) satırların tümünü işaretler/kaldırır,
+        // durumu da yansıtır (hepsi / hiçbiri / bir kısmı). Sütun sıralanmaz (başlık tıklaması kutunun).
+        const header = new ankamon.ui.table.CheckHeaderRenderer(on => this._checkAll(table, on));
+        columnModel.setHeaderCellRenderer(1, header);
+        model.setColumnSortable(1, false);
+        let syncPending = false;
+        const syncHeader = () => {
+          const tm = table.getTableModel();
+          const can = table.getUserData("checkableRow");
+          let total = 0;
+          let checked = 0;
+          for (let row = 0; row < tm.getRowCount(); row++) {
+            if (!can || can(tm.getValue(0, row))) {
+              total++;
+              checked += tm.getValue(1, row) ? 1 : 0;
+            }
+          }
+          header.sync(checked, total);
+        };
         // Veri yenilenince (süzgeç/yenileme) satır sırası değişebilir; eski çapa geçersizdir.
         model.addListener("dataChanged", e => {
           const d = e.getData();
           if (!d || d.firstColumn !== 1 || d.lastColumn !== 1) {
             anchor = null;
+          }
+          // Toplu işaretleme satır başına bir olay üretir; başlık bir kez, döngü bitince güncellenir.
+          if (!syncPending) {
+            syncPending = true;
+            Promise.resolve().then(() => {
+              syncPending = false;
+              if (!table.isDisposed()) {
+                syncHeader();
+              }
+            });
           }
         });
         // Ctrl/⌘+A (kullanıcı isteği): tabloda hâlâ görünen (süzülmüş) TÜM satırları işaretler VE
@@ -621,11 +650,17 @@ qx.Class.define("ankamon.page.Base", {
       return ids;
     },
 
-    /** Şu an görünen (süzülmüş) bütün satırların onay kutusunu işaretler/kaldırır. */
+    /**
+     * Şu an görünen (süzülmüş) bütün satırların onay kutusunu işaretler/kaldırır. Tablonun "checkableRow"
+     * userData'sı (kimlik → Boolean) verilmişse yalnız onun kabul ettiği satırlar (ör. Ağ'da alt satırlar değil).
+     */
     _checkAll(table, checked) {
       const tm = table.getTableModel();
+      const can = table.getUserData("checkableRow");
       for (let row = 0; row < tm.getRowCount(); row++) {
-        tm.setValue(1, row, checked);
+        if ((!can || can(tm.getValue(0, row))) && !!tm.getValue(1, row) !== checked) {
+          tm.setValue(1, row, checked);
+        }
       }
     }
   }

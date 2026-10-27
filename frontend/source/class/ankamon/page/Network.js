@@ -82,6 +82,8 @@ qx.Class.define("ankamon.page.Network", {
     ];
     this.__model = new ankamon.ui.table.GroupModel(() => this.__apply());
     this.__table = this._createTable(this.__columns, { checkable: true, storageKey: "network.columns", model: this.__model });
+    // Yalnız cihaz satırları işaretlenir (başlıktaki onay kutusu ve Tümünü işaretle alt satırları saymaz).
+    this.__table.setUserData("checkableRow", id => typeof id === "number");
     // Servis/paylaşım (alt) satırları temaya uyumlu farklı zeminle (bkz. ui.table.GroupRowRenderer).
     this.__table.setDataRowRenderer(new ankamon.ui.table.GroupRowRenderer(row => typeof row[0] !== "number"));
     // "Durum" sütunu: çevrim içi yeşil, çevrim dışı kırmızı (bkz. ui.table.StatusRenderer).
