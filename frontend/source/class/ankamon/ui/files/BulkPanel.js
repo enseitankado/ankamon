@@ -165,30 +165,9 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       return new qx.ui.basic.Label(text).set({ font: "bold", marginTop: 4 });
     },
 
-    /**
-     * Numaralı adım kutusu (kullanıcı isteği: bileşenler ana işlemlere göre gruplanır, sıra numarası
-     * büyük ve fark edilir): ince çerçeve, başlıkta vurgu renginde daire içinde numara + adım adı.
-     * @return {qx.ui.container.Composite} kutu (başlık eklenmiş; içerik çağıran tarafından eklenir)
-     */
+    /** Numaralı adım kutusu (bkz. ui.StepBox — Anomaliler ▸ Tarama ile aynı görünüm). */
     __step(n, title, hint) {
-      const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(6)).set({
-        padding: [8, 12, 10, 12],
-        decorator: new qx.ui.decoration.Decorator().set({ width: 1, color: "app-border", radius: 8 })
-      });
-      box.add(this.__stepHead(n, title, hint));
-      return box;
-    },
-
-    __stepHead(n, title, hint) {
-      const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" }));
-      const esc = qx.bom.String.escape;
-      head.add(new qx.ui.basic.Label(
-        `<span style="display:inline-block;width:30px;height:30px;line-height:30px;border-radius:50%;` +
-        `background:${this.__color("primary")};color:#fff;text-align:center;font-weight:700;font-size:17px">${n}</span>`
-      ).set({ rich: true, alignY: "middle" }));
-      head.add(new qx.ui.basic.Label(`<span style="font-size:15px;font-weight:600">${esc(title)}</span>` +
-        (hint ? `  <span style="opacity:.65">${esc(hint)}</span>` : "")).set({ rich: true, alignY: "middle" }));
-      return head;
+      return ankamon.ui.StepBox.create(n, title, hint);
     },
 
     __createSetup(boards, selected) {

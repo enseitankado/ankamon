@@ -173,7 +173,8 @@ qx.Class.define("ankamon.ui.Shell", {
       // rapor + seçilen tahtalarda tarama (bkz. page.Anomalies). Bakım'ın altında (kullanıcı isteği); Bakım
       // kapalı kullanıcıda Tahtalar'ın altında (bkz. __createTree).
       { id: "anomalies", label: "Anomaliler", feature: "anomalies", parent: "diagnose", create: u => new ankamon.page.Anomalies(u),
-        tabs: ["Anlık", "Geçmiş", "Tahta özeti", "Tarama"].map(label => ({ key: label, label })) },
+        tabs: [{ key: "Anlık", label: "Anlık" }, { key: "Tarama", label: "Tarama" }, { key: "Geçmiş", label: "Geçmiş" },
+          { key: "summary", label: "Özet" }] },
       // Loglar Tahtalar'ın altında EN SONDA (kullanıcı isteği).
       { id: "logs", label: "Loglar", feature: "logs", parent: "boards", create: u => new ankamon.page.Logs(u),
         tabs: () => ankamon.ui.Shell.LOG_KINDS.map(kind => ({ key: kind.mode, label: kind.label })) },

@@ -82,13 +82,9 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     __jobId: null,
     __lastJobShown: null,
 
-    __heading(text) {
-      return new qx.ui.basic.Label(text).set({ font: "bold" });
-    },
-
+    // Adımlar "Dosyaları dağıt"taki numaralı kutularla aynı görünümde (bkz. ui.StepBox).
     __createBoardsPane() {
-      const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(6)).set({ paddingRight: 8 });
-      box.add(this.__heading("1. Tahtalar"));
+      const box = ankamon.ui.StepBox.create(1, "Tahtaları seç").set({ marginRight: 5 });
       const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(4).set({ alignY: "middle" }));
       this.__search = new qx.ui.form.TextField().set({ placeholder: "Ara: ad, konum, IP…", liveUpdate: true });
       this.__search.addListener("changeValue", () => this.__renderBoards());
@@ -119,8 +115,9 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     },
 
     __createRightPane() {
-      const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(6)).set({ paddingLeft: 8 });
-      box.add(this.__heading("2. Anomaliler"));
+      const pane = new qx.ui.container.Composite(new qx.ui.layout.VBox(10)).set({ marginLeft: 5 });
+      const box = ankamon.ui.StepBox.create(2, "Anomalileri seç ve tara", "seçili tahtalarda şu an yoklanır");
+      pane.add(box);
       this.__kindBox = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
       box.add(this.__kindBox);
 
@@ -134,13 +131,13 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       run.add(this.__status, { flex: 1 });
       box.add(run);
 
-      const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ marginTop: 8 });
-      head.add(this.__heading("3. Sonuçlar"));
+      const results = ankamon.ui.StepBox.create(3, "Sonuçlar");
+      pane.add(results, { flex: 1 });
+      const head = results.getChildren()[0]; // başlık satırı: sağına süzgeç onay kutusu
       head.add(new qx.ui.core.Spacer(), { flex: 1 });
       this.__onlyFound = new qx.ui.form.CheckBox("Yalnız anomali bulunanlar");
       this.__onlyFound.addListener("changeValue", () => this.__renderResults());
       head.add(this.__onlyFound);
-      box.add(head);
 
       const columns = [
         { id: "board", label: "Tahta", width: 180 },
@@ -157,8 +154,8 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         }
       });
       this.__resultTable.setToolTipText("Çift tıklayın: o tahtanın anomali kayıtları (Geçmiş)");
-      box.add(this.__resultTable, { flex: 1 });
-      return box;
+      results.add(this.__resultTable, { flex: 1 });
+      return pane;
     },
 
     /**

@@ -26,16 +26,18 @@
  */
 
 /**
- * Anomaliler ▸ Tahta özeti: seçili dönemde tahta (ve tür) başına anomali sayısı, toplam/en uzun süre,
+ * Anomaliler ▸ Özet: seçili dönemde tahta (ve tür) başına anomali sayısı, toplam/en uzun süre,
  * son başlangıç, şu an sürüyor mu. Süreler döneme kırpılır (dönem başından önce başlayan kaydın yalnız
- * dönem içindeki kısmı sayılır). Çift tık → Geçmiş sekmesi o tahtaya süzülür.
+ * dönem içindeki kısmı sayılır). Sütun süzgeçli (bkz. page.Base _addColumnFilters). Çift tık → Geçmiş
+ * sekmesi o tahtaya süzülür.
  */
 qx.Class.define("ankamon.ui.anomaly.Summary", {
   extend: qx.ui.tabview.Page,
 
   /** @param page {ankamon.page.Anomalies} */
   construct(page) {
-    super("Tahta özeti");
+    super("Özet");
+    this.setUserData("key", "summary"); // sekme kimliği etiketten bağımsız (sol menü yaprağı, hatırlanan sekme)
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
 
@@ -62,13 +64,19 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
       }
     });
     this.__table.setToolTipText("Çift tıklayın: o tahtanın kayıtları (Geçmiş)");
+    this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this));
     this.add(this.__table, { flex: 1 });
+    this.__count = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
+    this.add(this.__count);
   },
 
   members: {
     __columns: null,
     __table: null,
     __raw: null,
+    __rows: null,
+    __filterFields: null,
+    __count: null,
 
     __rawOf(row) {
       return this.__raw[row[0]];
@@ -90,14 +98,28 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
         g.open = g.open || a.ended_at === null;
       });
       this.__raw = {};
-      const rows = Object.keys(groups)
+      this.__rows = Object.keys(groups)
         .sort((x, y) => groups[y].total - groups[x].total)
         .map(key => {
           const g = this.__raw[key] = groups[key];
           return [key, g.board, g.kind, g.count, F.duration(g.total), F.duration(g.longest),
             F.dateTime(g.lastAt * 1000), g.open ? "Sürüyor" : ""];
         });
-      this.__table.getTableModel().setData(rows);
+      this.__apply();
+    },
+
+    /** Sütun süzgeçlerini uygular (her süzgeç değişikliğinde ve yeni veride). */
+    __apply() {
+      if (!this.__rows) {
+        return;
+      }
+      const filters = this.__columns
+        .map((column, index) => ({ index: index + 1, text: (this.__filterFields[column.id].getValue() || "").toLowerCase().trim() }))
+        .filter(f => f.text);
+      const shown = this.__rows.filter(cells =>
+        filters.every(f => String(cells[f.index] ?? "").toLowerCase().includes(f.text)));
+      this.__table.getTableModel().setData(shown);
+      this.__count.setValue(`${shown.length} / ${this.__rows.length} satır`);
     }
   }
 });

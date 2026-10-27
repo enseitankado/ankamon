@@ -31,11 +31,11 @@
  * worker/ankamon/anomaly, backend AnomaliesApi). Kurallar: "Oturumsuz açık" (tahta 15 dk'dır açık,
  * oturum açılmamış), "NTP eşitlenmemiş" (saat 15 dk'dır NTP ile eşitlenmiyor ya da sunucudan sapmış).
  *
- * Dört sekme; ilk üçü tek veri (sayfa /anomalies'i dönemle çeker, sekmelere verir):
+ * Dört sekme (bu sırayla); Tarama dışındakiler tek veri (sayfa /anomalies'i dönemle çeker, sekmelere verir):
  *  - "Anlık" (ui.anomaly.Live): şu an süren anomaliler (dönemden bağımsız).
- *  - "Geçmiş" (ui.anomaly.History): dönemle örtüşen tüm kayıtlar, sütun süzgeçli.
- *  - "Tahta özeti" (ui.anomaly.Summary): tahta başına sayı/süre; çift tık → o tahtanın Geçmiş'i.
  *  - "Tarama" (ui.anomaly.Scan): seçilen tahtalarda seçilen anomaliler o an yoklanır ("anomaly_scan" görevi).
+ *  - "Geçmiş" (ui.anomaly.History): dönemle örtüşen tüm kayıtlar, sütun süzgeçli.
+ *  - "Özet" (ui.anomaly.Summary): tahta başına sayı/süre, sütun süzgeçli; çift tık → o tahtanın Geçmiş'i.
  * Kayıtlar tahta silinse ya da logları silinse de kalır (bkz. 033_anomalies.sql).
  */
 qx.Class.define("ankamon.page.Anomalies", {
@@ -53,7 +53,7 @@ qx.Class.define("ankamon.page.Anomalies", {
         this.__period.setSelection([item]);
       }
     });
-    this.__period.setToolTipText("Geçmiş ve Tahta özeti bu dönemi gösterir; Anlık her zaman şu an sürenleri.");
+    this.__period.setToolTipText("Geçmiş ve Özet bu dönemi gösterir; Anlık her zaman şu an sürenleri.");
     this.__period.addListener("changeSelection", () => this.refresh());
     this._actions.add(this.__period);
     this._addButton("Yenile", () => this.refresh());
@@ -63,7 +63,7 @@ qx.Class.define("ankamon.page.Anomalies", {
     this.__history = new ankamon.ui.anomaly.History(this);
     this.__summary = new ankamon.ui.anomaly.Summary(this);
     this.__scan = new ankamon.ui.anomaly.Scan(this);
-    [this.__live, this.__history, this.__summary, this.__scan].forEach(tab => this.__tabs.add(tab));
+    [this.__live, this.__scan, this.__history, this.__summary].forEach(tab => this.__tabs.add(tab));
     this._rememberTab(this.__tabs, "anomalies");
     this.add(this.__tabs, { flex: 1 });
 
@@ -131,7 +131,7 @@ qx.Class.define("ankamon.page.Anomalies", {
       this.__scan.setKinds(data.kinds, data.last_scan_job);
     },
 
-    /** Tahta özeti → o tahtanın Geçmiş'i (çift tık). */
+    /** Özet → o tahtanın Geçmiş'i (çift tık). */
     showBoard(board) {
       this.__tabs.setSelection([this.__history]);
       this.__history.filterBoard(board);
