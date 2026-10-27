@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Görev yürütücüsü: kuyruğa yazılan görevleri (komut, hazır işlem, kapat, WoL) beklemeden çalıştırır.
 
 API görevi yazarken `pg_notify('ankamon_jobs')` gönderir; yürütücü bunu LISTEN ile anında yakalar (ayrıca

@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * "Koyu" tema: varsayılan mavi vurguyu koyu yüzeyler üzerinde tutar (Windows 11 koyu kip hissi).
  */

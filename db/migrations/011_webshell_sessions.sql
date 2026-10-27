@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Web terminal oturumları: Ankamon üzerinden (webssh, /webshell/) tahtalara açılan SSH oturumları
 -- — Oturumlar sayfası bunları greeter oturumlarıyla (board_sessions) birlikte listeler.
 --

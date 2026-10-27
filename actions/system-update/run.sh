@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Sistem güncelleme (bkz. action.json). Asıl iş tahtada ayrı bir systemd birimi olarak çalışır: SSH
 # bağlantısı koparsa ya da görev zaman aşımına uğrarsa dpkg yarıda kesilmez (yarım kalan dpkg tahtayı
 # açılmaz hâle getirebilir). Bu betik birimi başlatır ve çıktısını, birim bitene dek canlı izler.

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """İki panelli dosya gezgini ("Bilgisayarlar arasında kopyala"): tahtalardaki dosyaları listeler (sahip/grup/izin/
 boyut ile), siler, adını değiştirir, klasör oluşturur ve bir tahtadan diğerine ilerlemeli kopyalar.
 

@@ -1,0 +1,7 @@
+docker/rootfs/certs/meb-ca.crt — T.C. Millî Eğitim Bakanlığı (MEB) kök sertifika otoritesinin
+kamuya açık sertifikası ("DC=tr, DC=gov, DC=mebca, CN=fatihca").
+
+Bu dosya Ankamon'un eseri değildir ve Ankamon'un lisansı (AGPL-3.0-or-later) kapsamında değildir.
+MEB okul ağlarındaki içerik filtresi HTTPS bağlantılarını bu otoritenin imzaladığı sertifikayla
+kestiğinden, Ankamon konteyneri yalnızca TLS doğrulaması amacıyla bu kamuya açık sertifikanın
+değiştirilmemiş bir kopyasını taşır. Tüm hakları sahibine aittir.

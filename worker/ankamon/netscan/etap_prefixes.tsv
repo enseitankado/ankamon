@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # ankamon ETAP faz veritabanı — maskelenmiş MAC öneki → anakart modeli (bkz. etap_models.json).
 # Üretici: scripts/build-etap-phases.py (envanterin kendisi depoda yoktur). Sütunlar: önek, model, tahta sayısı
 0001808969	aopen-inc-i76hmt-wbop-r1-02hv	10

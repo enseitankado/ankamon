@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 // Eklentilerin arayüz kısmını derlemeye katar (bkz. ext/README.md, ankamon.ext.Extensions):
 // <ext dizini>/<ad>/frontend/Manifest.json olan her eklenti compile.json'a qooxdoo kütüphanesi olarak
 // eklenir ve "ankamonext.*" sınıfları pakete dahil edilir (çekirdek onları adıyla anmadığı için

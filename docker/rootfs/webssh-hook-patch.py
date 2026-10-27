@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Docker imajı derlenirken çalışır: webssh'e Ankamon oturum kancasının (webssh/ankamon_hook.py,
 kaynağı docker/rootfs/webssh-hook.py) çağrı noktalarını ekler — web terminal oturumlarının gerçek
 açılış/kapanışı Oturumlar sayfasında listelensin diye (bkz. db/migrations/011_webshell_sessions.sql).

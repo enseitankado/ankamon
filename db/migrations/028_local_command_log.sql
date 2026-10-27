@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Komut logları ▸ "Tahtada yerel" (source = 'local'): tahtadaki kullanıcıların kendi çalıştırdığı yetkili
 -- komutlar — sudo, pkexec, su. Tahtalar bunları syslog ile zaten gönderiyor (auth/authpriv); bu tetikleyici
 -- `logs`'a gelen satırı anında ayrıştırıp command_log'a KOPYALAR. Böylece syslog saklama süresi, Disk

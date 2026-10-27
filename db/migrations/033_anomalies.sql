@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Anomaliler (Tahtalar ▸ Anomaliler): ağdaki bilgisayarlarda işletim sistemi, donanım ve kullanıcı
 -- davranışına dair sıra dışı durumların zaman aralıkları. Kurallar worker'da (bkz. worker/ankamon/anomaly);
 -- her kural kendi türünü (kind) ön hesaplanmış kaynaklardan (board_uptime, board_sessions …) çıkarır.

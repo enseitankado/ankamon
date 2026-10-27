@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Merkezi log alıcısı (TCP+UDP 514 → Postgres). Yapılandırma docker/rsyslog/rsyslog.conf'tan gelir;
 # tek konteynerde veritabanı 127.0.0.1'dedir, o yüzden hedef çalışma anında yeniden yazılır.
 set -eu

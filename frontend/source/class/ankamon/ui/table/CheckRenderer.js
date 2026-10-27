@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * Metin tabanlı onay kutusu hücre render'ı: işaretliyse ortalanmış kalın "✓", değilse boş.
  *

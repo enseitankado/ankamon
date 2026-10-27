@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Her başlatmada çalışır: roller, yetkiler ve .env'deki saklama süreleri.
 -- psql değişkenleri migrate.sh tarafından verilir.
 

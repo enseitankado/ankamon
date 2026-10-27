@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Ekranlar önizlemesinin alt barı için oturum yoklamasının (worker executor/session_probe.py, 30 sn) aynı
 -- SSH turunda okunanlar:
 --  netifs: fiziksel ağ arabirimleri ve yapılandırmaları {"wifi_radio": bool|null, "ifaces": [{name, kind

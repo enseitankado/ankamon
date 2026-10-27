@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Arka plan etkinlik günlüğü: önemli olayları activity_log'a yazar (arayüzdeki durum çubuğu okur)."""
 
 from __future__ import annotations

@@ -1,4 +1,29 @@
 #!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Ankamon — ETAP akıllı tahtaları için merkezi log, izleme ve yönetim sunucusu
+# Copyright (C) 2026 Özgür Koca <ozgurkoca@gmail.com>
+# https://github.com/enseitankado/ankamon
+#
+# Bu program özgür yazılımdır: Free Software Foundation tarafından yayımlanan
+# GNU Affero Genel Kamu Lisansı'nın 3. sürümü ya da (tercihinize bağlı olarak)
+# daha sonraki herhangi bir sürümü koşulları altında yeniden dağıtabilir ve/veya
+# değiştirebilirsiniz.
+#
+# Bu program yararlı olması umuduyla dağıtılmaktadır, ancak HİÇBİR GARANTİSİ
+# YOKTUR; satılabilirlik veya belirli bir amaca uygunluk garantisi dahi
+# verilmez. Ayrıntılar için GNU Affero Genel Kamu Lisansı'na bakınız.
+#
+# Bu programla birlikte GNU Affero Genel Kamu Lisansı'nın bir kopyasını (LICENSE
+# dosyası) almış olmalısınız. Almadıysanız <https://www.gnu.org/licenses/>
+# adresine bakınız.
+#
+# Bu dosyadan (sınıf, işlev ya da işlev içi kod bloğu dahil) alınan her türlü
+# parça da AGPL-3.0-or-later ile lisanslıdır: parçayı kullanan türev eser aynı
+# lisansla yayımlanmalı, bu telif/atıf bildirimi ve değişiklik notu
+# korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
+# kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
+
 # Dosya yöneticisi (FileBrowser Quantum): tahtaların (sshfs ile bağlanan, bkz. filemanager-bridge.sh)
 # kök dizin ağacını sunar. Yalnız 127.0.0.1:8893 dinler; nginx /filemanager/ ile oturum + "filemanager"
 # yetkisiyle vekiller ve sabit bir X-Auth-User başlığı geçirir — kimlik/yetki zaten nginx'te denetlendi,

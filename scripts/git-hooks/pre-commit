@@ -1,0 +1,12 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Lisans başlığı güvencesi: eklenen/değiştirilen her dosya AGPL-3.0-or-later SPDX başlığı taşımalı
+# (yorum taşıyamayanlar REUSE.toml'da). Eksikse commit yapılmaz; düzeltme:
+#   python3 scripts/ankamon-lisans-basligi.py --ekle <dosya>
+# Kurulum (depo kökünde, bir kez; pre-push ile birlikte): git config core.hooksPath scripts/git-hooks
+files=$(git diff --cached --name-only --diff-filter=AM)
+[ -z "$files" ] && exit 0
+# shellcheck disable=SC2086 # dosya adlarında boşluk yok (depo kuralı)
+exec python3 "$(git rev-parse --show-toplevel)/scripts/ankamon-lisans-basligi.py" --denetle $files

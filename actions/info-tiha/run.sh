@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 var() { [ -e "$2" ] && echo "[x] $1" || echo "[ ] $1"; }
 svc() { systemctl is-enabled --quiet "$2" 2>/dev/null && echo "[x] $1" || echo "[ ] $1"; }
 act() { systemctl is-active --quiet "$2" 2>/dev/null && echo "[x] $1" || echo "[ ] $1"; }

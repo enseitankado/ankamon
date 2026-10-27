@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Tahta ekranının (etkin VT'deki X) monitör güç durumu: xset q "Monitor is On/Off/Standby/Suspend"
 -- (NULL = bilinmiyor / X yok). Oturum durumuyla aynı periyodik SSH yoklamasında okunur (bkz. worker
 -- executor/session_probe.py); Ekranlar önizlemesi "Ekran güç tasarrufu kipinde" yazısını buna göre gösterir

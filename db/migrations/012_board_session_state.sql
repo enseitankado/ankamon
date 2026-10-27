@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Tahtanın ANLIK oturum durumu (Tahtalar grid'inin "Oturum" sütunu): seat0'da oturum açmış kullanıcı
 -- (yoksa NULL = oturum kapalı), ekran kilitli mi, en son ne zaman yoklandı. SSH ile periyodik yoklanır
 -- (bkz. worker/ankamon/tasks/session_probe.py) ve "Oturumları sorgula"/"Oturum aç"/"Oturumu kapat"

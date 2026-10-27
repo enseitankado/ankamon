@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Yorum taşıyamayan dosyaların telif/lisans bilgisi (REUSE 3.x, https://reuse.software).
+# Geri kalan her dosyanın başında SPDX başlığı vardır (bkz. scripts/ankamon-lisans-basligi.py);
+# doğrulama: `reuse lint`.
+version = 1
+SPDX-PackageName = "Ankamon"
+SPDX-PackageSupplier = "Özgür Koca <ozgurkoca@gmail.com>"
+SPDX-PackageDownloadLocation = "https://github.com/enseitankado/ankamon"
+
+[[annotations]]
+path = ["*.json", "**/*.json", "**/.gitkeep"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Özgür Koca <ozgurkoca@gmail.com>"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+# Fluent temasına (MIT, github.com/sqville/ville.Fluent) ankamon yaması: üst akışla aynı lisansta kalır.
+[[annotations]]
+path = "frontend/themes-src/*.patch"
+precedence = "aggregate"
+SPDX-FileCopyrightText = ["ville.Fluent katkıcıları <https://github.com/sqville/ville.Fluent>",
+                          "2026 Özgür Koca <ozgurkoca@gmail.com>"]
+SPDX-License-Identifier = "MIT"
+
+# MEB kök sertifikası: Ankamon'un eseri değildir; filtreli ağda TLS doğrulaması için kopyası taşınır.
+[[annotations]]
+path = "docker/rootfs/certs/meb-ca.crt"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "T.C. Millî Eğitim Bakanlığı"
+SPDX-License-Identifier = "LicenseRef-MEB-CA"

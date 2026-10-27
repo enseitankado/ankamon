@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * GNOME Adwaita (Linux) görünümü, açık. Anahtar: "gnome-light" (bkz. Registry). Görünüm ve süsleme ville.Fluent'inki, renk/yazı tipi
  * türetilmiş (bkz. Derive, ColorGnomeLight, FontGnome).

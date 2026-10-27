@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Topluluk temalarını themes.txt'teki sabit commit'lerden indirir ve qooxdoo kütüphanesi olarak kurar:
 #   fetch-themes.sh <themes.txt dizini> <çıktı dizini>
 # Her tema için yalnız LICENSE, Manifest.json ve listelenen source/ yolları alınır; Manifest'teki demo

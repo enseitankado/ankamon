@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # PostgreSQL + TimescaleDB. İlk açılışta PGDATA'yı ilklendirir, sonra sunucuyu ön planda çalıştırır.
 # Yalnız konteyner içine (127.0.0.1 + unix soketi) dinler; 5432 dışarı açılmaz.
 set -eu

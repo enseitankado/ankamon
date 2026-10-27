@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Arka plan etkinlik günlüğü: worker'ın yaptığı işler (tahta keşfi, görev başlangıç/bitiş, hatalar).
 -- Arayüzün en altındaki durum çubuğu bu akışı gösterir. Düşük hacim; worker eski kayıtları budar.
 

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Ankamon — tek konteyner. Bütün bileşenler (PostgreSQL+TimescaleDB, rsyslog, Telegraf, Grafana,
 # nginx, PHP-FPM, Python worker+Ansible, MediaMTX) tek imajda; supervisord yönetir. Dışarı açık: 80/443
 # (arayüz), 514 (log), 8554 + 8189 (ekran yansıtma: tahtaların RTSP okuması, tarayıcının WebRTC medyası).

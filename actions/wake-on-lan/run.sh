@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # TiHA'nın "Uzaktan uyandırma (Wake-on-LAN)" adımını (tiha/modules/m15_wake_on_lan.py, apply) uzaktan
 # uygular — dosya içerikleri TiHA'nınkiyle BİREBİR aynıdır (TiHA özet sayfası da adımı "uygulanmış" görür):
 #   1. ethtool paketi (yoksa) kurulur

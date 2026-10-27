@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Ağ paylaşımları: NetBIOS/SMB portu (139/445) açık cihazlarda bulunan paylaşımlar (klasör/yazıcı).
 -- Ayrı bir tarama kanalı (worker/ankamon/netscan _shares_loop) varlık/servis taramasıyla EŞ ZAMANLI
 -- çalışır; smbclient ile önce anonim (guest), olmazsa kayıtlı Samba kimliğiyle paylaşımları listeler.

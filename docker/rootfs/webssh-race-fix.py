@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Docker imajı derlenirken çalışır: webssh'in handler.py'ındaki eşzamanlılık hatasını düzeltir.
 
 Hata: POST işleyicisi `workers = clients.get(ip, {})` ile BOŞ bir yerel sözlük alır (henüz

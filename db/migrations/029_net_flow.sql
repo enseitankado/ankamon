@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Görülen akış yoğunluğu: sunucunun telde PASİF gördüğü (broadcast/multicast/sunucuya gelen) paketlerden
 -- cihaz başına yoğunluk (bkz. worker netscan/flows.py, bellek network-usage-study). IP ID'nin aksine tüm
 -- cihazlarda çalışır (kaynak MAC ile eşlenir). flow_at = son gözlem penceresi; görülmeyen cihaz eski

@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Ağ envanteri tarayıcısı (bkz. worker/ankamon/netscan): bağlı fiziksel ağları ARP ile (arp-scan),
 # çevrimiçi cihazların servislerini nmap ile tarar. Konteyner host ağında olduğundan gerçek
 # arabirimlere erişir; ham soket için root çalışır (Docker'ın varsayılan NET_RAW yetkisi yeterli).

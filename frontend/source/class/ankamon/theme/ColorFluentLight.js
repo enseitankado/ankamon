@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * ville.Fluent (sqville, MIT) — Microsoft Fluent UI / Windows 11 tasarım dili, açık.
  * Temanın kendi renklerine Ankamon kabuğunun (başlık, sol menü, kenarlık…) kullandığı "app-*" ve ortak

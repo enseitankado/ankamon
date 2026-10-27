@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * qx.ui.table.headerrenderer.Default'u genişletir: her sütun için qx.ui.table.pane.Header'ın zaten
  * kurduğu önbellekleme mekanizmasıyla (bkz. createHeaderCell/updateHeaderCell) ankamon.ui.table.

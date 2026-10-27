@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * Hücre değerini verilen işlevle biçimlendirerek gösterir; sıralama ham değere göre kalır (ör. boyut
  * bayt cinsinden sayı olarak sıralanır, "1.2 MB" metni olarak değil).

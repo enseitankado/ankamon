@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Loglar grid'inden dışlanan (önemsiz sayılan) mesajlar: grid'de HERKES için gizlenir, kayıtlar
 -- silinmez (bkz. backend LogsApi::index NOT EXISTS koşulu, LogExclusionsApi). Eşleşme: mesaj
 -- `pattern`'i (büyük/küçük harf duyarlı, birebir alt metin) İÇERİYORSA ve `program` NULL ya da

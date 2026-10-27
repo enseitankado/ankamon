@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Lisans denetimi: her dosya AGPL-3.0-or-later SPDX/telif başlığı taşımalı (ya da REUSE.toml'da olmalı)
+# ve depo REUSE 3.x uyumlu kalmalı. Yerelde aynı denetimi scripts/git-hooks/pre-commit yapar.
+name: license-check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  reuse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Başlığı eksik dosya var mı
+        run: python3 scripts/ankamon-lisans-basligi.py --denetle
+      - name: REUSE uyumu
+        run: pipx run reuse==6.2.0 lint

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Haftalık güvenlik taraması: imaj sıfırdan (önbelleksiz, en güncel Alpine paketleriyle) derlenir ve
 # Trivy ile taranır. Yaması çıkmış HIGH/CRITICAL açık varsa "security-scan" etiketli tek bir issue
 # açılır/güncellenir; temizlenince kendiliğinden kapanır. PR'larda (ör. Dependabot) yalnız rapor üretir.

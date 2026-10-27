@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * Hücreye fareyle gelince tarayıcının kendi ipucunu (title) gösteren hücre çizici — ör. Bakım ▸ Ahenk'te
  * "Pulsar testi atlandı" ya da sonuç/durum açıklaması. İpucu metni satırdan üretilir (hint(cellInfo));

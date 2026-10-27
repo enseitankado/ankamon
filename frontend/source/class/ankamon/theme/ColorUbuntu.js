@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * Ubuntu Yaru (Linux) görünümü — ville.Fluent paletinden türetilmiş (vurgu #E95420, bkz. Derive.colors) + Ankamon
  * kabuğunun "app-*" ve ortak (surface, error, text-primary-on-surface…) takma adları.

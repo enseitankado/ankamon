@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Tahta oturumları: greeter (lightdm) loglarından çıkarılan gerçek kullanıcı oturum açma/kapama
 -- kayıtları (bkz. worker/ankamon/tasks/board_sessions.py). logs tablosunda satır kimliği yoktur
 -- (hypertable, PK yok); worker bu yüzden task_cursors ile "buraya kadar işlendi" zaman damgasını

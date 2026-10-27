@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Docker imajı derlenirken çalışır: webssh'in main.js'ine canlı yazı boyutu değiştirme ekler.
 
 webssh yazı boyutunu yalnız açılışta URL'den (?fontsize=) alır; sonradan değiştirmek sayfayı yeniden

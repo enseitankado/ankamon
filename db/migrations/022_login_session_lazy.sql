@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Oturum geçmişinde (login_sessions) betik/otomasyon girişleri birikmesin (kullanıcı bildirdi, 2026-10-19:
 -- etapadmin'in 127.0.0.1'den onlarca "0 sn" oturumu — Claude oturumlarının API/headless testleri).
 --  * Geçmiş kaydı artık GİRİŞTE (sessions INSERT tetikleyicisi) değil, arayüz İLK AÇILDIĞINDA oluşur: alt

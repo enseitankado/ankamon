@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Bağımlılık sürümlerini izler ve yükseltmeleri PR olarak açar (bakımcı birleştirir; kurulumlar
 # install.sh --update ile alır). Alpine paketleri (php84, nginx, grafana…) burada değil: taban imajın
 # Alpine sürümünden gelir; yamalı paketleri yakalamak haftalık güvenlik taramasının işidir.

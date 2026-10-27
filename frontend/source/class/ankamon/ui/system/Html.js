@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /** Sistem sayfası sekmelerinin bilgi kutuları için küçük, kaçırmalı HTML tablo yardımcıları. */
 qx.Class.define("ankamon.ui.system.Html", {
   type: "static",

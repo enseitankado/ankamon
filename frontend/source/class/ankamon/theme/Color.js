@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * Windows 11 benzeri temiz açık tema: qooxdoo Tangible (düz/flat) renk motoru üzerine
  * beyaz yüzeyler, açık gri paneller ve canlı mavi vurgu.

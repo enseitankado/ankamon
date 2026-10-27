@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # eta-112 ile BIOS parolası ayarlar. Araç runner tarafından /opt/eta-112'ye kopyalanmıştır
 # (bkz. worker/ankamon/executor/tools.py). Parolalar çıktıya YAZILMAZ.
 set -u

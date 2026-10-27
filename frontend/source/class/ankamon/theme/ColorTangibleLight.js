@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * qooxdoo'nun hazır "Tangible Açık" renk teması (stok mor vurgu #6200ee korunur) — yalnız
  * Ankamon'un "app-*" takma adları eklenir. text-primary-on-surface eklenmez: ColorEngine

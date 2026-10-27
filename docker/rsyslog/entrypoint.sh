@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Ani güç kesintisi kuyruğun konum dosyasını (.qi) yarım bırakabilir. rsyslog okunamayan bir .qi ile
 # açılır ama kuyruğu başlatamaz ve gelen bütün kayıtları sessizce atar; bu yüzden bozuk kuyruk
 # dosyaları açılıştan önce kenara alınır (içindeki bekleyen kayıtlar kaybedilir, alıcı çalışır kalır).

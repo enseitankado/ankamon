@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * Alt satırlı (katlanır) grid'ler için tablo modeli: başlığa tıklayınca satırları KENDİSİ sıralamaz,
  * yalnız sıralama durumunu (sütun + yön, başlıktaki ok) tutar ve sayfanın verdiği geri çağrıyı

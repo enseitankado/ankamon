@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Canlı tahta ekranı: tarayıcıdaki noVNC ile tahtadaki x11vnc arasında WebSocket ↔ SSH köprüsü.
 
 Tahtada kalıcı bir VNC servisi ya da ağa açık port yoktur. İzleme isteği gelince köprü SSH ile

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Ekran istemcisi (x11vnc) kurulumu (bkz. action.json). Ekranlar sekmesi, x11vnc yoksa bunu ayara
 # bağlı olarak kendiliğinden çalıştırır (bkz. worker/ankamon/screen/__main__.py). Eski "x11VNC kur"
 # (screen-share) işleminin sshd/servis adımları da buradadır; o işlem kaldırıldı.

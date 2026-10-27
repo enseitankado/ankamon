@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Görev olay akışı: komut/işlem görevlerinin tahta başına canlı ayrıntısı (bağlanılıyor, bağlandı,
 -- çıktı satırları, çıkış kodu…). Görev yürütücüsü (worker/ankamon/runner) olayları oluştukça yazar;
 -- arayüzün canlı çıktı penceresi /api/jobs/{id}/events?after=<son id> ile artımlı okur.

@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Komut günlüğü: tahtalarda çalıştırılan komutlar/işlemler (kim, ne zaman, ne, sonuç).
 -- Ham sistem logları (logs tablosu) ayrıdır; bu tablo "komut logları" türünü karşılar.
 

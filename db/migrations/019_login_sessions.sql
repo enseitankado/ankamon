@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Ankamon oturum geçmişi (Kullanıcılar ▸ Oturumlar sekmesi, alt çubuktaki "oturum açmış kullanıcılar").
 -- `sessions` yalnız GEÇERLİ oturumları tutar ve çıkışta/süre dolunca satır silinir; geçmiş burada kalır.
 -- Bakımı tetikleyiciler yapar: sessions'a eklenen/uzatılan/silinen her satır buraya yansır — oturumu

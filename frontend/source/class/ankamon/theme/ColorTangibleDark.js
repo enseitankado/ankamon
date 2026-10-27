@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * qooxdoo'nun hazır "Tangible Koyu" renk teması (stok teal vurgu #26a69a korunur) — yalnız
  * Ankamon'un "app-*" takma adları eklenir (bkz. ColorTangibleLight.js'teki aynı gerekçe).

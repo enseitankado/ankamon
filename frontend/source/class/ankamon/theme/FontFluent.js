@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * ville.Fluent'in yazı tipleri (body1, caption1, title1… — Fluent görünümü bunlara bakar) + Ankamon'un
  * kendi bileşenlerinin kullandığı "app-*" yazı tipleri (bkz. ankamon.theme.Font). Fluent'in "default"u

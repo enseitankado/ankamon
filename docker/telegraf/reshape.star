@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # node_exporter ölçümlerini (inputs.prometheus, metric_version = 1) tek ölçüme indirir:
 #   metrics, etiketler: board_id, name ve aşağıdaki KEEP_TAGS; alan: value
 # Listede olmayan her şey atılır — tahta başına seri sayısı düşük kalsın diye.

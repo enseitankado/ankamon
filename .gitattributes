@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Betikler ve yapılandırma dosyaları her ortamda (ör. Windows'ta düzenlense de) LF ile kalsın:
 # CRLF'li bir kabuk betiği konteynerde "bad interpreter" ile çalışmaz.
 * text=auto eol=lf

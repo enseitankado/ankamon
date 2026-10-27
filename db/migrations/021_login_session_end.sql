@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Ankamon oturum geçmişinin (login_sessions, göç 019) "oturum ne zaman bitti" kuralları — kullanıcı
 -- bildirdi: aynı kişinin saniyeler arayla onlarca "açık/boşta", saatler süren, işlemsiz kaydı; kapanmış
 -- tarayıcıların oturumları alt çubukta açık görünüyordu.

@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Bilinen takma adlar: MAC adresine göre önceden bilinen cihaz adları (ör. eski envanterden aktarılan).
 -- Ağ taraması her tur sonunda bunlarla Ağ grid'indeki (net_devices) ve Tahtalar grid'indeki (boards) BOŞ
 -- takma adları doldurur — cihaz henüz hiç görülmemiş olsa bile ilk göründüğünde adıyla gelir. Elle

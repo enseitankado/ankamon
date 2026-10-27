@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * GNOME Adwaita (Linux) görünümü, koyu — ville.Fluent paletinden türetilmiş (vurgu #3584E4, bkz. Derive.colors) + Ankamon
  * kabuğunun "app-*" ve ortak (surface, error, text-primary-on-surface…) takma adları.

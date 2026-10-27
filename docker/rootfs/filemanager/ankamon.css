@@ -1,4 +1,9 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+/*
  * FileBrowser Quantum için ankamon'a özel düzeltmeler (bkz. docker/rootfs/services/filemanager.sh
  * -> frontend.styling.customCSS). FileBrowser Quantum'un CSS'i büyük ölçüde rem/em birimiyle yazılmış
  * (bkz. _variables.css: --borderRadius: 1em, --icon-size: 3em, --header-height: calc(4em+...));

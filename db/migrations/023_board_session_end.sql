@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Tahta oturumu kapanma nedeninin ayrıntısı (Tahtalar ▸ Oturumlar). Kapanış mesajı gelmeden tahta
 -- çevrimdışı olunca oturum 'offline' kapatılır (bkz. tasks/board_sessions.py); tahta yeniden erişilebilir
 -- olunca tasks/session_end.py tahtanın kendi açılış günlüğüne (journalctl) bakıp nedeni netleştirir:

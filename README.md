@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Ankamon
 
 **Pardus İzleme ve Yönetim Merkezi** — okuldaki akıllı tahtalar için merkezi log sunucusu, sensör izleme ve uzaktan yönetim.
@@ -190,3 +195,18 @@ sudo rm -rf /opt/ankamon                          # veriler ve yedekler DAHİL h
 ```
 
 Silmeden önce yedekleri saklamak için `data/backups/` dizinini başka bir yere kopyalayın.
+
+## Lisans
+
+Telif hakkı © 2026 Özgür Koca. Bu proje **GNU Affero Genel Kamu Lisansı sürüm 3 veya sonrası
+(AGPL-3.0-or-later)** ile lisanslıdır; tam metin için [LICENSE](LICENSE) dosyasına bakınız. Kodun
+tamamı ya da herhangi bir parçası (sınıf, işlev, kod bloğu) türev esere alınırsa, türev eser de AGPL
+ile yayımlanmalı, telif/atıf bildirimi ve yapılan değişiklikler belirtilmelidir. Değiştirilmiş bir
+sürüm ağ üzerinden hizmet olarak sunulursa (ör. bir web paneli olarak), o hizmetin kullanıcılarına
+kaynak kodu sunulmalıdır (AGPLv3 madde 13).
+
+Her dosyanın telif/lisans bilgisi [REUSE](https://reuse.software) biçimindedir (dosya başlığındaki
+SPDX satırları ya da [REUSE.toml](REUSE.toml)); doğrulama `reuse lint`. Üçüncü taraf parçalar:
+Fluent tema yaması (`frontend/themes-src/fluent.patch`, MIT) ve MEB kök sertifikası
+(`docker/rootfs/certs/meb-ca.crt`, bkz. [LICENSES/LicenseRef-MEB-CA.txt](LICENSES/LicenseRef-MEB-CA.txt)).
+Yeni dosyalar başlıkla oluşturulur: `scripts/ankamon-lisans-basligi.py --ekle <dosya>`.

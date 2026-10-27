@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Web terminal (webssh): tarayıcıdan seçili tahtaya SSH. nginx /webshell/ ile vekillenir ve
 # oturum + "shell" yetkisiyle korunur. Yalnız 127.0.0.1 dinler; dışarı açılmaz.
 set -eu

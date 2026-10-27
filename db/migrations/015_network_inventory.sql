@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Ağ envanteri: bu sunucunun bağlı olduğu fiziksel ağlar ve o ağlarda görülen (çevrimiçi/çevrimdışı)
 -- bütün cihazlar. Tarayan: worker/ankamon/netscan (supervisord "netscan"). Arayüz: sol menü "Ağ".
 --

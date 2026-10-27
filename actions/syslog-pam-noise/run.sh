@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # pam_etap.py (pardus-etap-settings) session yığınında olduğu halde pam_sm_open/close_session tanımlamaz;
 # pam_python her girişte bunu authpriv.err olarak basar. Kural /etc/rsyslog.d/*.conf'un yerel dosya kurallarından
 # ÖNCE okunmasına dayanır (Debian rsyslog.conf: $IncludeConfig, ardından auth.log vb.) → iletim + yerel dosya ikisi de.

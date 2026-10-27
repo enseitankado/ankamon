@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Oturumun tarayıcıdaki durumu (alt çubuk ipucunda yeşil "Aktif"): Ankamon sekmesi GÖRÜNÜR ve tarayıcı
 -- penceresi ODAKTA mı. Tarayıcı durum değişince hemen, sürerken 15 sn'de bir bildirir (bkz. StatusBar
 -- __pollUsers, LoginSessionsApi::active). Bildirim kesilirse (sekme kapandı, ağ gitti) focus_at eskir ve

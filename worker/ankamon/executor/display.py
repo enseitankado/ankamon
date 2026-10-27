@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Sağ menü Ekran ▸ "Uyandır": tahtanın güç tasarrufuna girmiş (karartılmış) ekranını uyandırır.
 
 ETAP oturumlarında Cinnamon'un kendi ekran karartması kapalıdır (sleep-display-* 0); ekranı X

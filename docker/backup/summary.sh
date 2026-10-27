@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Yedek dosyalarının özeti → /run/ankamon/backups.json. Yedek dizini bilerek root'a özel (700 —
 # dökümlerde parola özetleri var) olduğundan PHP (nobody) dizini okuyamaz; içerik yerine yalnız
 # ad/boyut/zaman listesi herkesin okuyabileceği bir dosyaya yazılır (bkz. backend DashboardApi::backups,

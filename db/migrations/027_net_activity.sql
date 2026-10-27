@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Ağ etkinliği: cihazın IP ID sayacından türetilen kaba paket/sn tahmini (bkz. worker netscan/activity.py,
 -- bellek network-usage-study). Yalnız Windows güvenilirdir (tek global sayaç); Linux/kamera/router ID'yi
 -- rastgele artırdığından örneklenmez. activity_pps NULL = ölçülmedi/güvenilmez (Windows değil, yanıt yok,

@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Tahtaların AÇIK olduğu zaman aralıkları — loglardan önceden hesaplanır (bkz.
 -- worker/ankamon/tasks/board_uptime.py), Oturumlar > Kullanıcılar zaman çizelgesi kapalı saatleri
 -- (ör. kurumun kapalı olduğu 18:00–08:00) her açılışta logları taramadan, bu küçük tablodan çizer.
