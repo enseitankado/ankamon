@@ -54,6 +54,8 @@ EXIT_START_FAILED = 4
 # kendi komut satırından alınır (lightdm: /var/run/lightdm/root/:N) — giriş ekranında da kullanıcı
 # oturumunda da çalışır (Xorg bulunamazsa -auth verilmez: erişim denetimsiz X için).
 # x11vnc'ye </dev/null verilir: arka plana geçen süreç SSH oturumunun girdisini devralmasın.
+# VNC masaüstü adı ekranın gerçek çözünürlüğünü taşır ("ankamon-1920x1080"): önizleme -scale ile küçültülse de
+# tarayıcı kutucuğun en-boy oranını ve gerçek boyuta oranını bilsin (bkz. screen/index.html Tile.setResolution).
 _SCRIPT = r"""
 vt=$(cat /sys/class/tty/tty0/active 2>/dev/null)
 set -- $(ps -eo args= | awk -v vt="vt${vt#tty}" '
@@ -64,10 +66,12 @@ disp=${1:-:0}
 auth=${2:-}
 command -v x11vnc >/dev/null 2>&1 || exit 127
 sc=
-w=$(XAUTHORITY=${auth:-/nonexistent} xdpyinfo -display "$disp" 2>/dev/null | awk '/dimensions:/ { split($2, s, "x"); print s[1]; exit }')
+dim=$(XAUTHORITY=${auth:-/nonexistent} xdpyinfo -display "$disp" 2>/dev/null | awk '/dimensions:/ { print $2; exit }')
+case $dim in *[!0-9x]*|x*|*x) dim= ;; esac
+w=${dim%x*}
 [ -n "$w" ] && [ "$w" -gt MAXW ] && sc="-scale MAXW/$w"
 out=$(x11vnc -q -bg -localhost -once -timeout 15 -display "$disp" ${auth:+-auth "$auth"} INPUT -shared \
-  -nopw -norc -nosel -nobell -nolookup -noxrecord -wait WAIT -defer WAIT $sc 2>&1 </dev/null)
+  -nopw -norc -nosel -nobell -nolookup -noxrecord -wait WAIT -defer WAIT $sc ${dim:+-desktop "ankamon-$dim"} 2>&1 </dev/null)
 case "$out" in
   *PORT=*) printf '%s\n' "$out" | grep '^PORT=' | head -n 1 ;;
   *) printf '%s\n' "$out" | grep -v '^$' | tail -n 2 >&2; exit 4 ;;

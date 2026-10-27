@@ -292,6 +292,8 @@ qx.Class.define("ankamon.page.Boards", {
     __previewKey: null,
     __previewMenu: null,
     __onMessage: null,
+    __screenRes: null,
+    __sizeLabel: null,
     __shownBoards: null,
     __checkAllButton: null,
     __whoamiState: null,
@@ -402,6 +404,7 @@ qx.Class.define("ankamon.page.Boards", {
       this.__frame = new qx.ui.embed.Html("").set({ overflowX: "hidden", overflowY: "hidden" });
       page.add(this.__createScreensToolbar());
       page.add(this.__frame, { flex: 1 });
+      this.__screenRes = new Map(); // tahta id → ekran genişliği (px), bkz. "tm-res"
       page.add(this.__createSizeRow());
       this.__screensPage = page;
       this.__screenOrder = (this._user && this._user.screen_order) || [];
@@ -451,6 +454,10 @@ qx.Class.define("ankamon.page.Boards", {
           this.__saveScreenOrder(e.data.order || []);
         } else if (e.data.type === "tm-live") {
           this.__queueLiveWhoami(e.data.id);
+        } else if (e.data.type === "tm-res") {
+          // Tahtanın ekran çözünürlüğü (VNC çerçeve boyutu): slider'ın yanındaki % değeri buna göre.
+          this.__screenRes.set(e.data.id, e.data.w);
+          this.__updateSizeLabel();
         }
       };
       window.addEventListener("message", this.__onMessage);
@@ -554,10 +561,38 @@ qx.Class.define("ankamon.page.Boards", {
         this.__tileSize = v;
         this.__saveTileSize(v);
         this.__pushSize(true);
+        this.__updateSizeLabel();
       });
       this.__tileSize = slider.getValue();
       row.add(slider);
+      this.__sizeLabel = new qx.ui.basic.Label("").set({ font: "small", textColor: "app-muted", minWidth: 36 });
+      row.add(this.__sizeLabel);
+      this.__updateSizeLabel();
       return row;
+    },
+
+    /**
+     * Slider'ın yanındaki % değeri: kutucuk genişliğinin tahta ekranının gerçek genişliğine oranı (ör. 1920
+     * px'lik ekran 300 px'lik kutucukta %16). Tahtaların çözünürlüğü önizleme bağlanınca öğrenilir
+     * ("tm-res"); farklı çözünürlükte tahtalar varsa en yaygın olanınki, hiç bilinmiyorsa 1920 esas alınır.
+     */
+    __updateSizeLabel() {
+      if (!this.__sizeLabel) {
+        return;
+      }
+      const counts = new Map();
+      this.__screenRes.forEach(w => counts.set(w, (counts.get(w) || 0) + 1));
+      let width = 1920;
+      let best = 0;
+      counts.forEach((n, w) => {
+        if (n > best) {
+          best = n;
+          width = w;
+        }
+      });
+      const pct = Math.max(1, Math.round(this.__tileSize * 100 / width));
+      this.__sizeLabel.setValue("%" + pct);
+      this.__sizeLabel.setToolTipText(`Kutucuk genişliği ${this.__tileSize} px — tahta ekranının (${width} px genişlik) %${pct}'i`);
     },
 
     __loadTileSize() {

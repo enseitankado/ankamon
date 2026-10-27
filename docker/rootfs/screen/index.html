@@ -89,12 +89,12 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     font-size: 15px; color: #888; pointer-events: none; z-index: 5; }
   /* Kutucuklar sarılan satırlarda; genişlik ortak boyuttan (alt slider, --tile-min) ya da kutucuğun kendi
-     boyutundan (kenarından sürükleyerek — --w; görüntü yüksekliği --h, yoksa 16:9). Bkz. setTileSize. */
+     boyutundan (kenarından sürükleyerek — --w). Görüntü yüksekliği genişlikten, tahtanın ekran
+     çözünürlüğünün en-boy oranıyla (--ar; bilinmiyorsa 16:9) gelir. Bkz. setTileSize, Tile.setResolution. */
   html.embed #grid { display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start;
     gap: 6px; padding: 6px; background: #f3f3f3; }
   html.embed .tile { min-height: 0; border-radius: 4px; overflow: hidden; flex: none;
     width: var(--w, var(--tile-min, 300px)); max-width: 100%; }
-  html.embed .tile.has-h .view { aspect-ratio: auto; height: var(--h); }
   html.embed .tile:fullscreen { width: auto; max-width: none; }
   html.embed .tile:fullscreen .view { height: auto; }
   /* Boyutlandırma tutamaçları: sağ kenar, alt kenar, sağ alt köşe (bkz. Tile.makeResizable). */
@@ -116,7 +116,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   html.embed .tile .title { cursor: move; user-select: none; }
   html.embed .tile .title button { cursor: pointer; }
   .marquee { position: fixed; border: 1px dashed #4af; background: rgba(70, 150, 255, .15); z-index: 999; pointer-events: none; }
-  html.embed .tile .view { flex: none; aspect-ratio: 16 / 9; }
+  html.embed .tile .view { flex: none; aspect-ratio: var(--ar, 16 / 9); }
   /* Önizleme kutucuğu tam ekran olunca gömülü kipin sabit 16:9 kutu boyutu geçersiz kılınır —
      yoksa .view tam ekran tile'ın küçük bir köşesinde sıkışıp kanvas görünmez kalabilir. */
   .tile:fullscreen { background: #000; }
@@ -399,9 +399,10 @@ class Tile {
   }
 
   /**
-   * Gömülü kipte kutucuk kenarından boyutlandırılır (kullanıcı isteği): sağ kenar genişliği, alt kenar
-   * görüntü yüksekliğini, köşe ikisini birden değiştirir. Yalnız genişlik verilmişse görüntü 16:9 kalır.
-   * Boyut tahta başına bu tarayıcıda saklanır; alt slider (setTileSize reset) hepsini ortak boyuta döndürür.
+   * Gömülü kipte kutucuk kenarından boyutlandırılır (kullanıcı isteği): sağ kenar, alt kenar ya da köşe —
+   * hangisinden sürüklenirse sürüklensin en-boy oranı korunur (tahtanın ekran çözünürlüğü, bkz.
+   * setResolution); yalnız ölçek değişir. Köşede iki yöndeki sürüklemeden büyük olanı geçerlidir.
+   * Boyut (genişlik) tahta başına bu tarayıcıda saklanır; alt slider (setTileSize reset) hepsini ortak boyuta döndürür.
    */
   makeResizable() {
     ["e", "s", "se"].forEach(dir => {
@@ -414,14 +415,15 @@ class Tile {
         e.stopPropagation();
         h.setPointerCapture(e.pointerId);
         const startX = e.clientX, startY = e.clientY;
-        const w0 = this.el.offsetWidth, h0 = this.view.offsetHeight;
+        const w0 = this.el.offsetWidth;
+        const ar = this.aspect();
         const maxW = grid.clientWidth - 12;
         this.el.classList.add("resizing");
         const onMove = ev => {
-          const size = tileSizes[this.board.id] || {};
-          if (dir !== "s") size.w = Math.round(Math.max(Tile.MIN_W, Math.min(maxW, w0 + ev.clientX - startX)));
-          if (dir !== "e") size.h = Math.round(Math.max(Tile.MIN_H, h0 + ev.clientY - startY));
-          tileSizes[this.board.id] = size;
+          // Alt kenardaki dikey sürükleme, görüntü yüksekliğindeki değişimin genişlik karşılığına çevrilir.
+          const dx = ev.clientX - startX, dy = (ev.clientY - startY) * ar;
+          const d = dir === "e" ? dx : dir === "s" ? dy : (Math.abs(dx) > Math.abs(dy) ? dx : dy);
+          tileSizes[this.board.id] = { w: Math.round(Math.max(Tile.MIN_W, Math.min(maxW, w0 + d))) };
           this.applySize();
         };
         const onUp = () => {
@@ -440,13 +442,35 @@ class Tile {
     this.applySize();
   }
 
-  /** Kutucuğun kendi boyutu (yoksa ortak boyut — CSS --tile-min). */
+  /** Kutucuğun kendi genişliği (yoksa ortak boyut — CSS --tile-min) ve görüntünün en-boy oranı (--ar). */
   applySize() {
     const size = tileSizes[this.board.id];
     const s = this.el.style;
     if (size && size.w) s.setProperty("--w", size.w + "px"); else s.removeProperty("--w");
-    if (size && size.h) s.setProperty("--h", size.h + "px"); else s.removeProperty("--h");
-    this.el.classList.toggle("has-h", !!(size && size.h));
+    const res = tileRes[this.board.id];
+    if (res) s.setProperty("--ar", res[0] + " / " + res[1]); else s.removeProperty("--ar");
+  }
+
+  /** Görüntünün en-boy oranı (genişlik / yükseklik): tahtanın bilinen çözünürlüğü, yoksa 16:9. */
+  aspect() {
+    const res = tileRes[this.board.id];
+    return res ? res[0] / res[1] : 16 / 9;
+  }
+
+  /**
+   * Tahtanın ekran çözünürlüğü (VNC çerçeve boyutu — bağlanınca ve tahtada değişince): kutucuk oranı
+   * buna uyar, tahta kapalıyken de son bilinen oran kullanılsın diye bu tarayıcıda saklanır; üst sayfaya
+   * bildirilir (slider'ın yanındaki % değeri — bkz. Boards "tm-res").
+   */
+  setResolution(w, h) {
+    if (!(w > 0 && h > 0)) return;
+    const old = tileRes[this.board.id];
+    if (!old || old[0] !== w || old[1] !== h) {
+      tileRes[this.board.id] = [w, h];
+      try { localStorage.setItem(TILE_RES_KEY, JSON.stringify(tileRes)); } catch (e) { /* kalıcılık önemsiz */ }
+      if (embed) this.applySize();
+    }
+    if (embed) window.parent.postMessage({ type: "tm-res", id: this.board.id, w, h }, location.origin);
   }
 
   /** Ad/durum güncellemesi (gömülü kipte üst sayfadan gelen liste). */
@@ -634,6 +658,23 @@ class Tile {
     rfb.compressionLevel = p.compression;
     rfb.background = "#000";
     const fresh = !prev;                // kalite değişimi (kesintisiz geçiş) yeni bağlantı sayılmaz
+    // Ekranın gerçek çözünürlüğü VNC masaüstü adında gelir ("ankamon-1920x1080" — bkz. worker/ankamon/
+    // screen/remote.py; önizleme akışı tahtada küçültüldüğünden çerçeve boyutu gerçek boyut değildir).
+    // Ad yoksa (eski x11vnc) oran için çerçeve boyutu kullanılır: bağlantıda (ServerInit) ve tahtada
+    // çözünürlük değişince (DesktopSize) gelir; noVNC bunu olay olarak yaymıyor, iç _resize sarılır.
+    let native = false;
+    rfb.addEventListener("desktopname", e => {
+      const m = /^ankamon-(\d+)x(\d+)$/.exec((e.detail && e.detail.name) || "");
+      if (m && this.token === token) {
+        native = true;
+        this.setResolution(+m[1], +m[2]);
+      }
+    });
+    const resize = rfb._resize.bind(rfb);
+    rfb._resize = (w, h) => {
+      resize(w, h);
+      if (!native && this.token === token) this.setResolution(w, h);
+    };
     rfb.addEventListener("connect", () => {
       this.setState("live");
       if (this.control) rfb.focus();
@@ -894,11 +935,14 @@ Tile.INSTALL_POLL_MS = 5000;
 Tile.INSTALL_FAILED_RETRY_MS = 60000;
 // Kenardan boyutlandırmada en küçük kutucuk genişliği / görüntü yüksekliği (slider'ın alt sınırıyla uyumlu).
 Tile.MIN_W = 140;
-Tile.MIN_H = 60;
 
 // Kutucukların kendi boyutları (tahta id → {w?, h?}, piksel) — bu tarayıcıda kalıcı (bkz. Tile.makeResizable).
 const TILE_SIZES_KEY = "ankamon.screens.tileSizes";
 let tileSizes = {};
+// Tahta başına son bilinen ekran çözünürlüğü [genişlik, yükseklik] (bkz. Tile.setResolution).
+const TILE_RES_KEY = "ankamon.screens.tileRes";
+let tileRes = {};
+try { tileRes = JSON.parse(localStorage.getItem(TILE_RES_KEY) || "{}") || {}; } catch (e) { tileRes = {}; }
 try { tileSizes = JSON.parse(localStorage.getItem(TILE_SIZES_KEY) || "{}") || {}; } catch (e) { tileSizes = {}; }
 
 function saveTileSizes() {
