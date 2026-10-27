@@ -48,7 +48,6 @@ qx.Class.define("ankamon.ui.BoardOps", {
         width: Math.min(1024, bounds.width - 40),
         height: Math.min(640, bounds.height - 40)
       });
-      ankamon.ui.Dialog.slimCaption(win);
       // Yazı boyutu (kullanıcı isteği): seçim tarayıcıda kalıcı, açılışta URL'yle (webssh ?fontsize=;
       // çoklu terminal bölmeleri localStorage'dan okur — bkz. multishell/index.html) uygulanır, sonra
       // A−/A+ ile CANLI değişir (oturum kopmaz — bkz. docker/rootfs/webssh-fontsize-patch.py).
@@ -159,7 +158,6 @@ qx.Class.define("ankamon.ui.BoardOps", {
         width: Math.min(1200, bounds.width - 40),
         height: Math.min(800, bounds.height - 40)
       });
-      ankamon.ui.Dialog.slimCaption(win);
       const frame = new qx.ui.embed.Iframe(url);
       win.add(frame);
       win.addListener("close", () => {
@@ -221,7 +219,6 @@ qx.Class.define("ankamon.ui.BoardOps", {
         width: Math.min(1024, bounds.width - 40),
         height: Math.min(640, bounds.height - 40)
       });
-      ankamon.ui.Dialog.slimCaption(win);
       const frame = new qx.ui.embed.Iframe("/screen/#" + hash);
       // Sayfadaki "Tam ekran" (Fullscreen API) iframe içinden ancak bu izinle çalışır.
       frame.getContentElement().setAttribute("allowfullscreen", "true");

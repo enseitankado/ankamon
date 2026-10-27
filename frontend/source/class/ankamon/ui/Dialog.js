@@ -50,26 +50,40 @@ qx.Class.define("ankamon.ui.Dialog", {
       win.addListener("close", () => qx.event.Timer.once(() => win.destroy(), null, 0));
       win.addListenerOnce("appear", () => win.center());
       qx.core.Init.getApplication().getRoot().add(win);
-      this.slimCaption(win);
       return win;
     },
 
+    __slimCaptionsInstalled: false,
+    __slimTitleFont: null,
+
     /**
-     * Pencere başlığını inceltir (kullanıcı isteği: başlıklar iri/kaba durmasın, ekranı ekonomik kullansın):
+     * Pencere başlıklarını inceltir (kullanıcı isteği: başlıklar iri/kaba durmasın, ekranı ekonomik kullansın):
      * başlık yazısı daha küçük ve narin, başlık çubuğu daha az dolgulu. Yazı tipi doğrudan ayarlandığından
-     * (tema appearance'ından bağımsız) bütün temalarda tutarlı çalışır. Dialog.window dışındaki pencereler de
-     * (Jobs, BoardOps: web terminal / ekran / dosya yöneticisi) bunu çağırır.
+     * (tema appearance'ından bağımsız) bütün temalarda tutarlı çalışır.
+     *
+     * Uygulama açılışında bir kez çağrılır (bkz. Application.main): qx.ui.window.Window'ın alt öğe kurucusu
+     * yamalanır, böylece Ankamon'da açılan HER pencere — Dialog.window, Jobs, BoardOps, Window'dan türeyen
+     * sınıflar (Görev yöneticisi, dosya kopyalama/toplu işlem) ve eklentilerinkiler — açan kod bir şey
+     * çağırmadan ince başlıkla doğar (önceden pencere başına çağrılıyordu, bazı pencereler kalın kalmıştı).
      */
-    slimCaption(win) {
-      try {
-        win.getChildControl("captionbar").setPadding(3, 8, 3, 10);
-        win.getChildControl("title").set({
-          font: qx.bom.Font.fromConfig({ size: 12, lineHeight: 1.2, family: ["Segoe UI", "system-ui", "sans-serif"] }),
-          paddingRight: 10
-        });
-      } catch (e) {
-        // Beklenmedik tema/sürümde sessiz geç (başlık yalnızca incelmez, işlev bozulmaz).
+    installSlimWindowCaptions() {
+      if (this.__slimCaptionsInstalled) {
+        return;
       }
+      this.__slimCaptionsInstalled = true;
+      this.__slimTitleFont = qx.bom.Font.fromConfig({ size: 12, lineHeight: 1.2, family: ["Segoe UI", "system-ui", "sans-serif"] });
+      const font = this.__slimTitleFont;
+      const proto = qx.ui.window.Window.prototype;
+      const create = proto._createChildControlImpl;
+      proto._createChildControlImpl = function (id, hash) {
+        const control = create.call(this, id, hash);
+        if (id === "captionbar") {
+          control.setPadding(3, 8, 3, 10);
+        } else if (id === "title") {
+          control.set({ font, paddingRight: 10 });
+        }
+        return control;
+      };
     },
 
     /** Pencerenin altına sağa yaslı düğme sırası ekler. */
