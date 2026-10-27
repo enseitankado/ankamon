@@ -57,7 +57,8 @@
   /* Ekran güç tasarrufunda: tahtanın monitörü DPMS ile kapalı (üst sayfadan "powersave" — periyodik SSH
      yoklaması, bkz. Boards.js __previewList) ya da bağlı görüntü tümüyle siyah (bkz. Tile.checkBlank).
      DPMS'te x11vnc son görüntüyü vermeye devam eder: yazı koyu zeminle görüntünün üstünde; zemin arkadaki
-     görüntüyü yalnız hafifçe belli edecek kadar saydam (kullanıcı isteği). Uyandırmak için sağ menü Ekran ▸ Uyandır. */
+     görüntüyü yalnız hafifçe belli edecek kadar saydam (kullanıcı isteği). Uyandırmak için sağ menü Ekran ▸ Uyandır;
+     gömülü kipte DPMS'teki kutucuğun ekran alanına basmak da uyandırır (bkz. Tile.wake). */
   .tile .sleep { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
     text-align: center; padding: 12px; font-size: 13px; color: #fff; font-weight: 600; pointer-events: none;
     background: rgba(0, 0, 0, .82); }
@@ -65,11 +66,14 @@
   /* TiHA geri sayımlı otomatik kapatması: kalan süre (bkz. Tile.tickShutdown, worker executor/autoshutdown.py). */
   .tile .sleep .sd { margin-top: 6px; font-weight: 400; font-size: 12px; color: #ffcc80; }
   .tile .sleep .sd:empty { display: none; }
+  .tile .sleep .wk { margin-top: 6px; font-weight: 400; font-size: 11px; color: #ccc; }
+  html.embed .tile.live.powersave:not(.control) .view, html.embed .tile.live.powersave:not(.control) .view * { cursor: pointer !important; }
   /* "Başarım" açıkken (.perf kendi koyu zeminiyle zaten örtüyor) yazı tam örtü olmaz, sağ altta küçük
      rozete döner: koyu örtü göstergeleri okunmaz kılıyordu (kullanıcı isteği). */
   .tile .view:has(> .perf:not([hidden])) .sleep { inset: auto 4px 4px auto; max-width: 60%; padding: 3px 8px;
     border-radius: 3px; font-size: 12px; background: rgba(0, 0, 0, .85); }
   .tile .view:has(> .perf:not([hidden])) .sleep .sd { margin-top: 2px; font-size: 11px; }
+  .tile .view:has(> .perf:not([hidden])) .sleep .wk { display: none; }
   html.single #toolbar { display: none; }
   /* Gömülü kip (Tahtalar sayfasının "Ekranlar" sekmesi): sabit oranlı küçük kutucuklar, aşağı kaydırılır.
      Sınıf <html>'e eklenir (bkz. baştaki senkron betik), body'ye değil: <body> ayrıştırılmadan önce
@@ -227,7 +231,7 @@ class Tile {
     this.control = false;     // fare/klavye ile müdahale (yalnız "screen.control" yetkisiyle; sunucu da denetler)
     this.el.innerHTML = `<div class="title"><span class="dot"></span><span class="name"></span>
       ${spec.control ? '<button class="ctl" title="Fare ve klavye ile tahtayı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
-      <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div><div class="sleep"><div>Ekran güç tasarrufu kipinde<div class="sd"></div></div></div>
+      <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div><div class="sleep"><div>Ekran güç tasarrufu kipinde<div class="sd"></div>${embed ? '<div class="wk">Uyandırmak için tıklayın</div>' : ""}</div></div>
       <div class="whoami" hidden></div></div><div class="stats"></div>`;
     this.el.querySelector(".name").textContent = board.name || ("#" + board.id);
     this.view = this.el.querySelector(".view");
@@ -245,7 +249,23 @@ class Tile {
     this.tickShutdown();
     this.el.querySelector("button.fs").addEventListener("click", () => toggleFullscreen(single ? document.documentElement : this.el));
     const ctl = this.el.querySelector("button.ctl");
-    if (ctl) ctl.addEventListener("click", () => this.setControl(!this.control));
+    // Müdahale tam ekranda yapılır (kullanıcı isteği): Ekranlar sekmesinde (gömülü) kutucuğun kendisi değil,
+    // o tahtanın "Ekranı yönet" penceresi büyütülmüş açılır (üst sayfa — bkz. Boards.js "tm-manage"); ekran
+    // penceresinin içinde açılınca pencere büyütülür (bkz. BoardOps.screen "tm-maximize").
+    if (ctl) ctl.addEventListener("click", () => {
+      if (embed) {
+        window.parent.postMessage({ type: "tm-manage", id: this.board.id }, location.origin);
+        return;
+      }
+      this.setControl(!this.control);
+      if (this.control) window.parent.postMessage({ type: "tm-maximize" }, location.origin);
+    });
+    // Güç tasarrufundaki ekrana basmak onu uyandırır (gömülü kip; seçim/çift tıklama da aynen sürer).
+    if (embed) {
+      this.el.addEventListener("pointerdown", e => {
+        if (e.button === 0 && !this.control && e.target.closest(".view")) this.wake();
+      }, true);
+    }
     // Müdahale kipinde çift tıklama tahtaya gider; tam ekran yalnız ⛶ düğmesiyle.
     // Gömülü kipte (Ekranlar sekmesi) ekran alanına çift tıklama sağ menüdeki "Ekranı göster" ile aynı
     // işi yapar (kullanıcı isteği; üst sayfa açar — bkz. Boards.js "tm-show"); başlık çubuğuna çift
@@ -728,6 +748,17 @@ class Tile {
     if (!noReconnect) this.reconnect();
   }
 
+  /**
+   * Ekran güç tasarrufundaysa (DPMS — üst sayfanın "powersave"i) uyandırma ister: üst sayfa sağ menüdeki
+   * Ekran ▸ Uyandır ile aynı işi çalıştırır (bkz. Boards.js "tm-wake"). Art arda basışlar WAKE_MS içinde
+   * bir kez gönderilir (iş sürerken "Ekran uyandırılıyor…" yazar; DPMS durumu sonraki yoklamada kalkar).
+   */
+  wake() {
+    if (!this.el.classList.contains("powersave") || Date.now() - (this.wakeAt || 0) < Tile.WAKE_MS) return;
+    this.wakeAt = Date.now();
+    window.parent.postMessage({ type: "tm-wake", id: this.board.id }, location.origin);
+  }
+
   /** Önizlemedeki kutucuk tam ekrana geçince yüksek kaliteye, çıkınca önizleme kalitesine döner. */
   setQuality(q) {
     if (this.control) q = "view";
@@ -739,6 +770,8 @@ class Tile {
 // Kesintisiz geçişte yeni akış "connect" olduktan sonra eski görüntünün kaldırılmadan önce
 // beklediği süre (ilk tam kare genelde bundan önce çizilir).
 Tile.SWAP_MS = 700;
+// Kutucuğa basarak uyandırmada aynı tahtaya yeni iş gönderilmeden geçmesi gereken süre (bkz. Tile.wake).
+Tile.WAKE_MS = 15000;
 // Köprü x11vnc'yi ~2 sn'de başlatır (ssh ConnectTimeout 8 sn, başlatma en çok 30 sn bekler) — bu
 // süre içinde "connect" gelmezse akış takılmış sayılır.
 Tile.CONNECT_TIMEOUT_MS = 40000;

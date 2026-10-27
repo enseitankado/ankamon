@@ -400,6 +400,18 @@ qx.Class.define("ankamon.page.Boards", {
           if (board && board.online && this._can("screen")) {
             ankamon.ui.BoardOps.screen([board], this._user);
           }
+        } else if (e.data.type === "tm-manage") {
+          // Kutucuktaki "🖱 Müdahale" = sağ menüdeki "Ekranı yönet": pencere büyütülmüş açılır (kullanıcı isteği).
+          const board = this.__boards.get(e.data.id);
+          if (board && board.online && this._can("screen") && this._can("screen.control")) {
+            ankamon.ui.BoardOps.screen([board], this._user, true);
+          }
+        } else if (e.data.type === "tm-wake") {
+          // Güç tasarrufundaki kutucuğa basıldı = sağ menü Ekran ▸ Uyandır (yalnız o tahta).
+          const board = this.__boards.get(e.data.id);
+          if (board && board.online && this._can("screen")) {
+            this.__sessionOps().wake([board]);
+          }
         } else if (e.data.type === "tm-reorder") {
           this.__saveScreenOrder(e.data.order || []);
         } else if (e.data.type === "tm-live") {

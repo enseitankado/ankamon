@@ -171,6 +171,9 @@ qx.Class.define("ankamon.ui.BoardOps", {
       if (open) {
         if (!manage || open.manage) {
           open.win.open(); // görünür + öne
+          if (manage) {
+            open.win.maximize();
+          }
           open.win.focus();
           return;
         }
@@ -194,7 +197,16 @@ qx.Class.define("ankamon.ui.BoardOps", {
       frame.getContentElement().setAttribute("allowfullscreen", "true");
       frame.getContentElement().setAttribute("allow", "fullscreen");
       win.add(frame);
+      // Müdahale tam ekranda (kullanıcı isteği): pencerenin içinde "🖱 Müdahale" açılınca sayfa "tm-maximize"
+      // gönderir, pencere büyür (bkz. screen/index.html); "Ekranı yönet" zaten büyütülmüş açılır.
+      const onMessage = e => {
+        if (e.origin === location.origin && e.data && e.data.type === "tm-maximize" && e.source === frame.getWindow()) {
+          win.maximize();
+        }
+      };
+      window.addEventListener("message", onMessage);
       win.addListener("close", () => {
+        window.removeEventListener("message", onMessage);
         frame.setSource("about:blank"); // WebSocket'ler hemen kapansın (tahtadaki x11vnc de biter)
         if (single !== null && this.__screenWins.get(single)?.win === win) {
           this.__screenWins.delete(single);
@@ -202,9 +214,16 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         win.destroy();
       });
-      win.addListenerOnce("appear", () => win.center());
+      win.addListenerOnce("appear", () => {
+        if (!win.isMaximized()) {
+          win.center();
+        }
+      });
       root.add(win);
       win.open();
+      if (manage) {
+        win.maximize();
+      }
       if (single !== null) {
         this.__screenWins.set(single, { win, manage });
         this.__announceScreenWindows();
