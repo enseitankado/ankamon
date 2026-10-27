@@ -592,7 +592,7 @@ qx.Class.define("ankamon.page.Boards", {
       });
       const pct = Math.max(1, Math.round(this.__tileSize * 100 / width));
       this.__sizeLabel.setValue("%" + pct);
-      this.__sizeLabel.setToolTipText(`Kutucuk genişliği ${this.__tileSize} px — tahta ekranının (${width} px genişlik) %${pct}'i`);
+      this.__sizeLabel.setToolTipText(`Kutucuk genişliği ${this.__tileSize} px, tahta ekranı ${width} px genişlikte (%${pct} oranında)`);
     },
 
     __loadTileSize() {
