@@ -47,9 +47,11 @@ import sys
 import time
 import tomllib
 
-ANKAMON_PROJE_SATIRI = "Ankamon — ETAP akıllı tahtaları için merkezi log, izleme ve yönetim sunucusu"
+# Eklenti depoları (ext/<ad>) aynı aracı kendi proje satırı ve adresiyle kullanır (ortam değişkenleri).
+ANKAMON_PROJE_SATIRI = os.environ.get(
+    "ANKAMON_PROJE_SATIRI", "Ankamon — ETAP akıllı tahtaları için merkezi log, izleme ve yönetim sunucusu")
 ANKAMON_TELIF_SAHIBI = "Özgür Koca <ozgurkoca@gmail.com>"
-ANKAMON_DEPO_URL = "https://github.com/enseitankado/ankamon"
+ANKAMON_DEPO_URL = os.environ.get("ANKAMON_DEPO_URL", "https://github.com/enseitankado/ankamon")
 ANKAMON_SPDX = "AGPL-3.0-or-later"
 ANKAMON_TAM_BASLIK_ESIGI = 40  # satır; daha kısa yardımcı dosyalar kısa başlık alır
 
@@ -111,6 +113,11 @@ def ankamon_reuse_kapsami(kok):
         p = ann.get("path", [])
         kaliplar += [p] if isinstance(p, str) else p
     return kaliplar
+
+
+def ankamon_lisans_metni_mi(yol):
+    """LICENSE/COPYING ve LICENSES/ altındaki lisans metinleri başlık almaz (REUSE de onları atlar)."""
+    return yol.startswith("LICENSES/") or re.match(r"(LICENSE|COPYING)(\.|$)", yol) is not None
 
 
 def _kalip_eslesir(yol, kalip):
@@ -202,6 +209,8 @@ def main(argv):
     for yol in filter(None, dosyalar):
         yol = os.path.relpath(os.path.abspath(yol), kok) if os.path.isabs(yol) else yol
         if not os.path.isfile(os.path.join(kok, yol)) or any(_kalip_eslesir(yol, k) for k in kapsam):
+            continue
+        if ankamon_lisans_metni_mi(yol):
             continue
         if ankamon_yorum_bicimi(yol) is None:
             eksik.append(f"{yol} (yorum biçimi bilinmiyor — başlık ekleyin ya da REUSE.toml'a yazın)")
