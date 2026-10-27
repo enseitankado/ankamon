@@ -503,13 +503,40 @@ qx.Class.define("ankamon.ui.BoardOps", {
       this.__job({ type: "action", action: "reboot", board_ids: ids }, "Yeniden başlatma çıktısı");
     },
 
-    /** Seçili (kapalı) tahtaları ağdan uyandırır (WoL). */
-    wol(boards) {
+    // "Bu pencereyi bir daha gösterme" (kullanıcı isteği) bu kadar süre geçerli; sonra pencere yeniden
+    // görünür ve kutu işaretsiz gelir. Bitiş anı kullanıcı başına sunucuda: users.ui_prefs["wol.hideUntil"].
+    WOL_HIDE_MS: 7 * 24 * 3600 * 1000,
+
+    /**
+     * Seçili (kapalı) tahtaları ağdan uyandırır (WoL). Pencere gizlenmişse (bkz. WOL_HIDE_MS) uyandırma
+     * yine yapılır, yalnız çıktı penceresi açılmaz — başlatma hatası ise her durumda gösterilir.
+     * @param user {Map?} oturum sahibi (pencere gizleme tercihi okunur/yazılır)
+     */
+    wol(boards, user) {
       const ids = boards.map(b => b.id);
-      if (ids.length) {
-        ankamon.ui.Jobs.show(ankamon.io.Api.post("/jobs", { type: "wol", board_ids: ids }).then(res => res.id),
-          "Uyandırma (WoL)", { intro: this.WOL_INTRO });
+      if (!ids.length) {
+        return;
       }
+      const job = ankamon.io.Api.post("/jobs", { type: "wol", board_ids: ids }).then(res => res.id);
+      const prefs = user ? user.ui_prefs || (user.ui_prefs = {}) : {};
+      if ((prefs["wol.hideUntil"] || 0) > Date.now()) {
+        job.catch(e => ankamon.ui.Dialog.error(e));
+        return;
+      }
+      let footer = null;
+      if (user) {
+        footer = new qx.ui.form.CheckBox("Bu pencereyi bir daha gösterme (uyandırma yine yapılır; 7 gün sonra pencere yeniden gösterilir)");
+        footer.addListener("changeValue", e => {
+          const value = e.getData() ? Date.now() + this.WOL_HIDE_MS : null;
+          if (value) {
+            prefs["wol.hideUntil"] = value;
+          } else {
+            delete prefs["wol.hideUntil"];
+          }
+          ankamon.io.Api.put("/auth/prefs", { key: "wol.hideUntil", value }).catch(err => ankamon.ui.Dialog.error(err));
+        });
+      }
+      ankamon.ui.Jobs.show(job, "Uyandırma (WoL)", { intro: this.WOL_INTRO, footer });
     },
 
     // Uyandırma penceresinin çıktı kutusunun başındaki sabit açıklama (bkz. ui.Jobs opts.intro):
@@ -627,7 +654,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         const off = boards.filter(b => !b.online);
         const on = boards.filter(b => b.online);
         const n = list => (list.length > 1 ? ` (${list.length} tahta)` : "");
-        add(ICON.wol, "Bilgisayarı aç (WoL)" + n(off), () => this.wol(off));
+        add(ICON.wol, "Bilgisayarı aç (WoL)" + n(off), () => this.wol(off, user));
         menu.getChildren()[menu.getChildren().length - 1].setEnabled(off.length > 0);
         add(ICON.shutdown, "Bilgisayarı kapat" + n(on), () => this.shutdown(on));
         menu.getChildren()[menu.getChildren().length - 1].setEnabled(on.length > 0);

@@ -81,7 +81,7 @@ qx.Class.define("ankamon.page.Boards", {
     if (this._can("power")) {
       this.__onlineButtons.push(
         this._addButton("Kapat", () => this.__withSome(boards => ankamon.ui.BoardOps.shutdown(boards))));
-      this.__wolButton = this._addButton("Uyandır", () => this.__withSome(boards => ankamon.ui.BoardOps.wol(boards)));
+      this.__wolButton = this._addButton("Uyandır", () => this.__withSome(boards => ankamon.ui.BoardOps.wol(boards, this._user)));
     }
 
     // Sütun tanımları: hem tabloya hem de her sütunun altındaki süzgeç kutusuna aynı dizi verilir.

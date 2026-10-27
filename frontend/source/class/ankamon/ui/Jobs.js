@@ -62,7 +62,8 @@ qx.Class.define("ankamon.ui.Jobs", {
      *   worker/ankamon/executor/backup.py); {downloads: url(jobId, name)} — "file" olaylarındaki dosyalar
      *   indirme listesine eklenir ve DOWNLOAD_GAP_MS aralıklarla sırayla otomatik indirilir;
      *   {intro: "metin"} — çıktı kutusunun EN BAŞINDA (her görünümde, tahta seçiminden bağımsız) duran
-     *   sabit açıklama, ör. Uyandır'da "tahta açılmazsa neden" bilgisi (bkz. BoardOps.WOL_INTRO).
+     *   sabit açıklama, ör. Uyandır'da "tahta açılmazsa neden" bilgisi (bkz. BoardOps.WOL_INTRO);
+     *   {footer: widget} — pencerenin en altına eklenir, ör. Uyandır'da "Bu pencereyi bir daha gösterme".
      */
     async show(jobOrPromise, caption, opts = {}) {
       const root = qx.core.Init.getApplication().getRoot();
@@ -100,6 +101,9 @@ qx.Class.define("ankamon.ui.Jobs", {
       split.add(list, 0);
       split.add(log, 1);
       win.add(split, { flex: 1 });
+      if (opts.footer) {
+        win.add(opts.footer);
+      }
       root.add(win);
       win.open();
 
