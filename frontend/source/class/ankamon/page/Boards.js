@@ -53,36 +53,10 @@ qx.Class.define("ankamon.page.Boards", {
 
   construct(user) {
     super(user, "Tahtalar");
-    this._compact = true; // çok düğmeli araç çubuğu: küçük dolgu/yazı tipiyle daha az yer kaplar.
-    this._addButton("Yenile", this.refresh);
-    this.__checkAllButton = this._addButton("Tümünü işaretle", () => this._checkAll(this.__table, true));
-    this.__uncheckButton = this._addButton("İşaretleri kaldır", () => this._checkAll(this.__table, false));
-    if (this._can("boards.manage")) {
-      this._addButton("Ekle", () => this.__edit(null));
-      this.__editButton = this._addButton("Düzenle", () => this.__single(board => this.__edit(board)));
-      this.__deleteButton = this._addButton("Sil", () => this.__withSome(boards => this.__delete(boards)));
-    }
-    // Çevrimiçiye özgü (SSH gerektiren) ve çevrimdışına özgü (WoL) düğmeler; görünürlükleri işaretli
-    // tahtaların gerçek durumuna göre ayarlanır — bkz. __updateActionState.
-    // "Web terminal" düğmesi kaldırıldı (kullanıcı isteği) — bkz. __rowMenu/satır sağ menüsü:
-    // birden fazla tahta işaretliyken sağ menüden "Web terminal" seçilirse hepsi için ortak terminal
-    // açılır (BoardOps.webshellMulti), tek tahta için tekli terminal (BoardOps.webshell).
-    this.__onlineButtons = [];
-    if (this._can("actions") || this._can("shell")) {
-      this.__onlineButtons.push(
-        this._addButton("Komut çalıştır", () => ankamon.ui.BoardOps.run(this.__selectedBoards(), this._user))
-          .set({ toolTipText: "İşaretli tahtalarda hazır bir işlem ya da serbest komut çalıştırır" }));
-    }
-    if (this._can("cast")) {
-      this.__onlineButtons.push(
-        this._addButton("Yansıt", () => this.__withSome(boards => ankamon.ui.BoardOps.cast(boards)))
-          .set({ toolTipText: "Bu bilgisayarın ekranını işaretli tahtalarda tam ekran gösterir" }));
-    }
-    if (this._can("power")) {
-      this.__onlineButtons.push(
-        this._addButton("Kapat", () => this.__withSome(boards => ankamon.ui.BoardOps.shutdown(boards))));
-      this.__wolButton = this._addButton("Uyandır", () => this.__withSome(boards => ankamon.ui.BoardOps.wol(boards, this._user)));
-    }
+    // Üstteki düğme satırı (Yenile, Tümünü işaretle, İşaretleri kaldır, Ekle, Düzenle, Sil, Komut çalıştır,
+    // Yansıt, Kapat, Uyandır) kaldırıldı (kullanıcı isteği): hepsi satır/kutucuk sağ menüsünde (bkz.
+    // __rowMenu — işaretleme ve "Tahta ekle…" de orada); sayfa REFRESH_MS'de bir kendiliğinden yenilenir.
+    this._actions.exclude();
 
     // Sütun tanımları: hem tabloya hem de her sütunun altındaki süzgeç kutusuna aynı dizi verilir.
     // Başlıklar kısa (kullanıcı isteği; ör. üç ayrı "Disk" sütunu); "hint" tam adı verir — sütun
@@ -137,9 +111,7 @@ qx.Class.define("ankamon.page.Boards", {
     // "Durum" sütunu: Çevrimiçi yeşil, Kapalı kırmızı (bkz. ui.table.StatusRenderer).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "status"),
       new ankamon.ui.table.StatusRenderer());
-    // Hiç tahta işaretli değilken tekli/çoklu işlem düğmeleri (Düzenle, Sil, Web terminal, İşlem
-    // çalıştır, Kapat, Uyandır) devre dışı kalır; Düzenle yalnız tam 1 işaretliyken etkinleşir;
-    // diğerleri 1 ya da daha fazla işaretli olunca etkinleşir — bkz. __updateActionState.
+    // İşaretler Ekranlar kutucuklarına yansır — bkz. __updateActionState.
     this.__table.getTableModel().addListener("dataChanged", this.__updateActionState, this);
     this.__table.addListener("cellDbltap", e => {
       if (this._can("boards.manage")) {
@@ -172,7 +144,7 @@ qx.Class.define("ankamon.page.Boards", {
     this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply);
 
     // İki sekme: "Liste" (grid) ve "Ekranlar" (grid'deki tahtaların canlı ekran önizlemeleri).
-    // Araç çubuğu sekmelerin üstünde kalır; işaretli tahtalara her iki sekmeden de uygulanır.
+    // Sağ menü işlemleri işaretli tahtalara her iki sekmeden de uygulanır.
     const tabs = new qx.ui.tabview.TabView().set({ contentPadding: 0 });
     const listPage = new qx.ui.tabview.Page("Liste");
     listPage.setLayout(new qx.ui.layout.VBox(8));
@@ -278,11 +250,6 @@ qx.Class.define("ankamon.page.Boards", {
     },
     __boards: null,
     __rows: null,
-    __onlineButtons: null,
-    __wolButton: null,
-    __editButton: null,
-    __deleteButton: null,
-    __uncheckButton: null,
     __screensPage: null,
     __screenView: null,
     __frame: null,
@@ -295,7 +262,6 @@ qx.Class.define("ankamon.page.Boards", {
     __screenRes: null,
     __sizeLabel: null,
     __shownBoards: null,
-    __checkAllButton: null,
     __whoamiState: null,
     __liveQueue: null,
     __applyingPreview: false,
@@ -365,11 +331,6 @@ qx.Class.define("ankamon.page.Boards", {
       this.__table.getTableModel().setData(shown.map(r => r.cells));
       this.__shownBoards = shown.map(r => r.board);
       this.__pushPreview();
-      // "Tümünü işaretle" o anda GÖRÜNEN (süzülmüş) satır sayısını gösterir — _checkAll de yalnız
-      // bunları işaretler, gizli/süzülmüş satırları değil.
-      if (this.__checkAllButton) {
-        this.__checkAllButton.setLabel(shown.length ? `Tümünü işaretle (${shown.length})` : "Tümünü işaretle");
-      }
     },
 
     /**
@@ -1055,69 +1016,15 @@ qx.Class.define("ankamon.page.Boards", {
       });
     },
 
-    /** İşaretli satırlara karşılık gelen tahta nesneleri. */
-    __selectedBoards() {
-      return this._checkedIds(this.__table).map(id => this.__boards.get(id)).filter(Boolean);
-    },
-
     /**
-     * İşaretli satır sayısına ve durumuna göre düğmeleri etkin/devre dışı + görünür/gizli yapar:
-     * hiçbiri işaretli değilken Düzenle/Sil/Web terminal/Komut çalıştır/Kapat/Uyandır devre dışı;
-     * Düzenle yalnız tam 1 işaretliyken, diğerleri 1 ya da daha fazla işaretliyken etkin. SSH
-     * gerektiren düğmeler (Web terminal, Komut çalıştır, Kapat) yalnız işaretlilerden en az biri
-     * çevrimiçiyse görünür; Uyandır yalnız en az biri çevrimdışıyken (eskiden ayrı bir Durum süzgecine
-     * bakılıyordu — artık doğrudan işaretli tahtaların kendi durumuna bakılıyor, süzgeçten bağımsız).
-     * Tablo modelinin "dataChanged" olayına bağlıdır (onay kutusu tıklaması, Tümünü işaretle/kaldır,
-     * süzgeç/yenileme — hepsi bu olayı tetikler).
+     * Grid'deki işaretleri Ekranlar kutucuklarına yansıtır (bkz. __pushSelection). Tablo modelinin
+     * "dataChanged" olayına bağlıdır (onay kutusu tıklaması, Tümünü işaretle/kaldır, süzgeç/yenileme).
      */
     __updateActionState() {
       if (this.__applyingPreview) {
         return; // __checkFromPreview satır satır işaretlerken her satırda değil, sonunda bir kez
       }
       this.__pushSelection();
-      const boards = this.__selectedBoards();
-      const count = boards.length;
-      if (this.__editButton) {
-        this.__editButton.setEnabled(count === 1);
-      }
-      const showOnline = count === 0 || boards.some(b => b.online);
-      const showWol = count === 0 || boards.some(b => !b.online);
-      (this.__onlineButtons || []).forEach(b => b.setVisibility(showOnline ? "visible" : "excluded"));
-      if (this.__wolButton) {
-        this.__wolButton.setVisibility(showWol ? "visible" : "excluded");
-      }
-      // Seçime göre çalışan düğmeler etiketinde işaretli tahta sayısını gösterir: "Sil (3)".
-      // Düzenle her zaman tek tahtaya çalıştığı için sayı almaz.
-      const counted = [this.__deleteButton, this.__wolButton, this.__uncheckButton]
-        .concat(this.__onlineButtons || []).filter(Boolean);
-      counted.forEach(button => {
-        if (button.getUserData("baseLabel") === null) {
-          button.setUserData("baseLabel", button.getLabel());
-        }
-        const base = button.getUserData("baseLabel");
-        button.setLabel(count ? `${base} (${count})` : base);
-        if (button !== this.__uncheckButton) {
-          button.setEnabled(count >= 1);
-        }
-      });
-    },
-
-    __single(handler) {
-      const boards = this.__selectedBoards();
-      if (boards.length !== 1) {
-        ankamon.ui.Dialog.alert("Önce listeden tek bir tahtayı işaretleyin.");
-        return;
-      }
-      handler(boards[0]);
-    },
-
-    __withSome(handler) {
-      const boards = this.__selectedBoards();
-      if (!boards.length) {
-        ankamon.ui.Dialog.alert("Önce bir ya da daha fazla tahta işaretleyin.");
-        return;
-      }
-      handler(boards);
     },
 
     __edit(board) {
@@ -1180,7 +1087,8 @@ qx.Class.define("ankamon.page.Boards", {
       // isteği: ikisi komşu); çevrimiçi tahtada orada devre dışı görünür.
       if (this._can("boards.manage")) {
         extra.push(() => add(ICON.edit, "Düzenle", () => this.__edit(board)));
-        extra.push(() => add(ICON.delete, "Sil", () => this.__delete([board])));
+        extra.push(() => add(ICON.delete, "Sil" + (boards.length > 1 ? ` (${boards.length} tahta)` : ""),
+          () => this.__delete(boards)));
       }
       if (extra.length) {
         if (menu.getChildren().length) {
@@ -1188,7 +1096,18 @@ qx.Class.define("ankamon.page.Boards", {
         }
         extra.forEach(fn => fn());
       }
-      return menu.getChildren().length ? menu : null;
+      // Eski üst düğme satırından (kullanıcı isteğiyle kaldırıldı) buraya taşınanlar: grid işaretleri
+      // (yalnız o an GÖRÜNEN/süzülmüş satırlar — bkz. _checkAll) ve elle tahta ekleme.
+      const shown = (this.__shownBoards || []).length;
+      const checked = this._checkedIds(this.__table).length;
+      menu.add(new qx.ui.menu.Separator());
+      add(ICON.checkAll || "☑", "Tümünü işaretle" + (shown ? ` (${shown})` : ""), () => this._checkAll(this.__table, true));
+      add(ICON.uncheckAll || "☐", "İşaretleri kaldır" + (checked ? ` (${checked})` : ""), () => this._checkAll(this.__table, false));
+      menu.getChildren()[menu.getChildren().length - 1].setEnabled(checked > 0);
+      if (this._can("boards.manage")) {
+        add(ICON.add || "＋", "Tahta ekle…", () => this.__edit(null));
+      }
+      return menu;
     },
 
     /**
