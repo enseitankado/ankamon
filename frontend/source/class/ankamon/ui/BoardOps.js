@@ -471,8 +471,12 @@ qx.Class.define("ankamon.ui.BoardOps", {
       return m;
     },
 
-    /** Seçili tahtaları kapatır (SSH ile). Birden fazlaysa önce onay alır. */
-    async shutdown(boards) {
+    /**
+     * Seçili tahtaları kapatır (SSH ile). Birden fazlaysa önce onay alır (onay her zaman sorulur; "bir
+     * daha gösterme" yalnız çıktı penceresi içindir — bkz. __powerJob).
+     * @param user {Map?} oturum sahibi (pencere gizleme tercihi)
+     */
+    async shutdown(boards, user) {
       const ids = boards.map(b => b.id);
       if (!ids.length) {
         return;
@@ -484,11 +488,11 @@ qx.Class.define("ankamon.ui.BoardOps", {
           return;
         }
       }
-      this.__job({ type: "action", action: "shutdown", board_ids: ids }, "Kapatma çıktısı");
+      this.__powerJob({ type: "action", action: "shutdown", board_ids: ids }, "Kapatma çıktısı", "shutdown", "kapatma", user);
     },
 
-    /** Seçili tahtaları yeniden başlatır (hazır işlem "reboot"). Birden fazlaysa önce onay alır. */
-    async reboot(boards) {
+    /** Seçili tahtaları yeniden başlatır (hazır işlem "reboot"). Birden fazlaysa önce onay alır. @param user {Map?} */
+    async reboot(boards, user) {
       const ids = boards.map(b => b.id);
       if (!ids.length) {
         return;
@@ -500,43 +504,56 @@ qx.Class.define("ankamon.ui.BoardOps", {
           return;
         }
       }
-      this.__job({ type: "action", action: "reboot", board_ids: ids }, "Yeniden başlatma çıktısı");
+      this.__powerJob({ type: "action", action: "reboot", board_ids: ids }, "Yeniden başlatma çıktısı", "reboot",
+        "yeniden başlatma", user);
     },
 
     // "Bu pencereyi bir daha gösterme" (kullanıcı isteği) bu kadar süre geçerli; sonra pencere yeniden
-    // görünür ve kutu işaretsiz gelir. Bitiş anı kullanıcı başına sunucuda: users.ui_prefs["wol.hideUntil"].
-    WOL_HIDE_MS: 7 * 24 * 3600 * 1000,
+    // görünür ve kutu işaretsiz gelir. Bitiş anı kullanıcı başına sunucuda, işlem başına ayrı:
+    // users.ui_prefs["<wol|shutdown|reboot>.hideUntil"].
+    POWER_HIDE_MS: 7 * 24 * 3600 * 1000,
 
     /**
-     * Seçili (kapalı) tahtaları ağdan uyandırır (WoL). Pencere gizlenmişse (bkz. WOL_HIDE_MS) uyandırma
+     * Seçili (kapalı) tahtaları ağdan uyandırır (WoL). Pencere gizlenmişse (bkz. POWER_HIDE_MS) uyandırma
      * yine yapılır, yalnız çıktı penceresi açılmaz — başlatma hatası ise her durumda gösterilir.
      * @param user {Map?} oturum sahibi (pencere gizleme tercihi okunur/yazılır)
      */
     wol(boards, user) {
       const ids = boards.map(b => b.id);
-      if (!ids.length) {
-        return;
+      if (ids.length) {
+        this.__powerJob({ type: "wol", board_ids: ids }, "Uyandırma (WoL)", "wol", "uyandırma", user, { intro: this.WOL_INTRO });
       }
-      const job = ankamon.io.Api.post("/jobs", { type: "wol", board_ids: ids }).then(res => res.id);
+    },
+
+    /**
+     * Güç işlemi (aç/kapat/yeniden başlat) görevini başlatır ve çıktı penceresini açar; pencerenin altında
+     * "Bu pencereyi bir daha gösterme" kutusu (kullanıcı isteği). Kullanıcı gizlediyse POWER_HIDE_MS boyunca
+     * pencere açılmaz, işlem yine yapılır; görev başlatılamazsa hata her durumda gösterilir.
+     * @param kind {String} tercih anahtarı öneki ("wol" | "shutdown" | "reboot")
+     * @param verb {String} kutu metnindeki işlem adı ("uyandırma" …)
+     */
+    __powerJob(body, caption, kind, verb, user, opts = {}) {
+      const job = ankamon.io.Api.post("/jobs", body).then(res => res.id);
+      const key = kind + ".hideUntil";
       const prefs = user ? user.ui_prefs || (user.ui_prefs = {}) : {};
-      if ((prefs["wol.hideUntil"] || 0) > Date.now()) {
+      if ((prefs[key] || 0) > Date.now()) {
         job.catch(e => ankamon.ui.Dialog.error(e));
         return;
       }
       let footer = null;
       if (user) {
-        footer = new qx.ui.form.CheckBox("Bu pencereyi bir daha gösterme (uyandırma yine yapılır; 7 gün sonra pencere yeniden gösterilir)");
+        footer = new qx.ui.form.CheckBox(`Bu pencereyi bir daha gösterme (${verb} yine yapılır; 7 gün sonra pencere yeniden gösterilir)`);
         footer.addListener("changeValue", e => {
-          const value = e.getData() ? Date.now() + this.WOL_HIDE_MS : null;
+          const value = e.getData() ? Date.now() + this.POWER_HIDE_MS : null;
           if (value) {
-            prefs["wol.hideUntil"] = value;
+            prefs[key] = value;
           } else {
-            delete prefs["wol.hideUntil"];
+            delete prefs[key];
           }
-          ankamon.io.Api.put("/auth/prefs", { key: "wol.hideUntil", value }).catch(err => ankamon.ui.Dialog.error(err));
+          ankamon.io.Api.put("/auth/prefs", { key, value }).catch(err => ankamon.ui.Dialog.error(err));
         });
       }
-      ankamon.ui.Jobs.show(job, "Uyandırma (WoL)", { intro: this.WOL_INTRO, footer });
+      ankamon.ui.Jobs.show(job, caption, Object.assign({}, opts, { footer }));
     },
 
     // Uyandırma penceresinin çıktı kutusunun başındaki sabit açıklama (bkz. ui.Jobs opts.intro):
@@ -620,8 +637,16 @@ qx.Class.define("ankamon.ui.BoardOps", {
       if (handler) {
         btn.addListener("execute", handler, this);
       }
+      // Devre dışı madde belirgin soluk (kullanıcı isteği): zengin (HTML) etikete temaların "disabled" yazı
+      // rengi çoğu temada yansımıyor ya da normalden zor ayrılıyordu — opaklık temadan bağımsız.
+      const dim = () => btn.setOpacity(btn.getEnabled() ? 1 : this.DISABLED_OPACITY);
+      btn.addListener("changeEnabled", dim);
+      dim();
       return btn;
     },
+
+    /** Devre dışı sağ menü maddelerinin opaklığı (bkz. menuButton). */
+    DISABLED_OPACITY: 0.38,
 
     menu(board, user, boards = [board], sessionOps = null) {
       const can = feature => user.is_admin || user.features.includes(feature);
@@ -656,9 +681,9 @@ qx.Class.define("ankamon.ui.BoardOps", {
         const n = list => (list.length > 1 ? ` (${list.length} tahta)` : "");
         add(ICON.wol, "Bilgisayarı aç (WoL)" + n(off), () => this.wol(off, user));
         menu.getChildren()[menu.getChildren().length - 1].setEnabled(off.length > 0);
-        add(ICON.shutdown, "Bilgisayarı kapat" + n(on), () => this.shutdown(on));
+        add(ICON.shutdown, "Bilgisayarı kapat" + n(on), () => this.shutdown(on, user));
         menu.getChildren()[menu.getChildren().length - 1].setEnabled(on.length > 0);
-        add(ICON.reboot, "Bilgisayarı yeniden başlat" + n(on), () => this.reboot(on));
+        add(ICON.reboot, "Bilgisayarı yeniden başlat" + n(on), () => this.reboot(on, user));
         menu.getChildren()[menu.getChildren().length - 1].setEnabled(on.length > 0);
       };
       const group = (icon, label, submenu) => {
