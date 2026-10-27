@@ -27,6 +27,8 @@ qx.Class.define("ankamon.Application", {
       // kullanıcı devre dışı kaldığını GÖRMEDEN farkına varamıyordu. Rengi burada bir kez
       // ayarlamak, tema/pencereden bağımsız tüm modallar için aynı saydam açık gri görünümü verir.
       this.getRoot().set({ blockerColor: "#808080", blockerOpacity: 0.35 });
+      // Grid'lerde sağ tıklama işaret (✓) değiştirmez, yalnız satırı seçip sağ menüyü açar.
+      ankamon.ui.table.RightClickPatch.install();
 
       const boot = document.getElementById("boot");
       if (boot) {
