@@ -33,16 +33,19 @@ _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 _PY_LEVEL = {"WARNING": "warn", "ERROR": "error", "CRITICAL": "error"}
 
-# Bilinen zararsız gürültü (kaynak, düzenli ifade): kaydedilmez. Yeni bir gürültü görülürse buraya eklenir.
+# Bilinen zararsız gürültü (kaynak ya da "*" = her kaynak, düzenli ifade): kaydedilmez. Yeni bir gürültü
+# görülürse buraya eklenir.
 NOISE = [
     # Grafana internete çıkamaz (MEB filtresi / kapalı ağ) ve eklenti/uyarı provisioning dizinleri bilerek yok.
     ("grafana", r"Error downloading plugin manifest keys|Failed to get renderer plugin sources|"
                 r"Failed to load external plugins|provisioning files from directory|"
                 r"Problem deleting stale short urls|update checker|Failed to check for (?:grafana|plugin) update"),
     # Grafana'nın önbellek/kısa adres tabloları: Postgres'in yazdığı yarış hataları zararsız.
-    ("postgres", r'cache_data_pkey|relation "short_url" does not exist'),
+    # dbinit her açılışta eski adla (tihamon → ankamon göçü) bağlanmayı dener; rol yoksa göç gerekmez.
+    ("postgres", r'cache_data_pkey|relation "short_url" does not exist|role "tihamon" does not exist'),
     ("filemanager", r"is deprecated|cacheDir only has|ffmpeg unavailable"),
-    ("webssh", r"websocket_ping_timeout"),
+    # Tornado'nun ayar uyarısı; tornado kullanan her serviste (webssh, screen …) çıkar.
+    ("*", r"websocket_ping_timeout"),
     # Windows olmayan cihazlar NetBIOS'a yanıt vermez; ad çözümü zaten başka yollarla denenir.
     ("netscan", r"zaman aşımı: nmblookup"),
     # Görev hataları görev başlığıyla ve traceback'iyle zaten kaydedilir (activity.record); stderr kopyası atlanır.
@@ -121,7 +124,7 @@ def is_continuation(line: str) -> bool:
 
 
 def is_noise(source: str, message: str) -> bool:
-    return any(src == source and rx.search(message) for src, rx in _NOISE)
+    return any(src in (source, "*") and rx.search(message) for src, rx in _NOISE)
 
 
 def dedup_key(source: str, level: str, message: str) -> str:
