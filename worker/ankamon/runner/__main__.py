@@ -33,6 +33,7 @@ import os
 import select
 import subprocess
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import activity, db
@@ -126,7 +127,6 @@ def _run_job(job) -> None:
         names = {t["board_id"]: t["name"] for t in targets}
         general.add("info", f"Görev başladı: {job['title']} — {len(targets)} tahta")
         general.flush()
-        activity.record(conn, f"Görev başladı: {job['title']} ({job['username'] or '—'})")
         # Komut/hazır işlemde tahtalar grup grup çalışır: sıra gelene kadar "queued" kalır, her tahta
         # kendi işi başlarken "running" olur (canlı pencerede çalışan/sırada/biten ayrımı — bkz. ui/Jobs.js).
         if job["type"] not in ("command", "action"):
@@ -482,7 +482,6 @@ def _run_job(job) -> None:
 
         summary = _write_results(conn, job, results, targets)
         general.add("info", f"Görev bitti: {summary}")
-        activity.record(conn, f"Görev bitti: {job['title']} — {summary}")
     except Exception as exc:
         log.exception("görev #%s hatası", job["id"])
         conn.execute("UPDATE jobs SET status = 'failed', finished_at = now(), summary = %s WHERE id = %s",
@@ -490,7 +489,8 @@ def _run_job(job) -> None:
         conn.execute("UPDATE job_targets SET status = 'failed', finished_at = now() WHERE job_id = %s"
                      " AND status IN ('queued', 'running')", (job["id"],))
         general.add("fail", f"Görev hatası: {exc}")
-        activity.record(conn, f"Görev hatası: {job['title']} — {exc}"[:200], "error")
+        # Ankamon logs: görev başlığıyla tek kayıt, traceback ayrıntıda (stderr'deki kopyası logwatch'ta atlanır).
+        activity.record(conn, f"Görev hatası: {job['title']} — {exc}"[:200], "error", "runner", traceback.format_exc())
     finally:
         _scrub_secrets(conn, job)
         general.close()

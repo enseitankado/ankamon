@@ -26,7 +26,11 @@
  */
 
 /**
- * Arayüzün en altındaki durum çubuğu: arka plan işlemlerinin (worker) etkinlik akışını gösterir.
+ * Arayüzün en altındaki durum çubuğu: "Ankamon logs" — Ankamon çekirdeğinin ve eklentilerinin faydalı/kritik
+ * kayıtları: servis hataları ve çökmeleri, darboğazlar (CPU/RAM/disk/veritabanı bağlantıları/log kuyruğu),
+ * program hata çıktıları (traceback, PHP istisnası) ve genel olaylar (bkz. worker/ankamon/logwatch). Satırda
+ * kaynak servis köşeli parantezde; ayrıntısı olan satırın üzerine gelince ayrıntı (ör. traceback) görünür.
+ * Servis kayıtları yalnız yöneticiye gelir (bkz. backend ActivityApi).
  * Varsayılan olarak katlıdır (yalnız başlık satırı); baştaki ok düğmesine ya da başlık çubuğunun
  * herhangi bir yerine tıklamak açar/kapatır. Açıkken
  * üstteki tutamaç sürüklenerek yüksekliği ayarlanabilir; yükseklik tarayıcının localStorage'ında
@@ -77,7 +81,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
     });
     this.__foldButton.addListener("execute", () => this.__setFolded(!this.__folded));
     head.add(this.__foldButton);
-    head.add(new qx.ui.basic.Label("Arka plan işlemleri").set({ font: "app-mono", textColor: "app-muted" }));
+    head.add(new qx.ui.basic.Label("Ankamon logs").set({ font: "app-mono", textColor: "app-muted" }));
     // Küçültülmüş pencereler (bkz. ui.WindowDock): tıklanınca geri açılır.
     this.__dock = new ankamon.ui.WindowDock();
     head.add(this.__dock);
@@ -326,7 +330,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
     __buildListMenu() {
       const menu = new qx.ui.menu.Menu();
       const clear = new qx.ui.menu.Button("Temizle");
-      clear.addListener("execute", () => this.__list.removeAll());
+      clear.addListener("execute", () => this.__list.removeAll().forEach(item => this.__disposeItem(item)));
       menu.add(clear);
       menu.add(new qx.ui.menu.Separator());
       ankamon.ui.Shell.LOG_KINDS.forEach(kind => {
@@ -335,6 +339,17 @@ qx.Class.define("ankamon.ui.StatusBar", {
         menu.add(btn);
       });
       return menu;
+    },
+
+    /** Listeden çıkan satırı (ve varsa ayrıntı ipucunu) bırakır; akış saatlerce açık kalabilir. */
+    __disposeItem(item) {
+      if (item) {
+        const tip = item.getToolTip();
+        item.dispose();
+        if (tip) {
+          tip.dispose();
+        }
+      }
     },
 
     __setFolded(folded) {
@@ -445,8 +460,16 @@ qx.Class.define("ankamon.ui.StatusBar", {
       }
       this.__lastId = data.last_id;
       const F = ankamon.util.Format;
+      const esc = qx.bom.String.escape;
       data.events.forEach(ev => {
-        const item = new qx.ui.form.ListItem(`${F.dateTime(ev.ts)}  ${ev.message}`);
+        const item = new qx.ui.form.ListItem(`${F.dateTime(ev.ts)}  ${ev.source ? `[${ev.source}] ` : ""}${ev.message}`);
+        if (ev.detail) {
+          // Ayrıntı (traceback, SQL, en çok CPU yiyen süreçler …): satırın üzerine gelince, eş aralıklı yazıyla.
+          item.setToolTip(new qx.ui.tooltip.ToolTip(
+            `<div style="font-family:monospace;white-space:pre-wrap;max-width:900px">${esc(ev.detail)}</div>`
+          ).set({ rich: true, showTimeout: 400, hideTimeout: 60000 }));
+          item.setLabel(item.getLabel() + "  ⓘ");
+        }
         if (ev.level === "error") {
           item.setTextColor("error");
         } else if (ev.level === "warn") {
@@ -457,7 +480,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
       // En çok 200 satır tut.
       const extra = this.__list.getChildren().length - 200;
       for (let i = 0; i < extra; i++) {
-        this.__list.removeAt(0);
+        this.__disposeItem(this.__list.removeAt(0));
       }
       // Katlıyken de kaydırır: açıkken her zaman en güncel satırda olunur, 4 sn'lik yoklama
       // aralığında ayrıca beklenmez.

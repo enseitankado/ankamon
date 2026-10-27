@@ -11,24 +11,27 @@ namespace Ankamon\Api;
 use Ankamon\Core\Db;
 use Ankamon\Core\Request;
 
-/** Arka plan etkinlik akışı (durum çubuğu). `after` ile yalnız yeni kayıtlar istenir. */
+/**
+ * "Ankamon logs" akışı (arayüzün alt çubuğu). `after` ile yalnız yeni kayıtlar istenir.
+ * Kaynağı (source) olan kayıtlar Ankamon'un iç işleyişidir (servis hataları, traceback, SQL, darboğazlar —
+ * bkz. worker/ankamon/logwatch): Sistem sayfası gibi yalnız yöneticiye. Diğer kullanıcılar yalnız kaynaksız
+ * genel olayları (yeni tahta, ağ değişiklikleri …) görür.
+ */
 final class ActivityApi
 {
-    public function index(Request $request): array
+    public function index(Request $request, array $user): array
     {
         $after = (int) ($request->query('after') ?? 0);
+        $scope = $user['is_admin'] ? '' : " AND source = ''";
+        $cols = "id, (extract(epoch FROM time) * 1000)::bigint AS ts, level, message, source, detail";
         if ($after > 0) {
             $rows = Db::all(
-                'SELECT id, (extract(epoch FROM time) * 1000)::bigint AS ts, level, message
-                 FROM activity_log WHERE id > ? ORDER BY id ASC LIMIT 200',
+                "SELECT $cols FROM activity_log WHERE id > ?$scope ORDER BY id ASC LIMIT 200",
                 [$after]
             );
         } else {
-            // İlk yükleme: son 30 kayıt (eskiden yeniye).
-            $rows = array_reverse(Db::all(
-                'SELECT id, (extract(epoch FROM time) * 1000)::bigint AS ts, level, message
-                 FROM activity_log ORDER BY id DESC LIMIT 30'
-            ));
+            // İlk yükleme: son 60 kayıt (eskiden yeniye).
+            $rows = array_reverse(Db::all("SELECT $cols FROM activity_log WHERE true$scope ORDER BY id DESC LIMIT 60"));
         }
         $lastId = $rows ? (int) $rows[count($rows) - 1]['id'] : $after;
         return ['events' => $rows, 'last_id' => $lastId];

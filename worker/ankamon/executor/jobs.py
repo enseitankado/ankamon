@@ -35,6 +35,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import traceback
 
 from . import ansible, wol
 from .. import activity
@@ -83,18 +84,18 @@ def run(conn) -> None:
         if job is None:
             return
         log.info("görev çalıştırılıyor: #%s (%s)", job["id"], job["type"])
-        activity.record(conn, f"Görev başladı: {job['title']} ({job['username'] or '—'})")
         try:
             targets = _targets(conn, job["id"])
             results = _dispatch(conn, job, job["params"] or {}, targets)
-            summary = _write_results(conn, job, results, targets)
-            activity.record(conn, f"Görev bitti: {job['title']} — {summary}")
+            _write_results(conn, job, results, targets)
         except Exception as exc:  # beklenmeyen hata: görevi başarısız kapat, worker dönmeye devam etsin
             log.exception("görev #%s hatası", job["id"])
             conn.execute(
                 "UPDATE jobs SET status = 'failed', finished_at = now(), summary = %s WHERE id = %s",
                 (f"Hata: {exc}"[:200], job["id"]))
-            activity.record(conn, f"Görev hatası: {job['title']} — {exc}"[:200], "error")
+            # Ankamon logs: görev başlığıyla tek kayıt, traceback ayrıntıda (stderr'deki kopyası logwatch'ta atlanır).
+            activity.record(conn, f"Görev hatası: {job['title']} — {exc}"[:200], "error", "worker",
+                            traceback.format_exc())
 
 
 def _dispatch(conn, job, params, targets) -> dict[int, dict]:
