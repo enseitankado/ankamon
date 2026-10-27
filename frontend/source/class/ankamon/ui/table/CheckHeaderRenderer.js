@@ -76,6 +76,8 @@ qx.Class.define("ankamon.ui.table.CheckHeaderRenderer", {
      */
     sync(checked, total) {
       this.__state = total > 0 && checked === total ? true : checked > 0 ? null : false;
+      // Başlık yeniden kurulunca (sütun gizleme/taşıma, tema) eski hücreler atılır; onların kutuları bırakılır.
+      this.__boxes = this.__boxes.filter(box => !box.isDisposed());
       this.__syncing = true;
       try {
         this.__boxes.forEach(box => {
