@@ -41,8 +41,7 @@ NOISE = [
                 r"Problem deleting stale short urls|update checker|Failed to check for (?:grafana|plugin) update"),
     # Grafana'nın önbellek/kısa adres tabloları: Postgres'in yazdığı yarış hataları zararsız.
     ("postgres", r'cache_data_pkey|relation "short_url" does not exist'),
-    ("mediamtx", r"ffmpeg unavailable"),
-    ("filemanager", r"is deprecated|cacheDir only has"),
+    ("filemanager", r"is deprecated|cacheDir only has|ffmpeg unavailable"),
     ("webssh", r"websocket_ping_timeout"),
     # Windows olmayan cihazlar NetBIOS'a yanıt vermez; ad çözümü zaten başka yollarla denenir.
     ("netscan", r"zaman aşımı: nmblookup"),

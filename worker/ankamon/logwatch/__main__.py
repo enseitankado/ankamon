@@ -17,6 +17,7 @@ stdout supervisord ile protokol kanalıdır — bu süreç kendi loglarını yal
 
 from __future__ import annotations
 
+import codecs
 import collections
 import logging
 import sys
@@ -178,6 +179,21 @@ class Watch:
             self.on_tick()
 
 
+def _read_chars(inp, count: int) -> str:
+    """Olay gövdesini oku. supervisord len'i KARAKTER sayısı olarak verir (len(str)), ama UTF-8 bayt yollar:
+    bayt sayısıyla okumak Türkçe/"…" içeren satırda gövdeyi yarım bırakır, kalan baytlar sonraki başlık sanılır
+    ve dinleyici gelmemiş bir olaya yanıt verir (supervisord bunu protokol ihlali sayıp olay göndermeyi keser).
+    Her karakter en az bir bayt olduğundan eksik karakter kadar bayt okumak hiçbir zaman fazla okumaz."""
+    decoder = codecs.getincrementaldecoder("utf-8")("replace")
+    text = ""
+    while len(text) < count:
+        chunk = inp.read(count - len(text))
+        if not chunk:
+            break
+        text += decoder.decode(chunk)
+    return text
+
+
 def main():
     watch = Watch()
     out, inp = sys.stdout, sys.stdin.buffer
@@ -189,7 +205,7 @@ def main():
         if not header:
             return  # supervisord kapandı
         headers = dict(tok.split(":", 1) for tok in header.split() if ":" in tok)
-        payload = inp.read(int(headers.get("len", "0"))).decode("utf-8", "replace")
+        payload = _read_chars(inp, int(headers.get("len", "0")))
         try:
             watch.handle(headers.get("eventname", ""), headers, payload)
         except Exception:  # tek bir olay dinleyiciyi düşürmesin (düşerse supervisord olayları biriktirir)
