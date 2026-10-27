@@ -48,6 +48,8 @@
   /* Her akış kendi katmanında (bkz. Tile.connect/reconnect): kip/kalite değişiminde yeni akış eski
      görüntünün ALTINDA kurulur, ilk karesi gelince eskisi kaldırılır — ekran kararmaz. */
   .tile .view > .screen { position: absolute; inset: 0; }
+  /* Duraklatılmış akışın son karesi (bkz. Tile.freeze) — noVNC'nin ölçekli tuvaliyle aynı yerleşim. */
+  .tile .view > .screen > canvas.frozen { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
   /* noVNC tahtanın imlecini tuvale satır içi stil olarak yazar (salt izlemede de); müdahale kapalıyken
      görüntü alanında fare imleci değişmesin (kullanıcı isteği) — !important satır içi stili ezer. */
   .tile:not(.control) .view, .tile:not(.control) .view * { cursor: default !important; }
@@ -81,9 +83,22 @@
   html.embed #toolbar { display: none; }
   #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     font-size: 15px; color: #888; pointer-events: none; z-index: 5; }
-  html.embed #grid { grid-template-columns: repeat(auto-fill, minmax(var(--tile-min, 300px), 1fr)); grid-auto-rows: auto;
-    align-content: start; gap: 6px; padding: 6px; background: #f3f3f3; }
-  html.embed .tile { min-height: 0; border-radius: 4px; overflow: hidden; }
+  /* Kutucuklar sarılan satırlarda; genişlik ortak boyuttan (alt slider, --tile-min) ya da kutucuğun kendi
+     boyutundan (kenarından sürükleyerek — --w; görüntü yüksekliği --h, yoksa 16:9). Bkz. setTileSize. */
+  html.embed #grid { display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start;
+    gap: 6px; padding: 6px; background: #f3f3f3; }
+  html.embed .tile { min-height: 0; border-radius: 4px; overflow: hidden; flex: none;
+    width: var(--w, var(--tile-min, 300px)); max-width: 100%; }
+  html.embed .tile.has-h .view { aspect-ratio: auto; height: var(--h); }
+  html.embed .tile:fullscreen { width: auto; max-width: none; }
+  html.embed .tile:fullscreen .view { height: auto; }
+  /* Boyutlandırma tutamaçları: sağ kenar, alt kenar, sağ alt köşe (bkz. Tile.makeResizable). */
+  html.embed .tile .rs { position: absolute; z-index: 4; }
+  html.embed .tile .rs-e { top: 0; right: 0; width: 6px; height: 100%; cursor: ew-resize; }
+  html.embed .tile .rs-s { left: 0; bottom: 0; height: 6px; width: 100%; cursor: ns-resize; }
+  html.embed .tile .rs-se { right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+  html.embed .tile.resizing { outline: 2px dashed #0096ff; outline-offset: -2px; }
+  html.embed .tile:fullscreen .rs { display: none; }
   /* Kutucuk seçimi (Shift/Ctrl/dikdörtgen seçim) ve sürükle-bırak sıralama — yalnız gömülü kipte
      (Tahtalar sayfasının Ekranlar sekmesi). Seçim: mavi çerçeve. Sürüklenen: soluk; bırakılacak
      kutucuk: kesik çizgili çerçeve. */
@@ -312,8 +327,9 @@ class Tile {
       // olduğundan "click" kutucuğa hiç ulaşmıyor. Yakalama aşaması: tuvalin kendi dinleyicilerinden önce.
       // Zaten çoklu seçimin parçası olan kutucuğa düz basışta seçim hemen daraltılmaz — sürükleme
       // başlamazsa bırakınca daraltılır (Explorer'daki gibi; çoklu seçimi bozmadan sürüklenebilsin).
+      this.makeResizable();
       this.el.addEventListener("pointerdown", e => {
-        if (e.button !== 0 || this.control || e.target.closest("button")) return;
+        if (e.button !== 0 || this.control || e.target.closest("button") || e.target.closest(".rs")) return;
         const id = this.board.id;
         const ids = orderedIds();
         if (e.shiftKey && selectAnchor !== null && ids.includes(selectAnchor)) {
@@ -375,6 +391,57 @@ class Tile {
       });
     }
         grid.appendChild(this.el);
+  }
+
+  /**
+   * Gömülü kipte kutucuk kenarından boyutlandırılır (kullanıcı isteği): sağ kenar genişliği, alt kenar
+   * görüntü yüksekliğini, köşe ikisini birden değiştirir. Yalnız genişlik verilmişse görüntü 16:9 kalır.
+   * Boyut tahta başına bu tarayıcıda saklanır; alt slider (setTileSize reset) hepsini ortak boyuta döndürür.
+   */
+  makeResizable() {
+    ["e", "s", "se"].forEach(dir => {
+      const h = document.createElement("div");
+      h.className = "rs rs-" + dir;
+      h.title = "Sürükleyerek boyutlandırın";
+      h.addEventListener("pointerdown", e => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        h.setPointerCapture(e.pointerId);
+        const startX = e.clientX, startY = e.clientY;
+        const w0 = this.el.offsetWidth, h0 = this.view.offsetHeight;
+        const maxW = grid.clientWidth - 12;
+        this.el.classList.add("resizing");
+        const onMove = ev => {
+          const size = tileSizes[this.board.id] || {};
+          if (dir !== "s") size.w = Math.round(Math.max(Tile.MIN_W, Math.min(maxW, w0 + ev.clientX - startX)));
+          if (dir !== "e") size.h = Math.round(Math.max(Tile.MIN_H, h0 + ev.clientY - startY));
+          tileSizes[this.board.id] = size;
+          this.applySize();
+        };
+        const onUp = () => {
+          h.removeEventListener("pointermove", onMove);
+          h.removeEventListener("pointerup", onUp);
+          h.removeEventListener("pointercancel", onUp);
+          this.el.classList.remove("resizing");
+          saveTileSizes();
+        };
+        h.addEventListener("pointermove", onMove);
+        h.addEventListener("pointerup", onUp);
+        h.addEventListener("pointercancel", onUp);
+      });
+      this.el.appendChild(h);
+    });
+    this.applySize();
+  }
+
+  /** Kutucuğun kendi boyutu (yoksa ortak boyut — CSS --tile-min). */
+  applySize() {
+    const size = tileSizes[this.board.id];
+    const s = this.el.style;
+    if (size && size.w) s.setProperty("--w", size.w + "px"); else s.removeProperty("--w");
+    if (size && size.h) s.setProperty("--h", size.h + "px"); else s.removeProperty("--h");
+    this.el.classList.toggle("has-h", !!(size && size.h));
   }
 
   /** Ad/durum güncellemesi (gömülü kipte üst sayfadan gelen liste). */
@@ -510,11 +577,12 @@ class Tile {
     this.el.classList.toggle("popped", isPopped);
     if (isPopped) {
       this.setWanted(false);
+      this.disconnect();   // donmuş son görüntü de kalkar: yerine not
       this.setState("popped", "Ayrı pencerede izleniyor");
       return;
     }
     if (wasPopped) this.setState("connecting", "Bağlanıyor…");
-    this.setWanted(!document.hidden && this.inView);
+    this.setWanted(!document.hidden && !paused && this.inView);
   }
 
   setState(state, text) {
@@ -529,6 +597,11 @@ class Tile {
    */
   connect(prev) {
     clearTimeout(this.timer);
+    // Duraklatılmışken donan son görüntü (bkz. freeze), yeni akışın ilk karesi gelene dek ekranda kalır.
+    if (!prev && this.frozen) {
+      prev = this.frozen;
+      this.frozen = null;
+    }
     if (this.rfb || !this.wanted) {
       if (prev) Tile.dropLayer(prev);
       return;
@@ -588,6 +661,7 @@ class Tile {
    * anlık siyah kare yanlış uyarı vermesin); yalnız bağlı (live) kutucukta anlamlı.
    */
   checkBlank() {
+    if (this.frozen && !this.wrap) return;   // duraklatılmış: son durum kalır
     let blank = false;
     const c = this.el.classList.contains("live") && this.wrap && this.wrap.querySelector("canvas");
     if (c && c.width && c.height) {
@@ -613,6 +687,40 @@ class Tile {
     this.rfb = null;
     this.wrap = null;
     Tile.dropLayer(layer);
+    if (this.frozen) {
+      Tile.dropLayer(this.frozen);
+      this.frozen = null;
+    }
+  }
+
+  /**
+   * Akışı keser ama son görüntüyü ekranda bırakır (sekme/sayfa gizli, kutucuk görünür alanın dışında):
+   * kutucuk yeniden çizilmez, "Bağlanıyor…"a dönmez. Yeniden bağlanınca yeni akışın ilk karesi gelene dek
+   * bu görüntü kalır (bkz. connect). Bağlı değilse (hata/bağlanıyor) olağan disconnect.
+   */
+  freeze() {
+    if (!this.rfb || !this.el.classList.contains("live")) {
+      this.disconnect();
+      return;
+    }
+    clearTimeout(this.timer);
+    this.token = null;   // kapanan akışın "close"u kutucuğu hata durumuna sokmasın
+    if (this.frozen) Tile.dropLayer(this.frozen);
+    // noVNC disconnect'te kendi tuvalini kaldırır: son kare önce kopyalanır, katmanda o kalır.
+    const src = this.wrap.querySelector("canvas");
+    let shot = null;
+    if (src && src.width && src.height) {
+      shot = document.createElement("canvas");
+      shot.width = src.width;
+      shot.height = src.height;
+      shot.className = "frozen";
+      try { shot.getContext("2d").drawImage(src, 0, 0); } catch (e) { shot = null; }
+    }
+    try { this.rfb.disconnect(); } catch (e) { /* zaten kapalı */ }
+    if (shot) this.wrap.appendChild(shot);
+    this.frozen = { rfb: null, wrap: this.wrap };
+    this.rfb = null;
+    this.wrap = null;
   }
 
   /**
@@ -669,7 +777,7 @@ class Tile {
     this.wanted = wanted;
     // "Ekranı yönet" (sağ menü — bkz. ui/BoardOps.screen manage): ilk bağlantı doğrudan müdahale kipinde.
     if (spec.manage && spec.control) this.setControl(true, true);
-    wanted ? this.connect() : this.disconnect();
+    wanted ? this.connect() : this.freeze();
     this.syncPerf();
   }
 
@@ -779,6 +887,32 @@ Tile.CONNECT_TIMEOUT_MS = 40000;
 Tile.INSTALL_POLL_MS = 5000;
 // Otomatik kurulum başarısızsa (4007) seyrek deneme — köprü zaten 10 dk boyunca yeniden kurmaz.
 Tile.INSTALL_FAILED_RETRY_MS = 60000;
+// Kenardan boyutlandırmada en küçük kutucuk genişliği / görüntü yüksekliği (slider'ın alt sınırıyla uyumlu).
+Tile.MIN_W = 140;
+Tile.MIN_H = 60;
+
+// Kutucukların kendi boyutları (tahta id → {w?, h?}, piksel) — bu tarayıcıda kalıcı (bkz. Tile.makeResizable).
+const TILE_SIZES_KEY = "ankamon.screens.tileSizes";
+let tileSizes = {};
+try { tileSizes = JSON.parse(localStorage.getItem(TILE_SIZES_KEY) || "{}") || {}; } catch (e) { tileSizes = {}; }
+
+function saveTileSizes() {
+  try { localStorage.setItem(TILE_SIZES_KEY, JSON.stringify(tileSizes)); } catch (e) { /* kalıcılık önemsiz */ }
+}
+
+/**
+ * Ortak kutucuk boyutu (üst sayfadaki slider, "tm-size"). reset: kullanıcı slider'ı oynattı — kenardan
+ * verilmiş tek tek boyutlar silinir, bütün kutucuklar aynı genişlik ve yükseklikte olur. Açılışta gelen
+ * değer (reset yok) yalnız ortak boyutu kurar, saklı tek tek boyutlar korunur.
+ */
+function setTileSize(px, reset) {
+  document.documentElement.style.setProperty("--tile-min", px + "px");
+  if (reset && Object.keys(tileSizes).length) {
+    tileSizes = {};
+    saveTileSizes();
+    tiles.forEach(t => t.applySize());
+  }
+}
 
 function toggleFullscreen(el) {
   if (document.fullscreenElement) document.exitFullscreen();
@@ -787,6 +921,9 @@ function toggleFullscreen(el) {
 
 const tiles = new Map();   // tahta id → Tile
 let popped = new Set();     // ekranı ayrı pencerede açık tahtalar (üst sayfadan "tm-popped")
+// Üst sayfada Ekranlar sekmesi bir süredir görünmüyor ("tm-pause"): akışlar durur, kutucuklar ve son
+// görüntüler yerinde kalır (sayfa yeniden kurulmaz); sekme görününce kaldığı yerden sürer.
+let paused = false;
 
 // Kutucuk seçimi (yalnız gömülü kip — Tahtalar sayfasının Ekranlar sekmesi): Tile.click/contextmenu
 // ve aşağıdaki dikdörtgen (fare ile sürükleyerek) seçim bunları kullanır. `selected` DOM sırasıyla
@@ -957,7 +1094,7 @@ if (embed) {
 const io = "IntersectionObserver" in window && (embed || spec.boards.length > 1)
   ? new IntersectionObserver(entries => {
       // Gömülü kipte iframe'in kendisi gizlenince (Liste sekmesi) bütün kutucuklar "görünmez" olur;
-      // o durumda bağlantılar burada kesilmez — üst sayfa 10 sn sonra iframe'i kaldırarak durdurur
+      // o durumda bağlantılar burada kesilmez — üst sayfa 10 sn sonra "tm-pause" ile duraklatır
       // (sekmeler arasında hızlı gidip gelmede yeniden bağlanma olmasın).
       if (embed && grid.clientWidth === 0) return;
       entries.forEach(e => {
@@ -1093,7 +1230,11 @@ if (embed) {
     if (e.source !== window.parent || e.origin !== location.origin || !e.data) return;
     if (e.data.type === "tm-boards") { setBoards(e.data.boards || []); markLoaded(); }
     else if (e.data.type === "tm-selection") setSelected((e.data.ids || []).filter(id => tiles.has(id)), true);
-    else if (e.data.type === "tm-size") document.documentElement.style.setProperty("--tile-min", e.data.px + "px");
+    else if (e.data.type === "tm-size") setTileSize(e.data.px, !!e.data.reset);
+    else if (e.data.type === "tm-pause") {
+      paused = !!e.data.paused;
+      tiles.forEach(t => t.refreshWanted());
+    }
     else if (e.data.type === "tm-popped") {
       popped = new Set(e.data.ids || []);
       tiles.forEach(t => t.refreshWanted());

@@ -191,7 +191,8 @@ qx.Class.define("ankamon.page.Boards", {
       return board.session_locked ? `${board.session_username} (kilitli)` : board.session_username;
     },
 
-    // "Ekranlar" sekmesi görünmez olduktan (başka sekme/sayfa) bu kadar sonra önizleme akışları durur.
+    // "Ekranlar" sekmesi görünmez olduktan (başka sekme/sayfa) bu kadar sonra önizleme akışları duraklar
+    // (kutucuklar son görüntüleriyle kalır — bkz. __pausePreview).
     SCREENS_STOP_MS: 10000,
 
     // "online" artık API'de canlı hesaplanıyor (bkz. sınıf başı not); bu süre doğrudan algılama
@@ -210,6 +211,9 @@ qx.Class.define("ankamon.page.Boards", {
     }
     if (this.__onMessage) {
       window.removeEventListener("message", this.__onMessage);
+    }
+    if (this.__sliderThemeListener) {
+      qx.theme.manager.Meta.getInstance().removeListenerById(this.__sliderThemeListener);
     }
     if (this.__onScreenWindows) {
       qx.event.message.Bus.unsubscribe(ankamon.ui.BoardOps.SCREEN_WINDOWS, this.__onScreenWindows, this);
@@ -343,8 +347,9 @@ qx.Class.define("ankamon.page.Boards", {
      * "Ekranlar" sekmesi: grid'de o an listelenen (süzülmüş) tahtaların canlı ekran önizlemeleri.
      * Önizlemeler /screen/ sayfasının gömülü kipidir (spec.embed, q=thumb — küçük ve düşük kare hızlı;
      * komut loguna yazılmaz, bkz. ekran köprüsü nolog). Sekme görünmez olunca (Liste sekmesi ya da
-     * başka bir sayfa) SCREENS_STOP_MS sonra iframe boşaltılır: bütün akışlar ve tahtalardaki
-     * x11vnc'ler kapanır (yük tasarrufu); sekmeye dönülünce yeniden başlar.
+     * başka bir sayfa) SCREENS_STOP_MS sonra akışlar duraklatılır (yük tasarrufu; bkz. __pausePreview) —
+     * iframe ve kutucuklar son görüntüleriyle yerinde kalır, sekme yeniden kurulmaz; dönülünce akışlar sürer.
+     * Kutucuklar alttaki slider'la topluca, kenarlarından sürükleyerek tek tek boyutlandırılır.
      * Kutucuk sağ menüsü grid satırınınkiyle AYNI (__rowMenu); "Kullanıcılar ▸ Oturumları sorgula" (bkz.
      * __openPreviewMenu, BoardOps.menu) — SSH ile anlık sorgu sonucu (bkz. __whoamiState, worker/ankamon/executor/
      * whoami.py) sol altta gösterilir (bkz. __previewList, docker/rootfs/screen'de Tile.setWhoami).
@@ -382,8 +387,11 @@ qx.Class.define("ankamon.page.Boards", {
         if (e.data.type === "tm-ready") {
           this.__previewKey = null; // sayfa yeni yüklendi: güncel listeyi yeniden gönder
           this.__pushPreview();
-          this.__pushSize();
+          this.__pushSize(false);
           this.__pushView();
+          if (this.__screensPaused) {
+            this.__pausePreview(true);
+          }
           this.__pushSelection();
           this.__pushPopped();
         } else if (e.data.type === "tm-select") {
@@ -487,17 +495,38 @@ qx.Class.define("ankamon.page.Boards", {
     /** "Ekranlar" sekmesinin altındaki, önizleme kutucuklarının boyutunu ayarlayan slider satırı. */
     __createSizeRow() {
       const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({
-        padding: [4, 8]
+        padding: [2, 8]
       });
-      row.add(new qx.ui.basic.Label("Boyut:"));
+      row.add(new qx.ui.basic.Label("Boyut:").set({ font: "small", textColor: "app-muted" }));
+      // İnce ve narin (kullanıcı isteği): temanın kalın slider'ı yerine 2 px'lik ray + küçük yuvarlak tutamaç.
+      // Renkler etkin temadan (ray app-border, tutamaç temanın seçim rengi); tema değişince yeniden boyanır.
       const slider = new qx.ui.form.Slider().set({
-        minimum: 140, maximum: 640, singleStep: 10, value: this.__loadTileSize(), width: 220
+        minimum: 140, maximum: 640, singleStep: 10, value: this.__loadTileSize(), width: 200,
+        height: 12, maxHeight: 12, allowGrowY: false, alignY: "middle", decorator: null, padding: 0,
+        toolTipText: "Bütün kutucukları aynı boyuta getirir (tek tek boyut: kutucuğun kenarından sürükleyin)"
       });
+      const knob = slider.getChildControl("knob").set({
+        width: 12, height: 12, minWidth: 12, minHeight: 12, maxHeight: 12, decorator: null, alignY: "middle"
+      });
+      const paint = () => {
+        const mgr = qx.theme.manager.Color.getInstance();
+        const pick = (names, fallback) => {
+          const name = names.find(n => mgr.isDynamic(n));
+          return name ? mgr.resolve(name) : fallback;
+        };
+        const line = pick(["app-border"], "#c8c8c8");
+        const accent = pick(["primary", "background-selected", "selected-start", "table-row-background-selected"], "#0067c0");
+        slider.getContentElement().setStyle("background", `linear-gradient(transparent 5px, ${line} 5px, ${line} 7px, transparent 7px)`);
+        knob.getContentElement().setStyles({ background: accent, borderRadius: "50%" });
+      };
+      paint();
+      this.__sliderThemeListener = qx.theme.manager.Meta.getInstance().addListener("changeTheme", () => qx.event.Timer.once(paint, this, 0));
+      this.__sizeSlider = slider;
       slider.addListener("changeValue", e => {
         const v = e.getData();
         this.__tileSize = v;
         this.__saveTileSize(v);
-        this.__pushSize();
+        this.__pushSize(true);
       });
       this.__tileSize = slider.getValue();
       row.add(slider);
@@ -570,11 +599,14 @@ qx.Class.define("ankamon.page.Boards", {
       }
     },
 
-    /** Önizleme kutucuklarının boyutunu (CSS değişkeni --tile-min) iframe'e bildirir. */
-    __pushSize() {
+    /**
+     * Önizleme kutucuklarının ortak boyutunu (CSS değişkeni --tile-min) iframe'e bildirir. reset: slider
+     * oynatıldı — kenardan tek tek verilmiş boyutlar silinir, hepsi aynı boyuta gelir (bkz. screen setTileSize).
+     */
+    __pushSize(reset) {
       const el = this.__iframeEl();
       if (el && el.contentWindow) {
-        el.contentWindow.postMessage({ type: "tm-size", px: this.__tileSize }, window.location.origin);
+        el.contentWindow.postMessage({ type: "tm-size", px: this.__tileSize, reset: !!reset }, window.location.origin);
       }
     },
 
@@ -610,16 +642,33 @@ qx.Class.define("ankamon.page.Boards", {
         this.__screensHiddenAt = null;
         if (!this.__screensRunning) {
           this.__startPreview();
+        } else if (this.__screensPaused) {
+          this.__pausePreview(false);
         }
-      } else if (this.__screensRunning) {
+      } else if (this.__screensRunning && !this.__screensPaused) {
         const now = Date.now();
         if (this.__screensHiddenAt === null) {
           this.__screensHiddenAt = now;
         } else if (now - this.__screensHiddenAt >= ankamon.page.Boards.SCREENS_STOP_MS) {
-          this.__stopPreview();
+          this.__pausePreview(true);
         }
       }
     },
+
+    /**
+     * Ekranlar uzun süre görünmeyince akışlar durur ama önizleme sayfası (iframe) kaldırılmaz (kullanıcı
+     * isteği: sekme hiçbir zaman yeniden kurulmasın): kutucuklar son görüntüleriyle yerinde kalır; tahta
+     * listesi/oturum/durum/sensör güncellemeleri gizliyken de iletilir. Görününce akışlar kaldığı yerden sürer.
+     */
+    __pausePreview(paused) {
+      this.__screensPaused = paused;
+      const el = this.__iframeEl();
+      if (el && el.contentWindow) {
+        el.contentWindow.postMessage({ type: "tm-pause", paused }, window.location.origin);
+      }
+    },
+
+    __screensPaused: false,
 
     /**
      * Grid'in süzgeç/sıralamadan gelen DOĞAL sırasına, kullanıcının sürükle-bırakla değiştirdiği
@@ -712,20 +761,6 @@ qx.Class.define("ankamon.page.Boards", {
       // "allow=fullscreen": kutucuktaki tam ekran düğmesi iframe içinden ancak bu izinle çalışır.
       this.__frame.setHtml(`<iframe src="${url}" allow="fullscreen" allowfullscreen ` +
         `style="border:0;width:100%;height:100%;display:block"></iframe>`);
-    },
-
-    __stopPreview() {
-      this.__screensRunning = false;
-      this.__screensHiddenAt = null;
-      // iframe kaldırılır: bütün WebSocket'ler ve tahtalardaki x11vnc'ler kapanır. qooxdoo gizli
-      // bileşenin içerik değişikliğini görünür olana dek ertelediği için (setHtml tek başına sekme
-      // gizliyken DOM'a yansımıyordu — ölçüldü) iframe DOM'dan doğrudan da kaldırılır.
-      const el = this.__iframeEl();
-      if (el) {
-        el.src = "about:blank";
-        el.remove();
-      }
-      this.__frame.setHtml("");
     },
 
     /** Grid'in tahta listesi (süzgeç/yenileme) değiştiyse önizleme sayfasına bildirir; yalnız fark varsa. */
