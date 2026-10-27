@@ -953,6 +953,21 @@ qx.Class.define("ankamon.page.Boards", {
               return before.get(t.board_id) || { status: "ok", text: known(t.board_id) };
             });
         },
+        // Ekran ▸ Uyut: Uyandır'ın eşi; başarılıysa kutucuk hemen "güç tasarrufu" yazısına geçer.
+        sleep: boards => {
+          const before = new Map(boards.map(b => [b.id, this.__whoamiState && this.__whoamiState.get(b.id)]));
+          this.__sessionJob(boards.map(b => b.id), { type: "sleep" }, () => "Ekran uyutuluyor…",
+            t => {
+              if (t.status !== "ok") {
+                return { status: "error", text: "Uyutulamadı" };
+              }
+              const board = this.__boards.get(t.board_id);
+              if (board) {
+                board.display_state = "Off";
+              }
+              return before.get(t.board_id) || { status: "ok", text: known(t.board_id) };
+            });
+        },
         // Kilitte oturum açık kalır: kutucukta kullanıcı adı "(kilitli)" ile görünür (çıktının ilk satırı).
         lock: boards => this.__sessionJob(boards.map(b => b.id), { type: "lock" },
           id => (known(id) ? `${known(id)} oturumu kilitleniyor…` : "Oturum kilitleniyor…"),

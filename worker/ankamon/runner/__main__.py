@@ -322,7 +322,7 @@ def _run_job(job) -> None:
                         accounts.store(conn, t["board_id"], json.loads(result["output"]), now_ts)
                 _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
                 results[t["board_id"]] = result
-        elif job["type"] in ("login", "logout", "lock", "wake"):
+        elif job["type"] in ("login", "logout", "lock", "wake", "sleep"):
             # Seçilen hesapla oturum açma / açık oturumu kapatma ya da kilitleme — tahtalar bağımsız,
             # PARALEL (whoami deseni). logout/lock'ta username isteğe bağlı (Oturumlar grid'i belirli
             # kullanıcıyı hedefler; boşsa tahtadaki etkin oturum).
@@ -339,14 +339,18 @@ def _run_job(job) -> None:
             elif job["type"] == "lock":
                 def work(t):
                     return accounts.lock(t, user, password, username)
-            else:
+            elif job["type"] == "wake":
                 # Ekran ▸ Uyandır: güç tasarrufundaki ekranı uyandırır (bkz. executor/display.py).
                 def work(t):
                     return display.wake(t, user, password)
+            else:
+                # Ekran ▸ Uyut: ekranı DPMS ile kapatır (dokunulunca açılır).
+                def work(t):
+                    return display.sleep(t, user, password)
             who = f"{username} oturumu" if username else "Açık oturum"
             start = {"login": f"{username} hesabıyla oturum açılıyor…",
                      "logout": f"{who} kapatılıyor…", "lock": f"{who} kilitleniyor…",
-                     "wake": "Ekran uyandırılıyor…"}[job["type"]]
+                     "wake": "Ekran uyandırılıyor…", "sleep": "Ekran uyutuluyor…"}[job["type"]]
             for t in targets:
                 _board_event(conn, job["id"], t["board_id"], "info", f"Bağlanılıyor: root@{t['ip'] or '—'} — {start}")
             n = whoami.dynamic_concurrency()
@@ -365,9 +369,9 @@ def _run_job(job) -> None:
                            "Bitti." if result["status"] == "ok" else f"Başarısız ({result['status']}).")
                     ev.close()
                     # Tahtalar grid'inin "Oturum" sütunu hemen güncellensin (bkz. executor/session_probe.py).
-                    if result["status"] == "ok" and job["type"] == "wake":
-                        # Ekranlar'daki "güç tasarrufu" yazısı bir sonraki yoklamayı beklemeden kalksın.
-                        session_probe.store_display(conn, t["board_id"], "On")
+                    if result["status"] == "ok" and job["type"] in ("wake", "sleep"):
+                        # Ekranlar'daki "güç tasarrufu" yazısı bir sonraki yoklamayı beklemeden kalksın / çıksın.
+                        session_probe.store_display(conn, t["board_id"], "On" if job["type"] == "wake" else "Off")
                     elif result["status"] == "ok":
                         if job["type"] == "login":
                             session_probe.store(conn, t["board_id"], username, False)

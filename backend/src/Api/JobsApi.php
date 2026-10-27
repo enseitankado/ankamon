@@ -146,6 +146,8 @@ final class JobsApi
             // Sağ menü Ekran ▸ "Uyandır" (bkz. worker executor/display.py): güç tasarrufuna girmiş (siyah)
             // ekranı uyandırır — kilitli oturumun kilidini açmaz; ekran izleme yetkisiyle.
             'wake' => ['screen', 'Ekranı uyandır', [], true],
+            // Sağ menü Ekran ▸ "Uyut": ekranı DPMS ile kapatır (dokunulunca açılır) — Uyandır'ın eşi.
+            'sleep' => ['screen', 'Ekranı uyut', [], true],
             // Sağ menü "Yedekle" (bkz. frontend ui/BoardOps.js, worker executor/backup.py): seçilen
             // hesabın ev dizini izin/sahiplik bilgisiyle tar.gz; indirme HomeBackupApi'den.
             'backup_home' => $this->backupJob($request),

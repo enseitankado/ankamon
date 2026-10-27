@@ -709,7 +709,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         group(ICON.run, "Komut çalıştır" + count, commands);
 
-        // Ekran ▸ Ekranı göster, Ekranı yönet, Uyandır, Ekranımı yansıt ▸ <kalite> + Ses (ayar penceresi sorulmaz — bkz. cast()).
+        // Ekran ▸ Ekranı göster, Ekranı yönet, Uyandır, Uyut, Ekranımı yansıt ▸ <kalite> + Ses (ayar penceresi sorulmaz — bkz. cast()).
         const screens = sub();
         if (can("screen")) {
           subAdd(screens, ICON.screen, "Ekranı göster" + count, () => this.screen(boards, user));
@@ -724,6 +724,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
           subAdd(screens, ICON.wakeScreen, "Uyandır" + count, () => (sessionOps && sessionOps.wake
             ? sessionOps.wake(online)
             : this.__job({ type: "wake", board_ids: online.map(b => b.id) }, "Ekranı uyandır")));
+          // Uyut: ekranı güç tasarrufuna sokar (DPMS kapalı; tahtaya dokunulunca açılır).
+          subAdd(screens, ICON.sleepScreen, "Uyut" + count, () => (sessionOps && sessionOps.sleep
+            ? sessionOps.sleep(online)
+            : this.__job({ type: "sleep", board_ids: online.map(b => b.id) }, "Ekranı uyut")));
         }
         if (can("cast")) {
           screens.add(this.menuButton(ICON.cast, "Ekranımı yansıt" + count, null, this.__castMenu(online)));

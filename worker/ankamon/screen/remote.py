@@ -31,12 +31,19 @@ Akış iki adımdır (bkz. __main__.py):
      portu "PORT=<n>" diye yazıp biter.
   2) `ssh -W 127.0.0.1:<n> tahta` — standart SSH tüneli: SSH'nin stdin/stdout'u doğrudan x11vnc'nin
      TCP bağlantısıdır. Köprü bu baytları WebSocket'e geçirir. Tünel kapanınca x11vnc (-once) biter.
+
+Müdahale (control) kipinde tahta "kullanılıyor" sayılır: başlarken ekran uyandırılır, X'in boşta kalma
+sayacı sıfırlanır (otomatik kapanma onu okur) ve açık TiHA geri sayım penceresi ertelenir (bkz.
+executor/display.py); oturum sürdükçe (x11vnc yaşadıkça) sayaç 30 sn'de bir sıfırlanır — TiHA'nın en kısa
+boşta eşiği 60 sn olduğundan müdahale sırasında yeni kapatma penceresi açılmaz. Salt izleme sayaca dokunmaz.
 """
 
 from __future__ import annotations
 
 import re
 import shlex
+
+from ..executor import display
 
 # Görüntü profilleri. max_width: tahta ekranı bundan genişse x11vnc tahtada küçültür (ağ ve
 # tarayıcı yükü azalır). wait: x11vnc'nin ekran yoklama/güncelleme aralığı (ms) — kare hızını belirler.
@@ -65,6 +72,7 @@ set -- $(ps -eo args= | awk -v vt="vt${vt#tty}" '
 disp=${1:-:0}
 auth=${2:-}
 command -v x11vnc >/dev/null 2>&1 || exit 127
+CONTROL_PRE
 sc=
 dim=$(XAUTHORITY=${auth:-/nonexistent} xdpyinfo -display "$disp" 2>/dev/null | awk '/dimensions:/ { print $2; exit }')
 case $dim in *[!0-9x]*|x*|*x) dim= ;; esac
@@ -73,10 +81,24 @@ w=${dim%x*}
 out=$(x11vnc -q -bg -localhost -once -timeout 15 -display "$disp" ${auth:+-auth "$auth"} INPUT -shared \
   -nopw -norc -nosel -nobell -nolookup -noxrecord -wait WAIT -defer WAIT $sc ${dim:+-desktop "ankamon-$dim"} 2>&1 </dev/null)
 case "$out" in
-  *PORT=*) printf '%s\n' "$out" | grep '^PORT=' | head -n 1 ;;
+  *PORT=*) printf '%s\n' "$out" | grep '^PORT=' | head -n 1
+    CONTROL_POST;;
   *) printf '%s\n' "$out" | grep -v '^$' | tail -n 2 >&2; exit 4 ;;
 esac
 """
+
+# Müdahale kipi (bkz. modül açıklaması). Çıktı atılır: betiğin stdout'u yalnız PORT satırını taşır.
+_CONTROL_PRE = """export DISPLAY="$disp"; [ -n "$auth" ] && export XAUTHORITY="$auth"
+{ xset s reset; xset dpms force on; """ + display.COUNTDOWN_POSTPONE + """} >/dev/null 2>&1
+"""
+# Sıfırlama döngüsü x11vnc'nin PID'ine bağlı (portu dinleyen süreç, ss ile): bağlantı kapanıp x11vnc
+# (-once) çıkınca döngü de biter. setsid + yönlendirmeler: SSH oturumu döngüyü beklemeden kapansın.
+_CONTROL_POST = """
+    port=$(printf '%s\\n' "$out" | sed -n 's/^PORT=\\([0-9]*\\).*/\\1/p' | head -n 1)
+    pid=$(ss -Hltnp "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\\([0-9]*\\).*/\\1/p' | head -n 1)
+    [ -n "$pid" ] && setsid sh -c 'while kill -0 "$0" 2>/dev/null; do xset s reset; sleep 30; done' "$pid" \\
+      >/dev/null 2>&1 </dev/null &
+    """
 
 _PORT = re.compile(r"^PORT=(\d+)\s*$", re.M)
 
@@ -88,6 +110,8 @@ def start_command(profile: str, control: bool = False) -> str:
     p = PROFILES[profile]
     script = _SCRIPT.replace("MAXW", str(int(p["max_width"]))).replace("WAIT", str(int(p["wait"])))
     script = script.replace("INPUT", "-xkb" if control else "-viewonly")
+    script = script.replace("CONTROL_PRE", _CONTROL_PRE if control else "")
+    script = script.replace("CONTROL_POST", _CONTROL_POST if control else "")
     return "sh -c " + shlex.quote(script)
 
 
