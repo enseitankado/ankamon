@@ -115,6 +115,17 @@ qx.Class.define("ankamon.ui.StatusBar", {
       font: "app-log", backgroundColor: "surface", visibility: "excluded", selectionMode: "multi", spacing: 0
     });
     this.__list.setContextMenu(this.__buildListMenu());
+    // Sağ tıklanan satır seçili değilse yalnız o seçilir (Explorer'daki gibi): tek satır, önce sol tıklamadan
+    // kopyalanabilsin. Seçili satıra sağ tıklamak çoklu seçimi korur.
+    this.__list.addListener("contextmenu", e => {
+      let target = e.getTarget();
+      while (target && !(target instanceof qx.ui.form.ListItem)) {
+        target = target.getLayoutParent();
+      }
+      if (target && !this.__list.isSelected(target)) {
+        this.__list.setSelection([target]);
+      }
+    });
     this.__list.addListener("keydown", e => {
       if ((e.isCtrlPressed() || e.isMetaPressed()) && e.getKeyIdentifier() === "C") {
         e.preventDefault();
@@ -349,8 +360,15 @@ qx.Class.define("ankamon.ui.StatusBar", {
       const clear = new qx.ui.menu.Button("Temizle");
       clear.addListener("execute", () => this.__list.removeAll().forEach(item => this.__disposeItem(item)));
       menu.add(clear);
-      // Kopyala yalnız seçim varken; sağ tıklanan satır seçili değilse önce o seçilir (tek satır kopyası için).
+      // Kopyala yalnız seçim varken (sağ tıklanan satır kurucudaki "contextmenu" dinleyicisiyle seçilir).
       menu.addListener("appear", () => copy.setEnabled(!this.__list.isSelectionEmpty()));
+      // Menü açıkken satırların ayrıntı ipucu (ör. bağlantı listesi) menünün üstünde açılıp Kopyala'yı örtüyordu.
+      const tips = qx.ui.tooltip.Manager.getInstance();
+      menu.addListener("appear", () => {
+        tips.setShowToolTips(false);
+        tips.setCurrent(null);
+      });
+      menu.addListener("disappear", () => tips.setShowToolTips(true));
       return menu;
     },
 
