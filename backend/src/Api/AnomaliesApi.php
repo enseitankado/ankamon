@@ -60,10 +60,32 @@ final class AnomaliesApi
         ],
     ];
 
+    /**
+     * Bütün türler: çekirdeğinkiler + eklentilerin (ext/<ad>/anomaly_kinds.json — {tür: {label, description,
+     * scan?}}; kuralları worker'da ext/<ad>/worker/anomaly_rules.py). Çekirdek eklentiyi adıyla bilmez.
+     */
+    public static function kinds(): array
+    {
+        static $kinds = null;
+        if ($kinds === null) {
+            $kinds = self::KINDS;
+            $dir = defined('EXT_DIR') ? EXT_DIR : '/opt/ankamon/ext';
+            foreach (glob($dir . '/*/anomaly_kinds.json') ?: [] as $file) {
+                $extra = json_decode((string) file_get_contents($file), true);
+                foreach (is_array($extra) ? $extra : [] as $kind => $def) {
+                    if (is_string($kind) && is_array($def) && !isset($kinds[$kind])) {
+                        $kinds[$kind] = $def;
+                    }
+                }
+            }
+        }
+        return $kinds;
+    }
+
     /** Anlık taranabilen türler (JobsApi "anomaly_scan" doğrulaması). */
     public static function scannable(): array
     {
-        return array_filter(self::KINDS, static fn(array $k) => !empty($k['scan']));
+        return array_filter(self::kinds(), static fn(array $k) => !empty($k['scan']));
     }
 
     public function index(Request $request, array $user): array
@@ -97,7 +119,7 @@ final class AnomaliesApi
             [$user['id'], $user['is_admin'] ? 'true' : 'false']
         );
         return [
-            'kinds' => self::KINDS,
+            'kinds' => self::kinds(),
             'anomalies' => $rows,
             'computed_at' => $computed === null ? null : (int) $computed,
             'last_scan_job' => $lastScan === null ? null : (int) $lastScan,

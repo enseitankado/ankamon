@@ -96,7 +96,8 @@ qx.Class.define("ankamon.page.Anomalies", {
         }
         return parts.join("; ") || "Saat eşitlenmemiş";
       }
-      return "";
+      // Eklenti kuralları ayrıntı metnini kendileri verir (detail.text — bkz. worker anomaly eklenti kancası).
+      return d.text || "";
     }
   },
 

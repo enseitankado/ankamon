@@ -38,17 +38,43 @@ sürmekte olan anomalilerin başından itibaren. Yeni kural: modülü yazıp RUL
 
 Kural ayrıca PROBE (tahtada çalışan kabuk parçası) ve evaluate(values, ctx) tanımlarsa Anomaliler ▸ Tarama'da
 seçilen tahtalarda anlık taranabilir (bkz. anomaly.scan).
+
+Eklentiler de kural ekleyebilir (çekirdek eklentiyi adıyla bilmez): /opt/ankamon/ext/<ad>/worker/anomaly_rules.py
+içindeki RULES listesi, burada aynı sözleşmeyle çalışır; tür adları ext/<ad>/anomaly_kinds.json'dan (bkz. backend
+AnomaliesApi). Eklentinin verisine dayanan kural (ör. kendi tablosu) eklenti devre dışıyken kendisi boş dönmeli.
 """
 
 import datetime
+import glob
+import importlib.util
 import json
 import logging
+import os
+import sys
 
 from . import no_login, ntp_unsynced
 
 log = logging.getLogger(__name__)
 
-RULES = [no_login, ntp_unsynced]
+
+def _extension_rules() -> list:
+    found = []
+    for path in sorted(glob.glob("/opt/ankamon/ext/*/worker/anomaly_rules.py")):
+        name = "ankamonext_anomaly_" + path.split("/")[-3]
+        try:
+            worker_dir = os.path.dirname(path)
+            if worker_dir not in sys.path:
+                sys.path.insert(0, worker_dir)
+            spec = importlib.util.spec_from_file_location(name, path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            found.extend(getattr(module, "RULES", []))
+        except Exception:  # noqa: BLE001 — bir eklentinin hatası çekirdek kurallarını durdurmasın
+            log.exception("Eklenti anomali kuralları yüklenemedi: %s", path)
+    return found
+
+
+RULES = [no_login, ntp_unsynced] + _extension_rules()
 
 # Her turda yeniden hesaplanan geriye dönük pencere (geç gelen loglar/oturum kayıtları için).
 WINDOW = datetime.timedelta(days=1)
