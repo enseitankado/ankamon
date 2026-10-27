@@ -38,7 +38,6 @@ qx.Class.define("ankamon.ui.files.CopyWindow", {
     this.set({
       layout: new qx.ui.layout.VBox(8),
       contentPadding: 10,
-      showMinimize: false,
       width: Math.min(1500, bounds.width - 30),
       height: Math.min(820, bounds.height - 30)
     });

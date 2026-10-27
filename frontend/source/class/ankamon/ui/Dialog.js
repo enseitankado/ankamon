@@ -1,18 +1,16 @@
-/** Kalıcı pencereler: bilgi, hata, onay ve form pencereleri için ortak yardımcılar. */
+/** Bilgi, hata, onay ve form pencereleri için ortak yardımcılar (kipsiz, küçültülebilir — bkz. ui.WindowDock). */
 qx.Class.define("ankamon.ui.Dialog", {
   type: "static",
 
   statics: {
     /**
-     * Ortalanmış, kalıcı (modal) boş pencere açar.
+     * Ortalanmış boş pencere açar.
      * @param opts {Map?} {maximizable: true} verilirse pencere büyüt düğmesi kazanır (kullanıcı
      *   elle büyütmedikçe GENE normal/ortalı boyutta açılır — yalnız büyütme İMKANI eklenir).
      *   Varsayılan (verilmezse) önceki davranış: büyütülemez, sabit boyutlu pencere.
      */
     window(caption, width, opts = {}) {
       const win = new qx.ui.window.Window(caption).set({
-        modal: true,
-        showMinimize: false,
         showMaximize: !!opts.maximizable,
         allowMaximize: !!opts.maximizable,
         width: width || 420,

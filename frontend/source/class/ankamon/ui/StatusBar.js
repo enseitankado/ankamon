@@ -51,7 +51,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
     this.__foldButton.addListener("execute", () => this.__setFolded(!this.__folded));
     head.add(this.__foldButton);
     head.add(new qx.ui.basic.Label("Arka plan işlemleri").set({ font: "app-mono", textColor: "app-muted" }));
-    // Küçültülmüş pencereler (Ekranlar sekmesindeyken açılanlar — bkz. ui.WindowDock): tıklanınca geri açılır.
+    // Küçültülmüş pencereler (bkz. ui.WindowDock): tıklanınca geri açılır.
     this.__dock = new ankamon.ui.WindowDock();
     head.add(this.__dock);
     head.add(new qx.ui.core.Spacer(), { flex: 1 });

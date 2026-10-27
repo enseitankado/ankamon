@@ -41,8 +41,6 @@ qx.Class.define("ankamon.ui.Jobs", {
       const root = qx.core.Init.getApplication().getRoot();
       const bounds = root.getBounds() || { width: 1100, height: 700 };
       const win = new qx.ui.window.Window(caption || "Komut çıktısı").set({
-        modal: true,
-        showMinimize: false,
         contentPadding: 10,
         layout: new qx.ui.layout.VBox(8),
         width: Math.min(1000, bounds.width - 40),

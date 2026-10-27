@@ -16,9 +16,9 @@
  * var olan tahtanın çevrimiçi/çevrimdışı durumu yukarıdaki iki yoldan çok daha hızlı yansır.
  *
  * "Web terminal": üst araç çubuğunda düğmesi yok, yalnız satır sağ menüsünden açılır (bkz. __rowMenu).
- * O satır işaretli ÇOKLU seçimin bir parçasıysa hepsi için ortak, modal bir pencerede yan yana
+ * O satır işaretli ÇOKLU seçimin bir parçasıysa hepsi için ortak bir pencerede yan yana
  * panolar (toplu komut yazılabilen) çoklu terminal açılır (BoardOps.webshellMulti — bkz. /multishell/);
- * değilse yalnız o tahtanın tekli terminali (BoardOps.webshell) açılır — ikisi de aynı modal pencere
+ * değilse yalnız o tahtanın tekli terminali (BoardOps.webshell) açılır — ikisi de aynı pencere
  * deseniyle (BoardOps.__terminalWindow), yeni sekme YOKTUR.
  */
 qx.Class.define("ankamon.page.Boards", {
@@ -362,8 +362,6 @@ qx.Class.define("ankamon.page.Boards", {
      */
     __createScreensPage() {
       const page = new qx.ui.tabview.Page("Ekranlar");
-      // Bu sekme açıkken açılan pencereler simge durumuna küçültülebilir (alt çubukta durur — bkz. ui.WindowDock).
-      ankamon.ui.WindowDock.addContext(page);
       page.setLayout(new qx.ui.layout.VBox());
       page.setPadding([8, 0, 0, 0]);
       // qx.ui.embed.Iframe yerine düz <iframe> (Html bileşeni): Iframe her pointerdown'da üstüne saydam

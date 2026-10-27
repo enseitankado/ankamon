@@ -496,7 +496,7 @@ qx.Class.define("ankamon.page.Network", {
     },
 
     /**
-     * Bilgisayar ayrıntıları (modal; çift tıklama ve sağ menü — kullanıcı isteği): grid'in TÜM sütunlarının
+     * Bilgisayar ayrıntıları (ayrı pencere; çift tıklama ve sağ menü — kullanıcı isteği): grid'in TÜM sütunlarının
      * (gizlenmiş olanlar dahil) değerleri iki sütunlu tabloda; ardından varsa açık portlar/servisler ve ağ
      * paylaşımları. Metin fareyle seçilip kopyalanabilir; "Tümünü kopyala" hepsini düz metin verir. "Düzenle"
      * yalnız network.manage yetkisiyle.

@@ -616,11 +616,11 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       }));
       menu.add(ops.menuButton(icon.boards, `Yalnız bu tahta (${s.board || s.host})`,
         () => this.__selectValue(this.__board, this.__boardKey(s))));
-      // Açık tahta oturumu: o tahtanın canlı ekranı, kipli pencerede (Ekran ▸ Ekranı göster ile aynı işlev).
+      // Açık tahta oturumu: o tahtanın canlı ekranı (Ekran ▸ Ekranı göster ile aynı işlev).
       if (s.kind === "board" && !s.ended_at && s.board_id && this.__page._can("screen")) {
         menu.add(new qx.ui.menu.Separator());
         menu.add(ops.menuButton(icon.screen, `Ekranı göster (${s.board || s.host})`,
-          () => ops.screen([{ id: s.board_id, label: s.board || s.host }], this.__page._user, false, { modal: true })));
+          () => ops.screen([{ id: s.board_id, label: s.board || s.host }], this.__page._user)));
       }
       if (s.kind === "board" && !s.ended_at && s.board_id && this.__page._can("boards.login")) {
         const board = { id: s.board_id, label: s.board };

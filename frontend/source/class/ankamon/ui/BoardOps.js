@@ -8,16 +8,14 @@ qx.Class.define("ankamon.ui.BoardOps", {
 
   statics: {
     /**
-     * Yeni sekme açmadan, uygulama içinde modal (büyütülebilir — qx.ui.window.Window varsayılanı)
-     * bir pencerede iframe gösterir. webshell/webshellMulti ortak kullanır (bkz. screen()/
-     * filemanager() ile aynı Grow+Iframe deseni; buradaki fark modal:true olması).
+     * Yeni sekme açmadan, uygulama içinde (büyütülebilir, küçültülebilir — bkz. ui.WindowDock) bir
+     * pencerede iframe gösterir. webshell/webshellMulti ortak kullanır (bkz. screen()/filemanager() ile
+     * aynı Grow+Iframe deseni; buradaki fark üstteki yazı boyutu çubuğu).
      */
     __terminalWindow(caption, url) {
       const root = qx.core.Init.getApplication().getRoot();
       const bounds = root.getBounds() || { width: 1024, height: 700 };
       const win = new qx.ui.window.Window(caption).set({
-        modal: true,
-        showMinimize: false,
         contentPadding: 0,
         layout: new qx.ui.layout.VBox(),
         width: Math.min(1024, bounds.width - 40),
@@ -128,7 +126,6 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const root = qx.core.Init.getApplication().getRoot();
       const bounds = root.getBounds() || { width: 1024, height: 700 };
       const win = new qx.ui.window.Window("Dosya yöneticisi — " + name).set({
-        showMinimize: false,
         contentPadding: 0,
         layout: new qx.ui.layout.Grow(),
         width: Math.min(1200, bounds.width - 40),
@@ -156,13 +153,12 @@ qx.Class.define("ankamon.ui.BoardOps", {
      * @param boards {Array} [{id, label|hostname|ip}]
      * @param user {Map?} oturum sahibi
      * @param manage {Boolean?} "Ekranı yönet" kipi (tek tahta)
-     * @param opts {Map?} {modal: true} — pencere kipli açılır (ör. Oturumlar ▸ Kullanıcılar çizelgesinden)
      * Tek tahtalık pencere tahta başına BİR tane açılır (kullanıcı isteği): aynı tahtanın penceresi zaten
      * açıksa yenisi açılmaz, o öne getirilir ("Ekranı yönet" istenmişse izleme penceresi yönetim kipiyle
      * değiştirilir). Açık pencereler SCREEN_WINDOWS iletisiyle duyurulur — Ekranlar sekmesi o tahtanın
      * önizlemesini durdurup "Ayrı pencerede izleniyor" yazar (bkz. Boards.js, screen/index.html "tm-popped").
      */
-    screen(boards, user, manage = false, opts = {}) {
+    screen(boards, user, manage = false) {
       const list = boards.map(b => ({ id: b.id, name: b.label || b.hostname || b.ip || "#" + b.id }));
       if (!list.length) {
         return;
@@ -188,8 +184,6 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const root = qx.core.Init.getApplication().getRoot();
       const bounds = root.getBounds() || { width: 1024, height: 700 };
       const win = new qx.ui.window.Window(caption).set({
-        modal: !!opts.modal,
-        showMinimize: false,
         contentPadding: 0,
         layout: new qx.ui.layout.Grow(),
         width: Math.min(1024, bounds.width - 40),
@@ -498,7 +492,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
     ].join("\n"),
 
     /**
-     * Birden fazla tahtanın web terminalini, uygulama içinde tek modal pencerede yan yana panolar
+     * Birden fazla tahtanın web terminalini, uygulama içinde tek pencerede yan yana panolar
      * hâlinde açar (bkz. /multishell/ — toplu komut yazma üstten yapılır). Her panonun bağlantı
      * bilgisi (host/kullanıcı/parola) ayrı ayrı /shell ucundan alınır (tek tahtadaki ile aynı uç,
      * aynı komut loguna işlenir), tarayıcıya hiç sunucuya gitmeyen URL fragmanıyla (#...) taşınır.

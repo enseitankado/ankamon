@@ -35,7 +35,6 @@ qx.Class.define("ankamon.ui.files.BulkWindow", {
     this.set({
       layout: new qx.ui.layout.Grow(),
       contentPadding: 10,
-      showMinimize: false,
       width: Math.min(1180, bounds.width - 30),
       height: Math.min(920, bounds.height - 30)
     });
