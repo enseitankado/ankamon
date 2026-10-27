@@ -64,6 +64,11 @@ qx.Class.define("ankamon.ui.Login", {
     card.add(this.__password);
     card.add(this.__message);
     card.add(this.__button);
+    // AGPLv3 madde 13: ağ üzerinden kullanan herkese (oturum açmadan da) kaynak koda ulaşma yolu sunulur.
+    // Değiştirilmiş sürümü çalıştıran, bu bağlantıyı kendi kaynak koduna çevirmelidir; kaldırılmaz.
+    card.add(new qx.ui.basic.Label(ankamon.ui.Login.agplKaynakBaglantisi()).set({
+      rich: true, textColor: "app-muted", alignX: "center", marginTop: 4
+    }));
     this.add(card);
 
     this.__button.addListener("execute", this.__submit, this);
@@ -92,6 +97,16 @@ qx.Class.define("ankamon.ui.Login", {
   statics: {
     /** Giriş ekranındaki slogan (logonun altında). */
     SLOGAN: "Pardus İzleme ve Yönetim Merkezi",
+
+    /** Bu kurulumun kaynak kodu (AGPLv3 madde 13 bildirimi); değiştirilmiş sürümde kendi deponuzu yazın. */
+    ANKAMON_KAYNAK_KODU_URL: "https://github.com/enseitankado/ankamon",
+
+    /** Giriş kartının dipnotu: lisans adı + kaynak kodu bağlantısı (yeni sekmede). */
+    agplKaynakBaglantisi() {
+      const url = qx.bom.String.escape(ankamon.ui.Login.ANKAMON_KAYNAK_KODU_URL);
+      return `<div style="font-size:10.5px;opacity:.65;text-align:center">Özgür yazılım · AGPL-3.0-or-later · ` +
+        `<a href="${url}" target="_blank" rel="noopener" style="color:inherit">Kaynak kodu</a></div>`;
+    },
 
     /** Sorun hücresinin ince çizgi simgeleri (24×24, rengi currentColor'dan). */
     ICON: {
