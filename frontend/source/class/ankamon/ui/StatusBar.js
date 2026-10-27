@@ -470,10 +470,11 @@ qx.Class.define("ankamon.ui.StatusBar", {
           ).set({ rich: true, showTimeout: 400, hideTimeout: 60000 }));
           item.setLabel(item.getLabel() + "  ⓘ");
         }
-        if (ev.level === "error") {
-          item.setTextColor("error");
-        } else if (ev.level === "warn") {
-          item.setTextColor("app-warn");
+        // Renk etikete verilir: temaların liste öğesi görünümü etiketin rengini kendisi atar, öğeye verilen
+        // textColor etikete geçmiyordu (hata/uyarı satırları renksiz kalıyordu).
+        const color = { error: "error", warn: "app-warn" }[ev.level];
+        if (color) {
+          item.getChildControl("label").setTextColor(color);
         }
         this.__list.add(item);
       });
