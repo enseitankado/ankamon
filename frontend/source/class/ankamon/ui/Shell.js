@@ -127,10 +127,10 @@ qx.Class.define("ankamon.ui.Shell", {
       { id: "boards", label: "Tahtalar", feature: "boards", create: u => new ankamon.page.Boards(u) },
       // parent: ağaçta o sayfanın düğümünün ALTINDA (kullanıcı isteği: tahtalarla ilgili sayfalar
       // "Tahtalar"ın altında). Üst sayfa kullanıcıya kapalıysa kökte gösterilir — bkz. __createTree.
-      // Sekmeleri ağaçta da (kullanıcı isteği: "Kullanıcılar" zaman çizelgesi sol menüden açılsın); key =
-      // sekme etiketi (page.Sessions sekmelerinde userData "key" yok).
+      // Sekmeleri ağaçta da (kullanıcı isteği: zaman çizelgesi sol menüden açılsın). key: Oturumlar sekmesinde
+      // etiket, Zaman çizelgesinde userData "key" (eski adı "Kullanıcılar" — bkz. ui.sessions.Users).
       { id: "sessions", label: "Oturumlar", feature: "logs", parent: "boards", create: u => new ankamon.page.Sessions(u),
-        tabs: ["Oturumlar", "Kullanıcılar"].map(label => ({ key: label, label })) },
+        tabs: [{ key: "Oturumlar", label: "Oturumlar" }, { key: "timeline", label: "Zaman çizelgesi" }] },
       // Bakım: "Bakım" (sorun tespiti) + "Sensörler" (Grafana) sekmeleri — bkz. page.Maintenance. features:
       // herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı
       // isteği); eski {page: "metrics"} bağlantıları __openPage'de buraya yönlenir. id "diagnose" kalır

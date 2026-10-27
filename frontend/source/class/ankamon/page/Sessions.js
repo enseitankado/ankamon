@@ -8,7 +8,7 @@
  *
  * İki sekme, tek veri: sayfa /board-sessions'ı kısa aralıkla çeker ve iki sekmeye de verir.
  *  - "Oturumlar" (ui.sessions.List): tüm kayıtların süzülebilir grid'i.
- *  - "Kullanıcılar" (ui.sessions.Users): kullanıcı/tahta bazında zaman çizelgesi ve özet. Grid'de
+ *  - "Zaman çizelgesi" (ui.sessions.Users): kullanıcı/tahta bazında zaman çizelgesi ve özet. Grid'de
  *    sağ tık → "Oturum geçmişi" buraya, o kullanıcı seçili olarak geçer (showUserHistory).
  *
  * Oturum kapanışı her zaman güvenilir biçimde loglanmaz (elektrik kesintisi, fiziksel güç

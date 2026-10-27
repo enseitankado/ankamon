@@ -1,5 +1,5 @@
 /**
- * Oturumlar sayfasının "Kullanıcılar" sekmesi: kullanıcıların hangi tahtada, ne zaman, ne kadar
+ * Oturumlar sayfasının "Zaman çizelgesi" sekmesi (eski adı "Kullanıcılar"): kullanıcıların hangi tahtada, ne zaman, ne kadar
  * süre oturum açtığını (ve hangilerinin düzgün kapanmadığını) zaman çizelgesinde gösterir.
  *
  * Veri, Oturumlar sekmesiyle aynı (/board-sessions — page.Sessions çeker, setData ile verir);
@@ -24,7 +24,9 @@ qx.Class.define("ankamon.ui.sessions.Users", {
 
   /** @param page {ankamon.page.Sessions} */
   construct(page) {
-    super("Kullanıcılar");
+    super("Zaman çizelgesi");
+    // Sekme kimliği (sol ağaç yaprağı, hatırlanan sekme) etiketten bağımsız — bkz. ui.Shell PAGES "sessions".
+    this.setUserData("key", "timeline");
     this.__page = page;
     this.setLayout(new qx.ui.layout.VBox(6));
     this.setPadding(8);
