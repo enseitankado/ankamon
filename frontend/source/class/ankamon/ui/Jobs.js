@@ -74,6 +74,7 @@ qx.Class.define("ankamon.ui.Jobs", {
         width: Math.min(1000, bounds.width - 40),
         height: Math.min(620, bounds.height - 40)
       });
+      ankamon.ui.Dialog.slimCaption(win);
       win.addListenerOnce("appear", () => win.center());
 
       const status = new qx.ui.basic.Label("Görev kuyruğa alınıyor…").set({ rich: true });
