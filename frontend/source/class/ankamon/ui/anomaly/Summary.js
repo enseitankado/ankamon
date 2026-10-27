@@ -41,9 +41,11 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
 
+    // Tahta ve Anomali her zaman hazır listeli (kullanıcı isteği): satır azken (her tahtanın birkaç türü)
+    // otomatik karar "değer sayısı satır sayısına yakın" diye listeyi gizliyordu (bkz. Base.choicesSuitable).
     this.__columns = [
-      { id: "board", label: "Tahta", width: 200 },
-      { id: "kind", label: "Anomali", width: 140 },
+      { id: "board", label: "Tahta", width: 200, choices: true },
+      { id: "kind", label: "Anomali", width: 140, choices: true },
       { id: "count", label: "Sayı", width: 70 },
       { id: "total", label: "Toplam süre", width: 130 },
       { id: "longest", label: "En uzun", width: 120 },
