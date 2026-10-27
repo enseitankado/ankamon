@@ -645,6 +645,26 @@ qx.Class.define("ankamon.ui.BoardOps", {
       return btn;
     },
 
+    /**
+     * menu()'nün dışında kalan iki ortak madde (Tahtalar sağ menüsünde Düzenle/Sil'in üstünde, Bakım ▸ Ahenk'te
+     * de): Logları göster (Loglar sayfasını bu tahtaya süzülmüş açar — bkz. ui.Shell.OPEN_LOGS) ve hemen altında
+     * Bilgi kartı (kullanıcı isteği; yalnız çevrimiçi tahtada). Yetkiye göre boş dizi dönebilir.
+     */
+    logsAndInfo(board, user, boards = [board]) {
+      const can = feature => user.is_admin || user.features.includes(feature);
+      const ICON = ankamon.ui.Shell.ICON;
+      const items = [];
+      if (can("logs")) {
+        items.push(this.menuButton(ICON.logs, "Logları göster", () =>
+          qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_LOGS, board.id)));
+      }
+      if (board.online && (can("boards") || can("screen"))) {
+        const count = boards.length > 1 ? ` (${boards.length} tahta)` : "";
+        items.push(this.menuButton(ICON.info, "Bilgi kartı" + count, () => this.infoCard(boards)));
+      }
+      return items;
+    },
+
     /** Devre dışı sağ menü maddelerinin opaklığı (bkz. menuButton). */
     DISABLED_OPACITY: 0.38,
 

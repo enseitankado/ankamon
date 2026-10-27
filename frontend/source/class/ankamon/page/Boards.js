@@ -1089,16 +1089,8 @@ qx.Class.define("ankamon.page.Boards", {
       const menu = ankamon.ui.BoardOps.menu(board, this._user, boards, sessionOps) || new qx.ui.menu.Menu();
       const ICON = ankamon.ui.Shell.ICON;
       const add = (icon, label, handler) => menu.add(ankamon.ui.BoardOps.menuButton(icon, label, handler.bind(this)));
-      const extra = [];
-      if (this._can("logs")) {
-        extra.push(() => add(ICON.logs, "Logları göster", () =>
-          qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_LOGS, board.id)));
-      }
-      // Bilgi kartı "Logları göster"in hemen altında (kullanıcı isteği); yalnız çevrimiçi tahtada.
-      if (board.online && (this._can("boards") || this._can("screen"))) {
-        const count = boards.length > 1 ? ` (${boards.length} tahta)` : "";
-        extra.push(() => add(ICON.info, "Bilgi kartı" + count, () => ankamon.ui.BoardOps.infoCard(boards)));
-      }
+      // Logları göster + Bilgi kartı: ortak (bkz. BoardOps.logsAndInfo — Bakım ▸ Ahenk sağ menüsü de kullanır).
+      const extra = ankamon.ui.BoardOps.logsAndInfo(board, this._user, boards).map(item => () => menu.add(item));
       // Bilgisayarı aç (WoL) artık BoardOps.menu'de "Bilgisayarı kapat"ın hemen yanında (kullanıcı
       // isteği: ikisi komşu); çevrimiçi tahtada orada devre dışı görünür.
       if (this._can("boards.manage")) {
