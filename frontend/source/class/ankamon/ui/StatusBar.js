@@ -37,8 +37,9 @@
  * tutulur (yalnız bu tarayıcıya özgüdür, sunucuya gitmez).
  *
  * /api/activity ucunu artımlı (last_id) yoklar; en yeni satırlar altta birikir. Üst bar sağda,
- * sunucunun anlık kaynak kullanımını gösterir (/api/system/stats, 1 sn'de bir). Listenin sağ
- * menüsünde Temizle (eskiden başlıktaki ayrı düğmeydi) + Sistem/Komut loglarına kısayol var.
+ * sunucunun anlık kaynak kullanımını gösterir (/api/system/stats, 1 sn'de bir). Satırlar tek tek ya da
+ * çoklu (Ctrl/Shift) seçilip panoya kopyalanır (sağ menü Kopyala ya da Ctrl+C); sağ menüde Tümünü seç ve
+ * Temizle (eskiden başlıktaki ayrı düğmeydi) de var.
  */
 qx.Class.define("ankamon.ui.StatusBar", {
   extend: qx.ui.container.Composite,
@@ -109,8 +110,17 @@ qx.Class.define("ankamon.ui.StatusBar", {
       }
     });
 
-    this.__list = new qx.ui.form.List().set({ font: "app-mono", backgroundColor: "surface", visibility: "excluded" });
+    // Satırlar seçilebilir (tek, Ctrl ile tek tek, Shift ile aralık) ve panoya kopyalanabilir (sağ menü, Ctrl+C).
+    this.__list = new qx.ui.form.List().set({
+      font: "app-log", backgroundColor: "surface", visibility: "excluded", selectionMode: "multi", spacing: 0
+    });
     this.__list.setContextMenu(this.__buildListMenu());
+    this.__list.addListener("keydown", e => {
+      if ((e.isCtrlPressed() || e.isMetaPressed()) && e.getKeyIdentifier() === "C") {
+        e.preventDefault();
+        this.__copySelected();
+      }
+    });
     this.add(this.__list, { flex: 1 });
 
     // Varsayılan: katlı. Akış yine de arka planda yoklanmaya devam eder; açılınca kayıtlar hazır olur.
@@ -326,19 +336,41 @@ qx.Class.define("ankamon.ui.StatusBar", {
       }
     },
 
-    /** Listenin sağ menüsü: Temizle (eskiden başlıktaki düğme) + Loglar sayfasına kısayollar. */
+    /** Listenin sağ menüsü: seçili satırları kopyala, tümünü seç, Temizle (eskiden başlıktaki düğme). */
     __buildListMenu() {
       const menu = new qx.ui.menu.Menu();
+      const copy = new qx.ui.menu.Button("Kopyala").set({ toolTipText: "Seçili satırları panoya kopyalar (Ctrl+C)" });
+      copy.addListener("execute", () => this.__copySelected());
+      menu.add(copy);
+      const all = new qx.ui.menu.Button("Tümünü seç");
+      all.addListener("execute", () => this.__list.selectAll());
+      menu.add(all);
+      menu.add(new qx.ui.menu.Separator());
       const clear = new qx.ui.menu.Button("Temizle");
       clear.addListener("execute", () => this.__list.removeAll().forEach(item => this.__disposeItem(item)));
       menu.add(clear);
-      menu.add(new qx.ui.menu.Separator());
-      ankamon.ui.Shell.LOG_KINDS.forEach(kind => {
-        const btn = new qx.ui.menu.Button(kind.label);
-        btn.addListener("execute", () => qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_LOGS_MODE, kind.mode));
-        menu.add(btn);
-      });
+      // Kopyala yalnız seçim varken; sağ tıklanan satır seçili değilse önce o seçilir (tek satır kopyası için).
+      menu.addListener("appear", () => copy.setEnabled(!this.__list.isSelectionEmpty()));
       return menu;
+    },
+
+    /**
+     * Seçili satırları (listedeki sırasıyla) panoya kopyalar; ayrıntısı olan satırın ayrıntısı (ör. traceback)
+     * altına girintili eklenir.
+     */
+    __copySelected() {
+      const selected = new Set(this.__list.getSelection());
+      const lines = [];
+      this.__list.getChildren().filter(item => selected.has(item)).forEach(item => {
+        lines.push(item.getUserData("ankamon.logText"));
+        const detail = item.getUserData("ankamon.logDetail");
+        if (detail) {
+          lines.push(...String(detail).split("\n").map(line => "    " + line));
+        }
+      });
+      if (lines.length) {
+        ankamon.util.Clipboard.copy(lines.join("\n"));
+      }
     },
 
     /** Listeden çıkan satırı (ve varsa ayrıntı ipucunu) bırakır; akış saatlerce açık kalabilir. */
@@ -462,7 +494,14 @@ qx.Class.define("ankamon.ui.StatusBar", {
       const F = ankamon.util.Format;
       const esc = qx.bom.String.escape;
       data.events.forEach(ev => {
-        const item = new qx.ui.form.ListItem(`${F.dateTime(ev.ts)}  ${ev.source ? `[${ev.source}] ` : ""}${ev.message}`);
+        const text = `${F.dateTime(ev.ts)}  ${ev.source ? `[${ev.source}] ` : ""}${ev.message}`;
+        // Sık satır (kullanıcı isteği): temanın liste öğesi iç boşluğu yerine yalnız yatay pay.
+        const item = new qx.ui.form.ListItem(text).set({ padding: [0, 6], minHeight: 0 });
+        // Yazı tipi etikete verilir: temaların liste öğesi görünümü etiketin yazısını kendisi atar, listeye
+        // verilen yazı tipi etikete geçmiyordu (14 px kalıyordu).
+        item.getChildControl("label").setFont("app-log");
+        item.setUserData("ankamon.logText", text);
+        item.setUserData("ankamon.logDetail", ev.detail || null);
         if (ev.detail) {
           // Ayrıntı (traceback, SQL, en çok CPU yiyen süreçler …): satırın üzerine gelince, eş aralıklı yazıyla.
           item.setToolTip(new qx.ui.tooltip.ToolTip(

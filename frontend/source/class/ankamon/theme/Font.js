@@ -85,6 +85,12 @@ qx.Theme.define("ankamon.theme.Font", {
     "app-mono": {
       size: 13,
       family: ["Consolas", "Cascadia Mono", "monospace"]
+    },
+
+    // Alt çubuktaki "Ankamon logs" satırları (bkz. ui.StatusBar): app-mono'dan bir tık küçük, sık satırlı.
+    "app-log": {
+      size: 12,
+      family: ["Consolas", "Cascadia Mono", "monospace"]
     }
   }
 });
