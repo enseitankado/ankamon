@@ -55,7 +55,7 @@ final class UsersApi
     public function index(): array
     {
         $users = Db::all('SELECT ' . self::COLUMNS . ' FROM users ORDER BY username');
-        return ['users' => array_map(self::decode(...), $users)];
+        return ['users' => array_map(self::userRowForPanel(...), $users)];
     }
 
     public function create(Request $request, array $admin): array
@@ -154,7 +154,7 @@ final class UsersApi
         return array_values(array_intersect(array_keys(self::featureCatalog()), $wanted));
     }
 
-    private static function decode(array $user): array
+    private static function userRowForPanel(array $user): array
     {
         $user['features'] = json_decode((string) $user['features'], true) ?: [];
         return $user;

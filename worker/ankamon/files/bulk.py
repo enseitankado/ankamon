@@ -361,7 +361,7 @@ def public(job: dict) -> dict:
     return out
 
 
-def _human(n: int) -> str:
+def bulk_transfer_size_text(n: int) -> str:
     for unit in ("B", "KB", "MB", "GB"):
         if n < 1024 or unit == "GB":
             return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
@@ -412,8 +412,8 @@ def new_upload(owner: str, total: int = 0) -> str:
     cleanup()
     free = shutil.disk_usage(STAGE).free - DISK_RESERVE - _reserved
     if total > free:
-        raise RemoteError(f"Sunucuda yeterli boş disk alanı yok: {_human(total)} yüklenecek, "
-                          f"{_human(max(0, free))} kullanılabilir (1 GB pay hariç).")
+        raise RemoteError(f"Sunucuda yeterli boş disk alanı yok: {bulk_transfer_size_text(total)} yüklenecek, "
+                          f"{bulk_transfer_size_text(max(0, free))} kullanılabilir (1 GB pay hariç).")
     token = secrets.token_hex(12)
     path = os.path.join(STAGE, "u-" + token)
     os.makedirs(os.path.join(path, "files"), mode=0o700)
@@ -1049,7 +1049,7 @@ def _collect_board(job: dict, row: dict, access: dict) -> None:
         row["state"] = "done"
         row["message"] = f"{len(paths)} öğe bulunur"
         row["bytes"] = row["total"]
-        _event(job, "info", f"{row['name']}: {len(paths)} öğe, {_human(row['total'])} toplanır.")
+        _event(job, "info", f"{row['name']}: {len(paths)} öğe, {bulk_transfer_size_text(row['total'])} toplanır.")
         return
     with _lock:
         free = shutil.disk_usage(STAGE).free - DISK_RESERVE - _reserved

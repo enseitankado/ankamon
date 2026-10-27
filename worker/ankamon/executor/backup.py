@@ -89,7 +89,7 @@ exec env LC_ALL=C nice -n 19 ionice -c3 tar --create --gzip --file=- \
 _CHECKPOINT_RE = re.compile(r"checkpoint (\d+)\s*$")
 
 
-def human(n: float) -> str:
+def home_backup_size_text(n: float) -> str:
     for unit in ("B", "KB", "MB", "GB", "TB"):
         if abs(n) < 1024 or unit == "TB":
             return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
@@ -163,7 +163,7 @@ def backup(board: dict, user: str, password: str, username: str, job_id: int, ev
                 parts = line.split(" ", 2)
                 total = int(parts[1]) if parts[1].isdigit() else 0
                 home = parts[2] if len(parts) > 2 else ""
-                events.add("info", f"Bağlandı. Ev dizini: {home} — toplam {human(total)}; arşivleniyor ve sıkıştırılıyor…")
+                events.add("info", f"Bağlandı. Ev dizini: {home} — toplam {home_backup_size_text(total)}; arşivleniyor ve sıkıştırılıyor…")
                 _progress(events, 0, 0, total, 0)
                 continue
             if line.startswith("ANKAMON_ERR "):
@@ -179,7 +179,7 @@ def backup(board: dict, user: str, password: str, username: str, job_id: int, ev
                     last_progress = now
                     _progress(events, pct, done, total, _size(path))
                 if total and pct >= next_report:
-                    events.add("info", f"%{pct} — {human(done)} / {human(total)} işlendi, arşiv şu an {human(_size(path))}")
+                    events.add("info", f"%{pct} — {home_backup_size_text(done)} / {home_backup_size_text(total)} işlendi, arşiv şu an {home_backup_size_text(_size(path))}")
                     next_report = (pct // 10 + 1) * 10
                 continue
             if line:
@@ -197,7 +197,7 @@ def backup(board: dict, user: str, password: str, username: str, job_id: int, ev
         note = " (bazı dosyalar yedeklenirken değişti/okunamadı — ayrıntı yukarıda)" if rc == 1 or warnings else ""
         _progress(events, 100, total, total, size)
         events.add("file", json.dumps({"name": name, "size": size}, ensure_ascii=False))
-        text = f"Yedek hazır: {name} — {human(total)} → {human(size)} ({elapsed:.0f} sn){note}"
+        text = f"Yedek hazır: {name} — {home_backup_size_text(total)} → {home_backup_size_text(size)} ({elapsed:.0f} sn){note}"
         events.add("ok", text)
         return {"status": "ok", "rc": rc, "output": text}
 

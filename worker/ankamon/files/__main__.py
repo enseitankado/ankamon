@@ -105,13 +105,13 @@ def _size(n: int) -> str:
     return str(n)
 
 
-class Base(tornado.web.RequestHandler):
+class BoardFilesRequestHandler(tornado.web.RequestHandler):
     def prepare(self):
         if self.request.method in ("POST", "PUT") and self.request.headers.get("X-Requested-With") != "ankamon":
             raise tornado.web.HTTPError(403)
         self.user = self.request.headers.get("X-Auth-User", "")
 
-    def body(self) -> dict:
+    def board_request_json(self) -> dict:
         try:
             data = json.loads(self.request.body or b"{}")
         except ValueError:
@@ -120,7 +120,7 @@ class Base(tornado.web.RequestHandler):
             raise RemoteError("Geçersiz istek.")
         return data
 
-    async def board(self, value) -> dict:
+    async def resolve_board_access(self, value) -> dict:
         try:
             board_id = int(value)
         except (TypeError, ValueError):
@@ -130,7 +130,7 @@ class Base(tornado.web.RequestHandler):
     def write_error(self, status_code, **kwargs):
         self.write({"error": "İzin verilmedi." if status_code == 403 else "Sunucu hatası."})
 
-    async def guard(self, coro):
+    async def respond_board_file_op(self, coro):
         """RemoteError → 400 + Türkçe ileti; diğer hatalar 500 (günlüğe)."""
         try:
             self.write(await coro)
@@ -139,56 +139,56 @@ class Base(tornado.web.RequestHandler):
             self.write({"error": str(exc)})
 
 
-class ListHandler(Base):
+class BoardDirListHandler(BoardFilesRequestHandler):
     async def get(self):
         async def work():
-            board = await self.board(self.get_argument("board", ""))
+            board = await self.resolve_board_access(self.get_argument("board", ""))
             return await remote.listdir(board, self.get_argument("path", "/home"))
-        await self.guard(work())
+        await self.respond_board_file_op(work())
 
 
-class DeleteHandler(Base):
+class BoardFileDeleteHandler(BoardFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.body()
-            board = await self.board(data.get("board"))
+            data = self.board_request_json()
+            board = await self.resolve_board_access(data.get("board"))
             paths = [remote.check_path(p) for p in (data.get("paths") or [])][:500]
             await remote.delete(board, paths)
             shown = ", ".join(paths[:5]) + (f" … (+{len(paths) - 5})" if len(paths) > 5 else "")
             await asyncio.to_thread(_record, board, self.user, f"silindi: {shown}")
             return {"ok": True}
-        await self.guard(work())
+        await self.respond_board_file_op(work())
 
 
-class RenameHandler(Base):
+class BoardFileRenameHandler(BoardFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.body()
-            board = await self.board(data.get("board"))
+            data = self.board_request_json()
+            board = await self.resolve_board_access(data.get("board"))
             path = remote.check_path(data.get("path", ""))
             target = await remote.rename(board, path, data.get("name", ""))
             await asyncio.to_thread(_record, board, self.user, f"ad değiştirildi: {path} → {target}")
             return {"ok": True, "path": target}
-        await self.guard(work())
+        await self.respond_board_file_op(work())
 
 
-class MkdirHandler(Base):
+class BoardDirCreateHandler(BoardFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.body()
-            board = await self.board(data.get("board"))
+            data = self.board_request_json()
+            board = await self.resolve_board_access(data.get("board"))
             target = await remote.mkdir(board, data.get("path", ""), data.get("name", ""))
             await asyncio.to_thread(_record, board, self.user, f"klasör oluşturuldu: {target}")
             return {"ok": True, "path": target}
-        await self.guard(work())
+        await self.respond_board_file_op(work())
 
 
-class CopyHandler(Base):
+class BoardFileCopyHandler(BoardFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.body()
-            src = await self.board(data.get("src_board"))
-            dst = await self.board(data.get("dst_board"))
+            data = self.board_request_json()
+            src = await self.resolve_board_access(data.get("src_board"))
+            dst = await self.resolve_board_access(data.get("dst_board"))
             names = data.get("names") or []
             if not isinstance(names, list) or len(names) > 500:
                 raise RemoteError("Geçersiz seçim.")
@@ -205,10 +205,10 @@ class CopyHandler(Base):
 
             job_id = copy.start(src, data.get("src_dir", ""), names, dst, data.get("dst_dir", ""), done)
             return {"id": job_id}
-        await self.guard(work())
+        await self.respond_board_file_op(work())
 
 
-class CopyStatusHandler(Base):
+class CopyStatusHandler(BoardFilesRequestHandler):
     def get(self, job_id: str):
         job = copy.jobs.get(int(job_id))
         if not job:
@@ -218,7 +218,7 @@ class CopyStatusHandler(Base):
         self.write(copy.public(job))
 
 
-class CopyCancelHandler(Base):
+class CopyCancelHandler(BoardFilesRequestHandler):
     def post(self, job_id: str):
         self.write({"ok": copy.cancel(int(job_id))})
 
@@ -237,10 +237,10 @@ async def _accesses(ids: list[int]) -> list[dict]:
     return [await asyncio.to_thread(_access, i) for i in ids]
 
 
-class BulkUsersHandler(Base):
+class BulkUsersHandler(BoardFilesRequestHandler):
     async def post(self):
         async def work():
-            boards = await _accesses(_board_ids(self.body()))
+            boards = await _accesses(_board_ids(self.board_request_json()))
             sem = asyncio.Semaphore(bulk.parallel_limit())
 
             async def one(b):
@@ -250,22 +250,22 @@ class BulkUsersHandler(Base):
                     except RemoteError as exc:
                         return {"id": b["id"], "name": b["name"], "error": str(exc)}
             return {"boards": await asyncio.gather(*(one(b) for b in boards)), "limit": bulk.parallel_limit()}
-        await self.guard(work())
+        await self.respond_board_file_op(work())
 
 
-class BulkUploadHandler(Base):
+class BulkUploadHandler(BoardFilesRequestHandler):
     async def post(self):
         async def work():
             try:
-                total = int(self.body().get("total") or 0)
+                total = int(self.board_request_json().get("total") or 0)
             except (TypeError, ValueError):
                 total = 0
             return {"token": bulk.new_upload(self.user, total)}
-        await self.guard(work())
+        await self.respond_board_file_op(work())
 
 
 @tornado.web.stream_request_body
-class BulkUploadFileHandler(Base):
+class BulkUploadFileHandler(BoardFilesRequestHandler):
     def prepare(self):
         super().prepare()
         self.request.connection.set_max_body_size(1 << 40)
@@ -314,10 +314,10 @@ def _bulk_record(owner: str):
     return done
 
 
-class BulkDistributeHandler(Base):
+class BulkDistributeHandler(BoardFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.body()
+            data = self.board_request_json()
             boards = await _accesses(_board_ids(data))
             users = bulk.check_selection(data.get("users"))
             location = bulk.check_location(data.get("location"))
@@ -325,13 +325,13 @@ class BulkDistributeHandler(Base):
             return {"id": bulk.start_distribute(self.user, prepared, boards, users, location,
                                                 data.get("conflict", "overwrite"), _bulk_record(self.user),
                                                 relay=bool(data.get("relay", True)))}
-        await self.guard(work())
+        await self.respond_board_file_op(work())
 
 
-class BulkCollectHandler(Base):
+class BulkCollectHandler(BoardFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.body()
+            data = self.board_request_json()
             boards = await _accesses(_board_ids(data))
             users = bulk.check_selection(data.get("users"))
             location = bulk.check_location(data.get("location"))
@@ -345,10 +345,10 @@ class BulkCollectHandler(Base):
                                              bool(data.get("move")), _bulk_record(self.user), excludes=excludes,
                                              deep=bool(data.get("deep")), skip_hidden=bool(data.get("skip_hidden")),
                                              dry=bool(data.get("dry")))}
-        await self.guard(work())
+        await self.respond_board_file_op(work())
 
 
-class BulkJobHandler(Base):
+class BulkJobHandler(BoardFilesRequestHandler):
     def job(self, job_id: str) -> dict:
         job = bulk.get(int(job_id), self.user)
         if not job:
@@ -469,11 +469,11 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     os.makedirs(remote.CM_DIR, mode=0o700, exist_ok=True)
     app = tornado.web.Application([
-        (r"/list", ListHandler),
-        (r"/delete", DeleteHandler),
-        (r"/rename", RenameHandler),
-        (r"/mkdir", MkdirHandler),
-        (r"/copy", CopyHandler),
+        (r"/list", BoardDirListHandler),
+        (r"/delete", BoardFileDeleteHandler),
+        (r"/rename", BoardFileRenameHandler),
+        (r"/mkdir", BoardDirCreateHandler),
+        (r"/copy", BoardFileCopyHandler),
         (r"/copy/(\d+)", CopyStatusHandler),
         (r"/copy/(\d+)/cancel", CopyCancelHandler),
         (r"/bulk/users", BulkUsersHandler),

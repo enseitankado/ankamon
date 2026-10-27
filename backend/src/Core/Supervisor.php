@@ -45,31 +45,31 @@ final class Supervisor
     /** @return list<array<string,mixed>> supervisor.getAllProcessInfo */
     public static function processes(): array
     {
-        return self::call('supervisor.getAllProcessInfo');
+        return self::supervisorXmlRpcCall('supervisor.getAllProcessInfo');
     }
 
     public static function start(string $name): bool
     {
-        return (bool) self::call('supervisor.startProcess', [$name, true]);
+        return (bool) self::supervisorXmlRpcCall('supervisor.startProcess', [$name, true]);
     }
 
     public static function stop(string $name): bool
     {
-        return (bool) self::call('supervisor.stopProcess', [$name, true]);
+        return (bool) self::supervisorXmlRpcCall('supervisor.stopProcess', [$name, true]);
     }
 
     /** @return array<string,mixed> {statecode, statename} */
     public static function state(): array
     {
-        return self::call('supervisor.getState');
+        return self::supervisorXmlRpcCall('supervisor.getState');
     }
 
     public static function version(): string
     {
-        return (string) self::call('supervisor.getSupervisorVersion');
+        return (string) self::supervisorXmlRpcCall('supervisor.getSupervisorVersion');
     }
 
-    private static function call(string $method, array $params = []): mixed
+    private static function supervisorXmlRpcCall(string $method, array $params = []): mixed
     {
         $body = '<?xml version="1.0"?><methodCall><methodName>' . htmlspecialchars($method) . '</methodName><params>'
             . implode('', array_map(fn($p) => '<param>' . self::encode($p) . '</param>', $params))
@@ -89,10 +89,10 @@ final class Supervisor
             throw new ApiError(502, 'Servis yöneticisinden okunamayan yanıt.');
         }
         if (isset($xml->fault)) {
-            $fault = self::decode($xml->fault->value);
+            $fault = self::supervisorXmlRpcValue($xml->fault->value);
             throw new ApiError(409, 'Servis yöneticisi: ' . ($fault['faultString'] ?? 'hata'));
         }
-        return self::decode($xml->params->param->value);
+        return self::supervisorXmlRpcValue($xml->params->param->value);
     }
 
     private static function encode(mixed $v): string
@@ -104,7 +104,7 @@ final class Supervisor
         } . '</value>';
     }
 
-    private static function decode(\SimpleXMLElement $value): mixed
+    private static function supervisorXmlRpcValue(\SimpleXMLElement $value): mixed
     {
         $children = $value->children();
         if (count($children) === 0) {
@@ -115,17 +115,17 @@ final class Supervisor
             'int', 'i4' => (int) $node,
             'boolean' => (string) $node === '1',
             'double' => (float) $node,
-            'array' => array_map(fn($v) => self::decode($v), iterator_to_array($node->data->value, false)),
-            'struct' => self::struct($node),
+            'array' => array_map(fn($v) => self::supervisorXmlRpcValue($v), iterator_to_array($node->data->value, false)),
+            'struct' => self::supervisorXmlRpcStruct($node),
             default => (string) $node,
         };
     }
 
-    private static function struct(\SimpleXMLElement $node): array
+    private static function supervisorXmlRpcStruct(\SimpleXMLElement $node): array
     {
         $out = [];
         foreach ($node->member as $m) {
-            $out[(string) $m->name] = self::decode($m->value);
+            $out[(string) $m->name] = self::supervisorXmlRpcValue($m->value);
         }
         return $out;
     }

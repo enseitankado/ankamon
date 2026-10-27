@@ -45,7 +45,7 @@ final class CommandLogApi
     public function index(Request $request): array
     {
         $where = ['time >= ?::timestamptz', 'time <= ?::timestamptz'];
-        $params = [self::time($request->query('from'), '-7 days'), self::time($request->query('to'), 'now')];
+        $params = [self::commandLogTimeBound($request->query('from'), '-7 days'), self::commandLogTimeBound($request->query('to'), 'now')];
 
         if ($boardId = $request->query('board_id')) {
             $where[] = 'board_id = ?';
@@ -83,7 +83,7 @@ final class CommandLogApi
         return $result;
     }
 
-    private static function time(?string $value, string $default): string
+    private static function commandLogTimeBound(?string $value, string $default): string
     {
         $time = strtotime($value ?? $default);
         if ($time === false) {

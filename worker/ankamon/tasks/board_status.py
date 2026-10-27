@@ -54,7 +54,7 @@ _fails: dict[int, int] = {}
 _exporter_fails: dict[int, int] = {}
 
 
-async def _open(ip: str, port: int, limit: asyncio.Semaphore) -> bool:
+async def _board_tcp_port_open(ip: str, port: int, limit: asyncio.Semaphore) -> bool:
     async with limit:
         try:
             _, writer = await asyncio.wait_for(asyncio.open_connection(ip, port), TIMEOUT)
@@ -64,10 +64,10 @@ async def _open(ip: str, port: int, limit: asyncio.Semaphore) -> bool:
         return True
 
 
-async def _check(boards: list[dict]) -> list[tuple]:
+async def _probe_board_ssh_and_exporter(boards: list[dict]) -> list[tuple]:
     limit = asyncio.Semaphore(CONCURRENCY)
     results = await asyncio.gather(*(
-        asyncio.gather(_open(b["ip"], SSH_PORT, limit), _open(b["ip"], b["exporter_port"], limit))
+        asyncio.gather(_board_tcp_port_open(b["ip"], SSH_PORT, limit), _board_tcp_port_open(b["ip"], b["exporter_port"], limit))
         for b in boards
     ))
     return [(b["id"], ssh, exporter) for b, (ssh, exporter) in zip(boards, results)]
@@ -78,7 +78,7 @@ def run(conn) -> None:
     if not boards:
         return
     seen_ids = set()
-    for board_id, ssh, exporter in asyncio.run(_check(boards)):
+    for board_id, ssh, exporter in asyncio.run(_probe_board_ssh_and_exporter(boards)):
         seen_ids.add(board_id)
         reachable = ssh or exporter
         if reachable:

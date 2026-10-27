@@ -69,7 +69,7 @@ final class LogExclusionsApi
     /** Eklemeden önce uyarı için: bu dışlama son 24 saatte kaç kaydı, kaç farklı mesajı gizlerdi. */
     public function preview(Request $request): array
     {
-        [$pattern, $program] = self::validated($request->query('pattern'), $request->query('program'));
+        [$pattern, $program] = self::validatedLogExclusionRule($request->query('pattern'), $request->query('program'));
         $row = Db::one(
             "SELECT count(*) AS hits, count(DISTINCT ltrim(message)) AS distinct_messages FROM logs
              WHERE received_at > now() - interval '24 hours' AND (?::text IS NULL OR program = ?::text) AND strpos(message, ?) > 0",
@@ -80,7 +80,7 @@ final class LogExclusionsApi
 
     public function create(Request $request, array $user): array
     {
-        [$pattern, $program] = self::validated($request->input('pattern'), $request->input('program'));
+        [$pattern, $program] = self::validatedLogExclusionRule($request->input('pattern'), $request->input('program'));
         $id = Db::value(
             'INSERT INTO log_exclusions (pattern, program, created_by) VALUES (?, ?, ?)
              ON CONFLICT (pattern, program) DO NOTHING RETURNING id',
@@ -106,7 +106,7 @@ final class LogExclusionsApi
     }
 
     /** @return array{0:string,1:?string} */
-    private static function validated(mixed $pattern, mixed $program): array
+    private static function validatedLogExclusionRule(mixed $pattern, mixed $program): array
     {
         $pattern = trim((string) $pattern);
         $program = trim((string) $program);

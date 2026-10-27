@@ -76,7 +76,7 @@ def run(conn) -> None:
     since = _cursor(conn) or "1970-01-01"
     rows = conn.execute(RECENT, {"since": since}).fetchall()
     for row in rows:
-        _handle(conn, row)
+        _apply_pam_session_log_line(conn, row)
     if rows:
         _save_cursor(conn, rows[-1]["received_at"])
     # Büyük bir geçmiş birikintisi varsa (ör. ilk çalıştırma) _close_offline'ı henüz çalıştırma:
@@ -115,7 +115,7 @@ def _board_id(conn, host):
     return row["id"] if row else None
 
 
-def _handle(conn, row) -> None:
+def _apply_pam_session_log_line(conn, row) -> None:
     host, message, when = row["host"], row["message"], row["received_at"]
 
     m = _OPEN_RE.match(message)

@@ -64,11 +64,11 @@ final class MetricStatsApi
         $add = function (?string $boardId, string $field, array $g) use (&$rows, &$unmatched, &$total, $boards) {
             if ($boardId !== null && $boardId !== '' && isset($boards[$boardId])) {
                 $rows[$boardId] ??= self::emptyRow((int) $boardId, (string) $boards[$boardId]);
-                self::fold($rows[$boardId], $field, $g);
+                self::foldMetricBoardBucket($rows[$boardId], $field, $g);
             } else {
-                self::fold($unmatched, $field, $g);
+                self::foldMetricBoardBucket($unmatched, $field, $g);
             }
-            self::fold($total, $field, $g);
+            self::foldMetricBoardBucket($total, $field, $g);
         };
 
         foreach (Db::all('SELECT board_id, count(*) AS n FROM metrics_tag GROUP BY board_id') as $g) {
@@ -93,7 +93,7 @@ final class MetricStatsApi
             foreach ($bytes as $field => $b) {
                 $est += Storage::share($b, $row[$field], $total[$field]);
             }
-            return self::shape($row) + ['est_bytes' => $est];
+            return self::metricStatsRowShape($row) + ['est_bytes' => $est];
         };
 
         $rows = array_values($rows);
@@ -102,7 +102,7 @@ final class MetricStatsApi
         return [
             'boards' => array_map($estimate, $rows),
             'unmatched' => $hasUnmatched ? $estimate($unmatched) : null,
-            'total' => self::shape($total) + ['bytes' => array_sum($bytes)],
+            'total' => self::metricStatsRowShape($total) + ['bytes' => array_sum($bytes)],
             'disk' => Storage::diskSpace(),
         ];
     }
@@ -167,7 +167,7 @@ final class MetricStatsApi
         return ['board_id' => $id, 'name' => $name, 'series' => 0, 'raw' => 0, 'm5' => 0, 'h1' => 0, 'first' => null, 'last' => null];
     }
 
-    private static function fold(array &$acc, string $field, array $g): void
+    private static function foldMetricBoardBucket(array &$acc, string $field, array $g): void
     {
         $acc[$field] += (int) $g['n'];
         if (isset($g['first']) && ($acc['first'] === null || $g['first'] < $acc['first'])) {
@@ -179,7 +179,7 @@ final class MetricStatsApi
     }
 
     /** Arayüz biçimi: n = ham ölçüm, agg = 5 dk + 1 sa özet satırı. */
-    private static function shape(array $row): array
+    private static function metricStatsRowShape(array $row): array
     {
         return [
             'board_id' => $row['board_id'], 'name' => $row['name'], 'series' => $row['series'],

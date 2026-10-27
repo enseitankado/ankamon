@@ -59,8 +59,8 @@ final class LessonTimesApi
         sort($days);
         $lessons = [];
         foreach ((array) $request->input('lessons', []) as $i => $row) {
-            $start = self::time($row['start'] ?? null);
-            $end = self::time($row['end'] ?? null);
+            $start = self::lessonClockTime($row['start'] ?? null);
+            $end = self::lessonClockTime($row['end'] ?? null);
             $no = $i + 1;
             if ($start === null || $end === null) {
                 throw new ApiError(422, "$no. satır: başlangıç ve bitiş SS:DD biçiminde olmalı (ör. 08:30).");
@@ -87,7 +87,7 @@ final class LessonTimesApi
     }
 
     /** "8:5" / "08:05" → "08:05"; geçersizse null. */
-    private static function time(mixed $value): ?string
+    private static function lessonClockTime(mixed $value): ?string
     {
         if (!is_string($value) || !preg_match('/^\s*(\d{1,2}):(\d{1,2})\s*$/', $value, $m)) {
             return null;

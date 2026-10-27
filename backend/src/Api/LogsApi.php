@@ -46,13 +46,13 @@ final class LogsApi
     {
         $where = ['received_at >= ?::timestamptz', 'received_at <= ?::timestamptz'];
         $params = [
-            self::time($request->query('from'), '-24 hours'),
-            self::time($request->query('to'), 'now'),
+            self::logQueryTimeBound($request->query('from'), '-24 hours'),
+            self::logQueryTimeBound($request->query('to'), 'now'),
         ];
 
         if ($before = $request->query('before')) {
             $where[] = 'received_at < ?::timestamptz';
-            $params[] = self::time($before, 'now');
+            $params[] = self::logQueryTimeBound($before, 'now');
         }
         if ($boardId = $request->query('board_id')) {
             $board = Db::one('SELECT hostname, host(ip) AS ip FROM boards WHERE id = ?', [(int) $boardId])
@@ -109,7 +109,7 @@ final class LogsApi
     /** Toplam sayımın üst sınırı — ötesi "100.000+" diye gösterilir (bkz. sınıf başı not). */
     private const COUNT_CAP = 100000;
 
-    private static function time(?string $value, string $default): string
+    private static function logQueryTimeBound(?string $value, string $default): string
     {
         $time = strtotime($value ?? $default);
         if ($time === false) {

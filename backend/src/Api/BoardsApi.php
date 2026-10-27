@@ -65,19 +65,19 @@ final class BoardsApi
     public function index(): array
     {
         $boards = Db::all('SELECT ' . self::COLUMNS . ' ' . self::FROM . ' ORDER BY b.label, b.hostname, b.ip');
-        return ['boards' => array_map(self::decode(...), $boards)];
+        return ['boards' => array_map(self::boardRowForPanel(...), $boards)];
     }
 
     public function show(Request $request): array
     {
         $board = Db::one('SELECT ' . self::COLUMNS . ' ' . self::FROM . ' WHERE b.id = ?', [$request->arg('id')])
             ?? throw ApiError::notFound();
-        return ['board' => self::decode($board)];
+        return ['board' => self::boardRowForPanel($board)];
     }
 
     public function create(Request $request, array $user): array
     {
-        $fields = self::validated($request);
+        $fields = self::validatedBoardFields($request);
         if (empty($fields['ip']) && empty($fields['hostname'])) {
             throw ApiError::badRequest('IP adresi ya da bilgisayar adı gerekli.');
         }
@@ -95,7 +95,7 @@ final class BoardsApi
     {
         $id = $request->arg('id');
         Db::value('SELECT 1 FROM boards WHERE id = ?', [$id]) ?? throw ApiError::notFound();
-        $fields = self::validated($request);
+        $fields = self::validatedBoardFields($request);
         if ($fields) {
             $sets = implode(', ', array_map(static fn($column) => "$column = ?", array_keys($fields)));
             Db::exec("UPDATE boards SET $sets, updated_at = now() WHERE id = ?", [...array_values($fields), $id]);
@@ -196,7 +196,7 @@ final class BoardsApi
     }
 
     /** İstekte gelen, düzenlenebilir alanları doğrulayıp sütun → değer olarak döner. */
-    private static function validated(Request $request): array
+    private static function validatedBoardFields(Request $request): array
     {
         $fields = [];
         foreach (['label', 'location', 'notes', 'hostname'] as $key) {
@@ -234,7 +234,7 @@ final class BoardsApi
         return $fields;
     }
 
-    private static function decode(array $board): array
+    private static function boardRowForPanel(array $board): array
     {
         $board['facts'] = json_decode((string) $board['facts'], true) ?: new \stdClass();
         // ETAP faz bilgisi (bkz. migration 018, worker netscan/etap_phase.py); yoksa null.

@@ -138,14 +138,14 @@ final class LogStatsApi
                 }
             }
             if ($match === null) {
-                self::fold($unmatched, $g);
+                self::foldLogBoardBucket($unmatched, $g);
                 continue;
             }
             $byBoard[$match['id']] ??= ['board_id' => $match['id'], 'name' => $match['name'], 'n' => 0, 'first' => null, 'last' => null];
-            self::fold($byBoard[$match['id']], $g);
+            self::foldLogBoardBucket($byBoard[$match['id']], $g);
         }
 
-        return $this->shape(array_values($byBoard), $unmatched, $grandN, $bytesTotal);
+        return $this->logStatsResponseShape(array_values($byBoard), $unmatched, $grandN, $bytesTotal);
     }
 
     private function commandStats(): array
@@ -165,17 +165,17 @@ final class LogStatsApi
         foreach ($groups as $g) {
             $grandN += (int) $g['n'];
             if ($g['board_id'] === null) {
-                self::fold($unmatched, $g);
+                self::foldLogBoardBucket($unmatched, $g);
                 continue;
             }
             $byBoard[] = ['board_id' => (int) $g['board_id'], 'name' => $g['name'], 'n' => (int) $g['n'], 'first' => $g['first'], 'last' => $g['last']];
         }
 
-        return $this->shape($byBoard, $unmatched, $grandN, $bytesTotal);
+        return $this->logStatsResponseShape($byBoard, $unmatched, $grandN, $bytesTotal);
     }
 
     /** @param array<string,mixed> $acc birikimli {n, first, last}; $row aynı şekle sahip tek grup. */
-    private static function fold(array &$acc, array $row): void
+    private static function foldLogBoardBucket(array &$acc, array $row): void
     {
         $acc['n'] += (int) $row['n'];
         if ($row['first'] !== null && ($acc['first'] === null || $row['first'] < $acc['first'])) {
@@ -187,7 +187,7 @@ final class LogStatsApi
     }
 
     /** Oranlı boyut tahminini ekleyip tek bir yanıt şekline sokar. */
-    private function shape(array $byBoard, array $unmatched, int $grandN, int $bytesTotal): array
+    private function logStatsResponseShape(array $byBoard, array $unmatched, int $grandN, int $bytesTotal): array
     {
         $withBytes = fn(array $row) => $row + [
             'est_bytes' => Storage::share($bytesTotal, $row['n'], $grandN),
