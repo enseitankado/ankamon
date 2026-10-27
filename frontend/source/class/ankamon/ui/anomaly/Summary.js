@@ -64,7 +64,8 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
       }
     });
     this.__table.setToolTipText("Çift tıklayın: o tahtanın kayıtları (Geçmiş)");
-    this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this));
+    this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this),
+      { rows: () => this.__rows || [] });
     this.add(this.__table, { flex: 1 });
     this.__count = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
     this.add(this.__count);
@@ -117,7 +118,7 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
         .map((column, index) => ({ index: index + 1, text: (this.__filterFields[column.id].getValue() || "").toLowerCase().trim() }))
         .filter(f => f.text);
       const shown = this.__rows.filter(cells =>
-        filters.every(f => String(cells[f.index] ?? "").toLowerCase().includes(f.text)));
+        filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
       this.__table.getTableModel().setData(shown);
       this.__count.setValue(`${shown.length} / ${this.__rows.length} satır`);
     }

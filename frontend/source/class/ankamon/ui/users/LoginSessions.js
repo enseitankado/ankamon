@@ -90,7 +90,8 @@ qx.Class.define("ankamon.ui.users.LoginSessions", {
       { id: "action_names", label: "Kullandığı işlevler", width: 300 }
     ];
     this.__table = page._createTable(this.__columns, { storageKey: "logins.columns" });
-    this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this));
+    this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this),
+      { rows: () => (this.__rows || []).map(r => r.cells) });
     this.__table.addListener("cellDbltap", e => {
       const row = e.getRow() === null ? null : this.__shownRows[e.getRow()];
       if (row) {
@@ -186,7 +187,7 @@ qx.Class.define("ankamon.ui.users.LoginSessions", {
         .map((column, index) => ({ index: index + 1, text: (this.__filterFields[column.id].getValue() || "").toLowerCase().trim() }))
         .filter(f => f.text);
       const shown = this.__rows.filter(({ cells }) =>
-        filters.every(f => String(cells[f.index] ?? "").toLowerCase().includes(f.text)));
+        filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
       this.__table.getTableModel().setData(shown.map(r => r.cells));
       this.__shownRows = shown;
       const live = ankamon.ui.users.LoginSessions.LIVE;

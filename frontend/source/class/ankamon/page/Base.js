@@ -36,6 +36,78 @@ qx.Class.define("ankamon.page.Base", {
   statics: {
     // Sayfanın sekmesi değişti ({page, tab}) — ui.Shell ağaçtaki sekme yaprağını vurgular.
     TAB_CHANGED: "ankamon.tabChanged",
+
+    // Hazır değer listesi (süzgeç kutusunun ▾ düğmesi) en çok bu kadar farklı değerli sütunda çıkar.
+    CHOICES_MAX: 25,
+
+    /**
+     * Hücre değerinin süzgeçte karşılaştırılan biçimi: HTML etiketsiz, kırpılmış, küçük harf. I/ı/İ/i ayrımı
+     * yapılmaz (ör. "IP" → "ip"): çağıranlar süzgeç metnini toLowerCase ile küçültebiliyor, dil kuralına göre
+     * küçültme ("ıp") onunla eşleşmezdi.
+     */
+    filterText(value) {
+      return ankamon.page.Base.__fold(String(value ?? "").replace(/<[^>]*>/g, "").trim());
+    },
+
+    __fold(text) {
+      return text.toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/\u0307/g, "");
+    },
+
+    /**
+     * Sütun süzgeci eşleşmesi — bütün grid'ler bunu kullanır (düz `includes` yerine). Süzgeç metni "|"
+     * ile ayrılmış terimlerden oluşabilir, biri tutarsa satır kalır (VEYA). Tırnaklı terim ("Kapalı") tam
+     * eşleşmedir (hazır listeden seçilenler böyle yazılır; "" = boş hücre), tırnaksız terim içerir-eşleşmesi.
+     * @param value {var} hücre değeri @param text {String} süzgeç kutusunun metni
+     */
+    filterMatch(value, text) {
+      const query = String(text ?? "").trim();
+      if (!query) {
+        return true;
+      }
+      const cell = ankamon.page.Base.filterText(value);
+      return query.split("|").some(raw => {
+        const term = ankamon.page.Base.__fold(raw.trim());
+        if (term.length >= 2 && term.startsWith('"') && term.endsWith('"')) {
+          return cell === term.slice(1, -1);
+        }
+        return term !== "" && cell.includes(term);
+      });
+    },
+
+    /** Süzgeç metni yalnız tırnaklı terimlerden mi oluşuyor (hazır listeden seçim) — seçili değerler, yoksa null. */
+    parseChoices(text) {
+      const terms = String(text ?? "").split("|").map(t => t.trim()).filter(Boolean);
+      if (!terms.length || !terms.every(t => t.length >= 2 && t.startsWith('"') && t.endsWith('"'))) {
+        return null;
+      }
+      return terms.map(t => t.slice(1, -1));
+    },
+
+    // Çok değişken (her satırda farklı olabilecek) değer biçimleri: tarih, saat, süre, sayı/boyut/yüzde.
+    __VARIABLE: [
+      /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/, /\d{4}-\d{2}-\d{2}/, /\b\d{1,2}:\d{2}\b/,
+      /^[-+]?\d+([.,]\d+)?\s*(%|°c|[kmgt]?i?b|ms|sn|dk|sa|gün|saat|dakika|saniye|rpm|v|mhz|ghz|mbit\/sn|mb\/sn)?$/i,
+      /\b\d+\s*(sa|dk|sn|gün|saat|dakika|saniye)\b/i,
+      /^%\s*\d/ // Türkçe yüzde ("%12")
+    ],
+
+    /**
+     * Sütunun değerleri hazır listeye uygun mu (kullanıcı isteği: yalnız az çeşitli sütunlarda; tarih/saat/
+     * süre gibi çok değişken sütunlarda liste satır sayısı kadar büyüyebileceğinden çıkmaz). Uygun: en az 2,
+     * en çok CHOICES_MAX farklı değer, farklı değer sayısı satır sayısından az (her satırı ayrı değerli sütun
+     * — ad, IP — değil) ve değerlerin yarısından azı tarih/saat/süre/sayı biçiminde.
+     * @param values {String[]} sütunun bütün satırlardaki değerleri (filterText'ten geçmiş değil, ham)
+     */
+    choicesSuitable(values) {
+      const B = ankamon.page.Base;
+      const distinct = new Set(values.map(v => B.filterText(v)));
+      if (distinct.size < 2 || distinct.size > B.CHOICES_MAX || distinct.size >= values.length) {
+        return false;
+      }
+      const filled = [...distinct].filter(Boolean);
+      const variable = filled.filter(v => B.__VARIABLE.some(re => re.test(v))).length;
+      return variable * 2 < filled.length;
+    },
     _canvas: null,
 
     /**
@@ -617,14 +689,73 @@ qx.Class.define("ankamon.page.Base", {
      * parçası (bkz. ui.table.FilterHeaderRenderer/FilterHeaderCell). Kutuya yazıldıkça `onChange`
      * çağrılır. Kutular gerçekten o sütunun başlık hücresinde yaşadığından sürükleyerek yeniden
      * boyutlandırma/gizleme ile otomatik hizalı kalır — ayrıca senkron kodu gerekmez.
+     *
+     * Hazır değer listesi (kullanıcı isteği, bütün grid'lerde): az çeşitli değerli sütunlarda (bkz.
+     * choicesSuitable; sütun tanımında `choices: true|false` ile zorlanabilir) kutunun sağında ▾ düğmesi
+     * çıkar; onay kutulu listeden birden çok değer seçilebilir, seçim kutuya `"A" | "B"` olarak yazılır
+     * (elle de düzenlenebilir). Liste, öteki sütunların süzgeçlerine uyan satırlardaki değerlerden ve
+     * sayılarından oluşur (Excel'deki gibi). Satır eşleşmesi çağıranda `Base.filterMatch(hücre, metin)` ile.
      * @param table {qx.ui.table.Table} _createTable'ın döndürdüğü tablo (offset bilgisi için)
      * @param columns {Array} _createTable'a verilen aynı dizi
      * @param onChange {Function} her değişiklikte çağrılır (parametresiz)
+     * @param opts {Map?} {rows: Function} — süzülmemiş BÜTÜN satırlar (tablo modeli satırı biçiminde: kimlik
+     *   [+ onay] + sütunlar). Verilmezse hazır liste çıkmaz (yalnız elle yazım).
      * @return {Map} {columnId: TextField} — değerlerini okumak için (bkz. çağıranların __apply'ı)
      */
-    _addColumnFilters(table, columns, onChange) {
+    _addColumnFilters(table, columns, onChange, opts = {}) {
       const columnModel = table.getTableColumnModel();
       const offset = table.getUserData("offset") || 1;
+      const B = ankamon.page.Base;
+      const buttons = {};
+      const allRows = () => (opts.rows && opts.rows()) || [];
+      const valuesOf = (rows, index) => rows.map(cells => cells[offset + index]);
+      // ▾ düğmeleri yalnız uygun sütunlarda: veri değiştikçe yeniden değerlendirilir (tek turda bir kez).
+      let pending = false;
+      const refreshButtons = () => {
+        if (pending) {
+          return;
+        }
+        pending = true;
+        qx.event.Timer.once(() => {
+          pending = false;
+          if (table.isDisposed()) {
+            return;
+          }
+          const rows = allRows();
+          columns.forEach((column, index) => {
+            const button = buttons[column.id];
+            if (!button || button.isDisposed()) {
+              return;
+            }
+            // Başlıksız sütun (ör. Ağ'daki aç/kapa oku) liste almaz.
+            const show = column.choices === undefined ? !!column.label && B.choicesSuitable(valuesOf(rows, index)) : !!column.choices;
+            // Seçim yapılmışken sütun "uygunsuz"a dönse de (ör. veri azaldı) düğme kalsın — seçim düzenlenebilsin.
+            button.setVisibility(show || B.parseChoices(fields[column.id].getValue()) ? "visible" : "excluded");
+          });
+        }, this, 0);
+      };
+      table.getTableModel().addListener("dataChanged", refreshButtons);
+      const openChoices = (column, index, button) => {
+        const others = columns.map((c, i) => ({ i, text: c === column ? "" : (fields[c.id].getValue() || "") }))
+          .filter(f => f.text.trim());
+        const counts = new Map();
+        allRows().filter(cells => others.every(f => B.filterMatch(cells[offset + f.i], f.text)))
+          .forEach(cells => {
+            const key = B.filterText(cells[offset + index]);
+            const entry = counts.get(key) || { label: String(cells[offset + index] ?? "").replace(/<[^>]*>/g, "").trim(), n: 0 };
+            entry.n++;
+            counts.set(key, entry);
+          });
+        // Tırnak/"|" içeren değer bu biçimle yazılamaz — listede gösterilmez (elle yazımla süzülebilir).
+        const keys = [...counts.keys()].filter(k => !/["|]/.test(counts.get(k).label))
+          .sort((a, b) => (a === "") - (b === "") || a.localeCompare(b, "tr", { numeric: true }));
+        const chosen = new Set((B.parseChoices(fields[column.id].getValue()) || []).map(v => B.filterText(v)));
+        this.__choicePopup(button, keys.map(k => ({ key: k, label: counts.get(k).label || "(Boş)", n: counts.get(k).n })),
+          chosen, selected => {
+            // Kutuya değerlerin özgün yazımı (eşleşme büyük/küçük harf duyarsız — bkz. filterMatch).
+            fields[column.id].setValue(selected.length ? selected.map(k => `"${counts.get(k).label}"`).join(" | ") : "");
+          });
+      };
       // Kutular başlık hücresi ÇİZİLİNCE oluşur — gizli sütunun (bkz. sütun gizleme) başlığı hiç
       // çizilmez. Çağıranlar her sütunun kutusunu okuduğundan (fields[id].getValue()) her sütun için
       // baştan sayfaya eklenmemiş bir yedek kutu konur; gerçek kutu gelince (sütun gösterilince) yerini
@@ -633,17 +764,24 @@ qx.Class.define("ankamon.page.Base", {
       columns.forEach(column => {
         fields[column.id] = new qx.ui.form.TextField();
       });
-      const renderer = new ankamon.ui.table.FilterHeaderRenderer((col, field) => {
+      const renderer = new ankamon.ui.table.FilterHeaderRenderer((col, field, button) => {
         const column = columns[col - offset];
         if (!column) {
           return;
         }
         // İpucu sütun adını tekrarlamaz (etiket hemen üstte); kutunun ne işe yaradığını söyler.
         field.setPlaceholder("Süz…");
-        field.setToolTipText((column.hint || column.label) + " sütununda süz");
+        field.setToolTipText((column.hint || column.label) + " sütununda süz (birden çok değer: | ile ayırın)");
         const previous = fields[column.id];
         field.addListener("changeValue", onChange, this);
         fields[column.id] = field;
+        // Liste yalnız tam satırları veren (ve eşleşmeyi filterMatch ile yapan) grid'de: tırnaklı seçim düz
+        // `includes` ile hiçbir satırla eşleşmezdi (henüz güncellenmemiş eklenti grid'i yanlış süzmesin).
+        if (button && opts.rows) {
+          buttons[column.id] = button;
+          button.addListener("execute", () => openChoices(column, col - offset, button));
+          refreshButtons();
+        }
         // Yedekte bekleyen değer (ör. Genel bakış kartından "Çevrimiçi") gerçek kutuya geçer ve süzer.
         if (previous && previous !== field && previous.getValue() && !field.getValue()) {
           field.setValue(previous.getValue());
@@ -656,6 +794,56 @@ qx.Class.define("ankamon.page.Base", {
       // pay kalır (48'de Gümüş Mavi'de 4 px kesiliyordu) — 17 temanın hepsinde tarayıcıda ölçüldü.
       table.setHeaderCellHeight(52);
       return fields;
+    },
+
+    /**
+     * Süzgeç kutusunun hazır değer listesi (bkz. _addColumnFilters): onay kutulu değerler (sayılarıyla),
+     * "Tümü" (üç durumlu) ve "Temizle". Seçim her değişiklikte hemen uygulanır (onSelect).
+     * @param items {Array} [{key, label, n}] @param chosen {Set} seçili anahtarlar @param onSelect {Function} (keys)
+     */
+    __choicePopup(button, items, chosen, onSelect) {
+      const popup = new qx.ui.popup.Popup(new qx.ui.layout.VBox(4)).set({ padding: 6, minWidth: 180, maxWidth: 360 });
+      const checks = [];
+      const all = new qx.ui.form.CheckBox("Tümü").set({ triState: true, font: "bold" });
+      const apply = () => onSelect(checks.filter(c => c.getValue()).map(c => c.getUserData("key")));
+      const syncAll = () => {
+        const n = checks.filter(c => c.getValue()).length;
+        all.setValue(n === 0 ? false : (n === checks.length ? true : null));
+      };
+      const list = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
+      items.forEach(item => {
+        const check = new qx.ui.form.CheckBox(`${item.label}  (${item.n})`).set({ value: chosen.has(item.key) });
+        check.setUserData("key", item.key);
+        check.addListener("changeValue", () => {
+          syncAll();
+          apply();
+        });
+        checks.push(check);
+        list.add(check);
+      });
+      all.addListener("execute", () => {
+        // Üç durumluda tıklama sırası null → true: kısmi seçimden "hepsi"; hepsi seçiliyken "hiçbiri".
+        const on = checks.some(c => !c.getValue());
+        checks.forEach(c => c.setValue(on));
+      });
+      syncAll();
+      if (!items.length) {
+        popup.add(new qx.ui.basic.Label("Öteki süzgeçlere uyan satır yok.").set({ textColor: "app-muted" }));
+      } else {
+        popup.add(all);
+        const scroll = new qx.ui.container.Scroll(list).set({ maxHeight: 280 });
+        popup.add(scroll, { flex: 1 });
+      }
+      const clear = new qx.ui.form.Button("Temizle").set({ allowGrowX: false, alignX: "right" });
+      clear.addListener("execute", () => {
+        checks.forEach(c => c.setValue(false));
+        onSelect([]);
+        popup.hide();
+      });
+      popup.add(clear);
+      popup.addListener("disappear", () => qx.event.Timer.once(() => popup.dispose(), this, 0));
+      popup.placeToWidget(button, true);
+      popup.show();
     },
 
     /** Tabloda seçili satırların kimlik sütunu değerleri (tek seçimli, satır vurgusuna dayalı). */

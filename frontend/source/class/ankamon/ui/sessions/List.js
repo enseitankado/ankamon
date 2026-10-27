@@ -75,7 +75,8 @@ qx.Class.define("ankamon.ui.sessions.List", {
 
     this.__table = page._createTable(this.__columns, { storageKey: "sessions.columns" });
     // Süzgeç kutuları her sütunun kendi başlık hücresinin içinde (bkz. Base.js _addColumnFilters).
-    this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this));
+    this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this),
+      { rows: () => (this.__rows || []).map(r => r.cells) });
     this.add(this.__table, { flex: 1 });
     this.__table.addListener("cellContextmenu", e => {
       const row = e.getRow() === null ? null : this.__shownRows[e.getRow()];
@@ -129,7 +130,7 @@ qx.Class.define("ankamon.ui.sessions.List", {
         .map((column, index) => ({ index: index + 1, text: (this.__filterFields[column.id].getValue() || "").toLowerCase().trim() }))
         .filter(f => f.text);
       const shown = this.__rows.filter(({ cells }) =>
-        colFilters.every(f => String(cells[f.index] ?? "").toLowerCase().includes(f.text)));
+        colFilters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
       this.__table.getTableModel().setData(shown.map(r => r.cells));
       this.__shownRows = shown;
       this.__count.setValue(`${shown.length} / ${this.__rows.length} oturum`);

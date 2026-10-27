@@ -81,7 +81,7 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
         .map((column, index) => ({ index: index + 1, text: (fields[column.id].getValue() || "").toLowerCase().trim() }))
         .filter(f => f.text);
       this.__apply();
-    });
+    }, { rows: () => (this.__rows || []).map((r, i) => [i].concat(r.cells)) });
     this.__table.getSelectionModel().addListener("changeSelection", () => this.__updateButton());
     this.__table.addListener("cellContextmenu", this.__onContextMenu, this);
     this.add(this.__table, { flex: 1 });
@@ -130,7 +130,7 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
       const filters = this.__colFilters || [];
       const shown = (this.__rows || [])
         .map((r, i) => [i].concat(r.cells))
-        .filter(cells => filters.every(f => String(cells[f.index] ?? "").toLowerCase().includes(f.text)));
+        .filter(cells => filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
       this.__table.getSelectionModel().resetSelection();
       this.__table.getTableModel().setData(shown);
       this.__updateButton();

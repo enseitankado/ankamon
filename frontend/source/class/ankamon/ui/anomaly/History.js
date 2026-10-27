@@ -27,7 +27,7 @@
 
 /**
  * Anomaliler ▸ Geçmiş: seçili dönemle örtüşen tüm anomali kayıtları (sürenler dahil), Excel tarzı
- * sütun süzgeçli (bkz. page.Base _addColumnFilters). Tahta özetinde çift tık bu sekmeyi o tahtaya süzer.
+ * sütun süzgeçli (bkz. page.Base _addColumnFilters). Özet'te çift tık bu sekmeyi o tahtaya süzer.
  */
 qx.Class.define("ankamon.ui.anomaly.History", {
   extend: qx.ui.tabview.Page,
@@ -47,7 +47,8 @@ qx.Class.define("ankamon.ui.anomaly.History", {
       { id: "detail", label: "Ayrıntı" }
     ];
     this.__table = page._createTable(this.__columns, { storageKey: "anomalies.history.columns" });
-    this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this));
+    this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this),
+      { rows: () => (this.__rows || []).map(r => r.cells) });
     this.add(this.__table, { flex: 1 });
     this.__count = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
     this.add(this.__count);
@@ -79,7 +80,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
       this.__apply();
     },
 
-    /** Tahta sütununun süzgecini verilen adla doldurur (Tahta özeti → çift tık). */
+    /** Tahta sütununun süzgecini verilen adla doldurur (Özet → çift tık). */
     filterBoard(board) {
       this.__filterFields.board.setValue(board);
       this.__apply();
@@ -93,7 +94,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
         .map((column, index) => ({ index: index + 1, text: (this.__filterFields[column.id].getValue() || "").toLowerCase().trim() }))
         .filter(f => f.text);
       const shown = this.__rows.filter(({ cells }) =>
-        filters.every(f => String(cells[f.index] ?? "").toLowerCase().includes(f.text)));
+        filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
       this.__table.getTableModel().setData(shown.map(r => r.cells));
       const total = shown.reduce((sum, r) => sum + r.seconds, 0);
       this.__count.setValue(`${shown.length} / ${this.__rows.length} kayıt · toplam süre ${ankamon.util.Format.duration(total)}`);

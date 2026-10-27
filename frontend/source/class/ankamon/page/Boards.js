@@ -141,7 +141,8 @@ qx.Class.define("ankamon.page.Boards", {
 
     // Süzgeç kutuları artık her sütunun kendi başlık hücresinin içinde (bkz. Base.js
     // _addColumnFilters) — ayrı bir satır/widget olarak sayfaya eklenmesi gerekmez.
-    this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply);
+    this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply,
+      { rows: () => (this.__rows || []).map(r => r.cells) });
 
     // İki sekme: "Liste" (grid) ve "Ekranlar" (grid'deki tahtaların canlı ekran önizlemeleri).
     // Sağ menü işlemleri işaretli tahtalara her iki sekmeden de uygulanır.
@@ -327,7 +328,7 @@ qx.Class.define("ankamon.page.Boards", {
         .filter(f => f.text);
 
       const shown = this.__rows.filter(({ cells }) =>
-        colFilters.every(f => String(cells[f.index] ?? "").toLowerCase().includes(f.text)));
+        colFilters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
       this.__table.getTableModel().setData(shown.map(r => r.cells));
       this.__shownBoards = shown.map(r => r.board);
       this.__pushPreview();

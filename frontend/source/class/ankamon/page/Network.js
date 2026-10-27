@@ -119,7 +119,8 @@ qx.Class.define("ankamon.page.Network", {
     // "Cihaz türü" hücresine türe özgü minik ikon (bkz. ui.table.DeviceTypeRenderer).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "type"),
       new ankamon.ui.table.DeviceTypeRenderer());
-    this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply);
+    this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply,
+      { rows: () => (this.__rows || []).map(r => r.cells) });
     this.__model.addListener("dataChanged", this.__onDataChanged, this);
 
     // ▸ sütunu alt satırları açar/kapar; alt (servis) satırları işaretlenemez (Base'in işaretlemesinden sonra geri alınır).
@@ -320,7 +321,7 @@ qx.Class.define("ankamon.page.Network", {
         .map((column, index) => ({ index: index + 2, text: (this.__filterFields[column.id].getValue() || "").toLowerCase().trim() }))
         .filter(f => f.text);
       let shown = this.__rows.filter(({ cells }) =>
-        colFilters.every(f => String(cells[f.index] ?? "").toLowerCase().includes(f.text)));
+        colFilters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
 
       const col = this.__model.getSortColumnIndex();
       const asc = this.__model.isSortAscending();

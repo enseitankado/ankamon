@@ -67,7 +67,18 @@ qx.Class.define("ankamon.ui.table.FilterHeaderCell", {
     // tuşlarını kendisi işleyip varsayılanı engelliyor — kutuya boşluk yazılamıyordu ("Arge 2" → "Arge2").
     this.__filterField.addListener("keypress", e => e.stopPropagation());
     this.__filterField.addListener("keydown", e => e.stopPropagation());
-    this._add(this.__filterField, { row: 1, column: 0, colSpan: 3 });
+    // Hazır değer listesi düğmesi (▾): yalnız az çeşitli değerli sütunlarda görünür — görünürlüğü ve
+    // açtığı onay kutulu liste Base._addColumnFilters'ta. Kutuyla aynı çerçeve/yükseklik, sağında.
+    this.__choiceButton = new qx.ui.form.Button("▾").set({
+      height: 22, width: 20, minWidth: 20, padding: [0, 2], marginTop: 1, font: "app-filter",
+      decorator: deco(false), visibility: "excluded", focusable: false,
+      toolTipText: "Hazır değerlerden seçerek süz (birden çok seçilebilir)"
+    });
+    ["tap", "pointerdown", "dbltap"].forEach(type => this.__choiceButton.addListener(type, e => e.stopPropagation()));
+    const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(2)).set({ alignY: "top" });
+    row.add(this.__filterField, { flex: 1 });
+    row.add(this.__choiceButton);
+    this._add(row, { row: 1, column: 0, colSpan: 3 });
     // Başlık yüksekliğinin fazlası etiket satırına değil kutunun satırına gitsin ve kutu etiketin
     // hemen altında (üste hizalı) dursun: aksi hâlde birçok temada (Açık/Koyu Mavi, Indigo, Simple…)
     // HeaderCell'in Grid'i etiket satırını esnetip kutuyu hücrenin dibine itiyordu — etiketle kutu
@@ -100,9 +111,15 @@ qx.Class.define("ankamon.ui.table.FilterHeaderCell", {
 
   members: {
     __filterField: null,
+    __choiceButton: null,
 
     getFilterField() {
       return this.__filterField;
+    },
+
+    /** Hazır değer listesini açan düğme (başta gizli — bkz. Base._addColumnFilters). */
+    getChoiceButton() {
+      return this.__choiceButton;
     }
   }
 });

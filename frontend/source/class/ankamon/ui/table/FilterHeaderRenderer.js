@@ -15,7 +15,7 @@ qx.Class.define("ankamon.ui.table.FilterHeaderRenderer", {
   extend: qx.ui.table.headerrenderer.Default,
 
   /**
-   * @param onFieldCreated {Function} (col, field) -> void — bir sütunun süzgeç kutusu
+   * @param onFieldCreated {Function} (col, field, choiceButton) -> void — bir sütunun süzgeç kutusu
    *   oluşturulur oluşturulmaz (tablo sütun indeksiyle, offset dahil) çağrılır.
    */
   construct(onFieldCreated) {
@@ -31,7 +31,7 @@ qx.Class.define("ankamon.ui.table.FilterHeaderRenderer", {
       const widget = new ankamon.ui.table.FilterHeaderCell();
       this.updateHeaderCell(cellInfo, widget);
       if (this.__onFieldCreated) {
-        this.__onFieldCreated(cellInfo.col, widget.getFilterField());
+        this.__onFieldCreated(cellInfo.col, widget.getFilterField(), widget.getChoiceButton());
       }
       return widget;
     }
