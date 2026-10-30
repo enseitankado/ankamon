@@ -384,6 +384,8 @@ def _run_job(job) -> None:
                     elif result["status"] == "ok" and job["type"] in ("screen_lock", "screen_unlock"):
                         # "Oturum" hücresindeki "/ Kilitli" bir sonraki yoklamayı beklemeden.
                         session_probe.store_screen_lock(conn, t["board_id"], job["type"] == "screen_lock")
+                        if job["type"] == "screen_lock":
+                            session_probe.store_display(conn, t["board_id"], "On")  # kilitleme ekranı uyandırır
                     elif result["status"] == "ok":
                         if job["type"] == "login":
                             session_probe.store(conn, t["board_id"], username, False)

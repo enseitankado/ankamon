@@ -269,7 +269,9 @@ def tick():
     if (scr.get_width(), scr.get_height()) != win.get_size():
         win.resize(scr.get_width(), scr.get_height())
     gw.raise_()
-    seat.grab(gw, Gdk.SeatCapabilities.ALL, True, None, None, None, None)
+    # Teyit: pencere görünür ve giriş bu pencerede — kilitleme işi bu işareti bekler (bkz. _LOCK).
+    if seat.grab(gw, Gdk.SeatCapabilities.ALL, True, None, None, None, None) == Gdk.GrabStatus.SUCCESS:
+        open("/var/lib/ankamon-lock/shown", "w").close()
     return True
 
 
@@ -314,18 +316,26 @@ cat > /etc/systemd/system/{UNIT} <<'ANKAMON_EOF'
 was=$([ -e "$D/locked" ] && echo 1)
 date '+%F %T' > "$D/locked"
 : > "$D/log"
+rm -f "$D/shown"
 systemctl daemon-reload
 systemctl enable {UNIT} >/dev/null 2>&1
 systemctl restart {UNIT}
 i=0
 while [ $i -lt 16 ]; do
   sleep 0.5; i=$((i + 1))
-  if grep -q 'kilit ekranı' "$D/log" 2>/dev/null; then
+  if [ -e "$D/shown" ]; then
+    __WAKE__
     echo "Ekran kilitlendi$([ -n "$was" ] && echo ' (zaten kilitliydi, yenilendi)'): $(grep 'kilit ekranı' "$D/log" | tail -1 | cut -d' ' -f2-)"
     exit 0
   fi
 done
-if systemctl is-active -q {UNIT}; then
+if pgrep -f "^/usr/bin/python3 $D/cover.py" >/dev/null; then
+  # Başka bir uygulamanın açık menüsü girişi tutuyor olabilir: pencere saniyede bir yeniden dener.
+  __WAKE__
+  echo "Kilit ekranı açık; giriş henüz yakalanamadı (başka bir uygulama tutuyor), yeniden deneniyor."
+  exit 0
+fi
+if systemctl is-active -q {UNIT} && ! grep -q 'kilit ekranı' "$D/log" 2>/dev/null; then
   echo "Kilit kuruldu; ekranda X bulunamadı — X açılınca kilit ekranı gelir."
   exit 0
 fi
@@ -333,6 +343,11 @@ echo "Kilit başlatılamadı:" >&2
 tail -n 5 "$D/log" "$D/cover.err" 2>/dev/null >&2
 exit 4
 """
+
+# Kilit görünsün: uyuyan ekran uyandırılır (alt kabukta — _ACTIVE_X X bulamazsa çıkar).
+_WAKE = "(\n" + _ACTIVE_X + """
+xset s reset; xset dpms force on
+) >/dev/null 2>&1"""
 
 # Bekçi geri yüklemeyi yapamadıysa: etkin ekranda kilidin eklediği srvrkeys:none çıkarılır (alt kabukta —
 # _ACTIVE_X X bulamazsa çıkar).
@@ -363,7 +378,7 @@ if [ -n "$was" ]; then echo "Ekran kilidi açıldı."; else echo "Tahtada ekran 
 
 def lock(board: dict, user: str, password: str) -> dict:
     """Ekran ▸ Kilitle. Döner: {"status", "rc", "output"} (bkz. accounts._ssh)."""
-    script = _LOCK.replace("__DAEMON__", _DAEMON).replace("__COVER__", _COVER)
+    script = _LOCK.replace("__DAEMON__", _DAEMON).replace("__COVER__", _COVER).replace("__WAKE__", _WAKE)
     return _ssh(board, user, password, script, timeout=30)
 
 

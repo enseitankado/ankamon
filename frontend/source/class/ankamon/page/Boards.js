@@ -200,6 +200,9 @@ qx.Class.define("ankamon.page.Boards", {
       return board.screen_locked ? `${text} / Kilitli` : text;
     },
 
+    // Kilit teyidinden sonra kutucuk akışının yenilenmesi için en uzun bekleme (bkz. __refreshTile).
+    TILE_REFRESH_MS: 8000,
+
     // "Ekranlar" sekmesi görünmez olduktan (başka sekme/sayfa) bu kadar sonra önizleme akışları duraklar
     // (kutucuklar son görüntüleriyle kalır — bkz. __pausePreview).
     SCREENS_STOP_MS: 10000,
@@ -443,6 +446,8 @@ qx.Class.define("ankamon.page.Boards", {
           this.__saveScreenOrder(e.data.order || []);
         } else if (e.data.type === "tm-live") {
           this.__queueLiveWhoami(e.data.id);
+        } else if (e.data.type === "tm-refreshed") {
+          this.__tileRefreshed(e.data.id);
         } else if (e.data.type === "tm-res") {
           // Tahtanın ekran çözünürlüğü (VNC çerçeve boyutu): slider'ın yanındaki % değeri buna göre.
           this.__screenRes.set(e.data.id, e.data.w);
@@ -761,6 +766,7 @@ qx.Class.define("ankamon.page.Boards", {
         return {
           id: b.id, name: b.label || b.hostname || b.ip || ("#" + b.id), online: !!b.online,
           whoami: whoami.get(b.id) || null,
+          refresh: (this.__tileRefresh && this.__tileRefresh.get(b.id)) || 0,
           // Monitör DPMS ile kapalı (bkz. 025_board_display_state.sql): kutucukta "Ekran güç tasarrufu kipinde".
           powersave: !!b.online && ["Off", "Standby", "Suspend"].includes(b.display_state),
           // Alt bardaki ağ simgeleri ve güç tasarrufu yazısının altındaki TiHA otomatik kapatma geri sayımı
@@ -1086,12 +1092,13 @@ qx.Class.define("ankamon.page.Boards", {
               return before.get(t.board_id) || { status: "ok", text: known(t.board_id) };
             });
         },
-        // Ekran ▸ Kilitle / Kilidi aç: kutucukta geçici yazı; bitince önceki oturum bilgisi geri gelir (ekran kilidi
-        // oturumu değiştirmez). Başarılıysa grid'in "Oturum" hücresi tazelemeyi beklemeden "/ Kilitli" alır/bırakır.
+        // Ekran ▸ Kilitle / Kilidi aç: tahta işi teyit edene dek kutucukta "Kilitleniyor…"; teyitten sonra akış
+        // yeniden kurulur (kilit görseli görünür), yeni görüntü gelince önceki oturum bilgisi geri döner (ekran
+        // kilidi oturumu değiştirmez). Grid'in "Oturum" hücresi tazelemeyi beklemeden "/ Kilitli" alır/bırakır.
         screenLock: (boards, on) => {
           const before = new Map(boards.map(b => [b.id, this.__whoamiState && this.__whoamiState.get(b.id)]));
-          this.__sessionJob(boards.map(b => b.id), { type: on ? "screen_lock" : "screen_unlock" },
-            () => (on ? "Ekran kilitleniyor…" : "Ekran kilidi açılıyor…"),
+          const pending = on ? "Kilitleniyor…" : "Kilit açılıyor…";
+          this.__sessionJob(boards.map(b => b.id), { type: on ? "screen_lock" : "screen_unlock" }, () => pending,
             t => {
               if (t.status !== "ok") {
                 return { status: "error", text: on ? "Kilitlenemedi" : "Kilit açılamadı" };
@@ -1099,8 +1106,20 @@ qx.Class.define("ankamon.page.Boards", {
               const board = this.__boards.get(t.board_id);
               if (board) {
                 board.screen_locked = on;
+                if (on) {
+                  board.display_state = "On"; // kilitleme ekranı uyandırır: "güç tasarrufu" örtüsü kilidi kapatmasın
+                }
               }
-              return before.get(t.board_id) || { status: "ok", text: known(t.board_id) };
+              this.__refreshTile(t.board_id, () => {
+                const prev = before.get(t.board_id);
+                if (prev) {
+                  this.__whoamiState.set(t.board_id, prev);
+                } else {
+                  this.__whoamiState.delete(t.board_id);
+                }
+                this.__pushPreview();
+              });
+              return { status: "querying", text: pending };
             });
         },
         // Kilitte oturum açık kalır: kutucukta kullanıcı adı "(kilitli)" ile görünür (çıktının ilk satırı).
@@ -1111,6 +1130,31 @@ qx.Class.define("ankamon.page.Boards", {
             return t.status === "ok" ? { status: "ok", text: user ? `${user} (kilitli)` : "" } : { status: "error", text: "Kilitlenemedi" };
           })
       };
+    },
+
+    /**
+     * Kutucuğun akışını yeniden kurdurur (bkz. screen/index.html Tile.refreshStream); yeni görüntü gelince
+     * ("tm-refreshed") ya da en geç TILE_REFRESH_MS sonra done() çağrılır — kutucuk o an görünmüyor, akış
+     * kurulamıyor olsa da yazı takılı kalmaz.
+     */
+    __refreshTile(id, done) {
+      this.__tileRefresh = this.__tileRefresh || new Map();
+      this.__tileRefreshDone = this.__tileRefreshDone || new Map();
+      this.__tileRefresh.set(id, (this.__tileRefresh.get(id) || 0) + 1);
+      this.__tileRefreshDone.set(id, done);
+      qx.event.Timer.once(() => {
+        if (this.__tileRefreshDone.get(id) === done) {
+          this.__tileRefreshed(id);
+        }
+      }, this, ankamon.page.Boards.TILE_REFRESH_MS);
+    },
+
+    __tileRefreshed(id) {
+      const done = this.__tileRefreshDone && this.__tileRefreshDone.get(id);
+      if (done) {
+        this.__tileRefreshDone.delete(id);
+        done();
+      }
     },
 
     /**

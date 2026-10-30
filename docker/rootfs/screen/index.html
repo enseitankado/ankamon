@@ -276,6 +276,7 @@ class Tile {
     this.perfIn = this.el.querySelector(".perf .in");
     this.perfWs = null;
     this.perfTimer = null;
+    this.refreshNonce = board.refresh || 0;
     this.setWhoami(board.whoami);
     this.setStats(board.stats);
     this.el.classList.toggle("powersave", !!board.powersave);
@@ -496,6 +497,23 @@ class Tile {
     this.el.classList.toggle("powersave", !!board.powersave);
     this.tickShutdown();
     this.refreshWanted();
+    if ((board.refresh || 0) !== this.refreshNonce) {
+      this.refreshNonce = board.refresh || 0;
+      this.refreshStream();
+    }
+  }
+
+  /**
+   * Üst sayfa ekranın değiştiğini biliyor (Ekran ▸ Kilitle / Kilidi aç teyit edildi): akış yeniden kurulur, yeni
+   * görüntü gelince "tm-refreshed" bildirilir. Bağlı değilse beklenecek akış yok: hemen bildirilir.
+   */
+  refreshStream() {
+    if (!this.rfb || !this.el.classList.contains("live")) {
+      window.parent.postMessage({ type: "tm-refreshed", id: this.board.id }, location.origin);
+      return;
+    }
+    this.refreshPending = true;
+    this.reconnect();
   }
 
   /**
@@ -697,7 +715,13 @@ class Tile {
         // "connect" ilk kareden hemen önce gelir; yeni akış ilk görüntüsünü çizene dek eskisi kalsın.
         const old = prev;
         prev = null;
-        setTimeout(() => Tile.dropLayer(old), Tile.SWAP_MS);
+        setTimeout(() => {
+          Tile.dropLayer(old);
+          if (this.refreshPending) {
+            this.refreshPending = false;
+            window.parent.postMessage({ type: "tm-refreshed", id: this.board.id }, location.origin);
+          }
+        }, Tile.SWAP_MS);
       }
     });
     this.rfb = rfb;
