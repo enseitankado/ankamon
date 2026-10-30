@@ -59,4 +59,13 @@ done
 
 echo
 echo "Özet: $ayarlanan hesabın parolası ayarlandı, $atlanan bu tahtada yoktu, $hata ayarlanamadı."
+# Açılışta parola sıfırlama servisi etkinse verilen parola kalıcı değildir (bkz. actions/user-add).
+case "$(systemctl is-enabled tiha-boot-password-wipe.service 2>/dev/null)" in
+    enabled|enabled-runtime)
+        if [ ! -e /etc/tiha/boot-wipe.disabled ]; then
+            echo
+            echo "⚠ UYARI: Bu tahtada açılışta parola sıfırlama servisi etkin: etapadmin dışındaki hesapların parolası"
+            echo "  yalnız bir sonraki açılışa kadar geçerlidir, sonrasında giriş EBA-QR, PIN ya da USB ile yapılır."
+        fi ;;
+esac
 [ "$hata" -eq 0 ]

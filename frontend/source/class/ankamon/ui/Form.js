@@ -55,8 +55,26 @@ qx.Class.define("ankamon.ui.Form", {
       return this.addField(key, label, new qx.ui.form.TextField(value || "").set({ placeholder: placeholder || null }));
     },
 
-    password(key, label, placeholder) {
-      return this.addField(key, label, new qx.ui.form.PasswordField().set({ placeholder: placeholder || null }));
+    /** @param warning {Map?} {note, hint}: kutunun yanında uyarı rengiyle kısa not, üzerine gelince ipucu */
+    password(key, label, placeholder, warning) {
+      const field = new qx.ui.form.PasswordField().set({ placeholder: placeholder || null });
+      if (!warning) {
+        return this.addField(key, label, field);
+      }
+      field.setToolTipText(warning.hint);
+      const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
+      row.add(field, { flex: 1 });
+      row.add(new qx.ui.basic.Label(warning.note).set({ textColor: "app-warn", toolTipText: warning.hint }));
+      this.add(new qx.ui.basic.Label(label), { row: this.__row, column: 0 });
+      this.add(row, { row: this.__row, column: 1 });
+      this.__fields[key] = field;
+      this.__row++;
+      return field;
+    },
+
+    /** Daha önce eklenmiş alan. */
+    getField(key) {
+      return this.__fields[key];
     },
 
     check(key, label, value) {

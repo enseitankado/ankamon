@@ -10,7 +10,7 @@
      "required": true,
      "pattern": "^[a-z_][a-z0-9_.-]{0,31}([ ,]+[a-z_][a-z0-9_.-]{0,31})*[ ,]*$",
      "pattern_error": "kullanıcı adları küçük harf, rakam, _ . - içerebilir; boşluk ya da virgülle ayrılır"},
-    {"key": "PAROLA", "label": "Yeni parola", "type": "password", "required": true,
+    {"key": "PAROLA", "label": "Yeni parola", "type": "password", "required": true, "boot_wipe_note": true,
      "pattern": "^.{1,128}$", "pattern_error": "en çok 128 karakter olmalı"}
   ]
 }

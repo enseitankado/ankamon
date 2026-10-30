@@ -34,6 +34,32 @@ qx.Class.define("ankamon.ui.BoardOps", {
   type: "static",
 
   statics: {
+    /** Tahtada açılışta parola sıfırlama servisi uyarısı: parola kutusunun yanındaki kısa not ve ipucu. */
+    BOOT_WIPE_NOTE: "⚠ Açılışta sıfırlanabilir",
+    BOOT_WIPE_HINT: "Tahtada açılışta parola sıfırlama servisi etkinse etapadmin dışındaki hesapların parolası her açılışta " +
+      "rastgele bir değerle değişir: bu parola yalnız bir sonraki açılışa kadar geçerli olur, sonrasında giriş EBA-QR, PIN " +
+      "ya da USB ile yapılır. Servis tahtada etkinse işlem çıktısı da bunu söyler.",
+
+    /** Tahtanın ekranı güç tasarrufunda mı (uykuda; bkz. 025_board_display_state.sql). */
+    isScreenAsleep(board) {
+      return !!board.online && ["Off", "Standby", "Suspend"].includes(board.display_state);
+    },
+
+    /**
+     * ETAP'ın kuralıyla tam addan kullanıcı adı (bkz. actions/user-add gen_username): Türkçe harfler sadeleşir, küçük
+     * harf, boşluk atılır, en çok 31 karakter. Kutu salt okunur olduğundan kuralın kabul etmeyeceği karakterler de atılır.
+     */
+    etapUsername(fullName) {
+      const map = { "İ": "i", "I": "i", "ı": "i", "Ç": "c", "ç": "c", "Ğ": "g", "ğ": "g", "Ö": "o", "ö": "o", "Ş": "s", "ş": "s", "Ü": "u", "ü": "u" };
+      return String(fullName || "")
+        .replace(/[İIıÇçĞğÖöŞşÜü]/g, c => map[c])
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "")
+        .replace(/^[^a-z_]+/, "")
+        .slice(0, 31);
+    },
+
     /**
      * Yeni sekme açmadan, uygulama içinde (büyütülebilir, küçültülebilir — bkz. ui.WindowDock) bir
      * pencerede iframe gösterir. webshell/webshellMulti ortak kullanır (bkz. screen()/filemanager() ile
@@ -680,6 +706,13 @@ qx.Class.define("ankamon.ui.BoardOps", {
       // Alt menü yardımcıları: madde yoksa grup hiç eklenmez (yetkiye göre boş alt menü görünmesin).
       const sub = () => new qx.ui.menu.Menu();
       const subAdd = (target, icon, label, handler) => target.add(this.menuButton(icon, label, handler));
+      // Tahtanın durumuna bağlı madde (Uyut, Kilitle, Kilidi aç): yalnız uygun tahtalara uygulanır; uygun tahta
+      // yoksa (ör. zaten uykuda) görünür ama devre dışıdır.
+      const stateAdd = (target, icon, label, list, handler) => {
+        const button = this.menuButton(icon, label, () => handler(list));
+        button.setEnabled(list.length > 0);
+        target.add(button);
+      };
       // Bilgisayarı aç (WoL) + Bilgisayarı kapat: her zaman yan yana (kullanıcı isteği), çevrimiçi/
       // çevrimdışı tahtada da. Her biri seçimin yalnız uygun kısmına uygulanır (aç → kapalı olanlar,
       // kapat → açık olanlar); uygulanacak tahta yoksa madde görünür ama devre dışıdır.
@@ -743,22 +776,23 @@ qx.Class.define("ankamon.ui.BoardOps", {
             ? sessionOps.wake(online)
             : this.__job({ type: "wake", board_ids: online.map(b => b.id) }, "Ekranı uyandır")));
           // Uyut: ekranı güç tasarrufuna sokar (DPMS kapalı; tahtaya dokunulunca açılır).
-          subAdd(screens, ICON.sleepScreen, "Uyut" + count, () => (sessionOps && sessionOps.sleep
-            ? sessionOps.sleep(online)
-            : this.__job({ type: "sleep", board_ids: online.map(b => b.id) }, "Ekranı uyut")));
+          stateAdd(screens, ICON.sleepScreen, "Uyut" + count, online.filter(b => !this.isScreenAsleep(b)), list => (sessionOps && sessionOps.sleep
+            ? sessionOps.sleep(list)
+            : this.__job({ type: "sleep", board_ids: list.map(b => b.id) }, "Ekranı uyut")));
         }
         // Kilitle: "Kilidi aç"a dek tahtada tam ekran "Kilitli"; klavye, fare ve dokunmatik çalışmaz, yeniden
         // açılışta da sürer (bkz. worker executor/screenlock.py). Oturumu kilitle'den (parolayla açılır) ayrı.
         if (can("screen.lock")) {
           // Kapat/yeniden başlat gibi çıktı penceresinin altında "Bu pencereyi bir daha gösterme" kutusu
           // (kullanıcı isteği; __powerJob ile — kutu işaretliyse kilitleme yine yapılır, pencere açılmaz).
-          subAdd(screens, ICON.screenLock, "Kilitle" + count, () => (sessionOps && sessionOps.screenLock
-            ? sessionOps.screenLock(online, true)
-            : this.__powerJob({ type: "screen_lock", board_ids: online.map(b => b.id) }, "Ekranı kilitle",
+          // Durumu bilinmeyen tahta (screen_locked gelmeyen çağıran) iki maddede de sayılır.
+          stateAdd(screens, ICON.screenLock, "Kilitle" + count, online.filter(b => b.screen_locked !== true), list => (sessionOps && sessionOps.screenLock
+            ? sessionOps.screenLock(list, true)
+            : this.__powerJob({ type: "screen_lock", board_ids: list.map(b => b.id) }, "Ekranı kilitle",
                 "screen_lock", "kilitleme", user)));
-          subAdd(screens, ICON.screenUnlock, "Kilidi aç" + count, () => (sessionOps && sessionOps.screenLock
-            ? sessionOps.screenLock(online, false)
-            : this.__job({ type: "screen_unlock", board_ids: online.map(b => b.id) }, "Ekran kilidini aç")));
+          stateAdd(screens, ICON.screenUnlock, "Kilidi aç" + count, online.filter(b => b.screen_locked !== false), list => (sessionOps && sessionOps.screenLock
+            ? sessionOps.screenLock(list, false)
+            : this.__job({ type: "screen_unlock", board_ids: list.map(b => b.id) }, "Ekran kilidini aç")));
         }
         if (can("cast")) {
           screens.add(this.menuButton(ICON.cast, "Ekranımı yansıt" + count, null, this.__castMenu(online)));
@@ -937,7 +971,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
 
       // Çift kutulu parola girişi: iki kutu ve anlık eşleşme notu. check() → hata metni ya da null.
       const pairs = [];
-      const pairBox = () => {
+      const pairBox = bootWipe => {
         const box = new qx.ui.container.Composite(new qx.ui.layout.Grid(8, 6));
         box.getLayout().setColumnFlex(1, 1);
         const first = new qx.ui.form.PasswordField().set({ placeholder: "Yeni parola", liveUpdate: true });
@@ -948,6 +982,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
         box.add(new qx.ui.basic.Label("Tekrar:"), { row: 1, column: 0 });
         box.add(second, { row: 1, column: 1 });
         box.add(note, { row: 2, column: 1 });
+        if (bootWipe) {
+          box.add(new qx.ui.basic.Label(this.BOOT_WIPE_NOTE).set({ textColor: "app-warn", toolTipText: this.BOOT_WIPE_HINT, alignY: "middle" }), { row: 0, column: 2 });
+          first.setToolTipText(this.BOOT_WIPE_HINT);
+        }
         const pair = {
           box, first, second,
           value: () => first.getValue() || "",
@@ -995,7 +1033,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const list = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
       const scroll = new qx.ui.container.Scroll(list).set({ height: 60 });
       win.add(scroll, { flex: 1 });
-      const users = pairBox();
+      const users = pairBox(true);
       win.add(users.box);
 
       // 2) Yönetici hesapları: yalnız yetkisi olanlar; her biri ayrı onay kutusu ve ayrı çift kutulu parola.
@@ -1193,10 +1231,17 @@ qx.Class.define("ankamon.ui.BoardOps", {
               } else if (p.type === "password") {
                 // Gizli değer (ör. BIOS parolası): maskeli; tarayıcı kayıtlı oturum parolasını buraya
                 // kendiliğinden doldurmasın diye "new-password" (Ankamon parolası BIOS'a yazılmasın).
-                form.password(p.key, p.label).getContentElement().setAttribute("autocomplete", "new-password");
+                const field = form.password(p.key, p.label, null, p.boot_wipe_note ? { note: this.BOOT_WIPE_NOTE, hint: this.BOOT_WIPE_HINT } : null);
+                field.getContentElement().setAttribute("autocomplete", "new-password");
               } else {
                 form.text(p.key, p.label, p.default);
               }
+            });
+            // Salt okunur, başka alandan üretilen alan: yazıldıkça dolar (bkz. user-add "derive").
+            action.params.filter(p => p.derive === "etap_username").forEach(p => {
+              const target = form.getField(p.key).set({ readOnly: true, focusable: false });
+              const source = form.getField(p.from).set({ liveUpdate: true });
+              source.addListener("changeValue", e => target.setValue(this.etapUsername(e.getData())));
             });
             body.add(form);
           }

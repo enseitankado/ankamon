@@ -1,6 +1,6 @@
 {
   "title": "Kullanıcı ekle",
-  "description": "Tahtaya yerel kullanıcı hesabı ekler; ETAP'ın kendi hesap açma adımlarını izler (EBA-QR/USB girişinin yaptığı gibi: ev dizini /etc/skel'den, kabuk bash, cdrom, floppy, audio, video, plugdev, bluetooth, scanner, netdev, dip, lpadmin grupları). Kullanıcı adı boş bırakılırsa ETAP kuralıyla tam addan üretilir (\"Ayşe Çelik\" → aysecelik). Hesap tahtada zaten varsa dokunulmaz, atlanır; yönetici (sudo) yetkisi verilmez. Tahtada açılışta parola sıfırlama servisi etkinse çıktıda uyarı verilir: parola o tahtada bir sonraki açılışa kadar geçerli olur.",
+  "description": "Tahtaya yeni kullanıcı hesabı ekler. Hesap tahtada zaten varsa değiştirilmez. Yönetici yetkisi verilmez.",
   "category": "Kullanıcılar",
   "feature": "boards.users",
   "confirm": true,
@@ -9,14 +9,15 @@
     {"key": "TAM_AD", "label": "Tam ad", "type": "text", "default": "", "required": true,
      "pattern": "^[^:,\\n\\r]{1,64}$",
      "pattern_error": "en çok 64 karakter olmalı; iki nokta ve virgül içeremez"},
-    {"key": "KULLANICI", "label": "Kullanıcı adı (boşsa tam addan üretilir)", "type": "text", "default": "",
+    {"key": "KULLANICI", "label": "Kullanıcı adı (tam addan üretilir)", "type": "text", "default": "",
+     "derive": "etap_username", "from": "TAM_AD",
      "pattern": "^[a-z_][a-z0-9_-]{0,30}$",
      "pattern_error": "küçük harf, rakam, _ ve - içerebilir; en çok 31 karakter, rakamla başlayamaz"},
-    {"key": "PAROLA", "label": "Parola", "type": "password", "required": true,
+    {"key": "PAROLA", "label": "Parola", "type": "password", "required": true, "boot_wipe_note": true,
      "pattern": "^.{1,128}$", "pattern_error": "en çok 128 karakter olmalı"},
     {"key": "ILK_GIRIS", "label": "İlk girişte parola değiştirilsin", "type": "select", "default": "evet",
      "options": [
-       {"value": "evet", "label": "Evet (ETAP'ın parola değiştirme penceresi açılır)"},
+       {"value": "evet", "label": "Evet"},
        {"value": "hayir", "label": "Hayır"}
      ]}
   ]
