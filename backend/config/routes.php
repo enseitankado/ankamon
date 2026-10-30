@@ -115,6 +115,7 @@ return [
     ['GET',    '/api/system/config',     [Api\SystemInfoApi::class, 'config'],   'admin'],
     ['GET',    '/api/system/software',   [Api\SoftwareApi::class, 'index'],   'admin'],
     ['GET',    '/api/metrics/latest',    [Api\MetricsApi::class, 'latest'],    'boards'],
+    ['GET',    '/api/metrics/baselines', [Api\MetricsApi::class, 'baselines'], 'boards'],
     ['GET',    '/api/metrics/{id}/sensors', [Api\MetricsApi::class, 'sensors'], 'boards'],
     ['GET',    '/api/metrics/info',      [Api\MetricsInfoApi::class, 'info'],  'metrics'],
     ['GET',    '/api/metrics/coverage',  [Api\MetricsApi::class, 'coverage'], 'metrics'],

@@ -26,7 +26,7 @@
  */
 
 /**
- * Tahtalar sayfasının "Bilgisayarlar" sekmesi — Ekranlar sekmesinin donanım karşılığı. Her tahtanın
+ * Tahtalar sayfasının "Donanımlar" sekmesi — Ekranlar sekmesinin donanım karşılığı. Her tahtanın
  * "bilgisayar"ı (OPS/PC modülü) stilize bir anakart çizimi olarak gösterilir ve canlı başarım +
  * yavaş sensörler + statik envanter bu çizimin üzerine bindirilir (çizim ve metrik yerleşimi gömülü
  * sayfada: docker/rootfs/screen/computer.html). Bu sınıf yalnız KABUĞU yönetir: iframe'li sayfa,
@@ -48,7 +48,7 @@ qx.Class.define("ankamon.ui.boards.ComputerTiles", {
   construct(api) {
     super();
     this.__api = api;
-    this.__page = new qx.ui.tabview.Page("Bilgisayarlar");
+    this.__page = new qx.ui.tabview.Page("Donanımlar");
     this.__page.setLayout(new qx.ui.layout.VBox());
     this.__page.setPadding([8, 0, 0, 0]);
     this.__page.add(this.__createToolbar());

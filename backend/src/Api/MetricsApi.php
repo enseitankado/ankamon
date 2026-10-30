@@ -134,6 +134,42 @@ final class MetricsApi
         return ['sensors' => BoardSensors::withRange((int) $request->arg('id')) ?: new \stdClass()];
     }
 
+    /**
+     * GET /api/metrics/baselines — tahta başına "normal" (kalıcı ortalama) değerler: son 14 günün saatlik
+     * özetinden (metrics_1h — ham veri silinse de kalır, sürekli güncellenir) işlemci/disk sıcaklığı ile
+     * bellek/disk doluluğunun ortalaması. Donanımlar sekmesi bunu "yüksek mi" kararında eşik olarak kullanır:
+     * bir tahta kendi geçmiş ortalamasının belirgin üstündeyse (ör. her zamankinden sıcak/dolu) kırmızı
+     * gösterilir — mutlak güvenlik tavanlarıyla birlikte (bkz. docker/rootfs/screen/computer.html). Ortalama
+     * yavaş değiştiğinden ön yüz bunu seyrek (dakikalarca arayla) çeker.
+     */
+    public function baselines(): array
+    {
+        $rows = Db::all(
+            "SELECT board_id,
+                    avg(value) FILTER (WHERE name = 'node_hwmon_temp_celsius'
+                        AND (chip LIKE '%coretemp%' OR chip LIKE '%k10temp%')) AS cpu_temp,
+                    avg(value) FILTER (WHERE name IN ('smartmon_temperature_celsius_raw_value',
+                        'smartmon_airflow_temperature_cel_raw_value', 'nvme_temperature_celsius')) AS disk_temp,
+                    avg(value) FILTER (WHERE name = 'node_memory_MemAvailable_bytes') AS mem_avail,
+                    avg(value) FILTER (WHERE name = 'node_memory_MemTotal_bytes') AS mem_total,
+                    avg(value) FILTER (WHERE name = 'node_filesystem_avail_bytes' AND mountpoint = '/') AS disk_avail,
+                    avg(value) FILTER (WHERE name = 'node_filesystem_size_bytes' AND mountpoint = '/') AS disk_size
+             FROM v_metrics_1h
+             WHERE time > now() - interval '14 days' AND board_id IS NOT NULL
+             GROUP BY board_id"
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(int) $row['board_id']] = [
+                'cpu_temp' => self::num($row['cpu_temp'], 1),
+                'disk_temp' => self::num($row['disk_temp'], 1),
+                'mem_percent' => self::usedPercent($row['mem_total'], $row['mem_avail']),
+                'disk_percent' => self::usedPercent($row['disk_size'], $row['disk_avail']),
+            ];
+        }
+        return ['baselines' => $out ?: new \stdClass()];
+    }
+
     private static function num(mixed $value, int $digits): ?float
     {
         return $value === null ? null : round((float) $value, $digits);

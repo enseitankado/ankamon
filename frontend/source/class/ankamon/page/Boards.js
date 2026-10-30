@@ -158,12 +158,12 @@ qx.Class.define("ankamon.page.Boards", {
     this.__listPage = listPage;
     if (this._can("screen")) {
       tabs.add(this.__createScreensPage());
-      // "Bilgisayarlar" sekmesi: Ekranlar'ın donanım karşılığı — her tahtanın OPS/PC modülü çizimi
+      // "Donanımlar" sekmesi: Ekranlar'ın donanım karşılığı — her tahtanın OPS/PC modülü çizimi
       // üzerine canlı başarım + sensör + envanter bindirilir (bkz. ui.boards.ComputerTiles,
       // docker/rootfs/screen/computer.html). Sürükle-bırak/seçim/sağ menü Ekranlar'la aynı köprüyü kullanır.
       tabs.add(this.__createComputersPage());
     }
-    this._rememberTab(tabs, "boards"); // son seçili sekme (Liste / Ekranlar / Bilgisayarlar — bkz. Base._rememberTab)
+    this._rememberTab(tabs, "boards"); // son seçili sekme (Liste / Ekranlar / Donanımlar — bkz. Base._rememberTab)
     this.add(tabs, { flex: 1 });
 
     // Sayfa açık kalsa bile kendiliğinden tazelenir (bkz. sınıf başı not — worker zinciriyle birlikte).
@@ -277,6 +277,8 @@ qx.Class.define("ankamon.page.Boards", {
     __applyingPreview: false,
     __metrics: null,
     __computers: null,
+    __baselines: null,
+    __baselinesAt: 0,
 
     async _refresh() {
       const F = ankamon.util.Format;
@@ -288,6 +290,15 @@ qx.Class.define("ankamon.page.Boards", {
       ]);
       this.__boards = new Map(boards.boards.map(b => [b.id, b]));
       this.__metrics = metrics.latest || {};
+      // Donanımlar sekmesinin "yüksek mi → kırmızı" eşiği için tahta başına kalıcı ortalama (son 14 gün,
+      // bkz. MetricsApi::baselines). Yavaş değiştiğinden seyrek (5 dk) ve yalnız sekme kurulmuşsa çekilir;
+      // gelince kutucuklar yeniden boyanır (pushList).
+      if (this.__computers && Date.now() - (this.__baselinesAt || 0) > 300000) {
+        this.__baselinesAt = Date.now();
+        ankamon.io.Api.get("/metrics/baselines")
+          .then(r => { this.__baselines = r.baselines || {}; this.__computers.pushList(); })
+          .catch(() => { this.__baselinesAt = 0; });
+      }
       const unit = (v, suffix) => v === null || v === undefined ? "" : v + suffix;
       const mbit = v => v === null || v === undefined ? "" : v.toFixed(v < 10 ? 2 : 1);   // birim sütun başlığında
       // cells[0]=kimlik, cells[1]=onay kutusu, cells[2..]=sütunlar.
@@ -716,7 +727,7 @@ qx.Class.define("ankamon.page.Boards", {
     /**
      * O an GÖSTERİLEN (süzülmüş) tahtalar, kullanıcının sürükle-bırak sırasıyla (bkz. __screenOrder):
      * sıradakiler önce o sırayla, sıralanmamışlar (yeni tahta) doğal sırayla sona. Ekranlar ve
-     * Bilgisayarlar sekmeleri aynı sırayı paylaşır (bkz. __previewList, __computerList).
+     * Donanımlar sekmeleri aynı sırayı paylaşır (bkz. __previewList, __computerList).
      */
     __orderedShown() {
       const shown = this.__shownBoards || [];
@@ -764,7 +775,7 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * "Bilgisayarlar" sekmesinin tahta listesi (bkz. ui.boards.ComputerTiles, docker/rootfs/screen/
+     * "Donanımlar" sekmesinin tahta listesi (bkz. ui.boards.ComputerTiles, docker/rootfs/screen/
      * computer.html): __previewList ile aynı sıra/çevrimiçi mantığı, ama kutucuk donanım çizimini
      * besleyen ZENGİNLEŞTİRİLMİŞ veri — yavaş sensörlerin tamamı (CPU/kasa/disk sıcaklığı, fan, pil,
      * disk doluluğu, ağ rx/tx, yük, çalışma süresi; bkz. backend MetricsApi::latest) ve çizim
@@ -773,6 +784,7 @@ qx.Class.define("ankamon.page.Boards", {
      */
     __computerList() {
       const metrics = this.__metrics || {};
+      const baselines = this.__baselines || {};
       return this.__orderedShown().map(b => {
         const m = b.online ? metrics[b.id] : null;
         const f = b.facts || {};
@@ -781,10 +793,20 @@ qx.Class.define("ankamon.page.Boards", {
           powersave: !!b.online && ["Off", "Standby", "Suspend"].includes(b.display_state),
           net: b.online ? b.netifs || null : null,
           autoshutdown: b.online ? b.autoshutdown || null : null,
+          // "Normal" referans (kalıcı ortalama — bkz. MetricsApi::baselines); çizim bunun belirgin üstünü
+          // kırmızı gösterir (mutlak tavanlarla birlikte). Henüz gelmemişse null → yalnız mutlak eşik.
+          base: baselines[b.id] || null,
           facts: {
             cpu_model: f.cpu_model || null, cpu_phys_cores: f.cpu_phys_cores || null, cpu_cores: f.cpu_cores || null,
-            cpu_max_mhz: f.cpu_max_mhz || null, disk_total_bytes: f.disk_total_bytes || null,
-            disk_rotational: f.disk_rotational, disk_model: f.disk_model || null, smart_health: f.smart_health || null
+            cpu_max_mhz: f.cpu_max_mhz || null, mem_total_bytes: f.mem_installed_bytes || f.mem_total_bytes || null,
+            disk_total_bytes: f.disk_total_bytes || null, disk_rotational: f.disk_rotational,
+            disk_model: f.disk_model || null,
+            // SMART sağlık + uyarı ayrıntıları (bkz. worker executor/hwfacts.py _smart): uyarıda disk
+            // kırmızı+ünlem, hint'te neden (bkz. computer.html smartWarn).
+            smart_health: f.smart_health || null, smart_failing: f.smart_failing || null,
+            smart_reallocated: f.smart_reallocated ?? null, smart_pending: f.smart_pending ?? null,
+            smart_uncorrectable: f.smart_uncorrectable ?? null, smart_life_left_pct: f.smart_life_left_pct ?? null,
+            smart_power_on_hours: f.smart_power_on_hours ?? null, smart_temp_c: f.smart_temp_c ?? null
           },
           stats: m ? {
             cpu: m.cpu_percent ?? null, mem: m.mem_percent ?? null, temp: m.cpu_temp ?? m.temp_max ?? null,
@@ -797,7 +819,7 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * "Bilgisayarlar" sekmesi: Ekranlar'ın donanım karşılığı. İçeriği ui.boards.ComputerTiles yönetir
+     * "Donanımlar" sekmesi: Ekranlar'ın donanım karşılığı. İçeriği ui.boards.ComputerTiles yönetir
      * (kendi iframe/araç çubuğu/boyut slider'ı); bu sayfa ona yalnızca veri (__computerList), sağ menü
      * (__openPreviewMenuAt — grid satır menüsüyle AYNI), çift tık→Bilgi kartı, Uyandır ve sürükle-bırak
      * sırasını kalıcılaştırma (__saveScreenOrder — Ekranlar'la ortak) sağlar. Seçim grid onay kutularıyla
@@ -902,7 +924,7 @@ qx.Class.define("ankamon.page.Boards", {
 
     /**
      * Önizleme/Bilgisayar kutucuğunun sağ menüsü, konum verilen iframe öğesine GÖRE hesaplanır
-     * (x/y iframe içi koordinat). Ekranlar sekmesi kendi iframe'ini, Bilgisayarlar sekmesi
+     * (x/y iframe içi koordinat). Ekranlar sekmesi kendi iframe'ini, Donanımlar sekmesi
      * (bkz. ui.boards.ComputerTiles) kendi iframe öğesini geçirir — menü içeriği ikisinde de AYNI (__rowMenu).
      */
     __openPreviewMenuAt(id, x, y, ids, el) {
