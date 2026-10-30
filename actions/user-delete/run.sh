@@ -96,6 +96,8 @@ for U in $ADLAR; do
     fi
     rm -f /tmp/userdel.$$
     rm -f "/var/lib/AccountsService/users/$U" "/var/lib/AccountsService/icons/$U"
+    # ETAP'ın "ilk girişte parola değiştir" işareti UID'ye bağlı: kalırsa UID'yi sonradan alan hesapta pencere açılır.
+    rm -f "/var/lib/eta/expire-uid/$uid"
     if [ "$tum_bu" = 1 ]; then
         [ -e "$home" ] && rm -rf -- "$home"
         echo "✓ $U silindi (ev dizini $home ve dışındaki $disari dosya/klasör dahil)"

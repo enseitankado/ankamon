@@ -27,7 +27,7 @@ return [
     'boards.backup' => 'Tahtadaki bir hesabın ev dizinini (kişisel dosyalar dahil) yedekleyip indirme (sağ menü "Yedekle")',
     'anomalies' => 'Anomaliler: tahtalardaki sıra dışı durumları (ör. açık ama oturum açılmamış tahta) anlık izleme ve geçmişe dönük raporlama',
     'diagnose' => 'Bakım (sorun tespiti): seçili tahtalarda donanım, disk sağlığı (SMART), sıcaklık ve sistem denetimi çalıştırma',
-    'boards.users' => 'Tahtadaki kullanıcı hesaplarını silme, isteğe bağlı tüm dosyalarıyla (sağ menü "Kullanıcılar ▸ Kullanıcı sil…" ve hazır işlem "Kullanıcı sil") — geri alınamaz',
+    'boards.users' => 'Tahtaya kullanıcı hesabı ekleme (hazır işlem "Kullanıcı ekle") ve hesapları silme, isteğe bağlı tüm dosyalarıyla (sağ menü "Kullanıcılar ▸ Kullanıcı sil…" ve hazır işlem "Kullanıcı sil") — silme geri alınamaz',
     'boards.passwords' => 'Tahtadaki kullanıcı hesaplarının parolasını ayarlama, tek tek ya da topluca (sağ menü "Kullanıcılar ▸ Parola ayarla…" ve hazır işlem "Kullanıcı parolası ayarla") — etapadmin ve root hariç',
     'boards.passwords.etapadmin' => 'Tahtanın yönetici hesabı etapadmin\'in parolasını ayarlama',
     'boards.passwords.root' => 'Tahtanın root parolasını ayarlama — Ankamon tahtalara root ile bağlanır; Ayarlar\'daki SSH parolası da aynı yapılmazsa o tahtalara erişim kopar',
