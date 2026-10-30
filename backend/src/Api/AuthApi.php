@@ -305,4 +305,18 @@ final class AuthApi
         header('X-Auth-User: ' . $user['username']);
         return ['ok' => true];
     }
+
+    /** nginx auth_request: "Yedekle/Geri al" ▸ Geri al yedek yüklemesi (bkz. /home-restore-api/). */
+    public function homeRestore(): array
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            throw new ApiError(401, 'Oturum açmanız gerekiyor.');
+        }
+        if (!Auth::can($user, 'boards.restore')) {
+            throw ApiError::forbidden();
+        }
+        header('X-Auth-User: ' . $user['username']);
+        return ['ok' => true];
+    }
 }

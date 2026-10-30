@@ -37,7 +37,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import activity, db
-from ..executor import accounts, backup, cast, diagnose, display, hwfacts, session_probe, tools, whoami, wol
+from ..executor import accounts, backup, cast, diagnose, display, home_restore, hwfacts, session_probe, tools, whoami, wol
 from ..anomaly import scan as anomaly_scan_mod
 from ..executor.jobs import _action_dir, _board_access, _claim, _targets, _write_one, _write_results
 from . import stream
@@ -383,10 +383,10 @@ def _run_job(job) -> None:
                                 session_probe.store(conn, t["board_id"], st["user"], st["locked"])
                                 session_probe.store_display(conn, t["board_id"], st["display"])
         elif job["type"] == "backup_home":
-            # "Yedekle": tahtalar SIRAYLA (command/action gibi) — her tahtanın canlı raporu ve ilerlemesi
+            # "Yedekle/Geri al" ▸ Yedekle: tahtalar SIRAYLA (command/action gibi) — her tahtanın canlı raporu ve ilerlemesi
             # okunaklı aksın, aynı anda onlarca tahtanın ağ/disk yükü birikmesin; `conn` da yalnız bu
             # iş parçacığında kullanılır (bkz. yukarıdaki not). Eski yedekler önce temizlenir.
-            username = (job["params"] or {}).get("username", "")
+            usernames = (job["params"] or {}).get("usernames") or []
             user, password = _board_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
@@ -396,11 +396,37 @@ def _run_job(job) -> None:
             for t in targets:
                 ev = stream.Events(conn, job["id"], t["board_id"])
                 try:
-                    result = backup.backup(t, user, password, username, job["id"], ev)
+                    parts = [backup.backup(t, user, password, name, job["id"], ev, (i, len(usernames)))
+                             for i, name in enumerate(usernames)]
                 finally:
                     ev.close()
+                result = home_restore.merge_home_backup_results(parts)
                 _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
                 results[t["board_id"]] = result
+        elif job["type"] == "restore_home":
+            # "Yedekle/Geri al" ▸ Geri al: yüklenen yedekten hesap + ev dizini + PIN anahtarı, tahtalar SIRAYLA.
+            params = job["params"] or {}
+            user, password = _board_access(conn)
+            if not password:
+                raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
+            backup.cleanup()
+            try:
+                row = conn.execute("SELECT is_admin FROM users WHERE username = %s", (job["username"],)).fetchone()
+                archive, meta = home_restore.prepare_home_restore(
+                    params.get("token", ""), job["username"], bool(row and row["is_admin"]))
+                for t in targets:
+                    ev = stream.Events(conn, job["id"], t["board_id"])
+                    try:
+                        result = home_restore.restore_home(t, user, password, archive, meta, bool(params.get("overwrite")), ev)
+                    finally:
+                        ev.close()
+                    accounts.invalidate(conn, t["board_id"])
+                    _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
+                    results[t["board_id"]] = result
+            except home_restore.HomeRestoreRefused as exc:
+                raise RuntimeError(str(exc))
+            finally:
+                home_restore.discard_upload(params.get("token", ""))
         elif job["type"] in ("cast_start", "cast_stop", "cast_volume"):
             # "Ekranımı yansıt" (bkz. executor/cast.py): tahtalar bağımsız, PARALEL (login deseni) —
             # yayın bütün sınıflarda aynı anda başlasın. conn yalnız bu iş parçacığında kullanılır.

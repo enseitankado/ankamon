@@ -52,6 +52,7 @@ return [
     // Yansıtma penceresinin tüketim tablosu: yayını okuyan tahtaların aldığı veri (MediaMTX API'si).
     ['GET',    '/api/cast/stats',        [Api\CastApi::class, 'stats'],        'cast'],
     ['GET',    '/api/auth/filemanager',  [Api\AuthApi::class, 'filemanager'],  'public'],
+    ['GET',    '/api/auth/home-restore', [Api\AuthApi::class, 'homeRestore'],  'public'],
 
     ['GET',    '/api/dashboard',         [Api\DashboardApi::class, 'summary'], 'dashboard'],
 

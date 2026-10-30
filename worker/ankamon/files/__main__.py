@@ -63,6 +63,7 @@ import tornado.iostream
 import tornado.web
 
 from .. import activity, db
+from ..executor import home_restore
 from ..executor.jobs import _board_access
 from . import bulk, copy, remote
 from .remote import RemoteError
@@ -294,6 +295,48 @@ class BulkUploadFileHandler(BoardFilesRequestHandler):
             self.fh.close()
 
 
+@tornado.web.stream_request_body
+class HomeRestoreUploadHandler(BoardFilesRequestHandler):
+    """ "Yedekle/Geri al" ▸ Geri al: yedek dosyası akışla diske iner, hesap bilgisi okunup özeti döner (gizli
+    alanlar dönmez). Yetki nginx'te ("boards.restore", /home-restore-api/); iş sonra "restore_home" görevidir."""
+
+    def prepare(self):
+        super().prepare()
+        self.request.connection.set_max_body_size(1 << 40)
+        self.fh = None
+        self.finished_upload = False
+        self.error = None
+        self.token = ""
+        try:
+            self.token, path = home_restore.new_upload(self.user, int(self.request.headers.get("Content-Length") or 0))
+            self.fh = open(path, "wb", opener=lambda p, flags: os.open(p, flags, 0o600))
+        except (home_restore.HomeRestoreRefused, OSError) as exc:
+            self.error = str(exc)
+
+    def data_received(self, chunk):
+        if self.fh:
+            self.fh.write(chunk)
+
+    async def put(self):
+        self.finished_upload = True
+        if self.fh:
+            self.fh.close()
+        try:
+            if self.error:
+                raise home_restore.HomeRestoreRefused(self.error)
+            self.write(await asyncio.to_thread(home_restore.upload_summary, self.token))
+        except home_restore.HomeRestoreRefused as exc:
+            home_restore.discard_upload(self.token)
+            self.set_status(400)
+            self.write({"error": str(exc)})
+
+    def on_connection_close(self):
+        if self.fh and not self.fh.closed:
+            self.fh.close()
+        if not self.finished_upload:
+            home_restore.discard_upload(self.token)
+
+
 def _bulk_record(owner: str):
     def done(job: dict) -> None:
         opts = job["options"]
@@ -476,6 +519,7 @@ def main() -> None:
         (r"/copy", BoardFileCopyHandler),
         (r"/copy/(\d+)", CopyStatusHandler),
         (r"/copy/(\d+)/cancel", CopyCancelHandler),
+        (r"/home-restore/upload", HomeRestoreUploadHandler),
         (r"/bulk/users", BulkUsersHandler),
         (r"/bulk/upload", BulkUploadHandler),
         (r"/bulk/upload/([0-9a-f]+)", BulkUploadFileHandler),

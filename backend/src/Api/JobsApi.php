@@ -148,9 +148,11 @@ final class JobsApi
             'wake' => ['screen', 'Ekranı uyandır', [], true],
             // Sağ menü Ekran ▸ "Uyut": ekranı DPMS ile kapatır (dokunulunca açılır) — Uyandır'ın eşi.
             'sleep' => ['screen', 'Ekranı uyut', [], true],
-            // Sağ menü "Yedekle" (bkz. frontend ui/BoardOps.js, worker executor/backup.py): seçilen
-            // hesabın ev dizini izin/sahiplik bilgisiyle tar.gz; indirme HomeBackupApi'den.
+            // Sağ menü "Yedekle/Geri al" (bkz. frontend ui/homebackup, worker executor/backup.py): seçilen
+            // hesapların ev dizini izin/sahiplik + hesap bilgisi + PIN anahtarıyla tar.gz; indirme HomeBackupApi'den.
             'backup_home' => $this->backupJob($request),
+            // Aynı pencerenin Geri al sekmesi (bkz. worker executor/home_restore.py): yüklenen yedekten hesap.
+            'restore_home' => $this->restoreJob($request),
             // "Ekranımı yansıt" (bkz. docker/rootfs/cast/, worker executor/cast.py): yayın sayfası önce
             // ekranı MediaMTX'e yollar, sonra seçili tahtalarda oynatıcıyı başlatır / durdurur.
             'cast_start' => $this->castJob($request),
@@ -167,7 +169,7 @@ final class JobsApi
                 throw ApiError::forbidden();
             }
         } elseif ($type === 'accounts') {
-            // Hesap listesi: Oturum aç, Yedekle, Kullanıcı sil ve Parola ayarla pencerelerini besler.
+            // Hesap listesi: Oturum aç, Yedekle/Geri al, Kullanıcı sil ve Parola ayarla pencerelerini besler.
             $any = array_filter(['boards.login', 'boards.backup', 'boards.users', 'boards.passwords'],
                 static fn(string $f) => Auth::can($user, $f));
             if (!$any) {
@@ -320,10 +322,31 @@ final class JobsApi
     /** Kullanıcı adı tahtada betiğe gömülür: loginJob ve worker accounts.USERNAME_RE ile AYNI kural. */
     private function backupJob(Request $request): array
     {
+        $usernames = $request->input('usernames', []);
+        if (!is_array($usernames) || !$usernames || count($usernames) > 200) {
+            throw ApiError::badRequest('Yedeklenecek hesap seçilmedi.');
+        }
+        foreach ($usernames as $username) {
+            if (!is_string($username) || !preg_match('/^[a-z_][a-z0-9_.-]{0,31}$/', $username)) {
+                throw ApiError::badRequest('Geçersiz kullanıcı adı.');
+            }
+        }
+        $usernames = array_values(array_unique($usernames));
+        $shown = implode(', ', array_slice($usernames, 0, 5)) . (count($usernames) > 5 ? ' …' : '');
+        return ['boards.backup', "Yedekle: $shown ev dizini", ['usernames' => $usernames], true];
+    }
+
+    /** Dosyanın içeriği (hesap, güvenlik denetimleri) worker'da doğrulanır (bkz. executor/home_restore.py). */
+    private function restoreJob(Request $request): array
+    {
+        $token = (string) $request->input('token', '');
+        if (!preg_match('/^[0-9a-f]{32}$/', $token)) {
+            throw ApiError::badRequest('Geçersiz yedek dosyası.');
+        }
         $username = (string) $request->input('username', '');
         if (!preg_match('/^[a-z_][a-z0-9_.-]{0,31}$/', $username)) {
             throw ApiError::badRequest('Geçersiz kullanıcı adı.');
         }
-        return ['boards.backup', "Yedekle: $username ev dizini", ['username' => $username], true];
+        return ['boards.restore', "Geri al: $username", ['token' => $token, 'overwrite' => (bool) $request->input('overwrite', false)], true];
     }
 }

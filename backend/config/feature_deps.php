@@ -21,6 +21,7 @@ return [
     'filemanager' => 'boards',
     'taskmgr' => 'boards',
     'boards.backup' => 'boards',
+    'boards.restore' => 'boards',
     'boards.login' => 'boards',
     'boards.users' => 'boards',
     'anomalies' => 'boards',

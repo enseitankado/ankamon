@@ -25,8 +25,9 @@
 
 """Tahtadaki bir hesabın ev dizinini, erişim izinleri ve dosya/dizin sahiplikleriyle tar.gz olarak yedekler.
 
-Tahtalar/Ekranlar sağ menüsü "Yedekle" → hesap (bkz. frontend ui/BoardOps.js) "backup_home" görevini
-açar; runner tahtaları SIRAYLA bu modülle işler (bkz. runner/__main__.py).
+Tahtalar/Ekranlar sağ menüsü "Yedekle/Geri al" ▸ Yedekle sekmesi (bkz. frontend ui/homebackup) "backup_home"
+görevini açar (seçilen tahtalar × seçilen hesaplar); runner tahtaları SIRAYLA bu modülle işler (bkz.
+runner/__main__.py). Geri alma: bkz. home_restore.py.
 
 Tek SSH oturumu: tahtada önce `du` ile ev dizininin toplam boyutu ölçülür, ardından GNU tar arşivi
 gzip'leyip stdout'a yazar — sıkıştırma tahtada yapılır (ağ ve konteyner CPU'su az kullanılır), akış
@@ -34,8 +35,11 @@ doğrudan sunucudaki dosyaya iner (Python belleğinden geçmez). tar'ın --check
 kayıtta (kayıt = 10240 bayt, sıkıştırılmamış) stderr'e bir satır yazar; ilerleme yüzdesi buradan,
 du'nun toplamına oranla hesaplanır. Tahtada nice/ionice ile en düşük öncelikte çalışır.
 
-Arşiv: izinler, sahiplik (ad + sayısal kimlik), ACL ve genişletilmiş öznitelikler korunur. Geri yükleme:
-  tar --extract --gzip --preserve-permissions --same-owner --acls --xattrs -f <dosya> -C /home
+Arşiv: izinler, sahiplik (ad + sayısal kimlik), ACL ve genişletilmiş öznitelikler korunur. Arşivin İLK üyesi
+hesap bilgisidir (HOME_BACKUP_META, JSON: kimlikler, tam ad, kabuk, gruplar, parola özeti ve varsa PIN anahtarı —
+/etc/otp-secrets.json'daki değeri); yedek dosyası bu yüzden gizlidir. Elle geri yükleme:
+  tar --extract --gzip --preserve-permissions --same-owner --acls --xattrs --anchored \\
+      --exclude=.ankamon-hesap.json -f <dosya> -C /home
 Dosyalar BASE_DIR/job-<görev>/ altına yazılır, KEEP_HOURS sonra silinir (bkz. cleanup).
 
 Yalnız .tar.gz (Linux'a geri yükleme biçimi) üretilir — kullanıcı kararı; Windows için ayrı .zip
@@ -56,7 +60,9 @@ from .accounts import USERNAME_RE
 
 BASE_DIR = "/data/home-backups"
 KEEP_HOURS = int(os.environ.get("HOME_BACKUP_KEEP_HOURS", "72"))
+RESTORE_UPLOAD_KEEP_HOURS = 24  # yarım kalan "Geri al" yüklemeleri (bkz. home_restore.py) en çok bu kadar kalır
 TIMEOUT_SECONDS = 6 * 3600
+HOME_BACKUP_META = ".ankamon-hesap.json"
 CHECKPOINT = 500               # kayıt (500 × 10240 bayt ≈ 5 MB sıkıştırılmamış veri) başına bir ilerleme satırı
 _RECORD = 10240
 _PROGRESS_EVERY = 1.5          # sn — ilerleme çubuğu olayı en sık bu aralıkla
@@ -74,16 +80,53 @@ _SSH_OPTS = [
 _SCRIPT = r"""
 set -u
 U='{user}'
+if ! getent passwd "$U" >/dev/null; then echo "ANKAMON_NOACCOUNT" >&2; exit 3; fi
 H=$(getent passwd "$U" | cut -d: -f6)
-if [ -z "$H" ] || [ ! -d "$H" ]; then echo "ANKAMON_ERR Hesap ya da ev dizini bulunamadı: $U" >&2; exit 3; fi
+if [ -z "$H" ] || [ ! -d "$H" ]; then echo "ANKAMON_ERR Ev dizini bulunamadı: $U" >&2; exit 3; fi
+T=$(mktemp -d) || {{ echo "ANKAMON_ERR Geçici dizin oluşturulamadı" >&2; exit 3; }}
+trap 'rm -rf "$T"' EXIT
+python3 - "$U" "$T/{meta}" <<'ANKAMON_PY' || {{ echo "ANKAMON_ERR Hesap bilgisi okunamadı" >&2; exit 3; }}
+{meta_py}
+ANKAMON_PY
 SIZE=$(du -sbx "$H" 2>/dev/null | cut -f1)
 echo "ANKAMON_SIZE ${{SIZE:-0}} $H" >&2
-cd "$(dirname "$H")" || exit 3
-exec env LC_ALL=C nice -n 19 ionice -c3 tar --create --gzip --file=- \
+env LC_ALL=C nice -n 19 ionice -c3 tar --create --gzip --file=- \
   --preserve-permissions --acls --xattrs --one-file-system --ignore-failed-read \
   --warning=no-file-changed --warning=no-file-removed --warning=no-file-shrank --warning=no-file-ignored --warning=no-xdev \
   --checkpoint={checkpoint} --checkpoint-action=echo \
-  "$(basename "$H")"
+  -C "$T" "{meta}" -C "$(dirname "$H")" "$(basename "$H")"
+"""
+
+# Tahtada çalışır: hesap bilgisini kök dışına kapalı geçici dosyaya yazar (arşive ilk üye olarak girer).
+_META_PY = r"""
+import grp, json, os, pwd, sys, time
+name, out = sys.argv[1:3]
+p = pwd.getpwnam(name)
+secret = ""
+with open("/etc/shadow") as f:
+    for line in f:
+        fields = line.rstrip("\n").split(":")
+        if fields[0] == name:
+            secret = fields[1]
+            break
+otp = None
+try:
+    with open("/etc/otp-secrets.json") as f:
+        otp = json.load(f).get(name)
+except (OSError, ValueError):
+    pass
+meta = {
+    "format": 1, "username": name, "uid": p.pw_uid, "gid": p.pw_gid, "group": grp.getgrgid(p.pw_gid).gr_name,
+    "gecos": p.pw_gecos, "home": p.pw_dir, "shell": p.pw_shell, "shadow": secret,
+    "groups": sorted(g.gr_name for g in grp.getgrall() if name in g.gr_mem),
+    "otp": otp if isinstance(otp, str) and otp else None,
+    "expire": os.path.exists("/var/lib/eta/expire-uid/%d" % p.pw_uid),
+    "hostname": os.uname().nodename, "created_at": int(time.time()),
+}
+fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+os.write(fd, json.dumps(meta, ensure_ascii=False).encode())
+os.close(fd)
+print("ANKAMON_META", "otp" if meta["otp"] else "nootp", file=sys.stderr)
 """
 
 _CHECKPOINT_RE = re.compile(r"checkpoint (\d+)\s*$")
@@ -111,7 +154,8 @@ def cleanup(now: float | None = None) -> int:
         return 0
     for name in entries:
         path = os.path.join(BASE_DIR, name)
-        if name.startswith("job-") and os.path.isdir(path) and now - os.path.getmtime(path) > KEEP_HOURS * 3600:
+        keep = KEEP_HOURS if name.startswith("job-") else RESTORE_UPLOAD_KEEP_HOURS if name.startswith("restore-") else None
+        if keep is not None and os.path.isdir(path) and now - os.path.getmtime(path) > keep * 3600:
             shutil.rmtree(path, ignore_errors=True)
             removed += 1
     return removed
@@ -122,10 +166,14 @@ def _safe(text: str) -> str:
     return re.sub(r"[^A-Za-z0-9._]+", "-", text or "").strip("-")[:60] or "tahta"
 
 
-def backup(board: dict, user: str, password: str, username: str, job_id: int, events) -> dict:
+def backup(board: dict, user: str, password: str, username: str, job_id: int, events, part: tuple = (0, 1)) -> dict:
     """Yedekler; olayları `events`'e yazar ("info"/"err"/"ok"/"fail" satırları + ilerleme çubuğu için
     "progress" ve indirilecek dosya için "file" — ikisi de JSON metinli, bkz. frontend ui/Jobs.js).
-    Döner: {"status", "rc", "output"} (job_targets için)."""
+    part: (sıra, toplam) — tahtada birden çok hesap yedeklenirken çubuk tahtanın toplamını göstersin.
+    Döner: {"status", "rc", "output"} (job_targets için); hesap bu tahtada yoksa status "skipped"."""
+    def progress(pct, done, size_total, gz):
+        _progress(events, (part[0] * 100 + pct) // part[1], done, size_total, gz)
+
     if not USERNAME_RE.match(username or ""):
         events.add("fail", f"Geçersiz kullanıcı adı: {username}")
         return {"status": "failed", "rc": None, "output": "Geçersiz kullanıcı adı."}
@@ -141,9 +189,9 @@ def backup(board: dict, user: str, password: str, username: str, job_id: int, ev
 
     target = f"{user}@{board['ip']}"
     events.add("info", f"Bağlanılıyor: {target} — {username} hesabının ev dizini yedeklenecek")
-    script = _SCRIPT.format(user=username, checkpoint=CHECKPOINT)
+    script = _SCRIPT.format(user=username, checkpoint=CHECKPOINT, meta=HOME_BACKUP_META, meta_py=_META_PY)
     started = time.monotonic()
-    with open(path, "wb") as out:
+    with open(path, "wb", opener=lambda p, flags: os.open(p, flags, 0o600)) as out:
         proc = subprocess.Popen(
             ["sshpass", "-e", "ssh", *_SSH_OPTS, target, "sh -c " + _quote(script)],
             stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.PIPE,
@@ -154,17 +202,24 @@ def backup(board: dict, user: str, password: str, username: str, job_id: int, ev
         next_report = 10
         err_tail: list[str] = []
         warnings = 0
+        missing = False
         for raw in iter(proc.stderr.readline, b""):
             line = raw.decode("utf-8", errors="replace").rstrip()
             if time.monotonic() - started > TIMEOUT_SECONDS:
                 proc.kill()
                 break
+            if line == "ANKAMON_NOACCOUNT":
+                missing = True
+                continue
+            if line.startswith("ANKAMON_META "):
+                events.add("info", "PIN anahtarı yedeğe eklendi." if line.endswith(" otp") else "Hesabın PIN anahtarı yok.")
+                continue
             if line.startswith("ANKAMON_SIZE "):
                 parts = line.split(" ", 2)
                 total = int(parts[1]) if parts[1].isdigit() else 0
                 home = parts[2] if len(parts) > 2 else ""
                 events.add("info", f"Bağlandı. Ev dizini: {home} — toplam {home_backup_size_text(total)}; arşivleniyor ve sıkıştırılıyor…")
-                _progress(events, 0, 0, total, 0)
+                progress(0, 0, total, 0)
                 continue
             if line.startswith("ANKAMON_ERR "):
                 err_tail.append(line[len("ANKAMON_ERR "):])
@@ -177,7 +232,7 @@ def backup(board: dict, user: str, password: str, username: str, job_id: int, ev
                 now = time.monotonic()
                 if now - last_progress >= _PROGRESS_EVERY:
                     last_progress = now
-                    _progress(events, pct, done, total, _size(path))
+                    progress(pct, done, total, _size(path))
                 if total and pct >= next_report:
                     events.add("info", f"%{pct} — {home_backup_size_text(done)} / {home_backup_size_text(total)} işlendi, arşiv şu an {home_backup_size_text(_size(path))}")
                     next_report = (pct // 10 + 1) * 10
@@ -193,9 +248,14 @@ def backup(board: dict, user: str, password: str, username: str, job_id: int, ev
 
     # tar: 0 = tamam, 1 = bazı dosyalar okunurken değişti/silindi (arşiv geçerli). SSH: 5 = parola, 255 = bağlantı.
     if rc in (0, 1) and size > 0 and total >= 0 and home:
-        os.chmod(path, 0o644)
+        # Parola özeti ve PIN anahtarı içerir: yalnız root ve X-Accel ile sunan nginx okuyabilir.
+        try:
+            shutil.chown(path, group="nginx")
+            os.chmod(path, 0o640)
+        except (LookupError, OSError):
+            os.chmod(path, 0o644)
         note = " (bazı dosyalar yedeklenirken değişti/okunamadı — ayrıntı yukarıda)" if rc == 1 or warnings else ""
-        _progress(events, 100, total, total, size)
+        progress(100, total, total, size)
         events.add("file", json.dumps({"name": name, "size": size}, ensure_ascii=False))
         text = f"Yedek hazır: {name} — {home_backup_size_text(total)} → {home_backup_size_text(size)} ({elapsed:.0f} sn){note}"
         events.add("ok", text)
@@ -205,6 +265,9 @@ def backup(board: dict, user: str, password: str, username: str, job_id: int, ev
         os.remove(path)
     except OSError:
         pass
+    if missing:
+        events.add("info", f"{username}: bu tahtada böyle bir hesap yok, atlandı.")
+        return {"status": "skipped", "rc": rc, "output": f"{username} hesabı yok"}
     if rc == 5:
         status, text = "unreachable", "Bağlanılamadı: SSH parolası reddedildi (Ayarlar → SSH erişimi)."
     elif rc == 255 and not home:

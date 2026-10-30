@@ -781,7 +781,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         group(ICON.sessions, "Kullanıcılar", sessions);
 
-        // Dosyalar ▸ Dosya yöneticisi, Bilgisayarlar arasında kopyala, Dosyaları dağıt/topla, Yedekle ▸ <hesap> (kullanıcı isteği: eski
+        // Dosyalar ▸ Dosya yöneticisi, Bilgisayarlar arasında kopyala, Dosyaları dağıt/topla, Yedekle/Geri al (kullanıcı isteği: eski
         // "Yedekle" + "Dosya yöneticisi" tek grupta; Dosya yöneticisi ilk sırada). Bilgisayarı aç/kapat
         // çiftinin hemen üstünde.
         const files = sub();
@@ -793,9 +793,8 @@ qx.Class.define("ankamon.ui.BoardOps", {
           // tersi; tek pencerede "Dağıt" ve "Topla" sekmeleri (bkz. ui.files.BulkWindow). Tahta seçimi değiştirilebilir.
           subAdd(files, ICON.bulk, "Dosyaları dağıt/topla" + count, () => ankamon.ui.files.BulkWindow.open(online, user));
         }
-        if (can("boards.backup")) {
-          files.add(this.menuButton(ICON.backup, "Yedekle" + count, null,
-            this.__accountMenu(online, "yedeklenir", (acc, label) => this.__backup(online, acc, label))));
+        if (can("boards.backup") || can("boards.restore")) {
+          files.add(this.menuButton(ICON.backup, "Yedekle/Geri al" + count, () => ankamon.ui.homebackup.Window.open(online, user)));
         }
         group(ICON.filemanager, "Dosyalar", files);
         // Görev yöneticisi (Windows'taki gibi; canlı SSH, pencere kapanınca biter — bkz. ui.taskmgr.Window):
@@ -1227,10 +1226,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
     ACCOUNTS_TTL_MS: 24 * 3600 * 1000,
 
     /**
-     * Sağ menünün hesap alt menüsü ("Oturum aç", "Yedekle"): tahtadaki hesaplar (çoklu seçimde İLK
+     * Sağ menünün hesap alt menüsü ("Oturum aç"): tahtadaki hesaplar (çoklu seçimde İLK
      * tahtadan alınır), birine tıklanınca onPick(hesap, etiket) çağrılır — işlem seçili TÜM tahtalara
      * uygulanır. Liste alt menü ilk kez açılınca yüklenir (menü açılışını SSH beklemesiyle geciktirmemek için).
-     * @param verb {String} çoklu seçim bilgi satırı için ("açılır", "yedeklenir")
+     * @param verb {String} çoklu seçim bilgi satırı için ("açılır")
      */
     __accountMenu(boards, verb, onPick) {
       const sub = new qx.ui.menu.Menu();
@@ -1296,19 +1295,14 @@ qx.Class.define("ankamon.ui.BoardOps", {
       throw new Error("zaman aşımı");
     },
 
-    /**
-     * Seçilen hesabın ev dizinini (izinler + sahiplik + ACL/xattr) her tahtada tar.gz yapar ve indirir
-     * (bkz. worker executor/backup.py, backend HomeBackupApi). Canlı rapor + toplam ilerleme çubuğu
-     * görev penceresinde; biten her tahtanın yedeği aralıklı, sırayla indirilir (bkz. ui.Jobs).
-     */
-    __backup(boards, acc, label) {
-      if (!boards.length) {
-        return;
-      }
-      ankamon.ui.Jobs.show(
-        ankamon.io.Api.post("/jobs", { type: "backup_home", username: acc.name, board_ids: boards.map(b => b.id) }).then(res => res.id),
-        `Yedekle — ${label}` + (boards.length > 1 ? ` (${boards.length} tahta)` : ""),
-        { progress: true, downloads: (jobId, name) => `/api/home-backups/${jobId}?file=${encodeURIComponent(name)}` });
+    /** Tahtanın hesap listesi (önbellekli — bkz. __accounts); Yedekle/Geri al penceresi de kullanır. */
+    accountsOf(board) {
+      return this.__accounts(board);
+    },
+
+    /** Tahtaların hesap listesi önbelleğini düşürür (hesap eklenip silinince). */
+    forgetAccounts(boards) {
+      boards.forEach(b => delete this.__accountsCache[b.id]);
     },
 
     async __login(boards, acc, label, sessionOps) {
