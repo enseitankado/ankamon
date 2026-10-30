@@ -286,7 +286,7 @@ class Tile {
     this.body.appendChild(this.svg);
     const veil = document.createElement("div");
     veil.className = "veil";
-    veil.innerHTML = `<div><span data-veil>Tahta kapalı</span><div class="sd" data-sd></div><div class="wk">Uyandırmak için tıklayın</div></div>`;
+    veil.innerHTML = `<div><span data-veil>Tahta kapalı</span><div class="sd" data-sd></div></div>`;
     this.body.appendChild(veil);
     this.veilText = veil.querySelector("[data-veil]");
     this.sdEl = veil.querySelector("[data-sd]");
@@ -615,10 +615,17 @@ class Tile {
 
   refreshWanted() {
     const offline = this.board.online === false;
+    const powersave = !offline && !!this.board.powersave;
     this.el.classList.toggle("offline", offline);
     this.el.classList.toggle("on", !offline);
-    this.el.classList.toggle("powersave", !offline && !!this.board.powersave);
-    this.veilText.textContent = offline ? "Tahta kapalı" : "Ekran güç tasarrufu kipinde";
+    // Güç tasarrufu yalnız MONİTÖRÜN uykusudur (DPMS); bilgisayar çalışır, donanım metrikleri canlıdır —
+    // bu yüzden donanım kartı ÖRTÜLMEZ (ekran önizlemesinden farkı budur). Örtü yalnız tahta KAPALI iken;
+    // uyku durumu yalnızca başlıktaki durum noktasını sarıya çevirir ve ipucuyla belirtilir.
+    this.el.classList.remove("powersave");
+    const dot = this.el.querySelector(".dot");
+    dot.style.background = powersave ? "#d29922" : "";
+    dot.title = offline ? "Tahta kapalı" : powersave ? "Monitör uykuda (bilgisayar çalışıyor)" : "Çevrimiçi";
+    this.veilText.textContent = "Tahta kapalı";
     this.setWanted(!offline && !document.hidden && !paused && this.inView);
   }
 
