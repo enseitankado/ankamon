@@ -635,6 +635,11 @@ qx.Class.define("ankamon.page.Network", {
       add(ICON.copy, "MAC adresini kopyala", () => ankamon.util.Clipboard.copy(device.mac));
       if (this._can("network.manage")) {
         menu.add(new qx.ui.menu.Separator());
+        const pingable = devices.filter(d => d.ip);
+        if (pingable.length) {
+          add("⇄", "Ping..." + (pingable.length > 1 ? ` (${pingable.length} cihaz)` : ""),
+            () => ankamon.ui.network.PingWindow.show(pingable));
+        }
         add("⟳", "Servisleri tara" + count, () => this.__scanServices(devices));
         add(ICON.edit, "Düzenle", () => this.__edit(device));
         add(ICON.delete, "Sil" + count, () => this.__remove(devices));

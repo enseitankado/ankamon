@@ -121,8 +121,37 @@ def arp_sweep(iface: str, cidr: str, on_progress=None, expected: float | None = 
     return found
 
 
+def arp_verify(iface: str, ips: list[str]) -> dict[str, str]:
+    """{mac: ip} — yalnız verilen IP'lere yavaş ARP sorusu; tam taramanın kaçırdıklarını doğrular.
+
+    Tam tarama (varsayılan hız) canlı cihazların çoğunu kaçırabiliyor: yoğun ARP'de yanıtlar yolda kayboluyor
+    (/21'de 26 canlı cihazdan her turda 9-14 yanıt). Ölçüm (160 hedef, 5'er tur): 128K ve 64K hâlâ kaçırıyor
+    (64K'da 12/25'e düşen tur var), 32K 5 turda da 25/25. Süre ~160 hedefte 6 sn. Ping yerine ARP: güvenlik
+    duvarlı cihazlar ICMP'ye yanıt vermez ama ARP'ye vermek zorundadır.
+    """
+    if not ips:
+        return {}
+    cmd = _LOW + ["arp-scan", "-I", iface, "-q", "-x", "-g", "-r", "2", "--bandwidth=32K", "-f", "-"]
+    try:
+        proc = subprocess.run(cmd, input="\n".join(ips) + "\n", capture_output=True, text=True,
+                              timeout=60 + len(ips))
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        log.warning("hedefli ARP doğrulaması yapılamadı: %s", exc)
+        return {}
+    found: dict[str, str] = {}
+    for line in proc.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2 and _MAC.match(parts[1].lower()):
+            found.setdefault(parts[1].lower(), parts[0])
+    return found
+
+
 def neighbors(iface_names: list[str]) -> dict[str, str]:
-    """{mac: ip} — çekirdeğin ARP tablosunda TAMAMLANMIŞ (flags 0x2) girdiler."""
+    """{mac: ip} — çekirdeğin ARP tablosunda TAMAMLANMIŞ (flags 0x2) girdiler.
+
+    DİKKAT: "çevrim içi" kanıtı DEĞİLDİR. 0x2 STALE girdilerde de durur ve tablo gc_thresh1'in (128) altındayken
+    temizlenmez: kapalı makine saatlerce burada kalır. Yalnız arp_verify için aday IP kaynağı olarak kullanılır.
+    """
     found: dict[str, str] = {}
     try:
         with open("/proc/net/arp") as fh:

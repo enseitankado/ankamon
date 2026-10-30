@@ -75,6 +75,7 @@ return [
     ['PATCH',  '/api/network/networks/{id}', [Api\NetworkApi::class, 'updateNetwork'],  'network.manage'],
     ['DELETE', '/api/network/networks/{id}', [Api\NetworkApi::class, 'deleteNetwork'],  'network.manage'],
     ['POST',   '/api/network/scan',          [Api\NetworkApi::class, 'scan'],           'network.manage'],
+    ['POST',   '/api/network/ping',          [Api\NetworkApi::class, 'ping'],           'network.manage'],
 
     ['GET',    '/api/logs',              [Api\LogsApi::class, 'index'],        'logs'],
     ['GET',    '/api/command-logs',      [Api\CommandLogApi::class, 'index'],  'logs'],

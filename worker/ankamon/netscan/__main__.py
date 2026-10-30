@@ -39,6 +39,7 @@ Her değişiklikte netscan_state.version artar; arayüz bunu birkaç saniyede bi
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import select
@@ -258,7 +259,15 @@ def _sweep(conn) -> None:
 
         found = probe.arp_sweep(net["iface"], net["cidr"], on_progress=report,
                                 expected=(previous["last_scan_ms"] or 0) / 1000 or None)
-        found.update({mac: ip for mac, ip in probe.neighbors(net["ifaces"]).items() if mac not in found})
+        # Tam taramanın kaçırdıkları: bilinen cihazlar ve ARP tablosundaki adaylar hedefli doğrulanır. ARP tablosu
+        # tek başına kanıt değildir (STALE girdiler kapalı makineleri çevrim içi gösteriyordu; bkz. probe.neighbors).
+        subnet = ipaddress.ip_network(net["cidr"])
+        candidates = set(store.known_ips(conn, net["id"]))
+        candidates.update(ip for ip in probe.neighbors(net["ifaces"]).values() if ipaddress.ip_address(ip) in subnet)
+        candidates -= set(found.values()) | set(net["local_macs"])
+        swept = len(found)
+        found.update({mac: ip for mac, ip in probe.arp_verify(net["iface"], sorted(candidates)).items() if mac not in found})
+        log.info("hedefli doğrulama %s: %d aday, %d yanıt daha", net["cidr"], len(candidates), len(found) - swept)
         changes = store.apply_sweep(conn, net, found)
         ms = int((time.monotonic() - started) * 1000)
         conn.execute("UPDATE net_networks SET last_scan_ms = %s WHERE id = %s", (ms, net["id"]))

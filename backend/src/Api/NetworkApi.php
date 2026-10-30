@@ -33,6 +33,7 @@ namespace Ankamon\Api;
 use Ankamon\Core\ApiError;
 use Ankamon\Core\Audit;
 use Ankamon\Core\Db;
+use Ankamon\Core\DevicePing;
 use Ankamon\Core\Request;
 
 /**
@@ -196,6 +197,22 @@ final class NetworkApi
             Audit::log($user, $request, 'network.update', (string) $id);
         }
         return ['ok' => true];
+    }
+
+    /** Seçili cihazlara sistem ping aracıyla 4'er paket; hepsi aynı anda, süre cihaz sayısından bağımsız (≤ ~8 sn). */
+    public function ping(Request $request, array $user): array
+    {
+        $ids = self::ids($request->input('ids'));
+        if (count($ids) > DevicePing::MAX_TARGETS) {
+            throw ApiError::badRequest('En çok ' . DevicePing::MAX_TARGETS . ' cihaz birden pinglenebilir.');
+        }
+        $rows = Db::all(
+            'SELECT id, host(ip) AS ip FROM net_devices WHERE id = ANY(?::int[]) AND family(ip) = 4',
+            ['{' . implode(',', $ids) . '}']
+        );
+        $byIp = DevicePing::run(array_column($rows, 'ip'));
+        Audit::log($user, $request, 'network.ping', implode(',', array_column($rows, 'ip')));
+        return ['results' => array_map(fn(array $row) => ['id' => (int) $row['id']] + $byIp[$row['ip']], $rows)];
     }
 
     /** Yalnız artık bağlı olmayan ağ (kayıtlarıyla birlikte) silinir; bağlı ağ bir sonraki taramada geri gelirdi. */

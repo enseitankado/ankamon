@@ -106,6 +106,13 @@ def _boards(conn) -> dict[str, dict]:
     return {r["mac"]: r for r in rows}
 
 
+def known_ips(conn, network_id: int) -> list[str]:
+    """Ağdaki kayıtlı cihazların IP'leri (kendi adreslerimiz hariç): hedefli ARP doğrulamasının adayları."""
+    return [r["ip"] for r in conn.execute(
+        "SELECT host(ip) AS ip FROM net_devices WHERE network_id = %s AND ip IS NOT NULL AND source <> 'self'",
+        (network_id,)).fetchall()]
+
+
 def apply_sweep(conn, net: dict, found: dict[str, str]) -> int:
     """Tek ağın varlık taraması sonucunu işler. {mac: ip}. Değişen (yeni/durum/IP/ad) cihaz sayısını döner."""
     boards = _boards(conn)
