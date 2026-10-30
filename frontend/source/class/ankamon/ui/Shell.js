@@ -151,7 +151,12 @@ qx.Class.define("ankamon.ui.Shell", {
     PAGES: [
       // retap: ağaçta zaten seçili düğüme yeniden tıklamak sayfayı yeniler (sayfada "Yenile" düğmesi yok).
       { id: "dashboard", label: "Genel bakış", feature: "dashboard", retap: true, create: u => new ankamon.page.Dashboard(u) },
-      { id: "boards", label: "Tahtalar", feature: "boards", create: u => new ankamon.page.Boards(u) },
+      // Tahtalar'ın sekmeleri ağaçta da (kullanıcı isteği): alt sayfalardan (Oturumlar, Bakım, Loglar) önce.
+      // "Donanım izleme"nin anahtarı eski etiketi "Donanımlar" (kayıtlı son sekme tercihi bozulmasın — bkz.
+      // ui.boards.ComputerTiles); Ekranlar/Donanım izleme sayfadaki gibi "screen" yetkisi ister.
+      { id: "boards", label: "Tahtalar", feature: "boards", create: u => new ankamon.page.Boards(u),
+        tabs: [{ key: "Liste", label: "Liste" }, { key: "Ekranlar", label: "Ekranlar", feature: "screen" },
+          { key: "Donanımlar", label: "Donanım izleme", feature: "screen" }] },
       // parent: ağaçta o sayfanın düğümünün ALTINDA (kullanıcı isteği: tahtalarla ilgili sayfalar
       // "Tahtalar"ın altında). Üst sayfa kullanıcıya kapalıysa kökte gösterilir — bkz. __createTree.
       // Sekmeleri ağaçta da (kullanıcı isteği: zaman çizelgesi sol menüden açılsın). key: Oturumlar sekmesinde

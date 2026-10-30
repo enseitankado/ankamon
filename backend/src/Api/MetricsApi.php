@@ -137,7 +137,7 @@ final class MetricsApi
     /**
      * GET /api/metrics/baselines — tahta başına "normal" (kalıcı ortalama) değerler: son 14 günün saatlik
      * özetinden (metrics_1h — ham veri silinse de kalır, sürekli güncellenir) işlemci/disk sıcaklığı ile
-     * bellek/disk doluluğunun ortalaması. Donanımlar sekmesi bunu "yüksek mi" kararında eşik olarak kullanır:
+     * bellek/disk doluluğunun ortalaması. "Donanım izleme" sekmesi bunu "yüksek mi" kararında eşik olarak kullanır:
      * bir tahta kendi geçmiş ortalamasının belirgin üstündeyse (ör. her zamankinden sıcak/dolu) kırmızı
      * gösterilir — mutlak güvenlik tavanlarıyla birlikte (bkz. docker/rootfs/screen/computer.html). Ortalama
      * yavaş değiştiğinden ön yüz bunu seyrek (dakikalarca arayla) çeker.

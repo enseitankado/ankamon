@@ -161,12 +161,12 @@ qx.Class.define("ankamon.page.Boards", {
     this.__listPage = listPage;
     if (this._can("screen")) {
       tabs.add(this.__createScreensPage());
-      // "Donanımlar" sekmesi: Ekranlar'ın donanım karşılığı — her tahtanın OPS/PC modülü çizimi
+      // "Donanım izleme" sekmesi: Ekranlar'ın donanım karşılığı — her tahtanın OPS/PC modülü çizimi
       // üzerine canlı başarım + sensör + envanter bindirilir (bkz. ui.boards.ComputerTiles,
       // docker/rootfs/screen/computer.html). Sürükle-bırak/seçim/sağ menü Ekranlar'la aynı köprüyü kullanır.
       tabs.add(this.__createComputersPage());
     }
-    this._rememberTab(tabs, "boards"); // son seçili sekme (Liste / Ekranlar / Donanımlar — bkz. Base._rememberTab)
+    this._rememberTab(tabs, "boards"); // son seçili sekme (Liste / Ekranlar / Donanım izleme — bkz. Base._rememberTab)
     this.add(tabs, { flex: 1 });
 
     // Sayfa açık kalsa bile kendiliğinden tazelenir (bkz. sınıf başı not — worker zinciriyle birlikte).
@@ -293,7 +293,7 @@ qx.Class.define("ankamon.page.Boards", {
       ]);
       this.__boards = new Map(boards.boards.map(b => [b.id, b]));
       this.__metrics = metrics.latest || {};
-      // Donanımlar sekmesinin "yüksek mi → kırmızı" eşiği için tahta başına kalıcı ortalama (son 14 gün,
+      // "Donanım izleme" sekmesinin "yüksek mi → kırmızı" eşiği için tahta başına kalıcı ortalama (son 14 gün,
       // bkz. MetricsApi::baselines). Yavaş değiştiğinden seyrek (5 dk) ve yalnız sekme kurulmuşsa çekilir;
       // gelince kutucuklar yeniden boyanır (pushList).
       if (this.__computers && Date.now() - (this.__baselinesAt || 0) > 300000) {
@@ -730,7 +730,7 @@ qx.Class.define("ankamon.page.Boards", {
     /**
      * O an GÖSTERİLEN (süzülmüş) tahtalar, kullanıcının sürükle-bırak sırasıyla (bkz. __screenOrder):
      * sıradakiler önce o sırayla, sıralanmamışlar (yeni tahta) doğal sırayla sona. Ekranlar ve
-     * Donanımlar sekmeleri aynı sırayı paylaşır (bkz. __previewList, __computerList).
+     * "Donanım izleme" sekmeleri aynı sırayı paylaşır (bkz. __previewList, __computerList).
      */
     __orderedShown() {
       const shown = this.__shownBoards || [];
@@ -778,7 +778,7 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * "Donanımlar" sekmesinin tahta listesi (bkz. ui.boards.ComputerTiles, docker/rootfs/screen/
+     * "Donanım izleme" sekmesinin tahta listesi (bkz. ui.boards.ComputerTiles, docker/rootfs/screen/
      * computer.html): __previewList ile aynı sıra/çevrimiçi mantığı, ama kutucuk donanım çizimini
      * besleyen ZENGİNLEŞTİRİLMİŞ veri — yavaş sensörlerin tamamı (CPU/kasa/disk sıcaklığı, fan, pil,
      * disk doluluğu, ağ rx/tx, yük, çalışma süresi; bkz. backend MetricsApi::latest) ve çizim
@@ -822,7 +822,7 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * "Donanımlar" sekmesi: Ekranlar'ın donanım karşılığı. İçeriği ui.boards.ComputerTiles yönetir
+     * "Donanım izleme" sekmesi: Ekranlar'ın donanım karşılığı. İçeriği ui.boards.ComputerTiles yönetir
      * (kendi iframe/araç çubuğu/boyut slider'ı); bu sayfa ona yalnızca veri (__computerList), sağ menü
      * (__openPreviewMenuAt — grid satır menüsüyle AYNI), çift tık→Bilgi kartı, Uyandır ve sürükle-bırak
      * sırasını kalıcılaştırma (__saveScreenOrder — Ekranlar'la ortak) sağlar. Seçim grid onay kutularıyla
@@ -927,7 +927,7 @@ qx.Class.define("ankamon.page.Boards", {
 
     /**
      * Önizleme/Bilgisayar kutucuğunun sağ menüsü, konum verilen iframe öğesine GÖRE hesaplanır
-     * (x/y iframe içi koordinat). Ekranlar sekmesi kendi iframe'ini, Donanımlar sekmesi
+     * (x/y iframe içi koordinat). Ekranlar sekmesi kendi iframe'ini, "Donanım izleme" sekmesi
      * (bkz. ui.boards.ComputerTiles) kendi iframe öğesini geçirir — menü içeriği ikisinde de AYNI (__rowMenu).
      */
     __openPreviewMenuAt(id, x, y, ids, el) {
