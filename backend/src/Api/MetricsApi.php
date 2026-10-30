@@ -145,22 +145,35 @@ final class MetricsApi
     public function baselines(): array
     {
         $rows = Db::all(
-            "SELECT board_id,
+            "SELECT a.board_id, a.cpu_temp_core, a.disk_temp, a.mem_avail, a.mem_total, a.disk_avail, a.disk_size,
+                    t.temp_any
+             FROM (
+                SELECT board_id,
                     avg(value) FILTER (WHERE name = 'node_hwmon_temp_celsius'
                         AND (chip LIKE '%coretemp%' OR chip LIKE '%k10temp%')) AS cpu_temp_core,
-                    -- Yedek: coretemp/k10temp serisi yoksa (çoğu ETAP tahtasında bu sürücü yüklü değil, CPU
-                    -- sıcaklığı ACPI/anakart sensöründen gelir — canlı cpu_temp de temp_max'e düşer, bkz. latest())
-                    -- tüm sıcaklık sensörlerinin ortalaması; aşağıda COALESCE ile yedek alınır.
-                    avg(value) FILTER (WHERE name IN ('node_hwmon_temp_celsius', 'node_thermal_zone_temp')) AS temp_any,
                     avg(value) FILTER (WHERE name IN ('smartmon_temperature_celsius_raw_value',
                         'smartmon_airflow_temperature_cel_raw_value', 'nvme_temperature_celsius')) AS disk_temp,
                     avg(value) FILTER (WHERE name = 'node_memory_MemAvailable_bytes') AS mem_avail,
                     avg(value) FILTER (WHERE name = 'node_memory_MemTotal_bytes') AS mem_total,
                     avg(value) FILTER (WHERE name = 'node_filesystem_avail_bytes' AND mountpoint = '/') AS disk_avail,
                     avg(value) FILTER (WHERE name = 'node_filesystem_size_bytes' AND mountpoint = '/') AS disk_size
-             FROM v_metrics_1h
-             WHERE time > now() - interval '14 days' AND board_id IS NOT NULL
-             GROUP BY board_id"
+                FROM v_metrics_1h
+                WHERE time > now() - interval '14 days' AND board_id IS NOT NULL
+                GROUP BY board_id
+             ) a
+             LEFT JOIN (
+                -- İşlemci sıcaklığı yedeği (coretemp/k10temp yoksa): canlı değer sensörlerin MAX'ıdır
+                -- (temp_max, bkz. latest()); ortalaması da SAATLİK MAX'ların ortalaması olmalı. Tüm sensörlerin
+                -- düz ortalaması YANLIŞ olurdu — düşük ortam/ACPI sensörleri ortalamayı aşağı çekip normal
+                -- sıcaklığı bile 'yüksek' gösterirdi.
+                SELECT board_id, avg(hmax) AS temp_any FROM (
+                    SELECT board_id, time, max(value) AS hmax
+                    FROM v_metrics_1h
+                    WHERE time > now() - interval '14 days' AND board_id IS NOT NULL
+                      AND name IN ('node_hwmon_temp_celsius', 'node_thermal_zone_temp')
+                    GROUP BY board_id, time
+                ) hm GROUP BY board_id
+             ) t ON t.board_id = a.board_id"
         );
         $out = [];
         foreach ($rows as $row) {
