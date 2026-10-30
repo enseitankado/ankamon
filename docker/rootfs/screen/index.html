@@ -114,8 +114,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   html.embed .tile:fullscreen .rs { display: none; }
   /* Kutucuk seçimi (Shift/Ctrl/dikdörtgen seçim) ve sürükle-bırak sıralama — yalnız gömülü kipte
      (Tahtalar sayfasının Ekranlar sekmesi). Seçim: mavi çerçeve. Sürüklenen: soluk; bırakılacak
-     kutucuk: kesik çizgili çerçeve. */
-  html.embed .tile.selected { outline: 3px solid #0096ff; outline-offset: -3px; z-index: 1; }
+     kutucuk: kesik çizgili çerçeve. Seçili kutucuk koyu görüntüler arasında seçilebilsin diye (kullanıcı isteği):
+     dışa taşan halka + parıltı, mavi başlık, başta ✓ (computer.html ile aynı). */
+  html.embed .tile.selected { outline: 3px solid #0096ff; outline-offset: -3px; z-index: 1;
+    box-shadow: 0 0 0 2px #0096ff, 0 0 12px 3px rgba(0, 150, 255, .75); }
+  html.embed .tile.selected .title { background: #0078d4; }
+  html.embed .tile.selected .title .name { color: #fff; }
+  html.embed .tile.selected .title::before { content: "✓"; color: #fff; font-weight: 700; flex: 0 0 auto; }
   /* Sürüklenen kutucuk sürükleme boyunca bırakılacağı yerde durur (canlı yerleşim — bkz. dragOver):
      soluk + kesik çizgili çerçeveyle "buraya yerleşecek" yer tutucusu olarak görünür. */
   html.embed .tile.dragging { opacity: .4; outline: 3px dashed #0096ff; outline-offset: -3px; }

@@ -60,7 +60,15 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   .tile .veil .wk { margin-top: 6px; font-weight: 400; font-size: 11px; color: #cbd5e1; }
 
   /* Seçim / sürükle-bırak (ekran önizlemesiyle aynı görsel dil). */
-  .tile.selected { outline: 3px solid #0096ff; outline-offset: -3px; z-index: 1; }
+  /* Seçili kart belirgin olsun (kullanıcı isteği): dışa taşan halka + parıltı, mavi başlık, başta ✓ (index.html ile
+     aynı). Kapalı kartın griye çevirmesi yalnız gövdede kalır: tüm karta uygulanınca seçim rengi de soluyordu. */
+  .tile.selected { outline: 3px solid #0096ff; outline-offset: -3px; z-index: 1;
+    box-shadow: 0 0 0 2px #0096ff, 0 0 12px 3px rgba(0, 150, 255, .75); }
+  .tile.selected .title { background: #0078d4; }
+  .tile.selected .title .name { color: #fff; }
+  .tile.selected .title::before { content: "✓"; color: #fff; font-weight: 700; flex: 0 0 auto; }
+  .tile.offline.selected { filter: none; }
+  .tile.offline.selected .body { filter: grayscale(.85) brightness(.75); }
   .tile.dragging { opacity: .4; outline: 3px dashed #0096ff; outline-offset: -3px; }
   .tile .title button { padding: 0 6px; border: 0; background: transparent; color: #9fb2c8; cursor: pointer; font-size: 13px; }
   .tile .title button:hover { color: #fff; }
