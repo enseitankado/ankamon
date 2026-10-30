@@ -747,7 +747,7 @@ qx.Class.define("ankamon.ui.Shell", {
       header.add(fold);
       // Logo simgesi: ekran çerçevesi başlık yazısının renginde (temaların koyu/mavi başlık zemininde seçilsin).
       header.add(new qx.ui.basic.Label(ankamon.ui.Logo.icon(32, "currentColor")).set({ rich: true, textColor: "app-header-text" }));
-      const brand = new qx.ui.container.Composite(new qx.ui.layout.VBox());
+      const brand = new qx.ui.container.Composite(new qx.ui.layout.VBox()).set({ backgroundColor: "app-header" });
       brand.add(new qx.ui.basic.Label("Ankamon").set({ font: "app-title", textColor: "app-header-text" }));
       brand.add(this.__createBuildStampLabel());
       header.add(brand);
