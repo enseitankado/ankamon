@@ -21,6 +21,7 @@ return [
     'shell' => 'Tahtalarda serbest komut çalıştırma',
     'screen' => 'Tahta ekranlarını canlı izleme',
     'screen.control' => 'Tahta ekranını uzaktan yönetme (fare/klavye ile müdahale)',
+    'screen.lock' => 'Tahta ekranını kilitleme / kilidini açma (kilitliyken tahtada büyük "Kilitli" yazısı; klavye, fare ve dokunmatik çalışmaz)',
     'cast' => 'Kendi ekranını seçili tahtalara yansıtma (tahtada tam ekran gösterilir)',
     'taskmgr' => 'Görev yöneticisi: tahtadaki işlemleri, performansı, hizmetleri, başlangıç uygulamalarını ve oturumları canlı görme; işlem sonlandırma, öncelik, hizmet başlatma/durdurma, yeni görev çalıştırma (tahtada root yetkisiyle)',
     'filemanager' => 'Tahtanın tüm dosya sistemine (root) web üzerinden erişim — gezinme, indirme, yükleme',

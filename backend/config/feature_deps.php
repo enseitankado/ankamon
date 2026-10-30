@@ -17,6 +17,7 @@ return [
     'shell' => 'boards',
     'screen' => 'boards',
     'screen.control' => 'screen',
+    'screen.lock' => 'screen',
     'cast' => 'boards',
     'filemanager' => 'boards',
     'taskmgr' => 'boards',

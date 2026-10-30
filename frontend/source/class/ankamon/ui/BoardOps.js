@@ -726,7 +726,8 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         group(ICON.run, "Komut çalıştır" + count, commands);
 
-        // Ekran ▸ Ekranı göster, Ekranı yönet, Uyandır, Uyut, Ekranımı yansıt ▸ <kalite> + Ses (ayar penceresi sorulmaz — bkz. cast()).
+        // Ekran ▸ Ekranı göster, Ekranı yönet, Uyandır, Uyut, Kilitle, Kilidi aç, Ekranımı yansıt ▸ <kalite> + Ses
+        // (ayar penceresi sorulmaz — bkz. cast()).
         const screens = sub();
         if (can("screen")) {
           subAdd(screens, ICON.screen, "Ekranı göster" + count, () => this.screen(boards, user));
@@ -745,6 +746,16 @@ qx.Class.define("ankamon.ui.BoardOps", {
           subAdd(screens, ICON.sleepScreen, "Uyut" + count, () => (sessionOps && sessionOps.sleep
             ? sessionOps.sleep(online)
             : this.__job({ type: "sleep", board_ids: online.map(b => b.id) }, "Ekranı uyut")));
+        }
+        // Kilitle: "Kilidi aç"a dek tahtada tam ekran "Kilitli"; klavye, fare ve dokunmatik çalışmaz, yeniden
+        // açılışta da sürer (bkz. worker executor/screenlock.py). Oturumu kilitle'den (parolayla açılır) ayrı.
+        if (can("screen.lock")) {
+          subAdd(screens, ICON.screenLock, "Kilitle" + count, () => (sessionOps && sessionOps.screenLock
+            ? sessionOps.screenLock(online, true)
+            : this.__job({ type: "screen_lock", board_ids: online.map(b => b.id) }, "Ekranı kilitle")));
+          subAdd(screens, ICON.screenUnlock, "Kilidi aç" + count, () => (sessionOps && sessionOps.screenLock
+            ? sessionOps.screenLock(online, false)
+            : this.__job({ type: "screen_unlock", board_ids: online.map(b => b.id) }, "Ekran kilidini aç")));
         }
         if (can("cast")) {
           screens.add(this.menuButton(ICON.cast, "Ekranımı yansıt" + count, null, this.__castMenu(online)));

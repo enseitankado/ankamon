@@ -179,16 +179,18 @@ qx.Class.define("ankamon.page.Boards", {
 
     /**
      * "Oturum" sütununun metni: çevrimdışı ya da henüz yoklanmamış tahtada boş (bilinmiyor), oturum
-     * yoksa "Oturum kapalı", varsa kullanıcı adı — ekran kilitliyse "(kilitli)" ekiyle.
+     * yoksa "Oturum kapalı", varsa kullanıcı adı — oturum kilitliyse (dm-tool lock) "(kilitli)" ekiyle.
+     * Ankamon ekran kilidi (Ekran ▸ Kilitle) ayrıca " / Kilitli" ile eklenir (bkz. worker executor/screenlock.py).
      */
     sessionText(board) {
       if (!board.online || !board.session_checked_at) {
         return "";
       }
-      if (!board.session_username) {
-        return "Oturum kapalı";
+      let text = "Oturum kapalı";
+      if (board.session_username) {
+        text = board.session_locked ? `${board.session_username} (kilitli)` : board.session_username;
       }
-      return board.session_locked ? `${board.session_username} (kilitli)` : board.session_username;
+      return board.screen_locked ? `${text} / Kilitli` : text;
     },
 
     // "Ekranlar" sekmesi görünmez olduktan (başka sekme/sayfa) bu kadar sonra önizleme akışları duraklar
@@ -964,6 +966,23 @@ qx.Class.define("ankamon.page.Boards", {
               const board = this.__boards.get(t.board_id);
               if (board) {
                 board.display_state = "Off";
+              }
+              return before.get(t.board_id) || { status: "ok", text: known(t.board_id) };
+            });
+        },
+        // Ekran ▸ Kilitle / Kilidi aç: kutucukta geçici yazı; bitince önceki oturum bilgisi geri gelir (ekran kilidi
+        // oturumu değiştirmez). Başarılıysa grid'in "Oturum" hücresi tazelemeyi beklemeden "/ Kilitli" alır/bırakır.
+        screenLock: (boards, on) => {
+          const before = new Map(boards.map(b => [b.id, this.__whoamiState && this.__whoamiState.get(b.id)]));
+          this.__sessionJob(boards.map(b => b.id), { type: on ? "screen_lock" : "screen_unlock" },
+            () => (on ? "Ekran kilitleniyor…" : "Ekran kilidi açılıyor…"),
+            t => {
+              if (t.status !== "ok") {
+                return { status: "error", text: on ? "Kilitlenemedi" : "Kilit açılamadı" };
+              }
+              const board = this.__boards.get(t.board_id);
+              if (board) {
+                board.screen_locked = on;
               }
               return before.get(t.board_id) || { status: "ok", text: known(t.board_id) };
             });

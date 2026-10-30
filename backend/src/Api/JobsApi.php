@@ -148,6 +148,10 @@ final class JobsApi
             'wake' => ['screen', 'Ekranı uyandır', [], true],
             // Sağ menü Ekran ▸ "Uyut": ekranı DPMS ile kapatır (dokunulunca açılır) — Uyandır'ın eşi.
             'sleep' => ['screen', 'Ekranı uyut', [], true],
+            // Sağ menü Ekran ▸ "Kilitle" / "Kilidi aç" (bkz. worker executor/screenlock.py): "Kilidi aç"a dek tahtada
+            // tam ekran "Kilitli", klavye/fare/dokunmatik yakalanır; yeniden açılışta da sürer.
+            'screen_lock' => ['screen.lock', 'Ekranı kilitle', [], true],
+            'screen_unlock' => ['screen.lock', 'Ekran kilidini aç', [], true],
             // Sağ menü "Yedekle/Geri al" (bkz. frontend ui/homebackup, worker executor/backup.py): seçilen
             // hesapların ev dizini izin/sahiplik + hesap bilgisi + PIN anahtarıyla tar.gz; indirme HomeBackupApi'den.
             'backup_home' => $this->backupJob($request),

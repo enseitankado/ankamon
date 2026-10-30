@@ -37,7 +37,8 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import activity, db
-from ..executor import accounts, backup, cast, diagnose, display, home_restore, hwfacts, session_probe, tools, whoami, wol
+from ..executor import (accounts, backup, cast, diagnose, display, home_restore, hwfacts, screenlock, session_probe,
+                        tools, whoami, wol)
 from ..anomaly import scan as anomaly_scan_mod
 from ..executor.jobs import _action_dir, _board_access, _claim, _targets, _write_one, _write_results
 from . import stream
@@ -322,7 +323,7 @@ def _run_job(job) -> None:
                         accounts.store(conn, t["board_id"], json.loads(result["output"]), now_ts)
                 _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
                 results[t["board_id"]] = result
-        elif job["type"] in ("login", "logout", "lock", "wake", "sleep"):
+        elif job["type"] in ("login", "logout", "lock", "wake", "sleep", "screen_lock", "screen_unlock"):
             # Seçilen hesapla oturum açma / açık oturumu kapatma ya da kilitleme — tahtalar bağımsız,
             # PARALEL (whoami deseni). logout/lock'ta username isteğe bağlı (Oturumlar grid'i belirli
             # kullanıcıyı hedefler; boşsa tahtadaki etkin oturum).
@@ -339,6 +340,13 @@ def _run_job(job) -> None:
             elif job["type"] == "lock":
                 def work(t):
                     return accounts.lock(t, user, password, username)
+            elif job["type"] == "screen_lock":
+                # Ekran ▸ Kilitle: "Kilidi aç"a dek tam ekran "Kilitli", giriş yakalanır (bkz. executor/screenlock.py).
+                def work(t):
+                    return screenlock.lock(t, user, password)
+            elif job["type"] == "screen_unlock":
+                def work(t):
+                    return screenlock.unlock(t, user, password)
             elif job["type"] == "wake":
                 # Ekran ▸ Uyandır: güç tasarrufundaki ekranı uyandırır (bkz. executor/display.py).
                 def work(t):
@@ -350,7 +358,8 @@ def _run_job(job) -> None:
             who = f"{username} oturumu" if username else "Açık oturum"
             start = {"login": f"{username} hesabıyla oturum açılıyor…",
                      "logout": f"{who} kapatılıyor…", "lock": f"{who} kilitleniyor…",
-                     "wake": "Ekran uyandırılıyor…", "sleep": "Ekran uyutuluyor…"}[job["type"]]
+                     "wake": "Ekran uyandırılıyor…", "sleep": "Ekran uyutuluyor…",
+                     "screen_lock": "Ekran kilitleniyor…", "screen_unlock": "Ekran kilidi açılıyor…"}[job["type"]]
             for t in targets:
                 _board_event(conn, job["id"], t["board_id"], "info", f"Bağlanılıyor: root@{t['ip'] or '—'} — {start}")
             n = whoami.dynamic_concurrency()
@@ -372,6 +381,9 @@ def _run_job(job) -> None:
                     if result["status"] == "ok" and job["type"] in ("wake", "sleep"):
                         # Ekranlar'daki "güç tasarrufu" yazısı bir sonraki yoklamayı beklemeden kalksın / çıksın.
                         session_probe.store_display(conn, t["board_id"], "On" if job["type"] == "wake" else "Off")
+                    elif result["status"] == "ok" and job["type"] in ("screen_lock", "screen_unlock"):
+                        # "Oturum" hücresindeki "/ Kilitli" bir sonraki yoklamayı beklemeden.
+                        session_probe.store_screen_lock(conn, t["board_id"], job["type"] == "screen_lock")
                     elif result["status"] == "ok":
                         if job["type"] == "login":
                             session_probe.store(conn, t["board_id"], username, False)
