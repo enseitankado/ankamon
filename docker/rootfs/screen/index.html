@@ -83,7 +83,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     display: flex; flex-direction: column; }
   .tile.live.blank .view > .perf:not([hidden]), .tile.live.powersave .view > .perf:not([hidden]) {
     position: relative; inset: auto; flex: 1; min-height: 0; }
-  .tile .view:has(> .perf:not([hidden])) .sleep { position: static; order: -1; flex: none; padding: 3px 8px;
+  /* position: static olmaz: mutlak konumlu .screen katmanlarının altında kalır. */
+  .tile .view:has(> .perf:not([hidden])) .sleep { position: relative; z-index: 1; order: -1; flex: none; padding: 3px 8px;
     font-size: 12px; background: #000; }
   .tile .view:has(> .perf:not([hidden])) .sleep > div { display: flex; flex-direction: column; }
   .tile .view:has(> .perf:not([hidden])) .sleep .sd { position: static; order: -1; margin-bottom: 1px; font-size: 11px; }
