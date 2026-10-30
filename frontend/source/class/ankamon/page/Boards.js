@@ -111,6 +111,9 @@ qx.Class.define("ankamon.page.Boards", {
     // "Durum" sütunu: Çevrimiçi yeşil, Kapalı kırmızı (bkz. ui.table.StatusRenderer).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "status"),
       new ankamon.ui.table.StatusRenderer());
+    // "Oturum" sütunu: ekran kilitliyse "(kilitli)" ifadesi kırmızı+kalın (bkz. ui.table.SessionRenderer).
+    this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "session"),
+      new ankamon.ui.table.SessionRenderer());
     // İşaretler Ekranlar kutucuklarına yansır — bkz. __updateActionState.
     this.__table.getTableModel().addListener("dataChanged", this.__updateActionState, this);
     this.__table.addListener("cellDbltap", e => {

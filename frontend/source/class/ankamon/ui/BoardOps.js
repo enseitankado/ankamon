@@ -750,9 +750,12 @@ qx.Class.define("ankamon.ui.BoardOps", {
         // Kilitle: "Kilidi aç"a dek tahtada tam ekran "Kilitli"; klavye, fare ve dokunmatik çalışmaz, yeniden
         // açılışta da sürer (bkz. worker executor/screenlock.py). Oturumu kilitle'den (parolayla açılır) ayrı.
         if (can("screen.lock")) {
+          // Kapat/yeniden başlat gibi çıktı penceresinin altında "Bu pencereyi bir daha gösterme" kutusu
+          // (kullanıcı isteği; __powerJob ile — kutu işaretliyse kilitleme yine yapılır, pencere açılmaz).
           subAdd(screens, ICON.screenLock, "Kilitle" + count, () => (sessionOps && sessionOps.screenLock
             ? sessionOps.screenLock(online, true)
-            : this.__job({ type: "screen_lock", board_ids: online.map(b => b.id) }, "Ekranı kilitle")));
+            : this.__powerJob({ type: "screen_lock", board_ids: online.map(b => b.id) }, "Ekranı kilitle",
+                "screen_lock", "kilitleme", user)));
           subAdd(screens, ICON.screenUnlock, "Kilidi aç" + count, () => (sessionOps && sessionOps.screenLock
             ? sessionOps.screenLock(online, false)
             : this.__job({ type: "screen_unlock", board_ids: online.map(b => b.id) }, "Ekran kilidini aç")));
