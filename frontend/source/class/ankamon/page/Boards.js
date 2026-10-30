@@ -158,8 +158,12 @@ qx.Class.define("ankamon.page.Boards", {
     this.__listPage = listPage;
     if (this._can("screen")) {
       tabs.add(this.__createScreensPage());
+      // "Bilgisayarlar" sekmesi: Ekranlar'ın donanım karşılığı — her tahtanın OPS/PC modülü çizimi
+      // üzerine canlı başarım + sensör + envanter bindirilir (bkz. ui.boards.ComputerTiles,
+      // docker/rootfs/screen/computer.html). Sürükle-bırak/seçim/sağ menü Ekranlar'la aynı köprüyü kullanır.
+      tabs.add(this.__createComputersPage());
     }
-    this._rememberTab(tabs, "boards"); // son seçili sekme (Liste / Ekranlar — bkz. Base._rememberTab)
+    this._rememberTab(tabs, "boards"); // son seçili sekme (Liste / Ekranlar / Bilgisayarlar — bkz. Base._rememberTab)
     this.add(tabs, { flex: 1 });
 
     // Sayfa açık kalsa bile kendiliğinden tazelenir (bkz. sınıf başı not — worker zinciriyle birlikte).
@@ -220,6 +224,9 @@ qx.Class.define("ankamon.page.Boards", {
     if (this.__onScreenWindows) {
       qx.event.message.Bus.unsubscribe(ankamon.ui.BoardOps.SCREEN_WINDOWS, this.__onScreenWindows, this);
     }
+    if (this.__computers) {
+      this.__computers.shutdown();
+    }
   },
 
   members: {
@@ -269,6 +276,7 @@ qx.Class.define("ankamon.page.Boards", {
     __liveQueue: null,
     __applyingPreview: false,
     __metrics: null,
+    __computers: null,
 
     async _refresh() {
       const F = ankamon.util.Format;
@@ -334,6 +342,9 @@ qx.Class.define("ankamon.page.Boards", {
       this.__table.getTableModel().setData(shown.map(r => r.cells));
       this.__shownBoards = shown.map(r => r.board);
       this.__pushPreview();
+      if (this.__computers) {
+        this.__computers.pushList();
+      }
     },
 
     /**
@@ -702,8 +713,12 @@ qx.Class.define("ankamon.page.Boards", {
      * tahtalar önce o sırayla, OLMAYANLAR (yeni tahta, henüz hiç sıralanmamış) doğal sırayla sona
      * eklenir — nav_order/__orderedPages ile aynı mantık (bkz. ui/Shell.js).
      */
-    __previewList() {
-      const whoami = this.__whoamiState || new Map();
+    /**
+     * O an GÖSTERİLEN (süzülmüş) tahtalar, kullanıcının sürükle-bırak sırasıyla (bkz. __screenOrder):
+     * sıradakiler önce o sırayla, sıralanmamışlar (yeni tahta) doğal sırayla sona. Ekranlar ve
+     * Bilgisayarlar sekmeleri aynı sırayı paylaşır (bkz. __previewList, __computerList).
+     */
+    __orderedShown() {
       const shown = this.__shownBoards || [];
       const byId = new Map(shown.map(b => [b.id, b]));
       const ordered = [];
@@ -719,8 +734,13 @@ qx.Class.define("ankamon.page.Boards", {
           ordered.push(b);
         }
       });
+      return ordered;
+    },
+
+    __previewList() {
+      const whoami = this.__whoamiState || new Map();
       const metrics = this.__metrics || {};
-      return ordered.map(b => {
+      return this.__orderedShown().map(b => {
         // Kutucuğun alt barı (bkz. screen/index.html Tile.setStats): grid'in İşlemci/Bellek/sensör
         // sütunlarıyla aynı son ölçümler — yalnız çevrimiçi tahtada (eski ölçüm kapalı tahtada yanıltır).
         const m = b.online ? metrics[b.id] : null;
@@ -741,6 +761,69 @@ qx.Class.define("ankamon.page.Boards", {
           } : null
         };
       });
+    },
+
+    /**
+     * "Bilgisayarlar" sekmesinin tahta listesi (bkz. ui.boards.ComputerTiles, docker/rootfs/screen/
+     * computer.html): __previewList ile aynı sıra/çevrimiçi mantığı, ama kutucuk donanım çizimini
+     * besleyen ZENGİNLEŞTİRİLMİŞ veri — yavaş sensörlerin tamamı (CPU/kasa/disk sıcaklığı, fan, pil,
+     * disk doluluğu, ağ rx/tx, yük, çalışma süresi; bkz. backend MetricsApi::latest) ve çizim
+     * etiketleri için statik envanterin bir alt kümesi (facts). Canlı çekirdek başına başarım kutucuğun
+     * kendi perf WebSocket'inden gelir (bkz. computer.html), burada DEĞİL.
+     */
+    __computerList() {
+      const metrics = this.__metrics || {};
+      return this.__orderedShown().map(b => {
+        const m = b.online ? metrics[b.id] : null;
+        const f = b.facts || {};
+        return {
+          id: b.id, name: b.label || b.hostname || b.ip || ("#" + b.id), online: !!b.online,
+          powersave: !!b.online && ["Off", "Standby", "Suspend"].includes(b.display_state),
+          net: b.online ? b.netifs || null : null,
+          autoshutdown: b.online ? b.autoshutdown || null : null,
+          facts: {
+            cpu_model: f.cpu_model || null, cpu_phys_cores: f.cpu_phys_cores || null, cpu_cores: f.cpu_cores || null,
+            cpu_max_mhz: f.cpu_max_mhz || null, disk_total_bytes: f.disk_total_bytes || null,
+            disk_rotational: f.disk_rotational, disk_model: f.disk_model || null, smart_health: f.smart_health || null
+          },
+          stats: m ? {
+            cpu: m.cpu_percent ?? null, mem: m.mem_percent ?? null, temp: m.cpu_temp ?? m.temp_max ?? null,
+            case_temp: m.case_temp ?? null, disk_temp: m.disk_temp ?? null, disk_percent: m.disk_percent ?? null,
+            fan: m.fan_rpm ?? null, battery: m.battery_v ?? null, net_rx: m.net_rx_mbit ?? null,
+            net_tx: m.net_tx_mbit ?? null, load1: m.load1 ?? null, uptime: m.uptime_seconds ?? null
+          } : null
+        };
+      });
+    },
+
+    /**
+     * "Bilgisayarlar" sekmesi: Ekranlar'ın donanım karşılığı. İçeriği ui.boards.ComputerTiles yönetir
+     * (kendi iframe/araç çubuğu/boyut slider'ı); bu sayfa ona yalnızca veri (__computerList), sağ menü
+     * (__openPreviewMenuAt — grid satır menüsüyle AYNI), çift tık→Bilgi kartı, Uyandır ve sürükle-bırak
+     * sırasını kalıcılaştırma (__saveScreenOrder — Ekranlar'la ortak) sağlar. Seçim grid onay kutularıyla
+     * tek kaynaktır: kutucukta seçim değişince __checkFromPreview grid'i eşitler, grid değişince
+     * __updateActionState kutucukları (pushSelection) eşitler.
+     */
+    __createComputersPage() {
+      this.__computers = new ankamon.ui.boards.ComputerTiles({
+        list: () => this.__computerList(),
+        syncSelection: ids => this.__checkFromPreview(ids),
+        openMenu: (id, x, y, ids, el) => this.__openPreviewMenuAt(id, x, y, ids, el),
+        info: id => {
+          const board = this.__boards && this.__boards.get(id);
+          if (board) {
+            ankamon.ui.BoardOps.infoCard([board]);
+          }
+        },
+        wake: id => {
+          const board = this.__boards && this.__boards.get(id);
+          if (board && board.online && this._can("screen")) {
+            this.__sessionOps().wake([board]);
+          }
+        },
+        saveOrder: order => this.__saveScreenOrder(order)
+      });
+      return this.__computers.getPage();
     },
 
     /**
@@ -814,6 +897,15 @@ qx.Class.define("ankamon.page.Boards", {
      *   elemanlıysa yalnız bu tek tahta — bkz. BoardOps.menu boards parametresiyle aynı desen.
      */
     __openPreviewMenu(id, x, y, ids) {
+      this.__openPreviewMenuAt(id, x, y, ids, this.__iframeEl());
+    },
+
+    /**
+     * Önizleme/Bilgisayar kutucuğunun sağ menüsü, konum verilen iframe öğesine GÖRE hesaplanır
+     * (x/y iframe içi koordinat). Ekranlar sekmesi kendi iframe'ini, Bilgisayarlar sekmesi
+     * (bkz. ui.boards.ComputerTiles) kendi iframe öğesini geçirir — menü içeriği ikisinde de AYNI (__rowMenu).
+     */
+    __openPreviewMenuAt(id, x, y, ids, el) {
       const board = this.__boards && this.__boards.get(id);
       if (!board) {
         return;
@@ -828,7 +920,6 @@ qx.Class.define("ankamon.page.Boards", {
         qx.event.Timer.once(() => old.destroy(), null, 0);
       }
       this.__previewMenu = menu;
-      const el = this.__iframeEl();
       if (!el) {
         return;
       }
@@ -1060,6 +1151,9 @@ qx.Class.define("ankamon.page.Boards", {
         return; // __checkFromPreview satır satır işaretlerken her satırda değil, sonunda bir kez
       }
       this.__pushSelection();
+      if (this.__computers) {
+        this.__computers.pushSelection(this._checkedIds(this.__table));
+      }
     },
 
     __edit(board) {

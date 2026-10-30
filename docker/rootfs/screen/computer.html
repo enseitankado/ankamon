@@ -1,0 +1,749 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ankamon — Tahta bilgisayarı</title>
+<!--
+  Tahtaların "bilgisayar" (OPS/PC modülü) görünümü — Tahtalar sayfasının "Bilgisayarlar" sekmesinin
+  gömülü (iframe) kipi; ekran önizlemesinin (screen/index.html) donanım karşılığı. Her tahta için
+  stilize bir anakart/OPS-modül çizimi (viewBox ile ölçeklenen tek SVG) çizilir ve canlı metrikler
+  bileşenlerin ÜZERİNE bindirilir:
+   - Canlı (1 Hz, yalnız kutucuk görünürken SSH): çekirdek başına CPU barları, toplam CPU, RAM/takas,
+     yük ortalaması, görev/iş parçacığı, çalışma süresi — perf WebSocket (/screen/ws/perf/<id>,
+     bkz. worker/ankamon/screen/perf.py; ekran önizlemesiyle AYNI akış).
+   - Yavaş sensörler (~60 sn, üst sayfadan "tm-boards"): CPU/kasa/disk sıcaklığı, fan devri, CMOS pil
+     voltajı, disk doluluğu, ağ rx/tx (bkz. backend MetricsApi::latest, Boards.js __computerList).
+   - Statik envanter (üst sayfadan): işlemci modeli/çekirdek/hız, RAM, disk boyutu+tür, SMART (facts).
+  Seçim (Shift/Ctrl/dikdörtgen), sürükle-bırak sıralama ve sağ tık menüsü EKRAN ÖNİZLEMESİYLE AYNI
+  davranır (üst sayfa Boards.js aynı "tm-*" köprüsünü ve __rowMenu'yu kullanır); kod buraya ayrı
+  kopyalanmıştır ki ekran sayfası (screen/index.html) hiç değişmesin / etkilenmesin.
+  Adres: /screen/computer.html#<base64(JSON {control?})> — tahta listesi üst sayfadan "tm-boards" ile gelir.
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; background: #f3f3f3; color: #ddd; }
+  #grid { flex: 1; display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start;
+    gap: 6px; padding: 6px; overflow: auto; min-height: 0; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 15px; color: #888; pointer-events: none; z-index: 5; }
+  #empty { margin: 40px; color: #888; }
+
+  /* Kutucuk: başlık çubuğu + gövde (SVG donanım çizimi). Genişlik ortak boyuttan (--tile-min, alt slider)
+     ya da kutucuğun kendi boyutundan (--w, kenardan sürükleyerek). Çizim sabit en-boy oranlıdır (--ar). */
+  .tile { position: relative; display: flex; flex-direction: column; border-radius: 6px; overflow: hidden;
+    background: #0d1726; width: var(--w, var(--tile-min, 320px)); max-width: 100%; flex: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .tile .title { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; padding: 3px 8px;
+    background: #16263c; font-size: 12px; white-space: nowrap; overflow: hidden; cursor: move; user-select: none; }
+  .tile .title .name { flex: 1; overflow: hidden; text-overflow: ellipsis; color: #e6edf3; }
+  .tile .title .dot { width: 8px; height: 8px; border-radius: 50%; background: #6e7681; flex: 0 0 auto; }
+  .tile.on .title .dot { background: #3fb950; box-shadow: 0 0 0 0 rgba(63,185,80,.6); animation: pulse 2.4s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(63,185,80,.5); } 70% { box-shadow: 0 0 0 5px rgba(63,185,80,0); } 100% { box-shadow: 0 0 0 0 rgba(63,185,80,0); } }
+  .tile .body { position: relative; aspect-ratio: var(--ar, 360 / 224); }
+  .tile svg.board { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* Çevrimdışı / güç tasarrufu örtüsü. */
+  .tile .veil { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    text-align: center; padding: 10px; font-size: 13px; font-weight: 600; color: #fff; pointer-events: none;
+    background: rgba(5,8,14,.78); }
+  .tile.offline .veil, .tile.powersave .veil { display: flex; }
+  .tile.offline { filter: grayscale(.85) brightness(.75); }
+  .tile .veil .sd { margin-top: 6px; font-weight: 400; font-size: 11px; color: #ffcc80; }
+  .tile .veil .sd:empty { display: none; }
+  .tile .veil .wk { margin-top: 6px; font-weight: 400; font-size: 11px; color: #cbd5e1; }
+
+  /* Seçim / sürükle-bırak (ekran önizlemesiyle aynı görsel dil). */
+  .tile.selected { outline: 3px solid #0096ff; outline-offset: -3px; z-index: 1; }
+  .tile.dragging { opacity: .4; outline: 3px dashed #0096ff; outline-offset: -3px; }
+  .tile .title button { padding: 0 6px; border: 0; background: transparent; color: #9fb2c8; cursor: pointer; font-size: 13px; }
+  .tile .title button:hover { color: #fff; }
+  .marquee { position: fixed; border: 1px dashed #4af; background: rgba(70,150,255,.15); z-index: 999; pointer-events: none; }
+  /* Boyutlandırma tutamaçları (ekran önizlemesiyle aynı): sağ kenar, alt kenar, sağ alt köşe. */
+  .tile .rs { position: absolute; z-index: 4; }
+  .tile .rs-e { top: 0; right: 0; width: 6px; height: 100%; cursor: ew-resize; }
+  .tile .rs-s { left: 0; bottom: 0; height: 6px; width: 100%; cursor: ns-resize; }
+  .tile .rs-se { right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+  .tile.resizing { outline: 2px dashed #0096ff; outline-offset: -2px; }
+
+  /* SVG çizim öğeleri. */
+  svg.board .pcb { fill: #0b1a2b; stroke: #1f3350; stroke-width: 1; }
+  svg.board .part { fill: #13233a; stroke: #27405f; stroke-width: 1; }
+  svg.board .slot { fill: #0e1d30; stroke: #27405f; stroke-width: 1; }
+  svg.board .lbl { fill: #6b87a8; font: 600 8px Segoe UI, sans-serif; }
+  svg.board .val { fill: #e6edf3; font: 700 12px "DejaVu Sans Mono", monospace; }
+  svg.board .sub { fill: #9fb2c8; font: 500 7.5px "DejaVu Sans Mono", monospace; }
+  svg.board .model { fill: #b9c7d8; font: 500 7px Segoe UI, sans-serif; }
+  svg.board .fill-ok { fill: #3fb950; }
+  svg.board .fill-warn { fill: #d29922; }
+  svg.board .fill-crit { fill: #f85149; }
+  svg.board .track { fill: #0a1420; }
+  svg.board .core { fill: #3fb950; }
+  svg.board text { pointer-events: none; }
+  /* Fan: devire göre süresi JS'le verilen sürekli dönüş (0 ise durur). */
+  svg.board .blades { transform-box: fill-box; transform-origin: center; }
+  svg.board .blades.spin { animation: fanspin linear infinite; }
+  @keyframes fanspin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { svg.board .blades.spin { animation: none; } .tile.on .title .dot { animation: none; } }
+</style>
+</head>
+<body>
+  <div id="grid"></div>
+  <div id="loading">Yükleniyor…</div>
+
+<script type="module">
+let spec = {};
+try { spec = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1))))) || {}; } catch (e) { /* boş/bozuk fragman */ }
+
+const grid = document.getElementById("grid");
+
+/* Eşik → renk sınıfı (üst eşikte kritik). pil ters (düşük eşik). */
+function cls(v, warn, crit, low) {
+  if (v === null || v === undefined || Number.isNaN(v)) return "";
+  if (low) return v <= crit ? "fill-crit" : v <= warn ? "fill-warn" : "fill-ok";
+  return v >= crit ? "fill-crit" : v >= warn ? "fill-warn" : "fill-ok";
+}
+const esc = s => String(s == null ? "" : s).replace(/[<>&]/g, "");
+const tempTxt = v => v === null || v === undefined ? "—" : Math.round(v) + "°";
+const gib = kib => kib >= 1048576 ? (kib / 1048576).toFixed(1) + "G" : Math.round(kib / 1024) + "M";
+
+// Ağ arabirimi simgeleri (ekran önizlemesindekiyle aynı yollar; renk currentColor).
+const NET_ICON = {
+  wifi: '<path d="M12 21l3.6-4.5a5.8 5.8 0 0 0-7.2 0z"/><path d="M4.9 12.2a11.3 11.3 0 0 1 14.2 0l-2 2.5a8.1 8.1 0 0 0-10.2 0z"/><path d="M1.2 7.6a17 17 0 0 1 21.6 0l-2 2.5a13.8 13.8 0 0 0-17.6 0z"/>',
+  ethernet: '<path fill-rule="evenodd" d="M3 4h18v11h-4v3h-3v2h-4v-2H7v-3H3zm4 3v4h2V7zm4 0v4h2V7zm4 0v4h2V7z"/>',
+  other: '<path d="M10 2h4v5h-4zM3 17h4v5H3zm14 0h4v5h-4zM11 7h2v4h7v6h-2v-4H6v4H4v-6h7z"/>'
+};
+const NET_KIND = { wifi: "Kablosuz (Wi-Fi)", ethernet: "Kablolu (Ethernet)", other: "Ağ arabirimi" };
+
+/* Tahtanın bilgisayar modülü çizimi (viewBox 0 0 360 224). Her canlı/yavaş değer bir SVG öğesine yazılır. */
+const SVG_NS = "http://www.w3.org/2000/svg";
+function boardSvg() {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "board");
+  svg.setAttribute("viewBox", "0 0 360 224");
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  svg.innerHTML = `
+    <rect class="pcb" x="2" y="2" width="356" height="220" rx="10"/>
+    <!-- CPU + soğutucu -->
+    <g transform="translate(12 12)">
+      <rect class="part" x="0" y="0" width="150" height="100" rx="6"/>
+      <text class="lbl" x="8" y="14">İŞLEMCİ</text>
+      <text class="model" data-cpu-model x="8" y="25"></text>
+      <g data-cores transform="translate(8 30)"></g>
+      <text class="val" data-cpu x="8" y="92">—</text>
+      <text class="sub" data-cpu-cores x="54" y="92"></text>
+      <rect data-cpu-temp-bg class="slot" x="104" y="80" width="40" height="16" rx="3"/>
+      <text data-cpu-temp class="val" style="font-size:10px" x="124" y="92" text-anchor="middle">—</text>
+    </g>
+    <!-- Fan -->
+    <g transform="translate(174 12)">
+      <rect class="part" x="0" y="0" width="76" height="100" rx="6"/>
+      <text class="lbl" x="8" y="14">FAN</text>
+      <circle class="track" cx="38" cy="50" r="30"/>
+      <g transform="translate(38 50)">
+        <g class="blades" data-blades>
+          <path d="M0 -6 C 10 -24 26 -18 24 -4 C 16 -8 8 -6 0 -6 Z" fill="#4a6ea0"/>
+          <path d="M0 -6 C 10 -24 26 -18 24 -4 C 16 -8 8 -6 0 -6 Z" fill="#4a6ea0" transform="rotate(120)"/>
+          <path d="M0 -6 C 10 -24 26 -18 24 -4 C 16 -8 8 -6 0 -6 Z" fill="#4a6ea0" transform="rotate(240)"/>
+          <circle r="6" fill="#30507a"/>
+        </g>
+      </g>
+      <text class="sub" data-fan x="38" y="94" text-anchor="middle">—</text>
+    </g>
+    <!-- RAM yuvaları -->
+    <g transform="translate(262 12)">
+      <rect class="part" x="0" y="0" width="86" height="100" rx="6"/>
+      <text class="lbl" x="8" y="14">BELLEK</text>
+      <g data-ram></g>
+      <text class="val" data-mem x="8" y="76" style="font-size:11px">—</text>
+      <text class="sub" data-mem-sub x="8" y="90"></text>
+    </g>
+    <!-- Depolama (SSD/HDD) -->
+    <g transform="translate(12 120)">
+      <rect class="part" x="0" y="0" width="236" height="44" rx="6"/>
+      <text class="lbl" x="8" y="14">DİSK <tspan data-disk-kind></tspan></text>
+      <rect class="track" x="8" y="20" width="160" height="14" rx="3"/>
+      <rect data-disk-fill class="fill-ok" x="8" y="20" width="0" height="14" rx="3"/>
+      <text class="sub" data-disk x="10" y="31" style="font-size:8px"></text>
+      <text class="sub" data-disk-cap x="176" y="19"></text>
+      <text class="sub" data-disk-temp x="176" y="31"></text>
+      <circle data-smart cx="226" cy="14" r="4" fill="#6e7681"/>
+    </g>
+    <!-- CMOS pili -->
+    <g transform="translate(258 120)">
+      <rect class="part" x="0" y="0" width="42" height="44" rx="6"/>
+      <text class="lbl" x="8" y="14">PİL</text>
+      <circle class="slot" cx="14" cy="30" r="8"/>
+      <text data-bat class="sub" x="24" y="33" style="font-size:8px">—</text>
+    </g>
+    <!-- Ağ -->
+    <g transform="translate(306 120)">
+      <rect class="part" x="0" y="0" width="42" height="44" rx="6"/>
+      <text class="lbl" x="8" y="14">AĞ</text>
+      <g data-net transform="translate(6 20)"></g>
+    </g>
+    <!-- Alt okuma satırı: yük / çalışma süresi / görevler -->
+    <g transform="translate(12 172)">
+      <rect class="part" x="0" y="0" width="336" height="44" rx="6"/>
+      <text class="lbl" x="8" y="14">BAŞARIM</text>
+      <text class="sub" data-load x="8" y="30"></text>
+      <text class="sub" data-uptime x="8" y="40"></text>
+      <text class="sub" data-tasks x="180" y="30"></text>
+      <text class="sub" data-loadavg x="180" y="40"></text>
+    </g>`;
+  return svg;
+}
+
+class Tile {
+  constructor(board) {
+    this.board = board;
+    this.wanted = false;
+    this.inView = true;
+    this.perfWs = null;
+    this.perfTimer = null;
+    this.el = document.createElement("div");
+    this.el.className = "tile";
+    this.el._boardId = board.id;
+    this.el.innerHTML = `<div class="title"><span class="dot"></span><span class="name"></span></div>
+      <div class="body"></div>`;
+    this.el.querySelector(".name").textContent = board.name || ("#" + board.id);
+    this.body = this.el.querySelector(".body");
+    this.svg = boardSvg();
+    this.body.appendChild(this.svg);
+    const veil = document.createElement("div");
+    veil.className = "veil";
+    veil.innerHTML = `<div><span data-veil>Tahta kapalı</span><div class="sd" data-sd></div><div class="wk">Uyandırmak için tıklayın</div></div>`;
+    this.body.appendChild(veil);
+    this.veilText = veil.querySelector("[data-veil]");
+    this.sdEl = veil.querySelector("[data-sd]");
+    this.q = this.svg.querySelectorAll.bind(this.svg);
+    this.$ = sel => this.svg.querySelector(sel);
+
+    this.makeResizable();
+    this.wireInteractions();
+    this.applySize();
+    this.renderStatic();
+    this.renderSlow();
+    grid.appendChild(this.el);
+  }
+
+  /* --- Etkileşim (ekran önizlemesiyle AYNI): seçim, sürükle-bırak, sağ menü, çift tık. --- */
+  wireInteractions() {
+    // Çift tık = Bilgi kartı (üst sayfa açar — "tm-show").
+    this.el.addEventListener("dblclick", e => {
+      if (e.target.closest(".rs")) return;
+      window.parent.postMessage({ type: "tm-show", id: this.board.id }, location.origin);
+    });
+    // Güç tasarrufundaki karta basmak uyandırır.
+    this.el.addEventListener("pointerdown", e => {
+      if (e.button === 0 && this.el.classList.contains("powersave") && e.target.closest(".body")) this.wake();
+    }, true);
+    // Sağ tık: ekran önizlemesiyle AYNI menü (üst sayfada Boards.__rowMenu kurulur).
+    this.el.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!selected.has(this.board.id)) setSelected([this.board.id]);
+      window.parent.postMessage(
+        { type: "tm-menu", id: this.board.id, ids: [...selected], x: e.clientX, y: e.clientY }, location.origin);
+    }, true);
+    // Basınca seç (düz=tek, Ctrl=ekle/çıkar, Shift=aralık).
+    this.el.addEventListener("pointerdown", e => {
+      if (e.button !== 0 || e.target.closest("button") || e.target.closest(".rs")) return;
+      const id = this.board.id;
+      const ids = orderedIds();
+      if (e.shiftKey && selectAnchor !== null && ids.includes(selectAnchor)) {
+        const a = ids.indexOf(selectAnchor), b = ids.indexOf(id);
+        setSelected(ids.slice(Math.min(a, b), Math.max(a, b) + 1));
+        return;
+      }
+      selectAnchor = id;
+      if (e.ctrlKey || e.metaKey) {
+        toggleSelected(id);
+      } else if (selected.has(id) && selected.size > 1) {
+        const token = pendingCollapse = { id };
+        document.addEventListener("pointerup", () => {
+          if (pendingCollapse !== token) return;
+          pendingCollapse = null;
+          setSelected([id]);
+        }, { once: true, capture: true });
+      } else {
+        setSelected([id]);
+      }
+    }, true);
+    // Sürükle-bırak sıralama (yalnız başlık çubuğundan).
+    this.el.draggable = true;
+    this.el.addEventListener("pointerdown", e => {
+      this.dragArmed = !!e.target.closest(".title") && !e.target.closest("button");
+    }, true);
+    this.el.addEventListener("dragstart", e => {
+      if (!this.dragArmed) { e.preventDefault(); return; }
+      pendingCollapse = null;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(this.board.id));
+      dragStart(this);
+    });
+    this.el.addEventListener("dragend", () => { this.dragArmed = false; dragEnd(); });
+    this.el.addEventListener("dragover", e => {
+      if (!drag) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      dragOver(this);
+    });
+  }
+
+  makeResizable() {
+    ["e", "s", "se"].forEach(dir => {
+      const h = document.createElement("div");
+      h.className = "rs rs-" + dir;
+      h.title = "Sürükleyerek boyutlandırın";
+      h.addEventListener("pointerdown", e => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        h.setPointerCapture(e.pointerId);
+        const startX = e.clientX, startY = e.clientY, w0 = this.el.offsetWidth, ar = 360 / 224;
+        const maxW = grid.clientWidth - 12;
+        this.el.classList.add("resizing");
+        const onMove = ev => {
+          const dx = ev.clientX - startX, dy = (ev.clientY - startY) * ar;
+          const d = dir === "e" ? dx : dir === "s" ? dy : (Math.abs(dx) > Math.abs(dy) ? dx : dy);
+          tileSizes[this.board.id] = { w: Math.round(Math.max(Tile.MIN_W, Math.min(maxW, w0 + d))) };
+          this.applySize();
+        };
+        const onUp = () => {
+          h.removeEventListener("pointermove", onMove);
+          h.removeEventListener("pointerup", onUp);
+          h.removeEventListener("pointercancel", onUp);
+          this.el.classList.remove("resizing");
+          saveTileSizes();
+        };
+        h.addEventListener("pointermove", onMove);
+        h.addEventListener("pointerup", onUp);
+        h.addEventListener("pointercancel", onUp);
+      });
+      this.el.appendChild(h);
+    });
+  }
+
+  applySize() {
+    const size = tileSizes[this.board.id];
+    if (size && size.w) this.el.style.setProperty("--w", size.w + "px");
+    else this.el.style.removeProperty("--w");
+  }
+
+  setBoard(board) {
+    this.board = board;
+    this.el._boardId = board.id;
+    this.el.querySelector(".name").textContent = board.name || ("#" + board.id);
+    this.renderStatic();
+    this.renderSlow();
+    this.refreshWanted();
+    this.tickShutdown();
+  }
+
+  /* Statik envanter: işlemci modeli/çekirdek, disk türü/boyutu (üst sayfadan facts). */
+  renderStatic() {
+    const f = this.board.facts || {};
+    const model = f.cpu_model ? String(f.cpu_model).replace(/\((R|TM|tm)\)/g, "").replace(/\s+@.*$/, "")
+      .replace(/\s+(CPU|APU)\b.*$/, "").replace(/\s+/g, " ").trim() : "";
+    this.$("[data-cpu-model]").textContent = model.length > 26 ? model.slice(0, 25) + "…" : model;
+    const phys = f.cpu_phys_cores, thr = f.cpu_cores;
+    let cores = "";
+    if (phys && thr && phys !== thr) cores = `${phys}ç/${thr}t`;
+    else if (thr || phys) cores = `${thr || phys} çekirdek`;
+    if (f.cpu_max_mhz) cores += ` @${(f.cpu_max_mhz / 1000).toFixed(1)}G`;
+    this.$("[data-cpu-cores]").textContent = cores;
+    const kind = f.disk_rotational === 0 ? "SSD" : f.disk_rotational === 1 ? "HDD" : "";
+    this.$("[data-disk-kind]").textContent = kind;
+    const gbD = f.disk_total_bytes ? (f.disk_total_bytes / 1073741824).toFixed(0) + "G" : "";
+    this.$("[data-disk-cap]").textContent = gbD;
+  }
+
+  /* Yavaş sensörler + statik doluluklar (~60 sn, üst sayfadan stats). Perf WS yoksa CPU/RAM da buradan. */
+  renderSlow() {
+    const s = this.board.stats || {};
+    if (!this.live) {
+      this.setCpu(s.cpu);
+      this.setMem(s.mem, null);
+    }
+    // Sıcaklıklar
+    const ct = s.temp;
+    this.$("[data-cpu-temp]").textContent = tempTxt(ct);
+    this.$("[data-cpu-temp]").style.fill = ct == null ? "#9fb2c8" : ct >= 85 ? "#f85149" : ct >= 70 ? "#d29922" : "#3fb950";
+    // Disk doluluk + sıcaklık + SMART
+    const dp = s.disk_percent;
+    const dfill = this.$("[data-disk-fill]");
+    dfill.setAttribute("width", dp == null ? 0 : Math.max(0, Math.min(160, 160 * dp / 100)));
+    dfill.setAttribute("class", cls(dp, 80, 92) || "fill-ok");
+    this.$("[data-disk]").textContent = dp == null ? "ölçüm yok" : "%" + Math.round(dp);
+    this.$("[data-disk-temp]").textContent = s.disk_temp == null ? "" : Math.round(s.disk_temp) + "°C";
+    const sh = (this.board.facts || {}).smart_health;
+    const smart = this.$("[data-smart]");
+    smart.setAttribute("fill", sh === "failed" ? "#f85149" : sh ? "#3fb950" : "#6e7681");
+    smart.querySelector("title")?.remove();
+    const st = document.createElementNS(SVG_NS, "title");
+    st.textContent = sh === "failed" ? "SMART: ARIZALI" : sh ? "SMART: sağlıklı" : "SMART: bilinmiyor";
+    smart.appendChild(st);
+    // Fan
+    this.setFan(s.fan);
+    // Pil
+    const bv = s.battery;
+    const batEl = this.$("[data-bat]");
+    batEl.textContent = bv == null ? "—" : bv.toFixed(2) + "V";
+    batEl.style.fill = bv == null ? "#9fb2c8" : bv <= 2.5 ? "#f85149" : bv <= 2.8 ? "#d29922" : "#3fb950";
+    // Ağ
+    this.setNet(this.board.net);
+    // Alt satır (perf yoksa yavaş kaynaktan yük/uptime)
+    if (!this.live) {
+      this.$("[data-loadavg]").textContent = s.load1 == null ? "" : "Yük: " + Number(s.load1).toFixed(2);
+      this.setUptime(s.uptime);
+      this.$("[data-load]").textContent = "";
+      this.$("[data-tasks]").textContent = "";
+    }
+    this.refreshWanted();
+  }
+
+  setCpu(pct) {
+    this.$("[data-cpu]").textContent = pct == null ? "—" : "%" + Math.round(pct);
+    this.$("[data-cpu]").style.fill = pct == null ? "#9fb2c8" : pct >= 90 ? "#f85149" : pct >= 70 ? "#d29922" : "#e6edf3";
+  }
+
+  /* Çekirdek barları: perf akışından [user,nice,sys,other] ya da yavaş kaynaktan tek toplam bar. */
+  setCores(cpus) {
+    const g = this.$("[data-cores]");
+    const n = cpus.length;
+    if (!n) { g.textContent = ""; return; }
+    const cols = Math.min(n, 8), rows = Math.ceil(n / cols);
+    const areaW = 134, areaH = 54;
+    const bw = Math.max(4, Math.floor(areaW / cols) - 2), bh = Math.max(6, Math.floor(areaH / rows) - 2);
+    g.textContent = "";
+    cpus.forEach((c, i) => {
+      const col = i % cols, row = Math.floor(i / cols);
+      const x = col * (bw + 2), y = row * (bh + 2);
+      const track = document.createElementNS(SVG_NS, "rect");
+      track.setAttribute("x", x); track.setAttribute("y", y);
+      track.setAttribute("width", bw); track.setAttribute("height", bh);
+      track.setAttribute("rx", 1); track.setAttribute("class", "track");
+      g.appendChild(track);
+      const busy = Array.isArray(c) ? c[0] + c[1] + c[2] + c[3] : c;
+      const fh = Math.max(0, Math.min(bh, bh * busy / 100));
+      const bar = document.createElementNS(SVG_NS, "rect");
+      bar.setAttribute("x", x); bar.setAttribute("y", y + (bh - fh));
+      bar.setAttribute("width", bw); bar.setAttribute("height", fh);
+      bar.setAttribute("rx", 1);
+      bar.setAttribute("fill", busy >= 90 ? "#f85149" : busy >= 70 ? "#d29922" : "#3fb950");
+      g.appendChild(bar);
+    });
+  }
+
+  setMem(pct, sub) {
+    const g = this.$("[data-ram]");
+    g.textContent = "";
+    // İki DIMM yuvası, alttan dolum.
+    const slots = 2, sw = 26, gap = 10, sh = 48, baseY = 22;
+    for (let i = 0; i < slots; i++) {
+      const x = 8 + i * (sw + gap);
+      const track = document.createElementNS(SVG_NS, "rect");
+      track.setAttribute("x", x); track.setAttribute("y", baseY);
+      track.setAttribute("width", sw); track.setAttribute("height", sh);
+      track.setAttribute("rx", 2); track.setAttribute("class", "slot");
+      g.appendChild(track);
+      const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+      const fh = sh * p / 100;
+      const bar = document.createElementNS(SVG_NS, "rect");
+      bar.setAttribute("x", x + 2); bar.setAttribute("y", baseY + (sh - fh));
+      bar.setAttribute("width", sw - 4); bar.setAttribute("height", Math.max(0, fh - 1));
+      bar.setAttribute("rx", 1);
+      bar.setAttribute("fill", p >= 92 ? "#f85149" : p >= 80 ? "#d29922" : "#58a6ff");
+      g.appendChild(bar);
+    }
+    this.$("[data-mem]").textContent = pct == null ? "—" : "%" + Math.round(pct);
+    this.$("[data-mem-sub]").textContent = sub || "";
+  }
+
+  setFan(rpm) {
+    const blades = this.$("[data-blades]");
+    this.$("[data-fan]").textContent = rpm == null ? "yok" : Math.round(rpm) + " RPM";
+    if (rpm == null || rpm <= 0) { blades.classList.remove("spin"); blades.style.animationDuration = ""; return; }
+    // 800→~1.6 sn, 6000→~0.25 sn arası (yüksek devir hızlı döner).
+    const dur = Math.max(0.25, Math.min(2.0, 1800 / rpm));
+    blades.style.animationDuration = dur.toFixed(2) + "s";
+    blades.classList.add("spin");
+  }
+
+  setUptime(sec) {
+    if (sec == null) { this.$("[data-uptime]").textContent = ""; return; }
+    const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
+    this.$("[data-uptime]").textContent = "Açık: " + (d ? d + "g " : "") + h + "s " + m + "d";
+  }
+
+  setNet(net) {
+    const g = this.$("[data-net]");
+    g.textContent = "";
+    if (!net || !net.ifaces || !net.ifaces.length) return;
+    net.ifaces.slice(0, 2).forEach((it, i) => {
+      const wrap = document.createElementNS(SVG_NS, "g");
+      wrap.setAttribute("transform", `translate(0 ${i * 13}) scale(0.5)`);
+      wrap.innerHTML = NET_ICON[it.kind] || NET_ICON.other;
+      const up = it.kind === "wifi" ? (net.wifi_radio !== false && (it.state === 100 || it.up)) : it.up;
+      wrap.setAttribute("fill", up ? "#3fb950" : "#6e7681");
+      const t = document.createElementNS(SVG_NS, "title");
+      t.textContent = `${NET_KIND[it.kind] || NET_KIND.other} — ${it.name}` + (it.ipv4 && it.ipv4.length ? `\n${it.ipv4.join(", ")}` : "") + (up ? "\nBağlı" : "\nBağlı değil");
+      wrap.appendChild(t);
+      g.appendChild(wrap);
+    });
+  }
+
+  tickShutdown() {
+    const sd = this.board.autoshutdown;
+    let text = "";
+    if (sd) {
+      const left = at => Math.max(0, Math.round((at - Date.now()) / 1000));
+      const fmt = s => s >= 3600 ? `${Math.floor(s / 3600)} sa ${String(Math.floor(s % 3600 / 60)).padStart(2, "0")} dk`
+        : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      if (sd.phase === "countdown" && sd.off_at) text = `${fmt(left(sd.off_at))} sonra kapanacak`;
+      else if (sd.dialog_at) text = `Otomatik kapatma uyarısına ${fmt(left(sd.dialog_at))}`;
+    }
+    if (this.sdEl.textContent !== text) this.sdEl.textContent = text;
+  }
+
+  refreshWanted() {
+    const offline = this.board.online === false;
+    this.el.classList.toggle("offline", offline);
+    this.el.classList.toggle("on", !offline);
+    this.el.classList.toggle("powersave", !offline && !!this.board.powersave);
+    this.veilText.textContent = offline ? "Tahta kapalı" : "Ekran güç tasarrufu kipinde";
+    this.setWanted(!offline && !document.hidden && !paused && this.inView);
+  }
+
+  setWanted(w) {
+    if (w === this.wanted) return;
+    this.wanted = w;
+    w ? this.perfStart() : this.perfStop();
+  }
+
+  /* Canlı başarım akışı (ekran önizlemesiyle aynı WS; yalnız görünür + açık tahtada). */
+  perfStart() {
+    if (this.perfWs || this.perfTimer) return;
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = this.perfWs = new WebSocket(`${proto}//${location.host}/screen/ws/perf/${this.board.id}`);
+    ws.addEventListener("message", e => { try { this.renderPerf(JSON.parse(e.data)); } catch (x) { /* bozuk kare */ } });
+    ws.addEventListener("close", () => {
+      if (this.perfWs !== ws) return;
+      this.perfWs = null;
+      this.live = false;
+      this.perfTimer = setTimeout(() => { this.perfTimer = null; if (this.wanted) this.perfStart(); }, 5000);
+    });
+  }
+
+  perfStop() {
+    clearTimeout(this.perfTimer);
+    this.perfTimer = null;
+    const ws = this.perfWs;
+    this.perfWs = null;
+    if (ws) ws.close();
+  }
+
+  renderPerf(p) {
+    this.live = true;
+    this.setCores(p.cpus || []);
+    this.setCpu(p.cpu);
+    const m = p.mem || {}, mt = m.total || 1;
+    this.setMem(mt ? 100 * m.used / mt : null, `${gib(m.used || 0)}/${gib(m.total || 0)}`);
+    this.setUptime(p.uptime);
+    this.$("[data-load]").textContent = `Görev: ${esc(p.tasks)} · Çalışan: ${esc(p.running)}`;
+    this.$("[data-tasks]").textContent = `İş parçacığı: ${esc(p.threads)}`;
+    this.$("[data-loadavg]").textContent = "Yük: " + (p.load || []).map(v => Number(v).toFixed(2)).join(" ");
+  }
+
+  wake() {
+    if (Date.now() - (this.wakeAt || 0) < Tile.WAKE_MS) return;
+    this.wakeAt = Date.now();
+    window.parent.postMessage({ type: "tm-wake", id: this.board.id }, location.origin);
+  }
+
+  dispose() {
+    this.perfStop();
+    if (io) io.unobserve(this.el);
+    this.el.remove();
+  }
+}
+Tile.MIN_W = 180;
+Tile.WAKE_MS = 15000;
+
+/* --- Kutucuk boyutları (bu tarayıcıda kalıcı) --- */
+const TILE_SIZES_KEY = "ankamon.computers.tileSizes";
+let tileSizes = {};
+try { tileSizes = JSON.parse(localStorage.getItem(TILE_SIZES_KEY) || "{}") || {}; } catch (e) { tileSizes = {}; }
+function saveTileSizes() { try { localStorage.setItem(TILE_SIZES_KEY, JSON.stringify(tileSizes)); } catch (e) { /* kalıcılık önemsiz */ } }
+function setTileSize(px, reset) {
+  document.documentElement.style.setProperty("--tile-min", px + "px");
+  if (reset && Object.keys(tileSizes).length) { tileSizes = {}; saveTileSizes(); tiles.forEach(t => t.applySize()); }
+}
+
+/* --- Seçim (ekran önizlemesiyle aynı sözleşme; grid onay kutularıyla tek kaynak) --- */
+const tiles = new Map();
+let paused = false;
+let selected = new Set();
+let selectAnchor = null;
+let pendingCollapse = null;
+
+function setSelected(ids, fromParent = false) {
+  const next = new Set(ids);
+  const changed = next.size !== selected.size || [...next].some(id => !selected.has(id));
+  selected = next;
+  tiles.forEach((t, id) => t.el.classList.toggle("selected", selected.has(id)));
+  if (changed && !fromParent) window.parent.postMessage({ type: "tm-select", ids: [...selected] }, location.origin);
+}
+function toggleSelected(id) { const n = new Set(selected); n.has(id) ? n.delete(id) : n.add(id); setSelected(n); }
+function orderedIds() { return [...grid.children].filter(el => el.classList.contains("tile")).map(el => el._boardId); }
+
+/* --- Sürükle-bırak sıralama (canlı yerleşim, FLIP — ekran önizlemesiyle aynı) --- */
+let drag = null;
+const FLIP_MS = 180;
+function dragStart(tile) {
+  drag = { tile, startOrder: orderedIds(), dropped: false };
+  requestAnimationFrame(() => drag && drag.tile.el.classList.add("dragging"));
+}
+function flip(mutate) {
+  const els = [...grid.children].filter(el => el.classList.contains("tile"));
+  const before = new Map(els.map(el => [el, el.getBoundingClientRect()]));
+  mutate();
+  els.forEach(el => {
+    const a = before.get(el), b = el.getBoundingClientRect();
+    const dx = a.left - b.left, dy = a.top - b.top;
+    if (!dx && !dy) return;
+    el.style.transition = "none";
+    el.style.transform = `translate(${dx}px, ${dy}px)`;
+    el._flipUntil = performance.now() + FLIP_MS;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.style.transition = `transform ${FLIP_MS}ms ease`;
+      el.style.transform = "";
+    }));
+  });
+}
+function dragOver(target) {
+  const dragged = drag.tile.el;
+  if (target.el === dragged || (target.el._flipUntil || 0) > performance.now()) return;
+  const els = [...grid.children];
+  const from = els.indexOf(dragged), to = els.indexOf(target.el);
+  flip(() => grid.insertBefore(dragged, from < to ? target.el.nextSibling : target.el));
+}
+function dragEnd() {
+  if (!drag) return;
+  const { tile, startOrder, dropped } = drag;
+  drag = null;
+  tile.el.classList.remove("dragging");
+  const now = orderedIds();
+  if (!dropped) {
+    if (now.join() !== startOrder.join()) flip(() => startOrder.forEach(id => grid.appendChild(tiles.get(id).el)));
+    return;
+  }
+  if (now.join() !== startOrder.join()) window.parent.postMessage({ type: "tm-reorder", order: now }, location.origin);
+}
+grid.addEventListener("dragover", e => { if (!drag) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; });
+grid.addEventListener("drop", e => { if (!drag) return; e.preventDefault(); drag.dropped = true; });
+
+/* Boş alanda dikdörtgen (rubber-band) seçim. */
+grid.addEventListener("pointerdown", e => {
+  if (e.button !== 0 || e.target.closest(".tile")) return;
+  const startX = e.clientX, startY = e.clientY;
+  const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+  const base = additive ? new Set(selected) : new Set();
+  let box = null;
+  const update = (cx, cy) => {
+    const x0 = Math.min(startX, cx), x1 = Math.max(startX, cx), y0 = Math.min(startY, cy), y1 = Math.max(startY, cy);
+    if (!box && (Math.abs(cx - startX) > 3 || Math.abs(cy - startY) > 3)) {
+      box = document.createElement("div"); box.className = "marquee"; document.body.appendChild(box);
+    }
+    if (box) { box.style.left = x0 + "px"; box.style.top = y0 + "px"; box.style.width = (x1 - x0) + "px"; box.style.height = (y1 - y0) + "px"; }
+    const hit = [];
+    tiles.forEach((t, id) => {
+      const r = t.el.getBoundingClientRect();
+      if (r.right >= x0 && r.left <= x1 && r.bottom >= y0 && r.top <= y1) hit.push(id);
+    });
+    setSelected([...base, ...hit]);
+  };
+  const onMove = ev => update(ev.clientX, ev.clientY);
+  const onUp = () => {
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    if (box) box.remove();
+    else if (!additive) setSelected([]);
+  };
+  document.addEventListener("pointermove", onMove);
+  document.addEventListener("pointerup", onUp);
+});
+document.addEventListener("keydown", e => {
+  if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "a") return;
+  e.preventDefault();
+  const allIds = [...tiles.keys()];
+  if (!allIds.length) return;
+  const allSelected = allIds.every(id => selected.has(id));
+  setSelected(allSelected ? [] : allIds);
+});
+
+/* Görünürlük: yalnız görünen kutucuklar canlı akış tutar. */
+const io = "IntersectionObserver" in window
+  ? new IntersectionObserver(entries => {
+      if (grid.clientWidth === 0) return;
+      entries.forEach(e => {
+        const t = [...tiles.values()].find(t => t.el === e.target);
+        if (t) { t.inView = e.isIntersecting; t.refreshWanted(); }
+      });
+    }, { root: grid })
+  : null;
+if (io) setInterval(() => {
+  if (document.hidden || grid.clientWidth === 0) return;
+  const g = grid.getBoundingClientRect();
+  tiles.forEach(t => {
+    if (t.inView) return;
+    const r = t.el.getBoundingClientRect();
+    if (r.bottom > g.top && r.top < g.bottom && r.right > g.left && r.left < g.right) { t.inView = true; t.refreshWanted(); }
+  });
+}, 3000);
+setInterval(() => { if (!document.hidden) tiles.forEach(t => t.tickShutdown()); }, 1000);
+document.addEventListener("visibilitychange", () => tiles.forEach(t => t.refreshWanted()));
+
+/* Kutucukları üst sayfadan gelen listeye eşitler. */
+function setBoards(list) {
+  const ids = new Set(list.map(b => b.id));
+  for (const [id, t] of tiles) { if (!ids.has(id)) { t.dispose(); tiles.delete(id); } }
+  let empty = document.getElementById("empty");
+  if (empty && list.length) { empty.remove(); empty = null; }
+  list.forEach((b, i) => {
+    let t = tiles.get(b.id);
+    if (!t) { t = new Tile(b); tiles.set(b.id, t); if (io) io.observe(t.el); }
+    if (!drag && grid.children[i] !== t.el) grid.insertBefore(t.el, grid.children[i] || null);
+    t.setBoard(b);
+  });
+  if (!list.length && !empty) {
+    empty = document.createElement("div");
+    empty.id = "empty";
+    empty.textContent = "Gösterilecek tahta yok.";
+    grid.appendChild(empty);
+  }
+  if ([...selected].some(id => !ids.has(id))) setSelected([...selected].filter(id => ids.has(id)), true);
+}
+
+function markLoaded() { document.getElementById("loading")?.remove(); }
+
+/* Üst sayfa köprüsü (ekran önizlemesiyle aynı "tm-*" sözleşmesi). */
+window.addEventListener("message", e => {
+  if (e.source !== window.parent || e.origin !== location.origin || !e.data) return;
+  if (e.data.type === "tm-boards") { setBoards(e.data.boards || []); markLoaded(); }
+  else if (e.data.type === "tm-selection") setSelected((e.data.ids || []).filter(id => tiles.has(id)), true);
+  else if (e.data.type === "tm-size") setTileSize(e.data.px, !!e.data.reset);
+  else if (e.data.type === "tm-pause") { paused = !!e.data.paused; tiles.forEach(t => t.refreshWanted()); }
+});
+document.addEventListener("pointerdown", () => window.parent.postMessage({ type: "tm-click" }, location.origin));
+window.parent.postMessage({ type: "tm-ready" }, location.origin);
+</script>
+</body>
+</html>
