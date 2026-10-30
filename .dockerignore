@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 .git
+# Üst çubuktaki derleme kodu için yalnız dal başvuruları (bkz. docker/rootfs/ankamon-surum-damgasi.py).
+!.git/HEAD
+!.git/packed-refs
+!.git/refs/heads
 .env
 data
 CLAUDE.md

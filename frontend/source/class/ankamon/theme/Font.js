@@ -76,6 +76,12 @@ qx.Theme.define("ankamon.theme.Font", {
       family: ["Segoe UI", "Roboto", "sans-serif"]
     },
 
+    // Üst çubukta "Ankamon" yazısının altındaki sürüm/derleme satırı (bkz. ui.Shell __createHeader).
+    "app-surum-damgasi": {
+      size: 10,
+      family: ["Segoe UI", "Roboto", "sans-serif"]
+    },
+
     "app-stat": {
       size: 26,
       bold: true,

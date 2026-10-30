@@ -158,6 +158,13 @@ COPY --from=frontend /out/frontend-versions.json /opt/ankamon/frontend-versions.
 COPY docker/rootfs/software-versions.py /tmp/software-versions.py
 RUN python3 /tmp/software-versions.py && rm /tmp/software-versions.py
 
+# Üst çubuktaki sürüm/derleme bilgisi (bkz. docker/rootfs/ankamon-surum-damgasi.py). Köşeli joker: .git yoksa
+# (kaynak arşivi) ya da dosyaysa (worktree) derleme kırılmaz; Dockerfile eşleşmeyen COPY olmasın diye kaynakta.
+COPY Dockerfile frontend/Manifest.json .gi[t]/HEA[D] .gi[t]/packed-ref[s] .gi[t]/refs/head[s] /tmp/ankamon-surum-kaynak/
+COPY docker/rootfs/ankamon-surum-damgasi.py /tmp/ankamon-surum-damgasi.py
+RUN python3 /tmp/ankamon-surum-damgasi.py /tmp/ankamon-surum-kaynak /opt/ankamon/surum-damgasi.json \
+ && rm -rf /tmp/ankamon-surum-kaynak /tmp/ankamon-surum-damgasi.py
+
 EXPOSE 80 443 514/tcp 514/udp 8554/tcp 8189/udp 8189/tcp
 VOLUME /data
 

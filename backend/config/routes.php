@@ -33,6 +33,7 @@ use Ankamon\Api;
 // [METOD, yol, [sınıf, metot], erişim] — erişim için bkz. Core\Router.
 return [
     ['GET',    '/api/health',            [Api\HealthApi::class, 'health'],     'public'],
+    ['GET',    '/api/surum-damgasi',     [Api\HealthApi::class, 'surumDamgasi'], 'user'],
     // Giriş ekranı durum satırı: yalnız sayılar (bkz. LoginStatusApi).
     ['GET',    '/api/login-status',      [Api\LoginStatusApi::class, 'status'], 'public'],
 

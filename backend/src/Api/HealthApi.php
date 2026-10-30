@@ -17,4 +17,11 @@ final class HealthApi
         Db::value('SELECT 1');
         return ['ok' => true];
     }
+
+    /** Üst çubuktaki sürüm/derleme bilgisi (imaj üretilirken yazılır, bkz. docker/rootfs/ankamon-surum-damgasi.py). */
+    public function surumDamgasi(): array
+    {
+        $raw = @file_get_contents('/opt/ankamon/surum-damgasi.json');
+        return ($raw !== false ? json_decode($raw, true) : null) ?: ['version' => '', 'commit' => '', 'built_at' => ''];
+    }
 }

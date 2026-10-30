@@ -716,6 +716,25 @@ qx.Class.define("ankamon.ui.Shell", {
       }
     },
 
+    /** Logonun altındaki "v0.1.0 · abc1234" satırı; bilgi gelene kadar yer kaplamaz. */
+    __createBuildStampLabel() {
+      const label = new qx.ui.basic.Label().set({
+        font: "app-surum-damgasi", textColor: "app-header-text", opacity: 0.75, visibility: "excluded"
+      });
+      ankamon.io.Api.get("/surum-damgasi").then(stamp => {
+        const parts = [stamp.version && `v${stamp.version}`, stamp.commit].filter(Boolean);
+        if (!parts.length) {
+          return;
+        }
+        label.setValue(parts.join(" · "));
+        if (stamp.built_at) {
+          label.setToolTipText(`Derleme: ${new Date(stamp.built_at).toLocaleString("tr-TR")}`);
+        }
+        label.show();
+      }).catch(() => null);
+      return label;
+    },
+
     __createHeader() {
       const header = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" })).set({
         padding: [8, 14],
@@ -728,7 +747,10 @@ qx.Class.define("ankamon.ui.Shell", {
       header.add(fold);
       // Logo simgesi: ekran çerçevesi başlık yazısının renginde (temaların koyu/mavi başlık zemininde seçilsin).
       header.add(new qx.ui.basic.Label(ankamon.ui.Logo.icon(32, "currentColor")).set({ rich: true, textColor: "app-header-text" }));
-      header.add(new qx.ui.basic.Label("Ankamon").set({ font: "app-title", textColor: "app-header-text" }));
+      const brand = new qx.ui.container.Composite(new qx.ui.layout.VBox());
+      brand.add(new qx.ui.basic.Label("Ankamon").set({ font: "app-title", textColor: "app-header-text" }));
+      brand.add(this.__createBuildStampLabel());
+      header.add(brand);
       header.add(new qx.ui.core.Spacer(), { flex: 1 });
       header.add(new qx.ui.basic.Label(this.__user.full_name || this.__user.username).set({ textColor: "app-header-text" }));
       const logout = new qx.ui.form.Button("Çıkış");
