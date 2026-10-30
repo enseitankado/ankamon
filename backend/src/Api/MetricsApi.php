@@ -147,7 +147,11 @@ final class MetricsApi
         $rows = Db::all(
             "SELECT board_id,
                     avg(value) FILTER (WHERE name = 'node_hwmon_temp_celsius'
-                        AND (chip LIKE '%coretemp%' OR chip LIKE '%k10temp%')) AS cpu_temp,
+                        AND (chip LIKE '%coretemp%' OR chip LIKE '%k10temp%')) AS cpu_temp_core,
+                    -- Yedek: coretemp/k10temp serisi yoksa (çoğu ETAP tahtasında bu sürücü yüklü değil, CPU
+                    -- sıcaklığı ACPI/anakart sensöründen gelir — canlı cpu_temp de temp_max'e düşer, bkz. latest())
+                    -- tüm sıcaklık sensörlerinin ortalaması; aşağıda COALESCE ile yedek alınır.
+                    avg(value) FILTER (WHERE name IN ('node_hwmon_temp_celsius', 'node_thermal_zone_temp')) AS temp_any,
                     avg(value) FILTER (WHERE name IN ('smartmon_temperature_celsius_raw_value',
                         'smartmon_airflow_temperature_cel_raw_value', 'nvme_temperature_celsius')) AS disk_temp,
                     avg(value) FILTER (WHERE name = 'node_memory_MemAvailable_bytes') AS mem_avail,
@@ -161,7 +165,8 @@ final class MetricsApi
         $out = [];
         foreach ($rows as $row) {
             $out[(int) $row['board_id']] = [
-                'cpu_temp' => self::num($row['cpu_temp'], 1),
+                // Canlı cpu_temp ile aynı kaynak sırası: coretemp/k10temp varsa o, yoksa tüm sensör ortalaması.
+                'cpu_temp' => self::num($row['cpu_temp_core'] ?? $row['temp_any'], 1),
                 'disk_temp' => self::num($row['disk_temp'], 1),
                 'mem_percent' => self::usedPercent($row['mem_total'], $row['mem_avail']),
                 'disk_percent' => self::usedPercent($row['disk_size'], $row['disk_avail']),
