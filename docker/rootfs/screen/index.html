@@ -70,16 +70,23 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     text-align: center; padding: 12px; font-size: 13px; color: #fff; font-weight: 600; pointer-events: none;
     background: rgba(0, 0, 0, .82); }
   .tile.live.blank .sleep, .tile.live.powersave .sleep { display: flex; }
-  /* TiHA geri sayımlı otomatik kapatması: kalan süre (bkz. Tile.tickShutdown, worker executor/autoshutdown.py). */
-  .tile .sleep .sd { margin-top: 6px; font-weight: 400; font-size: 12px; color: #ffcc80; }
+  /* TiHA geri sayımlı otomatik kapatması: kalan süre (bkz. Tile.tickShutdown, worker executor/autoshutdown.py).
+     Uyarı her zaman kutucuğun en üstünde (kullanıcı isteği); "güç tasarrufu" yazısı ortada kalır. */
+  .tile .sleep .sd { position: absolute; top: 6px; left: 8px; right: 8px; font-weight: 400; font-size: 12px; color: #ffcc80; }
   .tile .sleep .sd:empty { display: none; }
   .tile .sleep .wk { margin-top: 6px; font-weight: 400; font-size: 11px; color: #ccc; }
   html.embed .tile.live.powersave:not(.control) .view, html.embed .tile.live.powersave:not(.control) .view * { cursor: pointer !important; }
-  /* "Başarım" açıkken (.perf kendi koyu zeminiyle zaten örtüyor) yazı tam örtü olmaz, sağ altta küçük
-     rozete döner: koyu örtü göstergeleri okunmaz kılıyordu (kullanıcı isteği). */
-  .tile .view:has(> .perf:not([hidden])) .sleep { inset: auto 4px 4px auto; max-width: 60%; padding: 3px 8px;
-    border-radius: 3px; font-size: 12px; background: rgba(0, 0, 0, .85); }
-  .tile .view:has(> .perf:not([hidden])) .sleep .sd { margin-top: 2px; font-size: 11px; }
+  /* "Başarım" açıkken (.perf kendi koyu zeminiyle zaten örtüyor) yazı tam örtü olmaz, en üstte şerit olur:
+     koyu örtü göstergeleri okunmaz kılıyordu (kullanıcı isteği). Şerit kendi yüksekliğinde (dar kutucukta sarar),
+     .perf kalan alanı doldurur ve yazısı ona göre ölçeklenir — metriklerin üstüne binmez. */
+  .tile.live.blank .view:has(> .perf:not([hidden])), .tile.live.powersave .view:has(> .perf:not([hidden])) {
+    display: flex; flex-direction: column; }
+  .tile.live.blank .view > .perf:not([hidden]), .tile.live.powersave .view > .perf:not([hidden]) {
+    position: relative; inset: auto; flex: 1; min-height: 0; }
+  .tile .view:has(> .perf:not([hidden])) .sleep { position: static; order: -1; flex: none; padding: 3px 8px;
+    font-size: 12px; background: #000; }
+  .tile .view:has(> .perf:not([hidden])) .sleep > div { display: flex; flex-direction: column; }
+  .tile .view:has(> .perf:not([hidden])) .sleep .sd { position: static; order: -1; margin-bottom: 1px; font-size: 11px; }
   .tile .view:has(> .perf:not([hidden])) .sleep .wk { display: none; }
   html.single #toolbar { display: none; }
   /* Gömülü kip (Tahtalar sayfasının "Ekranlar" sekmesi): sabit oranlı küçük kutucuklar, aşağı kaydırılır.
