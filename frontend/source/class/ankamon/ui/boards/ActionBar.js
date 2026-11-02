@@ -180,6 +180,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       const accent = ["primary", "background-selected"].find(n => mgr.isDynamic(n)) || "#0067c0";
       const buttons = new Map();
       const radio = new qx.ui.form.RadioGroup();
+      const [r, g, b] = qx.util.ColorUtil.cssStringToRgb(mgr.resolve(accent));
+      const onAccent = (r * 299 + g * 587 + b * 114) / 1000 >= 130 ? "#111111" : "white";   // koyu temaların vurgusu açık: beyaz okunmaz
       // Temaların "basılı" görünümü çoğunda belirgin değil (kullanıcı bildirimi): seçili düğme her temada dolu renkli, yazısı beyaz.
       // Kapalı düğme (Liste görünümünde Sensörler) değerini korur ama seçili görünmez.
       const paint = button => {
@@ -187,7 +189,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         button.setUserData("ankamon.checked", on);
         button.setBackgroundColor(on ? accent : "transparent");
         button.setOpacity(button.getEnabled() ? 1 : ankamon.ui.boards.ActionBar.OFF_OPACITY);
-        button.getChildControl("label").setTextColor(on ? "white" : this.__colors.text);
+        button.getChildControl("label").setTextColor(on ? onAccent : this.__colors.text);
       };
       items.forEach((item, index) => {
         const html = `${ankamon.ui.boards.ActionIcons.svg(item.icon)}` +
