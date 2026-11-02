@@ -26,8 +26,9 @@
  */
 
 /**
- * Sağ menü "Wi-Fi Monitör": bilgisayarın Wi-Fi kartı, bağlantısı ve çevresindeki ağlar, canlı (bkz. worker screen/wifi.py). Salt
- * okunur; tahta başına bir pencere. Kart ya da bağlantı değiştirilmez.
+ * Sağ menü "Wi-Fi Monitör": bilgisayarın Wi-Fi kartı, bağlantısı, çevresindeki ağlar ve Bluetooth cihazları tek tabloda (bkz. worker
+ * screen/wifi.py). Tahta başına bir pencere. Varsayılan tek tarama, "Yenile" yeni tarama yapar; "Sürekli izle" açıkken liste tazelenir.
+ * Wi-Fi/Bluetooth kapalıysa tarama süresince tahtada geçici açılır (kayıtlı ağa bağlanmaz), sonra eski durumuna döner.
  */
 qx.Class.define("ankamon.ui.boards.WifiMonitor", {
   type: "static",
@@ -46,6 +47,14 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       const esc = qx.bom.String.escape;
       const win = ankamon.ui.Dialog.window("Wi-Fi Monitör — " + name, 760, { maximizable: true });
       win.setHeight(520);
+      const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(12).set({ alignY: "middle" }));
+      const refresh = new qx.ui.form.Button("Yenile");
+      const watchBox = new qx.ui.form.CheckBox("Sürekli izle").set({
+        toolTipText: "Açıkken liste sürekli tazelenir; kapalı radyo izleme bitene kadar açık kalır."
+      });
+      bar.add(refresh);
+      bar.add(watchBox);
+      win.add(bar);
       const status = new qx.ui.basic.Label("Bağlanılıyor…").set({ rich: true, wrap: true, allowGrowX: true });
       win.add(status);
       const html = new qx.ui.embed.Html("").set({ overflowY: "auto" });
@@ -55,51 +64,155 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       let closed = false;
       let ws = null;
+      let line = "";
+      let lastData = null;
+      const red = text => `<span style="color:#d93025">${esc(text)}</span>`;
       const bars = pct => {
+        if (pct === null || pct === undefined) {
+          return "";
+        }
         const color = pct >= 60 ? "#2fa84a" : pct >= 35 ? "#e8a200" : "#d93025";
         return `<span style="display:inline-block;width:80px;height:9px;background:rgba(127,127,127,.25);border-radius:5px;vertical-align:middle">` +
           `<span style="display:block;width:${pct}%;height:100%;background:${color};border-radius:5px"></span></span> ${pct}%`;
       };
-      const render = d => {
-        const radio = d.radio === "enabled" ? "açık" : d.radio === "disabled" ? "kapalı" : "bilinmiyor";
-        if (!d.device) {
-          status.setValue("Bu bilgisayarda Wi-Fi kartı görünmüyor.");
-        } else {
-          const color = d.radio === "enabled" ? "inherit" : "#d93025";
-          status.setValue(`Kart: <b>${esc(d.device)}</b> · Wi-Fi <b style="color:${color}">${radio}</b> · ` +
-            (d.connection ? `Bağlı: <b>${esc(d.connection)}</b>` : "bağlı değil") +
-            ` · ${d.networks.length} ağ · ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}` +
-            (d.radio === "disabled" ? "<br>Wi-Fi kapalıyken çevredeki ağlar taranamaz; bu pencere kartı açmaz." : ""));
+      const btNote = (bt, ended) => {
+        if (bt === "absent") {
+          return "Bu tahtada Bluetooth adaptörü yok.";
         }
+        if (bt === "temp") {
+          return ended ? "Bluetooth geçici açıldı, tarama sonrası eski durumuna döndürüldü." : "Bluetooth geçici açık.";
+        }
+        return bt && bt.startsWith("fail") ? red("Bluetooth açılamadı; cihazlar listelenemedi.") : "";
+      };
+      const wifiNote = (info, watching) => {
+        if (info.wifi_fail) {
+          return red(info.wifi_fail === "autoconnect"
+            ? "Otomatik bağlanma kapatılamadığından Wi-Fi açılmadı."
+            : "Wi-Fi geçici açılamadı; ağlar listelenemedi.");
+        }
+        if (info.wifi_temp !== "1") {
+          return "";
+        }
+        return watching ? "Wi-Fi izleme için geçici açık; izleme bitince kapatılacak." : "Wi-Fi geçici açık, tarama sonrası kapatılacak.";
+      };
+      const summaryLine = (d, radioValue) => {
+        const radio = radioValue === "enabled" ? "açık" : radioValue === "disabled" ? "kapalı" : "bilinmiyor";
+        const wifiCount = d.rows.filter(r => r.kind === "wifi").length;
+        const btCount = d.rows.length - wifiCount;
+        const info = d.info || {};
+        const summary = d.device
+          ? `Kart: <b>${esc(d.device)}</b> · Wi-Fi <b style="color:${radioValue === "enabled" ? "inherit" : "#d93025"}">${radio}</b> · ` +
+            (d.connection ? `Bağlı: <b>${esc(d.connection)}</b>` : "bağlı değil")
+          : "Bu bilgisayarda Wi-Fi kartı görünmüyor.";
+        const counts = `${wifiCount} ağ` + (info.bt === "on" || info.bt === "temp" ? ` · ${btCount} Bluetooth` : "") +
+          ` · ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}`;
+        return `${summary} · ${counts}`;
+      };
+      const showStatus = notes => {
+        const text = notes.filter(Boolean).join(" ");
+        status.setValue(line && text ? `${line}<br>${text}` : line || text);
+      };
+      const render = d => {
+        lastData = d;
+        line = summaryLine(d, d.radio);
+        const info = d.info || {};
+        showStatus([wifiNote(info, watchBox.getValue()), btNote(info.bt, false)]);
         const th = "text-align:left;padding:4px 8px;border-bottom:1px solid rgba(127,127,127,.4);position:sticky;top:0;background:inherit";
         const td = "padding:3px 8px;white-space:nowrap";
         html.setHtml(`<table style="border-collapse:collapse;font-size:13px;width:100%"><tr>` +
-          ["Ağ (SSID)", "Sinyal", "Kanal", "Frekans", "Hız", "Güvenlik", "BSSID"].map(h => `<th style="${th}">${h}</th>`).join("") + "</tr>" +
-          d.networks.map(n => `<tr style="${n.active ? "font-weight:600;background:rgba(26,115,232,.12)" : ""}">` +
-            `<td style="${td}">${n.active ? "● " : ""}${esc(n.ssid || "(gizli ağ)")}</td><td style="${td}">${bars(n.signal)}</td>` +
-            `<td style="${td}">${esc(n.chan)}</td><td style="${td}">${esc(n.freq)}</td><td style="${td}">${esc(n.rate)}</td>` +
-            `<td style="${td}">${esc(n.security || "açık")}</td><td style="${td};opacity:.7">${esc(n.bssid)}</td></tr>`).join("") + "</table>");
+          ["Tür", "Ad", "Sinyal", "Kanal", "Frekans", "Hız", "Güvenlik", "Adres"].map(h => `<th style="${th}">${h}</th>`).join("") + "</tr>" +
+          d.rows.map(n => {
+            const isWifi = n.kind === "wifi";
+            const name = n.name || (isWifi ? "(gizli ağ)" : "(adsız)");
+            const security = isWifi ? n.security || "açık" : n.security;
+            return `<tr style="${n.active ? "font-weight:600;background:rgba(26,115,232,.12)" : ""}">` +
+              `<td style="${td}">${isWifi ? "Wi-Fi" : "Bluetooth"}</td>` +
+              `<td style="${td}">${n.active ? "● " : ""}${esc(name)}</td><td style="${td}">${bars(n.signal)}</td>` +
+              `<td style="${td}">${esc(n.chan)}</td><td style="${td}">${esc(n.freq)}</td><td style="${td}">${esc(n.rate)}</td>` +
+              `<td style="${td}">${esc(security)}</td><td style="${td};opacity:.7">${esc(n.addr)}</td></tr>`;
+          }).join("") + "</table>");
+      };
+      const renderDone = d => {
+        if (lastData) {
+          line = summaryLine(lastData, d.radio);
+        }
+        const parts = [];
+        if (d.result === "fail" || d.result === "lock") {
+          parts.push(red("Tahtadaki kartın eski durumuna dönmesi doğrulanamadı; lütfen denetleyin."));
+        } else if (d.wifi_fail) {
+          parts.push(wifiNote(d, false));
+        } else if (d.wifi_temp === "1") {
+          parts.push(d.result === "shared"
+            ? "Wi-Fi geçici açıldı; bu tahtadaki başka bir tarama bitince kapatılacak."
+            : "Wi-Fi geçici açıldı, tarama sonrası kapatıldı.");
+        }
+        parts.push(btNote(d.bt, d.result !== "shared"));
+        showStatus(parts);
+      };
+      const syncControls = busy => refresh.setEnabled(!busy && !watchBox.getValue());
+      const discard = sock => {
+        if (sock) {
+          sock.onmessage = sock.onclose = null;
+          sock.close();
+        }
       };
       const connect = () => {
-        ws = new WebSocket(`${proto}//${location.host}/screen/ws/wifi/${board.id}`);
-        ws.onmessage = e => render(JSON.parse(e.data));
-        ws.onclose = e => {
-          if (closed) {
+        const watching = watchBox.getValue();
+        const sock = ws = new WebSocket(`${proto}//${location.host}/screen/ws/wifi/${board.id}${watching ? "?watch=1" : ""}`);
+        syncControls(true);
+        sock.onmessage = e => {
+          const d = JSON.parse(e.data);
+          if (d.phase === "scanning") {
+            showStatus(["Taranıyor…", wifiNote(d.info, watching), btNote(d.info.bt, false)]);
+          } else if (d.phase === "data") {
+            render(d);
+          } else if (d.phase === "done") {
+            renderDone(d);
+          }
+        };
+        sock.onclose = e => {
+          if (closed || sock !== ws) {
             return;
           }
-          const why = { 4001: "Tahta bulunamadı.", 4002: "Tahtaya ulaşılamıyor; yeniden deneniyor…", 4003: "SSH girişi reddedildi.", 4009: "Tahtada nmcli yok." };
-          status.setValue(`<span style="color:#d93025">${esc(why[e.code] || "Bağlantı kesildi; yeniden deneniyor…")}</span>`);
-          if (![4001, 4003, 4009].includes(e.code)) {
-            qx.event.Timer.once(() => !closed && connect(), null, 5000);
+          ws = null;
+          syncControls(false);
+          if (e.code === 1000) {
+            return;
+          }
+          const why = { 4001: "Tahta bulunamadı.", 4002: "Tahtaya ulaşılamıyor.", 4003: "SSH girişi reddedildi.", 4009: "Tahtada nmcli yok.", 4010: "Tahtada /run dizinine yazılamıyor." };
+          const retry = watchBox.getValue() && ![4001, 4003, 4009, 4010].includes(e.code);
+          status.setValue(red((why[e.code] || "Bağlantı kesildi.") + (retry ? " Yeniden deneniyor…" : "")));
+          if (retry) {
+            qx.event.Timer.once(() => !closed && !ws && watchBox.getValue() && connect(), null, 5000);
           }
         };
       };
+      refresh.addListener("execute", () => {
+        if (!ws) {
+          connect();
+        }
+      });
+      watchBox.addListener("changeValue", e => {
+        if (e.getData()) {
+          // Eski oturum kapanırken yenisi başlarsa tahtadaki sayım radyoyu boşuna kapatmaz (bkz. wifi_remote_scan.py).
+          discard(ws);
+          connect();
+        } else if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send("stop");
+          showStatus(["İzleme durduruluyor…"]);
+          syncControls(true);
+        } else if (ws) {
+          discard(ws);
+          ws = null;
+          syncControls(false);
+        } else {
+          syncControls(false);
+        }
+      });
       win.addListener("close", () => {
         closed = true;
         this.__open.delete(board.id);
-        if (ws) {
-          ws.close();
-        }
+        discard(ws);
       });
       win.open();
       connect();

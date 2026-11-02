@@ -1,0 +1,324 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Ankamon — ETAP akıllı tahtaları için merkezi log, izleme ve yönetim sunucusu
+# Copyright (C) 2026 Özgür Koca <ozgurkoca@gmail.com>
+# https://github.com/enseitankado/ankamon
+#
+# Bu program özgür yazılımdır: Free Software Foundation tarafından yayımlanan
+# GNU Affero Genel Kamu Lisansı'nın 3. sürümü ya da (tercihinize bağlı olarak)
+# daha sonraki herhangi bir sürümü koşulları altında yeniden dağıtabilir ve/veya
+# değiştirebilirsiniz.
+#
+# Bu program yararlı olması umuduyla dağıtılmaktadır, ancak HİÇBİR GARANTİSİ
+# YOKTUR; satılabilirlik veya belirli bir amaca uygunluk garantisi dahi
+# verilmez. Ayrıntılar için GNU Affero Genel Kamu Lisansı'na bakınız.
+#
+# Bu programla birlikte GNU Affero Genel Kamu Lisansı'nın bir kopyasını (LICENSE
+# dosyası) almış olmalısınız. Almadıysanız <https://www.gnu.org/licenses/>
+# adresine bakınız.
+#
+# Bu dosyadan (sınıf, işlev ya da işlev içi kod bloğu dahil) alınan her türlü
+# parça da AGPL-3.0-or-later ile lisanslıdır: parçayı kullanan türev eser aynı
+# lisansla yayımlanmalı, bu telif/atıf bildirimi ve değişiklik notu
+# korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
+# kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
+
+"""Wi-Fi Monitör'ün tahtada çalışan kabuk programı (bkz. wifi.py).
+
+Program /run/ankamon-wifimon/prog.sh olarak yazılıp sh (dash) ile çalışır. Kart kapalıysa geçici açar, tarar, eski durumuna döndürür:
+- Radyo kapalıysa önce `nmcli device set <kart> autoconnect no`, sonra radyo açılır; kart kayıtlı ağa bağlanmaz (bu sunucu ağları
+  arası geçiş yasak). Yine de bağlanmaya kalkarsa `device disconnect`. Autoconnect kapatılamazsa radyo hiç açılmaz.
+- Başlangıç durumu değişiklikten ÖNCE `orig` dosyasına yazılır. Geri yükleme önce radyoyu kapatır, sonra autoconnect'i döndürür.
+- Aynı tahtada eşzamanlı oturumlar: `flock` altında oturum sayımı; durumu ilk oturum kaydeder, son çıkan geri yükler.
+- Geri yüklemeyi hem ana sürecin trap'i hem `setsid` ile ayrılmış bekçi yapar (ikisi de güvenli, iş bir kez yapılır). Bekçi sunucudan
+  gelen stdin kalp atışını okur: EOF (SSH koptu, durdurma istendi), LEASE saniye sessizlik (ağ koptu) ya da ana sürecin ölmesi
+  (kill -9) durumunda devreye girer. stdout'u /dev/null'dur; SSH oturumunu açık tutmaz.
+- Bluetooth: /sys/class/bluetooth/hci* varsa rfkill, servis ve güç açısından gerekirse geçici açılır, durum aynı şekilde döner. Yoksa atlanır.
+
+Bilinen sınır: geçici açıkken tahtanın gücü kesilirse trap da bekçi de çalışamaz; NetworkManager radyoyu açık hatırlar ve /run açılışta
+silindiğinden sonraki oturum da bunu bilemez.
+
+Çıktı: önce @@INFO + @@START; her tarama @@RADIO/@@DEV/@@LIST/@@BT/@@INFO bölümleri + @@END; sonda @@RESTORED + @@DONE.
+"""
+
+from __future__ import annotations
+
+_WIFIMON_PROGRAM = r"""
+export LC_ALL=C.UTF-8 PATH=/usr/sbin:/usr/bin:/sbin:/bin
+D=/run/ankamon-wifimon
+O=$D/orig
+L=$D/lock
+LEASE=25
+SELF=$0
+
+n() { timeout 15 nmcli "$@" 2>/dev/null; }
+b() { timeout 5 bluetoothctl "$@" </dev/null 2>/dev/null; }
+wifi_radio() { n -t -f WIFI general; }
+wifi_state() { [ -n "$1" ] && n -g GENERAL.STATE device show "$1" | cut -d' ' -f1; }
+bt_powered() { b show | sed -n 's/.*Powered: *\([a-z]*\).*/\1/p' | head -n1; }
+
+live_sessions() {
+  c=0
+  for f in "$D"/s.*; do
+    [ -e "$f" ] || continue
+    if kill -0 "${f##*.}" 2>/dev/null; then c=$((c+1)); else rm -f "$f"; fi
+  done
+  echo "$c"
+}
+
+capture() {
+  W_DEV=$(n -t -f DEVICE,TYPE device | sed -n 's/^\(.*\):wifi$/\1/p' | head -n1)
+  W_TEMP=0; W_AC=
+  if [ -n "$W_DEV" ] && [ "$(wifi_radio)" = disabled ]; then
+    W_TEMP=1
+    W_AC=$(n -g GENERAL.AUTOCONNECT device show "$W_DEV")
+    [ -n "$W_AC" ] || W_AC=yes
+  fi
+  BT_PRESENT=0; BT_TEMP=0; BT_SVC=; BT_POW=; BT_RFK=
+  if ls -d /sys/class/bluetooth/hci* >/dev/null 2>&1 && command -v bluetoothctl >/dev/null 2>&1; then
+    BT_PRESENT=1
+    for r in /sys/class/rfkill/rfkill*; do
+      [ "$(cat "$r/type" 2>/dev/null)" = bluetooth ] && [ "$(cat "$r/soft" 2>/dev/null)" = 1 ] && BT_RFK="$BT_RFK $r"
+    done
+    BT_SVC=$(systemctl is-active bluetooth 2>/dev/null)
+    [ "$BT_SVC" = active ] && BT_POW=$(bt_powered)
+    { [ -n "$BT_RFK" ] || [ "$BT_SVC" != active ] || [ "$BT_POW" != yes ]; } && BT_TEMP=1
+  fi
+  cat > "$O.new" <<EOF
+W_DEV='$W_DEV'
+W_TEMP=$W_TEMP
+W_AC='$W_AC'
+W_FAIL=
+BT_PRESENT=$BT_PRESENT
+BT_TEMP=$BT_TEMP
+BT_SVC='$BT_SVC'
+BT_POW='$BT_POW'
+BT_RFK='$BT_RFK'
+BT_FAIL=
+EOF
+  sync "$O.new" 2>/dev/null
+  mv -f "$O.new" "$O"
+}
+
+open_radios() {
+  if [ "$W_TEMP" = 1 ]; then
+    if n device set "$W_DEV" autoconnect no >/dev/null; then
+      n radio wifi on >/dev/null || echo "W_FAIL=radio" >> "$O"
+    else
+      echo "W_FAIL=autoconnect" >> "$O"
+    fi
+  fi
+  [ "$BT_TEMP" = 1 ] || return 0
+  for r in $BT_RFK; do echo 0 > "$r/soft" 2>/dev/null; done
+  if [ "$BT_SVC" != active ] && ! timeout 15 systemctl start bluetooth >/dev/null 2>&1; then
+    echo "BT_FAIL=service" >> "$O"
+    return 0
+  fi
+  i=0; p=
+  while [ $i -lt 6 ]; do p=$(bt_powered); [ -n "$p" ] && break; sleep 1; i=$((i+1)); done
+  if [ "$p" != yes ]; then
+    b power on >/dev/null
+    sleep 1
+    [ "$(bt_powered)" = yes ] || echo "BT_FAIL=power" >> "$O"
+  fi
+}
+
+restore_orig() {
+  [ -f "$O" ] || { echo none; return 0; }
+  . "$O"
+  ok=1
+  if [ "$W_TEMP" = 1 ]; then
+    i=0
+    while :; do
+      n radio wifi off >/dev/null
+      [ "$(wifi_radio)" = disabled ] && break
+      i=$((i+1))
+      [ $i -ge 3 ] && { ok=0; break; }
+      sleep 1
+    done
+    n device set "$W_DEV" autoconnect "$W_AC" >/dev/null || ok=0
+  fi
+  if [ "$BT_TEMP" = 1 ]; then
+    { [ "$BT_SVC" = active ] && [ "$BT_POW" = yes ]; } || b power off >/dev/null
+    [ "$BT_SVC" = active ] || timeout 15 systemctl stop bluetooth >/dev/null 2>&1
+    for r in $BT_RFK; do echo 1 > "$r/soft" 2>/dev/null; done
+  fi
+  if [ $ok = 1 ]; then rm -f "$O"; echo restored; else echo fail; fi
+}
+
+acquire() {
+  (
+    flock -w 40 9 || exit 1
+    if [ "$(live_sessions)" = 0 ] && [ -f "$O" ]; then restore_orig >/dev/null; fi
+    if [ ! -f "$O" ]; then capture; . "$O"; open_radios; fi
+    : > "$D/s.$1"
+  ) 9>"$L"
+}
+
+release() {
+  (
+    flock -w 40 9 || { echo fail; exit 1; }
+    rm -f "$D/s.$1"
+    if [ "$(live_sessions)" = 0 ]; then restore_orig; else echo shared; fi
+  ) 9>"$L"
+}
+
+guard() {
+  M=$1
+  last=$(date +%s)
+  while kill -0 "$M" 2>/dev/null; do
+    line=$(timeout 3 head -n1); rc=$?
+    now=$(date +%s)
+    if [ $rc = 0 ]; then
+      [ -n "$line" ] || break
+      last=$now
+    elif [ $((now-last)) -ge $LEASE ]; then
+      break
+    fi
+  done
+  kill -TERM "$M" 2>/dev/null
+  i=0
+  while kill -0 "$M" 2>/dev/null && [ $i -lt 6 ]; do sleep 1; i=$((i+1)); done
+  release "$M" >/dev/null
+  kill -KILL "$M" 2>/dev/null
+  rm -f "$D/list.$M"
+}
+
+bt_info() {
+  if [ "$BT_PRESENT" != 1 ]; then echo absent
+  elif [ -n "$BT_FAIL" ]; then echo "fail:$BT_FAIL"
+  elif [ "$BT_TEMP" = 1 ]; then echo temp
+  else echo on
+  fi
+}
+
+finish() {
+  trap '' TERM HUP INT PIPE
+  [ -n "$CUR" ] && kill "$CUR" 2>/dev/null
+  [ -n "$BTP" ] && kill "$BTP" 2>/dev/null
+  res=$(release "$ME")
+  rm -f "$TMP"
+  echo '@@RESTORED'
+  echo "result=$res"
+  echo "wifi_temp=$W_TEMP"
+  echo "wifi_fail=$W_FAIL"
+  echo "bt=$(bt_info)"
+  echo "radio=$(wifi_radio)"
+  echo '@@DONE'
+  exit 0
+}
+
+info() {
+  echo '@@INFO'
+  echo "wifi_temp=$W_TEMP"
+  echo "wifi_fail=$W_FAIL"
+  echo "bt=$(bt_info)"
+  echo "disconnected=$DISCONNECTED"
+}
+
+# Geçici açık kart kendiliğinden bağlanmaya kalkarsa bağlantıyı keser. Autoconnect her seferinde yeniden kapatılır:
+# NetworkManager yeniden başlarsa bu çalışma zamanı ayarı "yes"e döner (Arge 1'de görüldü).
+block_connect() {
+  { [ "$W_TEMP" = 1 ] && [ -z "$W_FAIL" ]; } || return 0
+  n device set "$W_DEV" autoconnect no >/dev/null
+  case "$(wifi_state "$W_DEV")" in
+    40|50|60|70|80|90|100) n device disconnect "$W_DEV" >/dev/null; DISCONNECTED=1 ;;
+  esac
+}
+
+wifi_wait_ready() {
+  { [ "$W_TEMP" = 1 ] && [ -z "$W_FAIL" ]; } || return 0
+  i=0
+  while [ $i -lt 15 ]; do
+    s=$(wifi_state "$W_DEV")
+    [ -n "$s" ] && [ "$s" -ge 30 ] 2>/dev/null && return 0
+    sleep 1 & CUR=$!; wait $CUR; CUR=
+    i=$((i+1))
+  done
+  W_FAIL=timeout
+}
+
+# Sonuç $TMP dosyasında (trap'in çıktısı yönlendirmeye karışmasın diye işlevin stdout'u yönlendirilmez).
+wifi_list() {
+  : > "$TMP"
+  [ -n "$W_DEV" ] || return 0
+  [ "$(wifi_radio)" = enabled ] || return 0
+  for mode in "$1" no; do
+    timeout 25 nmcli -t -f IN-USE,BSSID,SSID,CHAN,FREQ,RATE,SIGNAL,SECURITY device wifi list ifname "$W_DEV" --rescan "$mode" >"$TMP" 2>/dev/null &
+    CUR=$!; wait $CUR; rc=$?; CUR=
+    [ $rc = 0 ] && break
+  done
+}
+
+bt_collect() {
+  macs=$(timeout 5 bluetoothctl devices </dev/null 2>/dev/null | grep -oE '([0-9A-F]{2}:){5}[0-9A-F]{2}' | sort -u | head -n 80)
+  for m in $macs; do timeout 3 bluetoothctl info "$m" </dev/null 2>/dev/null; done
+}
+
+scan_once() {
+  BTP=; t0=$(date +%s)
+  if [ "$BT_PRESENT" = 1 ] && [ -z "$BT_FAIL" ]; then
+    timeout 11 bluetoothctl --timeout 9 scan on </dev/null >/dev/null 2>&1 &
+    BTP=$!
+  fi
+  wifi_wait_ready
+  block_connect
+  mode=yes
+  [ "$(wifi_state "$W_DEV")" = 100 ] && mode=auto
+  wifi_list "$mode"
+  block_connect
+  echo '@@RADIO'; wifi_radio
+  echo '@@DEV'; n -t -f DEVICE,TYPE,STATE,CONNECTION device
+  echo '@@LIST'; cat "$TMP"
+  echo '@@BT'
+  if [ -n "$BTP" ]; then
+    # RSSI yalnız keşif sürerken okunur: bluetoothctl (9 sn) bitmeden, 8. saniyede topla.
+    rem=$((t0+8-$(date +%s)))
+    if [ $rem -gt 0 ]; then sleep "$rem" & CUR=$!; wait $CUR; CUR=; fi
+    timeout 25 sh "$SELF" btcollect & CUR=$!; wait $CUR; CUR=
+    wait "$BTP" 2>/dev/null; BTP=
+  fi
+  info
+  echo '@@END'
+}
+
+main() {
+  WATCH=$1
+  ME=$$
+  TMP=$D/list.$ME
+  CUR=; BTP=; W_DEV=; W_TEMP=0; W_FAIL=; BT_PRESENT=0; BT_TEMP=0; BT_FAIL=; DISCONNECTED=0
+  exec 2>/dev/null 3<&0 </dev/null
+  trap finish TERM HUP INT PIPE
+  setsid sh "$SELF" guard "$ME" <&3 3<&- >/dev/null 2>&1 &
+  exec 3<&-
+  acquire "$ME" || { echo '@@RESTORED'; echo 'result=lock'; echo '@@DONE'; exit 1; }
+  . "$O"
+  info
+  echo '@@START'
+  while :; do
+    scan_once
+    [ "$WATCH" = 1 ] || break
+    sleep 6 & CUR=$!; wait $CUR; CUR=
+  done
+  finish
+}
+
+case "$1" in
+  main) main "$2" ;;
+  guard) guard "$2" ;;
+  btcollect) bt_collect ;;
+esac
+"""
+
+
+def wifimon_remote_command(watch: bool) -> str:
+    """SSH ile tahtaya verilecek komut: programı /run altına yazar, çalıştırır. Çıkış: 49 nmcli yok, 48 /run yazılamıyor."""
+    return (
+        "command -v nmcli >/dev/null 2>&1 || { echo NO_NMCLI >&2; exit 49; }\n"
+        "umask 077; mkdir -p /run/ankamon-wifimon 2>/dev/null || exit 48\n"
+        "cat > /run/ankamon-wifimon/prog.$$ <<'ANKAMON_WIFIMON_EOF' || exit 48"
+        + _WIFIMON_PROGRAM
+        + "ANKAMON_WIFIMON_EOF\n"
+        "mv -f /run/ankamon-wifimon/prog.$$ /run/ankamon-wifimon/prog.sh || exit 48\n"
+        f"exec sh /run/ankamon-wifimon/prog.sh main {1 if watch else 0}\n"
+    )

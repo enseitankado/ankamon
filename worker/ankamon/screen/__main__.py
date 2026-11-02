@@ -277,7 +277,7 @@ async def main():
          # Ekran penceresindeki hoparlör düğmesi (bkz. audio.py) ve sağ menü "Sohbet" (bkz. chat.py).
          (r"/screen/ws/audio/(\d+)", audio.AudioSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),
          (r"/screen/ws/chat/(\d+)", chat.ChatSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),
-         # Sağ menü "Wi-Fi Monitör" (salt okunur, bkz. wifi.py).
+         # Sağ menü "Wi-Fi Monitör" (kapalı radyoyu geçici açıp geri kapatır, bkz. wifi.py).
          (r"/screen/ws/wifi/(\d+)", wifi.WifiSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS})],
         # Ölü tarayıcı bağlantıları (sekme çökmesi, ağ kopması) ssh süreçlerini sonsuza dek tutmasın.
         websocket_ping_interval=30,
