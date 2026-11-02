@@ -96,15 +96,16 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
    * @param getSelected {Function} () → seçili tahtalar
    */
   construct(getMenu, getSelected) {
-    super(new qx.ui.layout.Flow(2, 2).set({ alignY: "middle" }));
+    super(new qx.ui.layout.Flow(1, 2).set({ alignY: "middle" }));
     this.__getMenu = getMenu;
     this.__getSelected = getSelected;
     this.__widgets = new Map();
-    this.set({ padding: [3, 8], margin: [6, 8, 8, 8] });
+    this.set({ padding: [3, 6], margin: [6, 8, 8, 8] });
     this.__applyPanel();
     this.__build();
-    this.__count = new qx.ui.basic.Label("").set({ textColor: "app-muted", alignY: "middle", marginLeft: 10 });
+    this.__count = new qx.ui.basic.Label("").set({ textColor: "app-muted", alignY: "middle", marginLeft: 6 });
     this.add(this.__count);
+    this.addListener("resize", this.__queueSeparators, this);
     this.refresh();
   },
 
@@ -123,6 +124,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     __stateKey: null,
     __colors: null,
     __flatDecorator: null,
+    __separators: null,
+    __separatorTimer: null,
 
     /**
      * Panel görünümü: sayfadan ayrı dursun diye zemin temanın yüzey renginden biraz koyu (koyu temada açık), çerçeve ve
@@ -165,8 +168,34 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
 
     /** Kümeleri ayıran ince dikey çizgi. */
     __separator() {
-      return new qx.ui.core.Widget().set({
-        width: 1, height: 40, allowGrowY: false, alignY: "middle", backgroundColor: "app-border", marginLeft: 5, marginRight: 5
+      const line = new qx.ui.core.Widget().set({
+        width: 1, height: 40, allowGrowY: false, alignY: "middle", backgroundColor: "app-border", marginLeft: 3, marginRight: 3
+      });
+      (this.__separators || (this.__separators = [])).push(line);
+      return line;
+    },
+
+    __queueSeparators() {
+      if (!this.__separatorTimer) {
+        this.__separatorTimer = qx.event.Timer.once(() => {
+          this.__separatorTimer = null;
+          this.__tidySeparators();
+        }, this, 0);
+      }
+    },
+
+    /** Çubuk sarılınca satır başına ya da sonuna düşen ayırıcı gizlenir. Yeri korunur: yerleşim değişmez, boyut döngüsü olmaz. */
+    __tidySeparators() {
+      const shown = this.getChildren().filter(w => w.isVisible() || this.__separators.includes(w));
+      this.__separators.forEach(line => {
+        const at = shown.indexOf(line);
+        const own = line.getBounds();
+        const prev = (shown[at - 1] || line).getBounds();
+        const next = (shown[at + 1] || line).getBounds();
+        if (own && prev && next) {
+          const edge = at === 0 || prev.top + prev.height <= own.top || next.top >= own.top + own.height;
+          line.setVisibility(edge ? "hidden" : "visible");
+        }
       });
     },
 
@@ -195,7 +224,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         const html = `${ankamon.ui.boards.ActionIcons.svg(item.icon)}` +
           `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(item.label)}</div>`;
         const button = item.group ? new qx.ui.toolbar.RadioButton(html) : new qx.ui.toolbar.CheckBox(html);
-        button.set({ rich: true, show: "label", center: true, padding: [4, 6], minWidth: 58, toolTipText: item.tip });
+        button.set({ rich: true, show: "label", center: true, padding: [4, 3], minWidth: 46, toolTipText: item.tip });
         this.__flatten(button);
         if (item.group) {
           radio.add(button);
@@ -236,8 +265,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       box.setBackgroundColor("transparent");   // temanın "widget" zemini panelde kutu gibi görünüyordu
       const html = `${ankamon.ui.boards.ActionIcons.svg(group.icon)}` +
         `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(group.label)}</div>`;
-      const main = new qx.ui.toolbar.Button(html).set({ rich: true, show: "label", center: true, padding: [4, 6], minWidth: 58 });
-      const arrow = new qx.ui.toolbar.Button("▾").set({ show: "label", padding: [4, 2], minWidth: 14, toolTipText: `${group.label}: tüm seçenekler` });
+      const main = new qx.ui.toolbar.Button(html).set({ rich: true, show: "label", center: true, padding: [4, 3], minWidth: 46 });
+      const arrow = new qx.ui.toolbar.Button("▾").set({ show: "label", padding: [4, 1], minWidth: 12, toolTipText: `${group.label}: tüm seçenekler` });
       this.__flatten(main);
       this.__flatten(arrow);
       main.addListener("execute", () => this.__pressMain(group, main));
@@ -310,7 +339,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       if (cur.menu) {
         this.__dropMenu(cur.menu);
       }
-      this.__count.setValue(boards.length ? `${boards.length} tahta seçili` : "Tahta seçili değil");
+      this.__queueSeparators();
+      this.__count.setValue(boards.length ? `${boards.length} seçili` : "Seçim yok");
     },
 
     __tip(group, leaves) {
