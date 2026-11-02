@@ -35,12 +35,12 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import db
-from ..executor import board_password, homesize, inputlock, relay, screenshot, whoami
+from ..executor import board_password, homesize, inputlock, ntfy, open_url, relay, screenshot, whoami
 from ..executor.jobs import _board_access, _write_one
 from . import stream
 
 TYPES = ("screenshot", "input_lock", "relay_start", "relay_stop", "home_sizes",
-         "password_status", "password_verify", "password_change")
+         "password_status", "password_verify", "password_change", "open_url", "ntfy_test")
 
 # Çıktısı JSON olan görevlerde canlı pencereye yazılmaz (arayüz okur, pencere açılmaz).
 _QUIET = ("home_sizes", "password_status")
@@ -82,6 +82,16 @@ def _own_conn(fn):
 def run(conn, job, targets, names, results) -> None:
     params = job["params"] or {}
     kind = job["type"]
+    if kind == "ntfy_test":
+        # Tahtasız: sonuç görev durumu ve bildirim geçmişi.
+        cfg = ntfy.config(conn)
+        if not cfg["topic"]:
+            raise RuntimeError("Konu adı kaydedilmemiş.")
+        if not ntfy.send_logged(conn, cfg, None, "Deneme", "Ankamon deneme bildirimi",
+                                "Bu konuya abonesiniz: Ankamon bildirimleri telefonunuza ulaşıyor.", tags=["white_check_mark"]):
+            last = conn.execute("SELECT error FROM ntfy_messages ORDER BY id DESC LIMIT 1").fetchone()
+            raise RuntimeError(last["error"] if last else "Gönderilemedi.")
+        return
     user, password = _board_access(conn)
     if not password:
         raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
@@ -90,6 +100,9 @@ def run(conn, job, targets, names, results) -> None:
         taken_by = job["username"] or "?"
         _parallel(conn, job, targets, names, results,
                   _own_conn(lambda c, t: screenshot.take(c, t, user, password, taken_by)))
+    elif kind == "open_url":
+        url = params.get("url", "")
+        _parallel(conn, job, targets, names, results, lambda t: open_url.open_site(t, user, password, url))
     elif kind == "input_lock":
         device, lock = params.get("device", ""), bool(params.get("lock", True))
         _parallel(conn, job, targets, names, results, lambda t: inputlock.apply(t, user, password, device, lock),

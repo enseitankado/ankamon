@@ -30,6 +30,8 @@ return [
     'boards.login' => 'boards',
     'boards.users' => 'boards',
     'anomalies' => 'boards',
+    'anomalies.notify' => 'anomalies',
+    'screen.web' => 'screen',
     'boards.passwords' => 'boards',
     'boards.passwords.etapadmin' => 'boards.passwords',
     'boards.passwords.root' => 'boards.passwords',

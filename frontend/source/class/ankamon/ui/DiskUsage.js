@@ -55,7 +55,9 @@ qx.Class.define("ankamon.ui.DiskUsage", {
         this.__diagnoseSpec(),
         this.__backupSpec(),
         this.__shotSpec(),
-        this.__chatSpec()
+        this.__chatSpec(),
+        this.__scopedSpec("movements", "Oturum hareketleri", "oturum hareketi", "/storage/session-activity", "Olay sayısı"),
+        this.__scopedSpec("ntfy", "ntfy bildirimleri", "bildirim kaydı", "/storage/ntfy", "Bildirim sayısı", "Kural")
       ];
     },
 
@@ -186,6 +188,28 @@ qx.Class.define("ankamon.ui.DiskUsage", {
           return { rows, info: this.__info(spec, data, `${data.total.n} görüntü, ${F.bytes(data.total.bytes)} (${qx.bom.String.escape(data.dir)})`) };
         },
         remove: async row => (await ankamon.io.Api.del("/storage/screenshots?" + new URLSearchParams(row.scope).toString())).deleted
+      });
+      return spec;
+    },
+
+    /** Ad başına sayılan, orantılı boyutlu tablolar (oturum hareketleri, ntfy): name=<ad> ya da all=1 ile silinir. */
+    __scopedSpec(mode, label, noun, url, countLabel, nameLabel) {
+      const F = ankamon.util.Format;
+      const spec = this.__withDisk({
+        mode, size: this.__sizer(url), label, noun,
+        columns: this.__scopeColumns(countLabel).map(c => (c.id === "name" && nameLabel ? { id: "name", label: nameLabel } : c)),
+        load: async () => {
+          const data = await ankamon.io.Api.get(url);
+          const rows = [{ all: true, scope: { all: "1" }, ...data.total, name: "— Tümü —", estimated: false }];
+          data.boards.forEach(b => rows.push({ scope: { name: b.name }, ...b, bytes: b.est_bytes, estimated: true }));
+          rows.forEach(r => {
+            r.deletable = true;
+            r.n = Number(r.n);
+            r.cells = [r.name, r.n, F.dateTime(r.first), F.dateTime(r.last), this.__size(r.bytes, r.estimated)];
+          });
+          return { rows, info: this.__info(spec, data, `${data.total.n} kayıt, ${F.bytes(data.total.bytes)}`) };
+        },
+        remove: async row => (await ankamon.io.Api.del(url + "?" + new URLSearchParams(row.scope).toString())).deleted
       });
       return spec;
     },

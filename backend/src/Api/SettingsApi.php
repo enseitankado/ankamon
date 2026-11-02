@@ -45,6 +45,7 @@ final class SettingsApi
             'samba_access' => self::redacted(Settings::get('samba_access')),
             'screen_vnc_autoinstall' => (bool) Settings::get('screen_vnc_autoinstall'),
             'network_roles' => Settings::get('network_roles'),
+            'organization' => Settings::get('organization'),
             'interfaces' => self::interfaces(),
             'syslog_port' => (int) (getenv('SYSLOG_PORT') ?: 514),
             'scrape_interval' => getenv('SCRAPE_INTERVAL') ?: '60s',
@@ -67,6 +68,13 @@ final class SettingsApi
         if (is_array($roles = $request->input('network_roles'))) {
             Settings::set('network_roles', self::roles($roles));
             $changed[] = 'network_roles';
+        }
+        if (is_array($org = $request->input('organization'))) {
+            Settings::set('organization', [
+                'name' => mb_substr(trim((string) ($org['name'] ?? '')), 0, 120),
+                'code' => mb_substr(trim((string) ($org['code'] ?? '')), 0, 40),
+            ]);
+            $changed[] = 'organization';
         }
         Audit::log($user, $request, 'settings.update', implode(',', $changed));
         return ['ok' => true];

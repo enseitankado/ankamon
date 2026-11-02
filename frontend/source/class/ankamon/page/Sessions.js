@@ -55,6 +55,8 @@ qx.Class.define("ankamon.page.Sessions", {
     this.__users = new ankamon.ui.sessions.Users(this);
     this.__tabs.add(this.__list);
     this.__tabs.add(this.__users);
+    this.__movements = new ankamon.ui.sessions.Movements(this);
+    this.__tabs.add(this.__movements);
     this.__tabs.add(new ankamon.ui.sessions.Chats(this));
     this._rememberTab(this.__tabs, "sessions"); // son seçili sekme (bkz. Base._rememberTab)
     this.add(this.__tabs, { flex: 1 });
@@ -82,6 +84,7 @@ qx.Class.define("ankamon.page.Sessions", {
     __tabs: null,
     __list: null,
     __users: null,
+    __movements: null,
 
     async _refresh() {
       const data = await ankamon.io.Api.get("/board-sessions");
@@ -94,10 +97,18 @@ qx.Class.define("ankamon.page.Sessions", {
      * Kullanıcılar sekmesi (zaman çizelgesi) o tahtaya süzülmüş açılır (kullanıcı isteği).
      */
     openWith(data) {
-      if (data && data.board) {
+      if (data && data.movements) {
+        this.showMovements(data.movements);
+      } else if (data && data.board) {
         this.__tabs.setSelection([this.__users]);
         this.__users.showBoard(data.board);
       }
+    },
+
+    /** "Oturum hareketleri": Hareketler sekmesine süzülmüş geçer. @param filter {Map} bkz. ui.sessions.Movements.show */
+    showMovements(filter) {
+      this.__tabs.setSelection([this.__movements]);
+      this.__movements.show(filter);
     },
 
     /** Kullanıcılar sekmesine geçip o kullanıcının oturum geçmişini gösterir (grid sağ menüsü). */

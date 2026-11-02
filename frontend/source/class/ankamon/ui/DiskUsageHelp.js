@@ -66,7 +66,7 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
     },
 
     /** "Şu an" satırındaki sayının birimi (tanımlı değilse "kayıt"). */
-    UNIT: { queue: "dosya", backups: "dosya", jobs: "görev", diagnose: "tarama", screenshots: "görüntü", chat: "ileti" },
+    UNIT: { queue: "dosya", backups: "dosya", jobs: "görev", diagnose: "tarama", screenshots: "görüntü", chat: "ileti", movements: "olay", ntfy: "bildirim" },
 
     CSS: `<style>
       .dh{font:13px/1.55 sans-serif;padding:4px 14px 14px}
@@ -264,6 +264,27 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
               ["Saklama", "<b>Süresiz</b> — otomatik silme politikası yok."]
             ],
             todo: ["Eski görüntüleri tahta satırını seçip silin; tek görüntü Oturumlar ▸ Zaman çizelgesi'nden de silinebilir."]
+          };
+        case "movements":
+          return {
+            verdict: ["note", "Kontrolsüz büyüyüp diski doldurur mu? Yavaş birikir; otomatik silme yok.",
+              "Yalnız anlamlı olaylar tutulur (ham logun çok küçük bir kısmı), bu yüzden kayıtlar küçüktür ve yavaş birikir."],
+            rows: [
+              ["Ne?", "Oturumlar ▸ Hareketler verisi: loglardan, sensörlerden ve Ankamon işlemlerinden ayıklanan olaylar (oturum, yetki, USB, ağ, güç…)."],
+              ["Nerede?", `${pg}, <code>session_activity</code> tablosu.`],
+              ["Saklama", "<b>Süresiz</b> — ham loglar süresi dolup silinse de kalır; otomatik silme yok."],
+              ["Üretim", "Log geldikçe worker dakikada bir ayıklar; ekranda süzmek ham logları taramaz. Silinen kayıtlar yeniden üretilmez."]
+            ],
+            todo: ["Gereksiz tahtaların satırını seçip silin."]
+          };
+        case "ntfy":
+          return {
+            rows: [
+              ["Ne?", "Anomaliler ▸ Bildirimler'in gönderdiği (ya da gönderemediği) ntfy bildirimlerinin kaydı; kural başına listelenir."],
+              ["Nerede?", `${pg}, <code>ntfy_messages</code> tablosu.`],
+              ["Saklama", "<b>Süresiz</b> — otomatik silme yok; kayıt sayısı kuralların saatlik sınırıyla kısıtlıdır."]
+            ],
+            todo: ["Eski kayıtları kural satırını seçip silin; silmek telefona ulaşmış bildirimleri etkilemez, yeniden gönderim de yapmaz."]
           };
         case "chat":
           return {

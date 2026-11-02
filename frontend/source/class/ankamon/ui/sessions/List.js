@@ -153,6 +153,12 @@ qx.Class.define("ankamon.ui.sessions.List", {
       const menu = new qx.ui.menu.Menu();
       menu.add(ops.menuButton(icon.sessions,`Oturum geçmişi (${s.username})`,
         () => this.__page.showUserHistory(s.username, s.kind)));
+      if (s.kind === "board") {
+        menu.add(ops.menuButton(icon.movements, "Oturum hareketleri", () => this.__page.showMovements({
+          session: { id: s.id, label: `${s.username} · ${s.board || s.host} · ${ankamon.util.Format.dateTime(s.started_at * 1000)}` },
+          username: s.username, board_id: s.board_id, board_name: s.board || s.host
+        })));
+      }
       if (s.kind === "board" && !s.ended_at && s.board_id && this.__page._can("boards.login")) {
         const board = { id: s.board_id, label: s.board };
         menu.add(new qx.ui.menu.Separator());

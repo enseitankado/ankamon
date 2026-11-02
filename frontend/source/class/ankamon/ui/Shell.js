@@ -140,7 +140,7 @@ qx.Class.define("ankamon.ui.Shell", {
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
       info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", bulk: "⇄", wakeScreen: "☀", sleepScreen: "☾", screenLock: "🔐", screenUnlock: "🔓", cast: "⇪", logout: "⏏", lock: "🔒", password: "🔑", diagnose: "⚕", system: "⚒", diskusage: "⛁", software: "⬢",
       network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "⚠",
-      screenshot: "📷", keyboard: "⌨", mouse: "🖱", touch: "☝", unlockInput: "🔓", relay: "⇶", relayStop: "⏹", chat: "💬"
+      screenshot: "📷", keyboard: "⌨", mouse: "🖱", touch: "☝", unlockInput: "🔓", relay: "⇶", relayStop: "⏹", chat: "💬", web: "🌐", wifi: "📶", movements: "☰"
     },
 
     // Uzaktan işlemler kaldırıldı; işlevi Tahtalar sayfasına ve ağaç sağ menülerine taşındı.
@@ -161,7 +161,8 @@ qx.Class.define("ankamon.ui.Shell", {
       // Sekmeleri ağaçta da (kullanıcı isteği: zaman çizelgesi sol menüden açılsın). key: Oturumlar sekmesinde
       // etiket, Zaman çizelgesinde userData "key" (eski adı "Kullanıcılar" — bkz. ui.sessions.Users).
       { id: "sessions", label: "Oturumlar", feature: "logs", parent: "boards", create: u => new ankamon.page.Sessions(u),
-        tabs: [{ key: "Oturumlar", label: "Oturumlar" }, { key: "timeline", label: "Zaman çizelgesi" }, { key: "chat", label: "Sohbet geçmişi" }] },
+        tabs: [{ key: "Oturumlar", label: "Oturumlar" }, { key: "timeline", label: "Zaman çizelgesi" }, { key: "movements", label: "Hareketler" },
+          { key: "chat", label: "Sohbet geçmişi" }] },
       // Bakım: "Bakım" (sorun tespiti) + "Sensörler" (Grafana) sekmeleri — bkz. page.Maintenance. features:
       // herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı
       // isteği); eski {page: "metrics"} bağlantıları __openPage'de buraya yönlenir. id "diagnose" kalır
@@ -178,7 +179,7 @@ qx.Class.define("ankamon.ui.Shell", {
       // kapalı kullanıcıda Tahtalar'ın altında (bkz. __createTree).
       { id: "anomalies", label: "Anomaliler", feature: "anomalies", parent: "diagnose", create: u => new ankamon.page.Anomalies(u),
         tabs: [{ key: "Anlık", label: "Anlık" }, { key: "Tarama", label: "Tarama" }, { key: "Geçmiş", label: "Geçmiş" },
-          { key: "summary", label: "Özet" }] },
+          { key: "summary", label: "Özet" }, { key: "notifications", label: "Bildirimler" }] },
       // Loglar Tahtalar'ın altında EN SONDA (kullanıcı isteği).
       { id: "logs", label: "Loglar", feature: "logs", parent: "boards", create: u => new ankamon.page.Logs(u),
         tabs: () => ankamon.ui.Shell.LOG_KINDS.map(kind => ({ key: kind.mode, label: kind.label })) },

@@ -79,6 +79,14 @@ qx.Class.define("ankamon.page.Settings", {
       this.__addThemeSection(view);
       tabs.add(view);
 
+      const orgPage = this.__page("Kuruluş");
+      const org = new ankamon.ui.Form();
+      org.text("name", "Kuruluş adı", (settings.organization || {}).name || "");
+      org.text("code", "Kuruluş kodu", (settings.organization || {}).code || "");
+      this.__section(orgPage, "Kuruluş",
+        "Okul ya da kurumun adı ve kodu (ör. MEB kurum kodu). Bildirim başlıklarında görünür; Anomaliler ▸ Bildirimler'deki ntfy konu önerisi bunlardan türetilir.", org);
+      tabs.add(orgPage);
+
       const access = this.__page("Tahta erişimi");
       const ssh = new ankamon.ui.Form();
       ssh.text("user", "Kullanıcı adı", settings.ssh_access.user);
@@ -157,7 +165,8 @@ qx.Class.define("ankamon.page.Settings", {
             ssh_access: ssh.values(),
             samba_access: samba.values(),
             screen_vnc_autoinstall: vncAuto.getValue(),
-            network_roles: newRoles
+            network_roles: newRoles,
+            organization: org.values()
           });
           await ankamon.io.Api.put("/lesson-times", lessons.getValue());
           const rolesChanged = newRoles.board_iface !== (roles.board_iface || "") ||

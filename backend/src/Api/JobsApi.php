@@ -180,6 +180,10 @@ final class JobsApi
             'password_status' => ['boards.passwords', 'Yönetici parolası durumu', [], true],
             'password_verify' => $this->adminPasswordJob($request, false),
             'password_change' => $this->adminPasswordJob($request, true),
+            // Sağ menü "Web sitesi aç" (bkz. worker executor/open_url.py).
+            'open_url' => $this->openUrlJob($request),
+            // Anomaliler ▸ Bildirimler ▸ Deneme gönder (tahtasız; bkz. worker executor/ntfy.py).
+            'ntfy_test' => ['anomalies.notify', 'ntfy deneme bildirimi', [], false],
             // Anomaliler ▸ Tarama (bkz. worker/ankamon/anomaly/scan.py): seçilen kurallar seçilen tahtalarda anlık.
             'anomaly_scan' => $this->anomalyScanJob($request),
             default => throw ApiError::badRequest('Bilinmeyen görev türü.'),
@@ -340,6 +344,16 @@ final class JobsApi
         }
         $volume = max(0, min(100, (int) $volume));
         return ['cast', "Yansıtma ses düzeyi: %$volume", ['volume' => $volume], true];
+    }
+
+    /** Adres betiğe gömülür: worker open_url.URL_RE ile AYNI kural. */
+    private function openUrlJob(Request $request): array
+    {
+        $url = trim((string) $request->input('url', ''));
+        if (!preg_match('~^https?://[^\s"\'`<>\\\\]{1,2000}$~', $url)) {
+            throw ApiError::badRequest('Adres http:// ya da https:// ile başlamalı, boşluk ve tırnak içermemeli.');
+        }
+        return ['screen.web', 'Web sitesi aç: ' . mb_strimwidth($url, 0, 80, '…'), ['url' => $url], true];
     }
 
     /** Klavye/fare/dokunmatik kilidi: aygıt ve yön (bkz. worker executor/inputlock.py). */

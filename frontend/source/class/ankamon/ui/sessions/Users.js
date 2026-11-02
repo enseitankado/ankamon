@@ -703,6 +703,15 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       }));
       menu.add(ops.menuButton(icon.boards, `Yalnız bu tahta (${s.board || s.host})`,
         () => this.__selectValue(this.__board, this.__boardKey(s))));
+      if (s.kind === "board") {
+        menu.add(new qx.ui.menu.Separator());
+        menu.add(ops.menuButton(icon.movements, "Oturum hareketleri", () => this.__page.showMovements({
+          session: { id: s.id, label: `${s.username} · ${s.board || s.host} · ${ankamon.util.Format.dateTime(s.started_at * 1000)}` },
+          username: s.username, board_id: s.board_id, board_name: s.board || s.host
+        })));
+        menu.add(ops.menuButton(icon.movements, `Bu kullanıcının tüm hareketleri (${s.username})`,
+          () => this.__page.showMovements({ username: s.username })));
+      }
       // Açık tahta oturumu: o tahtanın canlı ekranı (Ekran ▸ Ekranı göster ile aynı işlev).
       if (s.kind === "board" && !s.ended_at && s.board_id && this.__page._can("screen")) {
         menu.add(new qx.ui.menu.Separator());
@@ -743,6 +752,10 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         const s = (this.__shown || []).find(x => this.__boardKey(x) === key);
         const name = s ? s.board || s.host : key.slice(1);
         menu.add(ops.menuButton(icon.boards, `Yalnız bu bilgisayar (${name})`, () => this.__selectValue(this.__board, key)));
+        if (key.startsWith("b")) {
+          menu.add(ops.menuButton(icon.movements, "Oturum hareketleri", () => this.__page.showMovements(
+            { board_id: Number(key.slice(1)), board_name: name, username: this.__value(this.__user) || undefined })));
+        }
         if (key.startsWith("h") && this.__page._can("sessions.hosts")) {
           menu.add(new qx.ui.menu.Separator());
           menu.add(ops.menuButton(icon.delete, `Bu bilgisayarın kayıtlarını sil (${key.slice(1)})…`,
@@ -751,6 +764,14 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       } else {
         const i = key.indexOf(":");
         menu.add(ops.menuButton(icon.sessions, `Yalnız bu kullanıcı (${key.slice(i + 1)})`, () => this.__pickKey(key)));
+        if (key.startsWith("board:") && key.slice(i + 1)) {
+          // Tahta süzgeci seçiliyse o tahtadaki, değilse bütün tahtalardaki hareketleri.
+          const pick = this.__value(this.__board);
+          menu.add(ops.menuButton(icon.movements, "Oturum hareketleri", () => this.__page.showMovements({
+            username: key.slice(i + 1), board_id: pick.startsWith("b") ? Number(pick.slice(1)) : undefined,
+            board_name: pick.startsWith("b") ? this.__board.getSelection()[0].getLabel() : undefined
+          })));
+        }
       }
       return menu;
     },

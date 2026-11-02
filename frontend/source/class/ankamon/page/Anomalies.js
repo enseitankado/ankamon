@@ -36,6 +36,7 @@
  *  - "Tarama" (ui.anomaly.Scan): seçilen tahtalarda seçilen anomaliler o an yoklanır ("anomaly_scan" görevi).
  *  - "Geçmiş" (ui.anomaly.History): dönemle örtüşen tüm kayıtlar, sütun süzgeçli.
  *  - "Özet" (ui.anomaly.Summary): tahta başına sayı/süre, sütun süzgeçli; çift tık → o tahtanın Geçmiş'i.
+ *  - "Bildirimler" (ui.anomaly.Notifications): ntfy konusu, kurallar ve gönderilen bildirimler (kendi verisini çeker).
  * Kayıtlar tahta silinse ya da logları silinse de kalır (bkz. 033_anomalies.sql).
  */
 qx.Class.define("ankamon.page.Anomalies", {
@@ -63,7 +64,8 @@ qx.Class.define("ankamon.page.Anomalies", {
     this.__history = new ankamon.ui.anomaly.History(this);
     this.__summary = new ankamon.ui.anomaly.Summary(this);
     this.__scan = new ankamon.ui.anomaly.Scan(this);
-    [this.__live, this.__scan, this.__history, this.__summary].forEach(tab => this.__tabs.add(tab));
+    this.__notifications = new ankamon.ui.anomaly.Notifications(this);
+    [this.__live, this.__scan, this.__history, this.__summary, this.__notifications].forEach(tab => this.__tabs.add(tab));
     this._rememberTab(this.__tabs, "anomalies");
     this.add(this.__tabs, { flex: 1 });
 

@@ -49,6 +49,10 @@ final class Settings
         // arabirim adları. Boş = otomatik (bağlı her ağ tahta ağı sayılır). Tahta işleri (ağ taraması,
         // syslog'dan tahta kaydı, Samba paylaşım taraması) yalnız tahta ağında yapılır.
         'network_roles' => ['board_iface' => '', 'admin_iface' => ''],
+        // Kuruluş (Ayarlar ▸ Kuruluş): bildirim başlıklarında görünür, ntfy konu önerisi bundan türer.
+        'organization' => ['name' => '', 'code' => ''],
+        // ntfy bildirimleri (Anomaliler ▸ Bildirimler; bkz. worker executor/ntfy.py).
+        'ntfy' => ['server' => 'https://ntfy.sh', 'topic' => ''],
     ];
 
     public static function get(string $key): mixed

@@ -847,6 +847,12 @@ qx.Class.define("ankamon.ui.BoardOps", {
             (sessionOps ? sessionOps.query(online) : this.__job({ type: "whoami", board_ids: online.map(b => b.id) }, "Oturumları sorgula")));
         }
         sessionHistory(sessions);
+        if (can("logs")) {
+          // Oturum hareketleri: Oturumlar ▸ Hareketler bu tahtaya süzülmüş açılır (bkz. ui.sessions.Movements).
+          subAdd(sessions, ICON.movements, "Oturum hareketleri", () => qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, {
+            page: "sessions", movements: { board_id: board.id, board_name: board.label || board.hostname || board.ip }
+          }));
+        }
         // Parola ayarla…: bir ya da birçok hesaba ortak parola; etapadmin/root ayrı bölümde, kendi
         // parolasıyla ve ayrı yetkiyle (bkz. setPasswords; işi hazır işlem "user-password" yapar).
         if (can("boards.passwords")) {
@@ -880,6 +886,17 @@ qx.Class.define("ankamon.ui.BoardOps", {
         if (can("taskmgr")) {
           add(ICON.taskmgr, "Görev yöneticisi", () => ankamon.ui.taskmgr.Window.open(board, user));
         }
+        // Web sitesi aç: seçili tahtalardan oturumu açık olanlarda varsayılan tarayıcıyla, tam ekran (bkz. worker executor/open_url.py).
+        if (can("screen.web")) {
+          const withSession = online.filter(b => b.session_username);
+          const webCount = withSession.length > 1 ? ` (${withSession.length} tahta)` : "";
+          add(ICON.web, "Web sitesi aç…" + webCount, () => this.openWebsite(withSession));
+          menu.getChildren()[menu.getChildren().length - 1].setEnabled(withSession.length > 0);
+        }
+        // Wi-Fi Monitör: kart, bağlantı ve çevredeki ağlar canlı; salt okunur, sağ tıklanan tahta (bkz. ui.boards.WifiMonitor).
+        if (can("screen")) {
+          add(ICON.wifi, "Wi-Fi Monitör", () => ankamon.ui.boards.WifiMonitor.open(board));
+        }
         // Sohbet: her bilgisayar için ayrı pencere; çoklu seçimde sağ tıklanan tahta (bkz. ui.chat.Window).
         if (can("boards.chat")) {
           add(ICON.chat, "Sohbet", () => ankamon.ui.chat.Window.open(board));
@@ -896,6 +913,20 @@ qx.Class.define("ankamon.ui.BoardOps", {
         power();
       }
       return menu.getChildren().length ? menu : null;
+    },
+
+    /** Web sitesi aç: adres sorar, açık oturumlu tahtalarda iş başlatır. */
+    async openWebsite(boards) {
+      const raw = await ankamon.ui.Dialog.prompt(
+        `<b>${boards.length} bilgisayarda</b> varsayılan tarayıcıyla, ekranı kaplayarak açılacak site:`, "https://", "Aç", "Web sitesi aç");
+      let url = (raw || "").trim();
+      if (!url || url === "https://") {
+        return;
+      }
+      if (!/^https?:\/\//i.test(url)) {
+        url = "https://" + url;
+      }
+      this.__job({ type: "open_url", url, board_ids: boards.map(b => b.id) }, "Web sitesi aç");
     },
 
     /**

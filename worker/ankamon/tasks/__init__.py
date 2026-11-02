@@ -26,7 +26,7 @@
 """Periyodik görevler. Yeni görev: run(conn) tanımlayan bir modül ekleyip TASKS'a yazın."""
 
 from .. import anomaly
-from . import diagnose_schedule, board_identity, board_sessions, board_uptime, boards_from_logs, board_status, session_end, telegraf_targets
+from . import diagnose_schedule, board_identity, board_sessions, board_uptime, boards_from_logs, board_status, ntfy_notify, session_activity, session_end, telegraf_targets
 
 # Sıra önemlidir: önce kayıt, sonra durum, oturumlar (board_status'ın güncellediği "online"a bakar),
 # kimlik (MAC; SSH erişimi gerekir), Telegraf hedefleri (board_status'ın güncellediği exporter_ok'a
@@ -46,8 +46,9 @@ from . import diagnose_schedule, board_identity, board_sessions, board_uptime, b
 # diagnose_schedule: haftalık otomatik sorun tespiti — kaynaklar müsaitken görev kuyruğa yazar (bkz. o dosya).
 # session_end: tahtası yeniden erişilebilir olan "tahta çevrimdışı oldu" kapanışlarını tahtanın açılış günlüğüne
 # bakıp netleştirir (düzenli kapatma / ETAP otomatik kapanma / elektrik kesintisi …; bkz. o dosya).
+# session_activity: Oturumlar ▸ Hareketler verisi (oturumlardan sonra); ntfy_notify: Anomaliler ▸ Bildirimler (anomaly'den sonra).
 TASKS = [boards_from_logs, board_status, board_sessions, board_identity, telegraf_targets, board_uptime, session_end,
-         anomaly, diagnose_schedule]
+         anomaly, diagnose_schedule, session_activity, ntfy_notify]
 
 
 def _extension_tasks() -> list:
