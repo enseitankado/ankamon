@@ -77,8 +77,9 @@ qx.Class.define("ankamon.ui.homebackup.CheckColumn", {
         check.addListener("changeValue", () => this.__changed());
         if (item.side !== undefined) {
           const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-          row.add(check, { flex: 1 });
-          row.add(new qx.ui.basic.Label(item.side).set({ textColor: "app-muted", alignY: "middle" }));
+          row.add(check);
+          row.add(new qx.ui.core.Spacer(), { flex: 1 });
+          row.add(new qx.ui.basic.Label(item.side).set({ textColor: "app-muted", alignY: "middle", marginRight: 4 }));
           this.__box.add(row);
         } else {
           this.__box.add(check);

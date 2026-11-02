@@ -164,21 +164,23 @@ class Hub:
 
     async def _from_board(self, line: str) -> None:
         if line.startswith("U "):
-            self.session = line[2:].strip() or None
+            # Giriş ekranının kullanıcısı (lightdm) oturum değildir.
+            name = line[2:].strip()
+            self.session = name if name and name != "lightdm" else None
             return
         try:
             msg = json.loads(line)
         except ValueError:
             return
         if msg.get("t") == "ready":
-            who = f" — oturum: {self.session}" if self.session and self.session != "lightdm" else " — giriş ekranı"
+            who = f" — oturum: {self.session}" if self.session else " — giriş ekranı"
             self.set_status("online", "Tahtada sohbet penceresi açık" + who)
             for old in self.sent_now[-20:]:
                 self._write_agent({"t": "msg", "author": old["author"], "text": old["text"]})
         elif msg.get("t") == "closed":
             self.set_status("closed", "Tahtadaki kişi pencereyi kapattı; yeni iletiyle yeniden açılır.")
         elif msg.get("t") == "msg" and msg.get("text"):
-            author = self.session if self.session and self.session != "lightdm" else "Tahta"
+            author = self.session or "Tahta"
             saved = await asyncio.to_thread(_save, self.board_id, self.name, self.session, "in", author, str(msg["text"])[:4000])
             self.sent_now.append(saved)
             self.broadcast(saved)

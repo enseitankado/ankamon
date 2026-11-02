@@ -189,9 +189,8 @@ cat > /etc/systemd/system/{UNIT} <<'ANKAMON_EOF'
 {_UNIT}ANKAMON_EOF
 touch "$D/__DEVICE__"
 systemctl daemon-reload
-systemctl enable {UNIT} >/dev/null 2>&1
-systemctl restart {UNIT}
-sleep 1
+systemctl enable --now {UNIT} >/dev/null 2>&1
+sleep 3
 systemctl is-active -q {UNIT} || {{ echo "Kilit başlatılamadı:" >&2; tail -n 5 "$D/log" >&2; exit 4; }}
 echo "__TITLE__ kilitlendi."
 grep -E 'tutuldu|tutulamadı' "$D/log" | tail -n 12 | cut -d' ' -f2-
@@ -209,7 +208,7 @@ if [ -z "$left" ]; then
   rm -rf "$D"
   echo "__TITLE__ kilidi açıldı; başka giriş kilidi yok."
 else
-  systemctl restart {UNIT}
+  sleep 3
   echo "__TITLE__ kilidi açıldı. Süren kilitler: $left"
 fi
 echo "I $left"

@@ -73,7 +73,9 @@ elif op == "change":
         print("Tahtada %s hesabı yok." % a); sys.exit(4)
     if not same(a, req["general"]) and not same(a, req["current"]):
         print("Mevcut parola yanlış."); sys.exit(3)
-    r = subprocess.run(["chpasswd"], input="%s:%s\n" % (a, req["new"]), text=True, capture_output=True)
+    # Düz chpasswd ETAP'ın PAM zincirinde reddedilir (bkz. actions/user-password): özet burada üretilir, -e PAM'e uğramaz.
+    h = crypt.crypt(req["new"], crypt.mksalt(crypt.METHOD_SHA512))
+    r = subprocess.run(["chpasswd", "-e"], input="%s:%s\n" % (a, h), text=True, capture_output=True)
     if r.returncode:
         print(r.stderr.strip() or "chpasswd başarısız."); sys.exit(5)
 """

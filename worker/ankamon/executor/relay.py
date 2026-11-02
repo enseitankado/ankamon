@@ -207,7 +207,7 @@ def stop(conn, board: dict, user: str, password: str) -> dict:
         res = stop_source(board, user, password)    # kayıt yok ama kalmış olabilir
         return {"status": res["status"], "rc": res["rc"], "output": "Bu tahtada ekran aktarımı yoktu."}
     # Hedef durdurulduysa kaynağında başka hedef kalmamış olabilir; kaynaksa kendisi.
-    lines.extend(_release_orphans(conn, user, password, sources | {board["board_id"]}))
+    lines.extend(_release_orphans(conn, user, password, sources))
     return {"status": "ok", "rc": 0, "output": "\n".join(lines)}
 
 
