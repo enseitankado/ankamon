@@ -68,7 +68,8 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           const color = d.radio === "enabled" ? "inherit" : "#d93025";
           status.setValue(`Kart: <b>${esc(d.device)}</b> · Wi-Fi <b style="color:${color}">${radio}</b> · ` +
             (d.connection ? `Bağlı: <b>${esc(d.connection)}</b>` : "bağlı değil") +
-            ` · ${d.networks.length} ağ · ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}`);
+            ` · ${d.networks.length} ağ · ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}` +
+            (d.radio === "disabled" ? "<br>Wi-Fi kapalıyken çevredeki ağlar taranamaz; bu pencere kartı açmaz." : ""));
         }
         const th = "text-align:left;padding:4px 8px;border-bottom:1px solid rgba(127,127,127,.4);position:sticky;top:0;background:inherit";
         const td = "padding:3px 8px;white-space:nowrap";

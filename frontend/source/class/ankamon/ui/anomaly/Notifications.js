@@ -132,22 +132,19 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       summary: ["Özet", "Seçilen aralıkta bilgisayar ve tür başına kayıt sayısı tek bildirimde gönderilir."]
     },
 
-    minutes(n) {
-      if (!n) {
-        return "Sınırsız";
-      }
+    /** "15 dakikada bir", "1 saatte bir", "1 günde bir": ek, birime göre. */
+    every(n) {
       if (n < 60) {
-        return `${n} dakika`;
+        return `${n} dakikada bir`;
       }
-      if (n < 1440) {
-        return `${n / 60} saat`;
-      }
-      return n === 10080 ? "7 gün" : `${n / 1440} gün`;
+      return n < 1440 ? `${n / 60} saatte bir` : `${n / 1440} günde bir`;
     },
 
     intervalText(mode, n) {
-      const t = this.minutes(n);
-      return mode === "live" ? (n ? `Aynı bilgisayar + tür: ${t}da bir` : "Tekrar sınırı yok") : `${t}da bir`;
+      if (mode === "live") {
+        return n ? `Aynı bilgisayar + tür: ${this.every(n)}` : "Tekrar sınırı yok";
+      }
+      return this.every(n);
     },
 
     /** Konu öneki: Türkçe harfler sadeleşir, yalnız a-z0-9, kelimeler - ile; rakam dizisi olan kod korunur. */

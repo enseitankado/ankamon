@@ -25,9 +25,10 @@
 
 """Sağ menü "Web sitesi aç": oturumu açık tahtada varsayılan tarayıcıyla siteyi ekranı kaplayacak biçimde açar.
 
-Tarayıcı oturum kullanıcısı olarak `xdg-open` ile başlatılır (kullanıcının varsayılanı), yeni pencere gelince pencere
-yöneticisinden tam ekran istenir (EWMH _NET_WM_STATE_FULLSCREEN): her tarayıcıda aynı çalışır, kiosk kipinin aksine kullanıcı
-F11 ya da pencere yöneticisiyle çıkabilir. Oturum yoksa işlem yapılmaz (giriş ekranında tarayıcı açılmaz).
+Tarayıcı oturum kullanıcısı olarak `xdg-open` ile başlatılır (kullanıcının varsayılanı), yeni pencere gelince tarayıcının kendi
+tam ekranına geçilir (XTEST ile F11). Pencere yöneticisinin tam ekranı (EWMH) yetmez: Chrome'da sekme ve adres çubuğu kalır
+(Arge 1'de görüldü). Kiosk kipinin aksine kullanıcı F11 ile çıkabilir; XTEST giriş kilidinden etkilenmez. Tarayıcı zaten
+tam ekransa F11 basılmaz (yoksa çıkardı). Oturum yoksa işlem yapılmaz (giriş ekranında tarayıcı açılmaz).
 """
 
 from __future__ import annotations
@@ -43,8 +44,8 @@ URL_RE = re.compile(r"^https?://[^\s\"'`<>\\]{1,2000}$")
 
 _FULLSCREEN = r"""
 import sys, time
-from Xlib import X, display
-from Xlib.protocol import event
+from Xlib import X, XK, display
+from Xlib.ext import xtest
 d = display.Display(); r = d.screen().root
 active = d.intern_atom("_NET_ACTIVE_WINDOW"); state = d.intern_atom("_NET_WM_STATE"); full = d.intern_atom("_NET_WM_STATE_FULLSCREEN")
 def current():
@@ -56,12 +57,16 @@ while time.time() < end and current() in (0, before):
 win = current()
 if not win:
     sys.exit("Etkin pencere bulunamadı.")
-time.sleep(1.5)  # pencere yerleşsin; hemen gönderilen istek bazı tarayıcılarda yok sayılır
+time.sleep(2.5)  # sayfa açılmaya başlasın; erken basılan tuşu ilk açılıştaki tarayıcı kaçırır
 w = d.create_resource_object("window", current())
 w.configure(stack_mode=X.Above)
-r.send_event(event.ClientMessage(window=w, client_type=state, data=(32, [1, full, 0, 1, 0])),
-             event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
+w.set_input_focus(X.RevertToParent, X.CurrentTime)
 d.sync()
+st = w.get_full_property(state, X.AnyPropertyType)
+if not (st and full in st.value):
+    key = d.keysym_to_keycode(XK.string_to_keysym("F11"))
+    xtest.fake_input(d, X.KeyPress, key); xtest.fake_input(d, X.KeyRelease, key)
+    d.sync()
 print((w.get_wm_class() or ("", "tarayıcı"))[-1])
 """
 
