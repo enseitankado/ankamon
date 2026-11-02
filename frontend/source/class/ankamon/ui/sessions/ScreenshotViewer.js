@@ -51,9 +51,9 @@ qx.Class.define("ankamon.ui.sessions.ScreenshotViewer", {
       win.setUserData("ankamon.keepModal", true);
 
       const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ padding: [6, 10] });
-      const who = shot.session_username ? esc(shot.session_username) : "oturum yok";
+      const who = shot.session_username ? "oturum: " + esc(shot.session_username) : "oturum yok";
       bar.add(new qx.ui.basic.Label(
-        `<b>${esc(shot.board_name)}</b> · oturum: ${who} · ${F.dateTime(shot.taken_at * 1000)} · çeken: ${esc(shot.taken_by)} · ${F.bytes(shot.bytes)}`
+        `<b>${esc(shot.board_name)}</b> · ${who} ·${F.dateTime(shot.taken_at * 1000)} · çeken: ${esc(shot.taken_by)} · ${F.bytes(shot.bytes)}`
       ).set({ rich: true, alignY: "middle", selectable: true }), { flex: 1 });
       const full = new qx.ui.form.Button("⛶ Tam ekran");
       bar.add(full);
