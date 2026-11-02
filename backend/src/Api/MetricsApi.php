@@ -134,60 +134,6 @@ final class MetricsApi
         return ['sensors' => BoardSensors::withRange((int) $request->arg('id')) ?: new \stdClass()];
     }
 
-    /**
-     * GET /api/metrics/baselines — tahta başına "normal" (kalıcı ortalama) değerler: son 14 günün saatlik
-     * özetinden (metrics_1h — ham veri silinse de kalır, sürekli güncellenir) işlemci/disk sıcaklığı ile
-     * bellek/disk doluluğunun ortalaması. "Donanım izleme" sekmesi bunu "yüksek mi" kararında eşik olarak kullanır:
-     * bir tahta kendi geçmiş ortalamasının belirgin üstündeyse (ör. her zamankinden sıcak/dolu) kırmızı
-     * gösterilir — mutlak güvenlik tavanlarıyla birlikte (bkz. docker/rootfs/screen/computer.html). Ortalama
-     * yavaş değiştiğinden ön yüz bunu seyrek (dakikalarca arayla) çeker.
-     */
-    public function baselines(): array
-    {
-        $rows = Db::all(
-            "SELECT a.board_id, a.cpu_temp_core, a.disk_temp, a.mem_avail, a.mem_total, a.disk_avail, a.disk_size,
-                    t.temp_any
-             FROM (
-                SELECT board_id,
-                    avg(value) FILTER (WHERE name = 'node_hwmon_temp_celsius'
-                        AND (chip LIKE '%coretemp%' OR chip LIKE '%k10temp%')) AS cpu_temp_core,
-                    avg(value) FILTER (WHERE name IN ('smartmon_temperature_celsius_raw_value',
-                        'smartmon_airflow_temperature_cel_raw_value', 'nvme_temperature_celsius')) AS disk_temp,
-                    avg(value) FILTER (WHERE name = 'node_memory_MemAvailable_bytes') AS mem_avail,
-                    avg(value) FILTER (WHERE name = 'node_memory_MemTotal_bytes') AS mem_total,
-                    avg(value) FILTER (WHERE name = 'node_filesystem_avail_bytes' AND mountpoint = '/') AS disk_avail,
-                    avg(value) FILTER (WHERE name = 'node_filesystem_size_bytes' AND mountpoint = '/') AS disk_size
-                FROM v_metrics_1h
-                WHERE time > now() - interval '14 days' AND board_id IS NOT NULL
-                GROUP BY board_id
-             ) a
-             LEFT JOIN (
-                -- İşlemci sıcaklığı yedeği (coretemp/k10temp yoksa): canlı değer sensörlerin MAX'ıdır
-                -- (temp_max, bkz. latest()); ortalaması da SAATLİK MAX'ların ortalaması olmalı. Tüm sensörlerin
-                -- düz ortalaması YANLIŞ olurdu — düşük ortam/ACPI sensörleri ortalamayı aşağı çekip normal
-                -- sıcaklığı bile 'yüksek' gösterirdi.
-                SELECT board_id, avg(hmax) AS temp_any FROM (
-                    SELECT board_id, time, max(value) AS hmax
-                    FROM v_metrics_1h
-                    WHERE time > now() - interval '14 days' AND board_id IS NOT NULL
-                      AND name IN ('node_hwmon_temp_celsius', 'node_thermal_zone_temp')
-                    GROUP BY board_id, time
-                ) hm GROUP BY board_id
-             ) t ON t.board_id = a.board_id"
-        );
-        $out = [];
-        foreach ($rows as $row) {
-            $out[(int) $row['board_id']] = [
-                // Canlı cpu_temp ile aynı kaynak sırası: coretemp/k10temp varsa o, yoksa tüm sensör ortalaması.
-                'cpu_temp' => self::num($row['cpu_temp_core'] ?? $row['temp_any'], 1),
-                'disk_temp' => self::num($row['disk_temp'], 1),
-                'mem_percent' => self::usedPercent($row['mem_total'], $row['mem_avail']),
-                'disk_percent' => self::usedPercent($row['disk_size'], $row['disk_avail']),
-            ];
-        }
-        return ['baselines' => $out ?: new \stdClass()];
-    }
-
     private static function num(mixed $value, int $digits): ?float
     {
         return $value === null ? null : round((float) $value, $digits);

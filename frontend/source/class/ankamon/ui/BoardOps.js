@@ -797,6 +797,36 @@ qx.Class.define("ankamon.ui.BoardOps", {
         if (can("cast")) {
           screens.add(this.menuButton(ICON.cast, "Ekranımı yansıt" + count, null, this.__castMenu(online)));
         }
+        // Ekran görüntüsü: Oturumlar ▸ Zaman çizelgesi'nde işaret olarak görünür (bkz. worker executor/screenshot.py).
+        if (can("screen.screenshot")) {
+          subAdd(screens, ICON.screenshot, "Ekran görüntüsü al" + count, () => this.__powerJob(
+            { type: "screenshot", board_ids: online.map(b => b.id) }, "Ekran görüntüsü", "screenshot", "görüntü alma", user));
+        }
+        // Ekran aktarımı: sağ tıklanan tahtanın ekranı başka tahtalarda (bkz. ui.boards.RelayDialog, executor/relay.py).
+        if (can("screen.relay")) {
+          subAdd(screens, ICON.relay, "Ekranı başka bilgisayara aktar…", () => ankamon.ui.boards.RelayDialog.open(board, online));
+          stateAdd(screens, ICON.relayStop, "Ekran aktarımını durdur", online.filter(b => b.relay_source || b.relay_is_source || b.relay_source === undefined),
+            list => this.__job({ type: "relay_stop", board_ids: list.map(b => b.id) }, "Ekran aktarımını durdur"));
+        }
+        // Klavye/fare/dokunmatik kilidi: seçili tahtaların yalnız uygun olanlarına (bkz. worker executor/inputlock.py). Klavye
+        // kilidi ekran klavyesini, fare kilidi dokunmayı da kapatır. Durumu bilinmeyen tahta iki maddede de sayılır.
+        if (can("screen.input")) {
+          const locks = b => b.input_locks || [];
+          const known = b => b.input_locks !== undefined;
+          // Fare kilidi dokunmayı da tuttuğundan dokunmatik "kilitli" sayılır; kendi kilidi yoksa açılacak bir şey de yoktur.
+          const held = (b, d) => locks(b).includes(d) || (d === "touch" && locks(b).includes("mouse"));
+          const n = list => (list.length > 1 ? ` (${list.length} tahta)` : "");
+          [["keyboard", ICON.keyboard, "Klavyeyi kilitle", "Klavye kilidini aç", "Klavye kilitle"],
+            ["mouse", ICON.mouse, "Fareyi kilitle", "Fare kilidini aç", "Fare kilitle"],
+            ["touch", ICON.touch, "Dokunmatiği kilitle", "Dokunmatik kilidini aç", "Dokunmatik kilitle"]].forEach(([device, icon, on, off, caption]) => {
+            const lockable = online.filter(b => !known(b) || !held(b, device));
+            const unlockable = online.filter(b => !known(b) || locks(b).includes(device));
+            stateAdd(screens, icon, on + n(lockable), lockable, list => this.__powerJob(
+              { type: "input_lock", device, lock: true, board_ids: list.map(b => b.id) }, caption, "input_lock", "kilitleme", user));
+            stateAdd(screens, ICON.unlockInput, off + n(unlockable), unlockable, list => this.__job(
+              { type: "input_lock", device, lock: false, board_ids: list.map(b => b.id) }, off));
+          });
+        }
         group(ICON.screen, "Ekran" + count, screens);
 
         // "Bilgi kartı" burada değil: Tahtalar sayfasındaki "Logları göster"in hemen altında (kullanıcı
@@ -849,6 +879,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
         // "Dosyalar"ın hemen altında (kullanıcı isteği). Tek tahta: çoklu seçimde sağ tıklanan tahta için açılır.
         if (can("taskmgr")) {
           add(ICON.taskmgr, "Görev yöneticisi", () => ankamon.ui.taskmgr.Window.open(board, user));
+        }
+        // Sohbet: her bilgisayar için ayrı pencere; çoklu seçimde sağ tıklanan tahta (bkz. ui.chat.Window).
+        if (can("boards.chat")) {
+          add(ICON.chat, "Sohbet", () => ankamon.ui.chat.Window.open(board));
         }
       } else {
         // Kapalı tahtada en olası iş onu açmak: Bilgisayarı aç (WoL) ve güç seçenekleri EN ÜSTTE (kullanıcı
@@ -957,6 +991,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
      * varsayılan kapalı, her biri kendi parolasıyla ve kendi yetkisiyle ("boards.passwords.<hesap>")
      * ayarlanır. Her parola iki kutuya yazılır; sonunda onay alınır. Her parola grubu ayrı bir görevdir
      * (hazır işlem "user-password"; parola görev bitince sunucudan silinir, denetim kaydına maskeli yazılır).
+     * İkinci sekme: root ve etapadmin parolası yalnız seçilen bilgisayarda (bkz. ui.boards.AdminPasswordPanel).
      */
     async setPasswords(boards, user) {
       if (!boards.length) {
@@ -967,7 +1002,19 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const can = feature => user.is_admin || user.features.includes(feature);
       const ADMIN = ["etapadmin", "root"];
       const where = boards.length > 1 ? `${boards.length} tahta` : esc(boards[0].label || boards[0].hostname || boards[0].ip);
-      const win = ankamon.ui.Dialog.window(`Parola ayarla — ${where}`, 520);
+      const win = ankamon.ui.Dialog.window(`Parola ayarla — ${where}`, 560);
+      // İki sekme: "Kullanıcılar" (toplu) ve yönetici hesapları (tek bilgisayarda, bkz. ui.boards.AdminPasswordPanel).
+      const tabs = new qx.ui.tabview.TabView().set({ contentPadding: 0 });
+      const pane = new qx.ui.tabview.Page("Kullanıcılar");
+      pane.setLayout(new qx.ui.layout.VBox(12));
+      pane.setPadding(10);
+      tabs.add(pane);
+      const ownAccounts = ADMIN.filter(name => can("boards.passwords." + name));
+      if (ownAccounts.length) {
+        tabs.add(new ankamon.ui.boards.AdminPasswordPanel(boards, ownAccounts));
+      }
+      win.setContentPadding(6);
+      win.add(tabs, { flex: 1 });
 
       // Çift kutulu parola girişi: iki kutu ve anlık eşleşme notu. check() → hata metni ya da null.
       const pairs = [];
@@ -1023,18 +1070,18 @@ qx.Class.define("ankamon.ui.BoardOps", {
 
       // 1) Kullanıcı hesapları: süzme kutusu + işaretlenebilir liste + ortak parola.
       const status = new qx.ui.basic.Label("Hesaplar yükleniyor…").set({ rich: true, wrap: true, textColor: "app-muted" });
-      win.add(status);
+      pane.add(status);
       const filter = new qx.ui.form.TextField().set({ placeholder: "Süz… (kullanıcı adı ya da tam ad)", liveUpdate: true });
       const all = new qx.ui.form.CheckBox("Görünenlerin tümü");
       const top = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" }));
       top.add(filter, { flex: 1 });
       top.add(all);
-      win.add(top);
+      pane.add(top);
       const list = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
       const scroll = new qx.ui.container.Scroll(list).set({ height: 60 });
-      win.add(scroll, { flex: 1 });
+      pane.add(scroll, { flex: 1 });
       const users = pairBox(true);
-      win.add(users.box);
+      pane.add(users.box);
 
       // 2) Yönetici hesapları: yalnız yetkisi olanlar; her biri ayrı onay kutusu ve ayrı çift kutulu parola.
       const admins = ADMIN.filter(name => can("boards.passwords." + name)).map(name => {
@@ -1056,15 +1103,15 @@ qx.Class.define("ankamon.ui.BoardOps", {
           qx.ui.core.queue.Manager.flush(); // pencere uzadı/kısaldı: ekranda kalsın
           win.center();
         });
-        win.add(group);
+        pane.add(group);
         return { name, box, pair };
       });
 
       // Düğme neden kapalı: eksik/hatalı olan her şey düğmelerin üstünde, canlı.
       const problems = new qx.ui.basic.Label("").set({ rich: true, wrap: true });
-      win.add(problems);
+      pane.add(problems);
       const apply = new qx.ui.form.Button("Parolayı ayarla").set({ enabled: false });
-      ankamon.ui.Dialog.buttons(win, [apply]);
+      ankamon.ui.Dialog.buttons(pane, [apply]);
       const boxes = [];
       const chosen = () => boxes.filter(b => b.getValue()).map(b => b.getModel());
       // Bir şey seçildiyse ve seçilen her grubun parolası geçerliyse etkin.

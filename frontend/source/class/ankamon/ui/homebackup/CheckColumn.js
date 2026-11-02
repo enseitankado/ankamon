@@ -65,7 +65,7 @@ qx.Class.define("ankamon.ui.homebackup.CheckColumn", {
 
     /**
      * Listeyi yeniden kurar; aynı değerli öğelerin işareti korunur.
-     * @param items {Array} [{value, label, checked?}]
+     * @param items {Array} [{value, label, checked?, side?}] side: sağda sütun gibi gösterilen kısa metin (ör. boyut)
      * @param note {String?} liste boşken gösterilecek metin
      */
     setItems(items, note) {
@@ -75,7 +75,14 @@ qx.Class.define("ankamon.ui.homebackup.CheckColumn", {
         const check = new qx.ui.form.CheckBox(item.label).set({ value: was.has(item.value) || !!item.checked });
         check.setUserData("value", item.value);
         check.addListener("changeValue", () => this.__changed());
-        this.__box.add(check);
+        if (item.side !== undefined) {
+          const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
+          row.add(check, { flex: 1 });
+          row.add(new qx.ui.basic.Label(item.side).set({ textColor: "app-muted", alignY: "middle" }));
+          this.__box.add(row);
+        } else {
+          this.__box.add(check);
+        }
         return check;
       });
       if (!items.length && note) {
@@ -98,14 +105,20 @@ qx.Class.define("ankamon.ui.homebackup.CheckColumn", {
 
     __setVisible(value) {
       this.__quiet = true;
-      this.__checks.filter(c => c.getVisibility() === "visible").forEach(c => c.setValue(value));
+      this.__checks.filter(c => {
+        const parent = c.getLayoutParent();
+        return (parent === this.__box ? c : parent).getVisibility() === "visible";
+      }).forEach(c => c.setValue(value));
       this.__quiet = false;
       this.__changed();
     },
 
     __applyFilter() {
       const q = (this.__filter.getValue() || "").toLocaleLowerCase("tr");
-      this.__checks.forEach(c => c.setVisibility(c.getLabel().toLocaleLowerCase("tr").includes(q) ? "visible" : "excluded"));
+      this.__checks.forEach(c => {
+        const parent = c.getLayoutParent();
+        (parent === this.__box ? c : parent).setVisibility(c.getLabel().toLocaleLowerCase("tr").includes(q) ? "visible" : "excluded");
+      });
     }
   }
 });

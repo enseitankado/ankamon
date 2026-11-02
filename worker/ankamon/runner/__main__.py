@@ -41,7 +41,7 @@ from ..executor import (accounts, backup, cast, diagnose, display, home_restore,
                         tools, whoami, wol)
 from ..anomaly import scan as anomaly_scan_mod
 from ..executor.jobs import _action_dir, _board_access, _claim, _targets, _write_one, _write_results
-from . import stream
+from . import board_media_jobs, stream
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("ankamon.runner")
@@ -472,6 +472,8 @@ def _run_job(job) -> None:
                     ev.close()
                     _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
                     results[t["board_id"]] = result
+        elif job["type"] in board_media_jobs.TYPES:
+            board_media_jobs.run(conn, job, targets, names, results)
         elif job["type"] == "diagnose":
             # "Bakım" taraması (bkz. executor/diagnose.py; elle "Şimdi tara" ya da haftalık otomatik): tahtalar
             # PARALEL, aynı anda en çok `n` tahta — n konteynerin o anki CPU/RAM boşluğuna göre
@@ -537,6 +539,7 @@ def _run_job(job) -> None:
         activity.record(conn, f"Görev hatası: {job['title']} — {exc}"[:200], "error", "runner", traceback.format_exc())
     finally:
         _scrub_secrets(conn, job)
+        board_media_jobs.scrub(conn, job)
         general.close()
         conn.close()
 

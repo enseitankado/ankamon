@@ -115,7 +115,9 @@ def _lookup(board_id: int):
         if not board or not board["ip"]:
             return None
         ssh_user, password = _board_access(conn)
-        return board, ssh_user, password
+        # sshfs parolayı stdin'den alır (sshpass süzgecinden geçmez): tahtaya özel root parolası burada.
+        own = conn.execute("SELECT root_password FROM board_credentials WHERE board_id = %s", (board_id,)).fetchone()
+        return board, ssh_user, (own["root_password"] if own else password)
 
 
 async def _mount(board_id: int, username: str) -> tuple[bool, str]:

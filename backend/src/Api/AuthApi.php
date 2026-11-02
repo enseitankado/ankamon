@@ -266,6 +266,20 @@ final class AuthApi
         return ['ok' => true];
     }
 
+    /** nginx auth_request ucu: /screen/ws/chat/ (Sohbet — bkz. worker screen/chat.py) için oturum + "boards.chat". */
+    public function chat(): array
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            throw new ApiError(401, 'Oturum açmanız gerekiyor.');
+        }
+        if (!Auth::can($user, 'boards.chat')) {
+            throw ApiError::forbidden();
+        }
+        header('X-Auth-User: ' . $user['username']);
+        return ['ok' => true];
+    }
+
     /**
      * nginx auth_request ucu: /cast/ (ekran yansıtma sayfası) ve /cast/mtx/ (WHIP → MediaMTX) için
      * oturum + "cast" yetkisi denetimi. Tahtalarda oynatıcıyı başlatmak ayrıca cast_start görevidir.

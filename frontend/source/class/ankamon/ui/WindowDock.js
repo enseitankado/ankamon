@@ -71,7 +71,11 @@ qx.Class.define("ankamon.ui.WindowDock", {
     /** Pencereye küçültme düğmesi ekler, kipliliği kaldırır; küçültülünce şeride, geri açılınca/kapanınca şeritten. */
     __adopt(win) {
       win.setUserData("ankamon.dock", true);
-      win.set({ showMinimize: true, allowMinimize: true, modal: false });
+      win.set({ showMinimize: true, allowMinimize: true });
+      // İstisna: açıkça kalıcı istenen pencere (bkz. ui.sessions.ScreenshotViewer).
+      if (!win.getUserData("ankamon.keepModal")) {
+        win.setModal(false);
+      }
       // qx minimize() büyütülmüş durumu atar (restore() normal boyuta, 0,0'a döner): geri açarken yeniden büyütülür.
       win.addListener("beforeMinimize", () => win.setUserData("ankamon.dock.maximized", win.isMaximized()));
       win.addListener("minimize", () => this.__add(win));

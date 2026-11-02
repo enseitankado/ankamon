@@ -66,7 +66,7 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
     },
 
     /** "Şu an" satırındaki sayının birimi (tanımlı değilse "kayıt"). */
-    UNIT: { queue: "dosya", backups: "dosya", jobs: "görev", diagnose: "tarama" },
+    UNIT: { queue: "dosya", backups: "dosya", jobs: "görev", diagnose: "tarama", screenshots: "görüntü", chat: "ileti" },
 
     CSS: `<style>
       .dh{font:13px/1.55 sans-serif;padding:4px 14px 14px}
@@ -253,6 +253,26 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
               ["Silme", "Elle, bu sekmeden. Silinen tahtalar bir sonraki otomatik taramada yeniden denetlenir."]
             ],
             todo: ["Eski taramaları \"Bitmiş tüm taramalar\" satırıyla silin; Bakım raporu yeni taramalarla dolar."]
+          };
+        case "screenshots":
+          return {
+            verdict: ["mid", "Kontrolsüz büyüyüp diski doldurur mu? Yalnız elle alınır; otomatik silme yok.",
+              "Her görüntü yalnız sağ menüden elle alınır (bir görüntü genellikle birkaç yüz KB), bu yüzden yavaş birikir. Gerektiğinde buradan silin."],
+            rows: [
+              ["Ne?", "Sağ menü Ekran ▸ Ekran görüntüsü al ile çekilen görüntüler (JPEG). Bilgisayar, oturum, zaman ve çeken kişi dosyanın içine de gömülüdür: oturum kayıtları silinse de kaybolmaz."],
+              ["Nerede?", "Sunucuda <code>data/screenshots/&lt;tahta&gt;/</code>; dizin satırları veritabanında <code>screenshots</code> tablosunda."],
+              ["Saklama", "<b>Süresiz</b> — otomatik silme politikası yok."]
+            ],
+            todo: ["Eski görüntüleri tahta satırını seçip silin; tek görüntü Oturumlar ▸ Zaman çizelgesi'nden de silinebilir."]
+          };
+        case "chat":
+          return {
+            rows: [
+              ["Ne?", "Sağ menü Sohbet ile tahtadaki kişiyle yazışılan iletiler. Oturumlar ▸ Sohbet geçmişi'nde listelenir."],
+              ["Nerede?", `${pg}, <code>chat_messages</code> tablosu (sıradan tablo).`],
+              ["Saklama", "<b>Süresiz</b> — otomatik silme politikası yok; metin olduğundan çok az yer tutar."]
+            ],
+            todo: ["Eski sohbetleri tahta satırını seçip silin."]
           };
         case "backups":
           return {

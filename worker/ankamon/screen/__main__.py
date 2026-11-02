@@ -51,7 +51,7 @@ from psycopg.types.json import Jsonb
 
 from .. import activity, db
 from ..executor.jobs import _board_access
-from . import perf, remote, taskmgr
+from . import audio, chat, perf, remote, taskmgr
 
 log = logging.getLogger("ankamon.screen")
 
@@ -273,7 +273,10 @@ async def main():
          # Ekranlar sekmesinin "Başarım" görünümü (htop üst panelleri, saniyelik) — bkz. perf.py.
          (r"/screen/ws/perf/(\d+)", perf.PerfSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),
          # Tahtalar/Ekranlar sağ menüsü "Görev yöneticisi" (canlı SSH + tahtada ajan) — bkz. taskmgr.py.
-         (r"/screen/ws/taskmgr/(\d+)", taskmgr.TaskMgrSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS})],
+         (r"/screen/ws/taskmgr/(\d+)", taskmgr.TaskMgrSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),
+         # Ekran penceresindeki hoparlör düğmesi (bkz. audio.py) ve sağ menü "Sohbet" (bkz. chat.py).
+         (r"/screen/ws/audio/(\d+)", audio.AudioSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),
+         (r"/screen/ws/chat/(\d+)", chat.ChatSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS})],
         # Ölü tarayıcı bağlantıları (sekme çökmesi, ağ kopması) ssh süreçlerini sonsuza dek tutmasın.
         websocket_ping_interval=30,
         websocket_ping_timeout=60,

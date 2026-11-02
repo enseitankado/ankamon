@@ -45,6 +45,7 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
   events: {
     changeRange: "qx.event.type.Data",
     itemContextmenu: "qx.event.type.Data",
+    itemClick: "qx.event.type.Data",
     groupContextmenu: "qx.event.type.Data"
   },
 
@@ -98,6 +99,11 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
       .vis-item.vis-background.tm-off { background: repeating-linear-gradient(135deg,
         rgba(95,99,104,.16) 0 6px, rgba(95,99,104,.08) 6px 12px); }
       .tm-legend.tm-off { background: rgba(95,99,104,.22); border-color: #9aa0a6; }
+      .vis-item.tm-shot { background: #fff; border: 1px solid #1a73e8; color: #1a73e8; cursor: pointer; z-index: 3; }
+      .vis-item.tm-shot:hover { background: #1a73e8; color: #fff; }
+      .vis-item.tm-shot .vis-item-content { box-sizing: border-box; min-width: 22px; height: 18px; padding: 0; line-height: 16px;
+        text-align: center; font-size: 12px; }
+      .vis-item.tm-shot .vis-dot { display: none; }
       .tm-legend { display: inline-block; width: 12px; height: 12px; border-radius: 2px;
         border: 1px solid; vertical-align: -2px; margin: 0 4px 0 10px; }
     `,
@@ -272,6 +278,11 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
       this.__timeline.on("rangechanged", props => {
         if (props.byUser) {
           this.__fireRange();
+        }
+      });
+      this.__timeline.on("click", props => {
+        if (props.item !== null && props.item !== undefined) {
+          this.fireDataEvent("itemClick", { item: props.item, event: props.event });
         }
       });
       this.__timeline.on("contextmenu", props => {

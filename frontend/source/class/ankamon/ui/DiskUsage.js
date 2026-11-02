@@ -53,7 +53,9 @@ qx.Class.define("ankamon.ui.DiskUsage", {
         this.__metricSpec(),
         this.__jobSpec(),
         this.__diagnoseSpec(),
-        this.__backupSpec()
+        this.__backupSpec(),
+        this.__shotSpec(),
+        this.__chatSpec()
       ];
     },
 
@@ -160,6 +162,52 @@ qx.Class.define("ankamon.ui.DiskUsage", {
           const search = new URLSearchParams(row.scope);
           return (await ankamon.io.Api.del("/storage/metrics?" + search.toString())).deleted;
         }
+      });
+      return spec;
+    },
+
+    /** Ekran görüntüleri: tahta başına, gerçek dosya boyutu, /api/storage/screenshots. */
+    __shotSpec() {
+      const F = ankamon.util.Format;
+      const spec = this.__withDisk({
+        mode: "screenshots", size: this.__sizer("/storage/screenshots"), label: "Ekran görüntüleri", noun: "ekran görüntüsü",
+        columns: this.__scopeColumns("Görüntü sayısı").map(c => (c.id === "size" ? { id: "size", label: "Boyut", width: 140 } : c)),
+        load: async () => {
+          const data = await ankamon.io.Api.get("/storage/screenshots");
+          const rows = [{ all: true, scope: { all: "1" }, ...data.total, name: "— Tüm tahtalar —" }];
+          data.boards.forEach(b => rows.push({ scope: { name: b.name }, ...b }));
+          rows.forEach(r => {
+            r.deletable = true;
+            r.estimated = false;
+            r.n = Number(r.n);
+            r.bytes = Number(r.bytes);
+            r.cells = [r.name, r.n, F.dateTime(r.first), F.dateTime(r.last), F.bytes(r.bytes)];
+          });
+          return { rows, info: this.__info(spec, data, `${data.total.n} görüntü, ${F.bytes(data.total.bytes)} (${qx.bom.String.escape(data.dir)})`) };
+        },
+        remove: async row => (await ankamon.io.Api.del("/storage/screenshots?" + new URLSearchParams(row.scope).toString())).deleted
+      });
+      return spec;
+    },
+
+    /** Sohbet geçmişi: tahta başına ileti, /api/storage/chat. */
+    __chatSpec() {
+      const F = ankamon.util.Format;
+      const spec = this.__withDisk({
+        mode: "chat", size: this.__sizer("/storage/chat"), label: "Sohbet geçmişi", noun: "sohbet iletisi",
+        columns: this.__scopeColumns("İleti sayısı"),
+        load: async () => {
+          const data = await ankamon.io.Api.get("/storage/chat");
+          const rows = [{ all: true, scope: { all: "1" }, ...data.total, name: "— Tüm tahtalar —", estimated: false }];
+          data.boards.forEach(b => rows.push({ scope: { name: b.name }, ...b, bytes: b.est_bytes, estimated: true }));
+          rows.forEach(r => {
+            r.deletable = true;
+            r.n = Number(r.n);
+            r.cells = [r.name, r.n, F.dateTime(r.first), F.dateTime(r.last), this.__size(r.bytes, r.estimated)];
+          });
+          return { rows, info: this.__info(spec, data, `${data.total.n} ileti, ${F.bytes(data.total.bytes)}`) };
+        },
+        remove: async row => (await ankamon.io.Api.del("/storage/chat?" + new URLSearchParams(row.scope).toString())).deleted
       });
       return spec;
     },

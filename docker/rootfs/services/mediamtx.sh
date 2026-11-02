@@ -31,7 +31,9 @@
 # Erişim kuralları:
 #   - yayınlama yalnız 127.0.0.1'den (yani yalnız nginx vekili üzerinden, yetki denetiminden geçmiş);
 #   - okuma yalnız "c-<rastgele 24+ karakter>" adlı yollardan — yol adını yalnız yayını başlatan sayfa
-#     ve o yayının tahtaları bilir (bkz. docker/rootfs/cast/index.html, worker/ankamon/executor/cast.py).
+#     ve o yayının tahtaları bilir (bkz. docker/rootfs/cast/index.html, worker/ankamon/executor/cast.py);
+#   - ekran aktarımı (tahtadan tahtaya, bkz. worker/ankamon/executor/relay.py): "r-<rastgele>" yolları tahtadan
+#     da yayınlanır ve okunur — yol adını yalnız o aktarımın tahtaları bilir.
 # Dışa açık portlar: RTSP 8554/tcp (tahtalar okur), WebRTC ICE 8189/udp+tcp (tarayıcının medya akışı).
 set -eu
 
@@ -55,6 +57,10 @@ authInternalUsers:
     permissions:
       - action: read
         path: "~^c-[A-Za-z0-9]{24,64}$"
+      - action: read
+        path: "~^r-[A-Za-z0-9]{24,64}$"
+      - action: publish
+        path: "~^r-[A-Za-z0-9]{24,64}$"
 
 api: true
 apiAddress: 127.0.0.1:${CAST_API_PORT:-9997}

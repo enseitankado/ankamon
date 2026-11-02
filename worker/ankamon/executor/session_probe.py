@@ -40,7 +40,7 @@ import json
 import os
 import subprocess
 
-from . import autoshutdown, netif, screenlock
+from . import autoshutdown, inputlock, netif, screenlock
 
 # Son satır: etkin VT'deki X'in monitör güç durumu ("M On|Off|Standby|Suspend" — bkz. 025_board_display_state.sql;
 # X seçimi screen/remote.py ile aynı).
@@ -55,7 +55,7 @@ set -- $(ps -eo args= | awk -v vt="vt${vt#tty}" '
     for (i = 2; i <= NF; i++) { if ($i ~ /^:[0-9]+$/) d = $i; if ($i == "-auth") a = $(i + 1); if ($i == vt) m = 1 }
     if (m && d != "") { print d, a; exit } }')
 [ -n "$1" ] && echo "M $(DISPLAY="$1" XAUTHORITY="$2" xset q 2>/dev/null | awk '/Monitor is/ { print $3 }')"
-""" + netif.SCRIPT + autoshutdown.SCRIPT + screenlock.SCRIPT
+""" + netif.SCRIPT + autoshutdown.SCRIPT + screenlock.SCRIPT + inputlock.SCRIPT
 # Aynı SSH turunda: ağ arabirimleri (NI/ND/NM/NW/NR satırları, bkz. executor/netif.py), TiHA otomatik
 # kapatma geri sayımı (SD satırı, bkz. executor/autoshutdown.py) — Ekranlar önizlemesinin alt barı için —
 # ve Ankamon ekran kilidi (L satırı, bkz. executor/screenlock.py).
@@ -116,17 +116,17 @@ def probe(board: dict, user: str, password: str, timeout: int = 8) -> dict:
     name, locked = parse(out)
     return {"ok": True, "user": name, "locked": locked, "display": display_state(out),
             "netifs": netif.parse(out), "shutdown": autoshutdown.parse(out),
-            "screen_locked": "L 1" in out.splitlines(), "error": ""}
+            "screen_locked": "L 1" in out.splitlines(), "input_locks": inputlock.parse(out), "error": ""}
 
 
 def store_extras(conn, board_id: int, res: dict) -> None:
     """Ağ arabirimleri, otomatik kapatma ve ekran kilidi durumunu yazar (bkz. göç 026, 035; None =
     bilinmiyor/yok)."""
     conn.execute(
-        "UPDATE boards SET netifs = %s::jsonb, autoshutdown = %s::jsonb, screen_locked = %s WHERE id = %s",
+        "UPDATE boards SET netifs = %s::jsonb, autoshutdown = %s::jsonb, screen_locked = %s, input_locks = %s WHERE id = %s",
         (json.dumps(res.get("netifs")) if res.get("netifs") else None,
          json.dumps(res.get("shutdown")) if res.get("shutdown") else None,
-         bool(res.get("screen_locked")), board_id))
+         bool(res.get("screen_locked")), res.get("input_locks") or [], board_id))
 
 
 def store_screen_lock(conn, board_id: int, locked: bool) -> None:

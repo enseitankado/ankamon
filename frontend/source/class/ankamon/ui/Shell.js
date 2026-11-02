@@ -139,7 +139,8 @@ qx.Class.define("ankamon.ui.Shell", {
       dashboard: "◈", boards: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
       info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", bulk: "⇄", wakeScreen: "☀", sleepScreen: "☾", screenLock: "🔐", screenUnlock: "🔓", cast: "⇪", logout: "⏏", lock: "🔒", password: "🔑", diagnose: "⚕", system: "⚒", diskusage: "⛁", software: "⬢",
-      network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "⚠"
+      network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "⚠",
+      screenshot: "📷", keyboard: "⌨", mouse: "🖱", touch: "☝", unlockInput: "🔓", relay: "⇶", relayStop: "⏹", chat: "💬"
     },
 
     // Uzaktan işlemler kaldırıldı; işlevi Tahtalar sayfasına ve ağaç sağ menülerine taşındı.
@@ -152,17 +153,15 @@ qx.Class.define("ankamon.ui.Shell", {
       // retap: ağaçta zaten seçili düğüme yeniden tıklamak sayfayı yeniler (sayfada "Yenile" düğmesi yok).
       { id: "dashboard", label: "Genel bakış", feature: "dashboard", retap: true, create: u => new ankamon.page.Dashboard(u) },
       // Tahtalar'ın sekmeleri ağaçta da (kullanıcı isteği): alt sayfalardan (Oturumlar, Bakım, Loglar) önce.
-      // "Donanım izleme"nin anahtarı eski etiketi "Donanımlar" (kayıtlı son sekme tercihi bozulmasın — bkz.
-      // ui.boards.ComputerTiles); Ekranlar/Donanım izleme sayfadaki gibi "screen" yetkisi ister.
+      // Ekranlar sayfadaki gibi "screen" yetkisi ister.
       { id: "boards", label: "Tahtalar", feature: "boards", create: u => new ankamon.page.Boards(u),
-        tabs: [{ key: "Liste", label: "Liste" }, { key: "Ekranlar", label: "Ekranlar", feature: "screen" },
-          { key: "Donanımlar", label: "Donanım izleme", feature: "screen" }] },
+        tabs: [{ key: "Liste", label: "Liste" }, { key: "Ekranlar", label: "Ekranlar", feature: "screen" }] },
       // parent: ağaçta o sayfanın düğümünün ALTINDA (kullanıcı isteği: tahtalarla ilgili sayfalar
       // "Tahtalar"ın altında). Üst sayfa kullanıcıya kapalıysa kökte gösterilir — bkz. __createTree.
       // Sekmeleri ağaçta da (kullanıcı isteği: zaman çizelgesi sol menüden açılsın). key: Oturumlar sekmesinde
       // etiket, Zaman çizelgesinde userData "key" (eski adı "Kullanıcılar" — bkz. ui.sessions.Users).
       { id: "sessions", label: "Oturumlar", feature: "logs", parent: "boards", create: u => new ankamon.page.Sessions(u),
-        tabs: [{ key: "Oturumlar", label: "Oturumlar" }, { key: "timeline", label: "Zaman çizelgesi" }] },
+        tabs: [{ key: "Oturumlar", label: "Oturumlar" }, { key: "timeline", label: "Zaman çizelgesi" }, { key: "chat", label: "Sohbet geçmişi" }] },
       // Bakım: "Bakım" (sorun tespiti) + "Sensörler" (Grafana) sekmeleri — bkz. page.Maintenance. features:
       // herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı
       // isteği); eski {page: "metrics"} bağlantıları __openPage'de buraya yönlenir. id "diagnose" kalır

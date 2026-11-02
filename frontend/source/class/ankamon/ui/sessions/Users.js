@@ -116,6 +116,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     this.__timeline = new ankamon.ui.sessions.Timeline();
     this.__timeline.addListener("changeRange", e => this.__summarize(e.getData()));
     this.__timeline.addListener("itemContextmenu", e => this.__itemMenu(e.getData()));
+    this.__timeline.addListener("itemClick", e => this.__openShot(e.getData().item));
     this.__timeline.addListener("groupContextmenu", e => {
       const data = e.getData();
       this.__openMenu(this.__groupMenu(data.group), data.event);
@@ -205,10 +206,62 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     __framed: false,
     __lessons: null,
     __lessonsAt: 0,
+    __shots: null,
+
+    /** Ekran görüntüleri (bkz. ankamon.ui.sessions.ScreenshotViewer): oturum kayıtlarından bağımsız, çizelgede işaret olarak. */
+    async __loadShots() {
+      try {
+        const shots = (await ankamon.io.Api.get("/screenshots")).screenshots;
+        if (JSON.stringify(shots) !== JSON.stringify(this.__shots)) {
+          this.__shots = shots;
+          if (!this.isDisposed()) {
+            this.__render();
+          }
+        }
+      } catch (e) {
+        // görüntü listesi okunamazsa çizelge oturumlarla çalışmaya devam eder
+      }
+    },
+
+    /** Süzgece uyan görüntülerin çizelge öğeleri; satırlar `groups`a eklenir (oturumu olmayan tahta/kişi de görünsün). */
+    __shotItems(groups, byBoard, kind, user, board, badOnly) {
+      if (kind === "webshell" || badOnly) {
+        return [];
+      }
+      const F = ankamon.util.Format;
+      const esc = qx.bom.String.escape;
+      return (this.__shots || []).filter(s => {
+        const key = s.board_id ? "b" + s.board_id : "h" + s.board_name;
+        return (!board || key === board) && (!user || s.session_username === user);
+      }).map(s => {
+        const group = byBoard ? (s.board_id ? "b" + s.board_id : "h" + s.board_name) : "board:" + (s.session_username || "");
+        if (!groups.has(group)) {
+          groups.set(group, byBoard ? s.board_name : (s.session_username || "(oturum yok)"));
+        }
+        return {
+          id: "s:" + s.id, group, type: "box", start: new Date(s.taken_at * 1000), content: "📷", className: "tm-shot",
+          title: `<b>Ekran görüntüsü</b> · ${esc(s.board_name)}<br>Oturum: ${esc(s.session_username || "yok")}<br>` +
+            `${F.dateTime(s.taken_at * 1000)} · çeken: ${esc(s.taken_by)}`
+        };
+      });
+    },
+
+    __shotOf(item) {
+      return String(item).startsWith("s:") ? (this.__shots || []).find(s => "s:" + s.id === item) : null;
+    },
+
+    /** Çizelgede görüntü işaretine tıklama: kalıcı pencerede normal boyutta. */
+    __openShot(item) {
+      const shot = this.__shotOf(item);
+      if (shot) {
+        ankamon.ui.sessions.ScreenshotViewer.open(shot, this.__page._can("logs.manage"), () => this.__loadShots());
+      }
+    },
 
     /** @param sessions {Array} /board-sessions yanıtındaki satırlar */
     setData(sessions) {
       this.__sessions = sessions;
+      this.__loadShots();
       if (this.__pendingBoard) {
         this.__applyBoard();
       } else {
@@ -446,6 +499,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
             (s.kind === "webshell" ? "" : this.__lessonLines(s, end))
         };
       });
+      items.push(...this.__shotItems(groups, byBoard, kind, user, board, badOnly));
       if (byBoard) {
         items.push(...this.__offItems(new Set(groups.keys())));
       }
@@ -629,6 +683,12 @@ qx.Class.define("ankamon.ui.sessions.Users", {
 
     /** Çubuğa sağ tıklama menüsü. @param data {Map} {item, event} */
     __itemMenu(data) {
+      if (this.__shotOf(data.item)) {
+        const open = new qx.ui.menu.Menu();
+        open.add(ankamon.ui.BoardOps.menuButton(ankamon.ui.Shell.ICON.screenshot, "Görüntüyü aç", () => this.__openShot(data.item)));
+        this.__openMenu(open, data.event);
+        return;
+      }
       const s = this.__shown && this.__shown.find(x => (x.kind === "webshell" ? "w:" : "b:") + x.id === data.item);
       if (!s) {
         return;

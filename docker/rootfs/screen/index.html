@@ -115,9 +115,9 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   /* Kutucuk seçimi (Shift/Ctrl/dikdörtgen seçim) ve sürükle-bırak sıralama — yalnız gömülü kipte
      (Tahtalar sayfasının Ekranlar sekmesi). Seçim: mavi çerçeve. Sürüklenen: soluk; bırakılacak
      kutucuk: kesik çizgili çerçeve. Seçili kutucuk koyu görüntüler arasında seçilebilsin diye (kullanıcı isteği):
-     dışa taşan halka + parıltı, mavi başlık, başta ✓ (computer.html ile aynı). */
+     dışa taşan düz mavi halka (ışıma yok), mavi başlık, başta ✓. */
   html.embed .tile.selected { outline: 3px solid #0096ff; outline-offset: -3px; z-index: 1;
-    box-shadow: 0 0 0 2px #0096ff, 0 0 12px 3px rgba(0, 150, 255, .75); }
+    box-shadow: 0 0 0 2px #0096ff; }
   html.embed .tile.selected .title { background: #0078d4; }
   html.embed .tile.selected .title .name { color: #fff; }
   html.embed .tile.selected .title::before { content: "✓"; color: #fff; font-weight: 700; flex: 0 0 auto; }
@@ -264,6 +264,7 @@ class Tile {
     this.control = false;     // fare/klavye ile müdahale (yalnız "screen.control" yetkisiyle; sunucu da denetler)
     this.el.innerHTML = `<div class="title"><span class="dot"></span><span class="name"></span>
       ${spec.control ? '<button class="ctl" title="Fare ve klavye ile tahtayı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
+      ${embed ? "" : '<button class="snd" title="Tahtanın sesini bu bilgisayara aktar (kapalı)">🔇</button>'}
       <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div><div class="sleep"><div>Ekran güç tasarrufu kipinde<div class="sd"></div>${embed ? '<div class="wk">Uyandırmak için tıklayın</div>' : ""}</div></div>
       <div class="whoami" hidden></div></div><div class="stats"></div>`;
     this.el.querySelector(".name").textContent = board.name || ("#" + board.id);
@@ -282,6 +283,8 @@ class Tile {
     this.el.classList.toggle("powersave", !!board.powersave);
     this.tickShutdown();
     this.el.querySelector("button.fs").addEventListener("click", () => toggleFullscreen(single ? document.documentElement : this.el));
+    const snd = this.el.querySelector("button.snd");
+    if (snd) snd.addEventListener("click", () => this.setAudio(!this.audioWs));
     const ctl = this.el.querySelector("button.ctl");
     // Müdahale tam ekranda yapılır (kullanıcı isteği): Ekranlar sekmesinde (gömülü) kutucuğun kendisi değil,
     // o tahtanın "Ekranı yönet" penceresi büyütülmüş açılır (üst sayfa — bkz. Boards.js "tm-manage"); ekran
@@ -607,6 +610,61 @@ class Tile {
    * (q=view) zaten canlı ekranın kendisi yeterli, rozet gereksiz. `whoami`: null (hiç sorgulanmadı,
    * gizli), {status:"querying", text?}, ya da {status:"ok"|"error", text}.
    */
+
+  /**
+   * Hoparlör düğmesi (varsayılan kapalı): tahtanın çıkış sesi bu tarayıcıda çalar. Ham PCM (24 kHz, stereo, s16le — bkz.
+   * worker screen/audio.py) parça parça zamanlanır; ağ gecikmesi birikirse atlanarak canlıya dönülür. Tahtanın sesi kesilmez.
+   */
+  setAudio(on, note) {
+    const btn = this.el.querySelector("button.snd");
+    const ws = this.audioWs;
+    this.audioWs = null;
+    if (ws) { ws.onclose = null; ws.close(); }
+    if (!on) {
+      if (this.audioCtx) { this.audioCtx.close(); this.audioCtx = null; }
+      if (btn) { btn.textContent = "🔇"; btn.title = note || "Tahtanın sesini bu bilgisayara aktar (kapalı)"; btn.style.color = note ? "#f55" : ""; }
+      return;
+    }
+    const ctx = this.audioCtx || (this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 }));
+    ctx.resume();
+    if (btn) { btn.textContent = "🔊"; btn.title = "Tahtanın sesi aktarılıyor (kapatmak için tıklayın)"; btn.style.color = "#6cf"; }
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const sock = this.audioWs = new WebSocket(`${proto}//${location.host}/screen/ws/audio/${this.board.id}`);
+    sock.binaryType = "arraybuffer";
+    let next = 0;
+    let rest = null;      // çerçeve sınırına denk gelmeyen artık baytlar
+    sock.onmessage = e => {
+      let bytes = new Uint8Array(e.data);
+      if (rest) {
+        const joined = new Uint8Array(rest.length + bytes.length);
+        joined.set(rest);
+        joined.set(bytes, rest.length);
+        bytes = joined;
+        rest = null;
+      }
+      const usable = bytes.length - bytes.length % 4;
+      if (usable < bytes.length) rest = bytes.slice(usable);
+      if (!usable) return;
+      const pcm = new Int16Array(bytes.buffer, bytes.byteOffset, usable / 2);
+      const frames = pcm.length / 2;
+      const buf = ctx.createBuffer(2, frames, 24000);
+      const l = buf.getChannelData(0), r = buf.getChannelData(1);
+      for (let i = 0; i < frames; i++) { l[i] = pcm[2 * i] / 32768; r[i] = pcm[2 * i + 1] / 32768; }
+      const now = ctx.currentTime;
+      if (next < now || next > now + 0.8) next = now + 0.12;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(next);
+      next += frames / 24000;
+    };
+    sock.onclose = e => {
+      this.audioWs = null;
+      const why = { 4008: "Tahtada ses sunucusu yok (oturum yok ya da ses kapalı).", 4002: "Tahtaya ulaşılamadı.", 4003: "SSH girişi reddedildi." };
+      this.setAudio(false, why[e.code] || "Ses aktarımı kesildi.");
+    };
+  }
+
   setWhoami(whoami) {
     if (!whoami || spec.q !== "thumb") {
       this.whoamiEl.hidden = true;

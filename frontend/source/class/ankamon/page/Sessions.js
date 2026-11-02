@@ -55,6 +55,7 @@ qx.Class.define("ankamon.page.Sessions", {
     this.__users = new ankamon.ui.sessions.Users(this);
     this.__tabs.add(this.__list);
     this.__tabs.add(this.__users);
+    this.__tabs.add(new ankamon.ui.sessions.Chats(this));
     this._rememberTab(this.__tabs, "sessions"); // son seçili sekme (bkz. Base._rememberTab)
     this.add(this.__tabs, { flex: 1 });
 

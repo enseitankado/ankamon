@@ -69,6 +69,9 @@ final class JobsApi
             throw ApiError::forbidden();
         }
         $job['params'] = json_decode((string) $job['params'], true);
+        if (is_array($job['params'])) {
+            unset($job['params']['current'], $job['params']['new']); // yönetici parolası görevleri (bkz. adminPasswordJob)
+        }
         if ($job['type'] === 'action' && is_array($job['params'])) {
             $job['params'] = Actions::redactParams($job['params']); // gizli değerler (parola) dışarı verilmez
         }
@@ -164,6 +167,19 @@ final class JobsApi
             // Yansıtma penceresindeki "Tahta ses düzeyi" kaydırıcısı: sesli yansıtma sürerken tahta çıkışının
             // düzeyi (asıl düzey cast_start'ta kaydedildi, cast_stop geri yükler — bkz. executor/cast.py).
             'cast_volume' => $this->castVolumeJob($request),
+            // Sağ menü Ekran ▸ Ekran görüntüsü al (bkz. worker executor/screenshot.py).
+            'screenshot' => ['screen.screenshot', 'Ekran görüntüsü al', [], true],
+            // Sağ menü Ekran ▸ Klavye/Fare/Dokunmatik kilitle (bkz. worker executor/inputlock.py).
+            'input_lock' => $this->inputLockJob($request),
+            // Sağ menü Ekran ▸ Ekranı başka bilgisayara aktar / durdur (bkz. worker executor/relay.py).
+            'relay_start' => $this->relayJob($request),
+            'relay_stop' => ['screen.relay', 'Ekran aktarımını durdur', [], true],
+            // Yedekle/Geri al penceresindeki hesap boyutları (bkz. worker executor/homesize.py).
+            'home_sizes' => ['boards.backup', 'Ev dizini boyutları', [], true],
+            // Parola ayarla ▸ Yönetici hesapları (bkz. worker executor/board_password.py): yetki aşağıda hesaba göre.
+            'password_status' => ['boards.passwords', 'Yönetici parolası durumu', [], true],
+            'password_verify' => $this->adminPasswordJob($request, false),
+            'password_change' => $this->adminPasswordJob($request, true),
             // Anomaliler ▸ Tarama (bkz. worker/ankamon/anomaly/scan.py): seçilen kurallar seçilen tahtalarda anlık.
             'anomaly_scan' => $this->anomalyScanJob($request),
             default => throw ApiError::badRequest('Bilinmeyen görev türü.'),
@@ -193,6 +209,11 @@ final class JobsApi
             }
         }
 
+        if (in_array($type, ['password_verify', 'password_change'], true)
+            && !Auth::can($user, 'boards.passwords.' . $params['account'])) {
+            throw ApiError::forbidden($params['account'] . ' parolasını ayarlama yetkiniz yok.');
+        }
+
         $boardIds = array_values(array_unique(array_map('intval', (array) $request->input('board_ids', []))));
         // Sorun tespiti sayfasının "Şimdi tara"sı tahta seçmez: o an çevrimiçi TÜM tahtalar.
         if ($type === 'diagnose' && !$boardIds && $request->input('all_online')) {
@@ -204,6 +225,16 @@ final class JobsApi
         }
         if ($needsBoards && !$boardIds) {
             throw ApiError::badRequest('En az bir tahta seçin.');
+        }
+        if (in_array($type, ['password_verify', 'password_change'], true) && count($boardIds) !== 1) {
+            throw ApiError::badRequest('Yönetici parolası tahta başına ayrı ayarlanır: tek tahta seçin.');
+        }
+        if ($type === 'relay_start') {
+            // Kaynak tahta hedef olamaz: kendi ekranını kendine aktarmak anlamsız (görüntü döngüye girer).
+            $boardIds = array_values(array_diff($boardIds, [$params['source_board_id']]));
+            if (!$boardIds) {
+                throw ApiError::badRequest('Kaynak tahtadan başka en az bir hedef tahta seçin.');
+            }
         }
 
         $pdo = Db::pdo();
@@ -226,6 +257,7 @@ final class JobsApi
         $pdo->commit();
 
         $logged = $type === 'action' ? Actions::redactParams($params) : $params; // parola denetim kaydına yazılmaz
+        unset($logged['current'], $logged['new']);                               // (yönetici parolası görevleri)
         Audit::log($user, $request, 'job.create', $title, ['job_id' => $jobId, 'boards' => $boardIds] + $logged);
         return ['id' => $jobId];
     }
@@ -308,6 +340,60 @@ final class JobsApi
         }
         $volume = max(0, min(100, (int) $volume));
         return ['cast', "Yansıtma ses düzeyi: %$volume", ['volume' => $volume], true];
+    }
+
+    /** Klavye/fare/dokunmatik kilidi: aygıt ve yön (bkz. worker executor/inputlock.py). */
+    private function inputLockJob(Request $request): array
+    {
+        $device = (string) $request->input('device', '');
+        $names = ['keyboard' => 'Klavye', 'mouse' => 'Fare', 'touch' => 'Dokunmatik'];
+        if (!isset($names[$device])) {
+            throw ApiError::badRequest('Geçersiz aygıt.');
+        }
+        $lock = (bool) $request->input('lock', true);
+        return ['screen.input', $names[$device] . ($lock ? ' kilitle' : ' kilidini aç'), ['device' => $device, 'lock' => $lock], true];
+    }
+
+    /** Ekran aktarımı: görev hedefleri gösterecek tahtalar; yayın adı burada üretilir (MediaMTX okuma/yazma kuralı r-…). */
+    private function relayJob(Request $request): array
+    {
+        $source = (int) $request->input('source_board_id', 0);
+        $board = Db::one("SELECT id, COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name, online FROM boards WHERE id = ?", [$source])
+            ?? throw ApiError::badRequest('Kaynak tahta bulunamadı.');
+        if (!$board['online']) {
+            throw ApiError::badRequest('Kaynak tahta çevrimdışı.');
+        }
+        return ['screen.relay', 'Ekranı aktar: ' . $board['name'],
+            ['source_board_id' => $source, 'stream' => 'r-' . bin2hex(random_bytes(16))], true];
+    }
+
+    /**
+     * Tahtaya özel yönetici parolası: doğrulama ya da değiştirme. Parolalar görev parametresinde yalnız görev bitene
+     * dek durur (runner siler), denetim kaydına ve görev okumasına girmez.
+     */
+    private function adminPasswordJob(Request $request, bool $change): array
+    {
+        $account = (string) $request->input('account', '');
+        if (!in_array($account, self::ADMIN_ACCOUNTS, true)) {
+            throw ApiError::badRequest('Geçersiz hesap.');
+        }
+        $current = (string) $request->input('current', '');
+        $new = (string) $request->input('new', '');
+        foreach ([$current, $new] as $value) {
+            if (strlen($value) > 128 || preg_match('/[\x00-\x1f\x7f]/', $value)) {
+                throw ApiError::badRequest('Parola en çok 128 karakter olabilir ve denetim karakteri içeremez.');
+            }
+        }
+        if ($change) {
+            if ($new === '' || $new !== trim($new)) {
+                throw ApiError::badRequest('Yeni parola boş olamaz, boşlukla başlayıp bitemez.');
+            }
+            return ['boards.passwords', "Yönetici parolasını değiştir: $account", ['account' => $account, 'current' => $current, 'new' => $new], true];
+        }
+        if ($current === '') {
+            throw ApiError::badRequest('Mevcut parolayı girin.');
+        }
+        return ['boards.passwords', "Mevcut parolayı doğrula: $account", ['account' => $account, 'current' => $current], true];
     }
 
     /** Taranacak anomali türleri: yalnız anlık taranabilenler (AnomaliesApi::scannable). */

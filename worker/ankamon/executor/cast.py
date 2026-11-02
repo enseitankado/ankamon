@@ -55,7 +55,8 @@ import socket
 import subprocess
 
 RTSP_PORT = int(os.environ.get("CAST_RTSP_PORT", "8554"))
-STREAM_RE = re.compile(r"^c-[A-Za-z0-9]{24,64}$")
+# c-: "Ekranımı yansıt" (tarayıcıdan yayın); r-: ekran aktarımı (tahtadan yayın, bkz. executor/relay.py).
+STREAM_RE = re.compile(r"^[cr]-[A-Za-z0-9]{24,64}$")
 
 VOLUME_MAX = 100
 

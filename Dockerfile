@@ -119,6 +119,8 @@ COPY docker/rootfs/nginx-default.conf /etc/nginx/http.d/default.conf
 COPY docker/rootfs/nginx-filemanager-proxy.conf /etc/nginx/filemanager-proxy.conf
 COPY docker/rootfs/multishell /var/www/multishell
 COPY docker/rootfs/screen /var/www/screen
+# Tahtaya özel SSH parolası: sshpass çağrılarının önüne geçen süzgeç (bkz. worker executor/board_password.py).
+COPY --chmod=755 docker/rootfs/ankamon-sshpass.sh /usr/local/bin/sshpass
 COPY docker/rootfs/cast /var/www/cast
 COPY docker/rootfs/filemanager-open /var/www/filemanager-open
 COPY docker/rootfs/filemanager/ankamon.css /opt/ankamon/filemanager/ankamon.css

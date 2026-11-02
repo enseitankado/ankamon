@@ -38,13 +38,13 @@ import logging
 import time
 
 from . import config, db
-from .tasks import TASKS, board_sessions, board_status, session_probe, telegraf_targets
+from .tasks import TASKS, board_credentials, board_sessions, board_status, session_probe, telegraf_targets
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("ankamon")
 
 # session_probe kendi içinde INTERVAL_SECONDS'ta (30 sn) bir çalışır — bkz. tasks/session_probe.py.
-_FAST_TASKS = [board_status, board_sessions, session_probe, telegraf_targets]
+_FAST_TASKS = [board_credentials, board_status, board_sessions, session_probe, telegraf_targets]
 _OTHER_TASKS = [task for task in TASKS if task not in _FAST_TASKS]
 
 

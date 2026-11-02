@@ -44,7 +44,9 @@ final class BoardsApi
         b.source, b.monitor_enabled, b.exporter_port, b.online,
         b.ssh_ok, b.exporter_ok, b.facts, b.etap,
         b.session_username, b.session_locked, extract(epoch FROM b.session_checked_at)::bigint AS session_checked_at,
-        b.display_state, b.netifs, b.autoshutdown, b.screen_locked,
+        b.display_state, b.netifs, b.autoshutdown, b.screen_locked, array_to_json(b.input_locks) AS input_locks,
+        (SELECT r.source_board_id FROM screen_relays r WHERE r.target_board_id = b.id) AS relay_source,
+        EXISTS (SELECT 1 FROM screen_relays r WHERE r.source_board_id = b.id) AS relay_is_source,
         extract(epoch FROM b.last_seen_at)::bigint AS last_seen_at,
         extract(epoch FROM GREATEST(b.last_log_at, rl.at))::bigint AS last_log_at";
 
@@ -164,7 +166,10 @@ final class BoardsApi
             'port' => 22,
             'username' => $access['user'] ?: 'root',
             // webssh URL parametresinde parolayı base64 bekler.
-            'password' => base64_encode((string) $access['password']),
+            // Tahtaya özel root parolası varsa o (bkz. worker executor/board_password.py).
+            'password' => base64_encode((string) (Db::value(
+                'SELECT root_password FROM board_credentials WHERE board_id = ?', [$board['id']]
+            ) ?: $access['password'])),
         ];
     }
 
@@ -242,6 +247,7 @@ final class BoardsApi
         // Ekranlar alt barı: ağ arabirimleri ve TiHA otomatik kapatma geri sayımı (bkz. migration 026); yoksa null.
         $board['netifs'] = isset($board['netifs']) ? json_decode((string) $board['netifs'], true) : null;
         $board['autoshutdown'] = isset($board['autoshutdown']) ? json_decode((string) $board['autoshutdown'], true) : null;
+        $board['input_locks'] = json_decode((string) ($board['input_locks'] ?? '[]'), true) ?: [];
         return $board;
     }
 }

@@ -112,14 +112,59 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
         });
       });
       const reached = boards.length - failed.length;
-      const items = [...union.values()]
-        .sort((a, b) => a.acc.name.localeCompare(b.acc.name, "tr", { numeric: true }))
-        .map(({ acc, count }) => {
-          const label = acc.full_name && acc.full_name !== acc.name ? `${acc.full_name} (${acc.name})` : acc.name;
-          return { value: acc.name, label: label + (reached > 1 && count < reached ? ` — ${count}/${reached} tahtada` : "") };
-        });
-      this.__accountList.setItems(items, "Seçili tahtalarda kullanıcı hesabı yok.");
-      this.__note.setValue(failed.length ? "Hesapları alınamayan tahtalar: " + qx.bom.String.escape(failed.join(", ")) : "");
+      const show = sizes => {
+        const items = [...union.values()]
+          .sort((a, b) => ((sizes && sizes[b.acc.name]) || 0) - ((sizes && sizes[a.acc.name]) || 0) ||
+            a.acc.name.localeCompare(b.acc.name, "tr", { numeric: true }))
+          .map(({ acc, count }) => {
+            const label = acc.full_name && acc.full_name !== acc.name ? `${acc.full_name} (${acc.name})` : acc.name;
+            const mb = sizes && sizes[acc.name];
+            return {
+              value: acc.name, label: label + (reached > 1 && count < reached ? ` — ${count}/${reached} tahtada` : ""),
+              side: sizes ? (mb === undefined ? "—" : `${mb} MB`) : "…"
+            };
+          });
+        this.__accountList.setItems(items, "Seçili tahtalarda kullanıcı hesabı yok.");
+      };
+      show(null);
+      this.__note.setValue((failed.length ? "Hesapları alınamayan tahtalar: " + qx.bom.String.escape(failed.join(", ")) + ". " : "") +
+        (union.size ? "Boyutlar ölçülüyor…" : ""));
+      const failNote = failed.length ? "Hesapları alınamayan tahtalar: " + qx.bom.String.escape(failed.join(", ")) : "";
+      let sizes = null;
+      try {
+        sizes = union.size ? await this.__homeSizes(boards.filter(b => !failed.includes(b.name))) : {};
+      } catch (e) {
+        // boyutlar okunamazsa liste yine kullanılabilir
+      }
+      if (seq !== this.__loadSeq || this.isDisposed()) {
+        return;
+      }
+      if (sizes) {
+        show(sizes);
+      }
+      this.__note.setValue(failNote + (sizes ? "" : (failNote ? " " : "") + "Ev dizini boyutları okunamadı."));
+    },
+
+    /**
+     * Ev dizini boyutları (MB): "home_sizes" görevi tahtalarda du çalıştırır (bkz. worker executor/homesize.py).
+     * Birden çok tahtada hesap başına toplam: yedeğin kaplayacağı alan.
+     * @return {Map} {hesap: MB}
+     */
+    async __homeSizes(boards) {
+      const id = (await ankamon.io.Api.post("/jobs", { type: "home_sizes", board_ids: boards.map(b => b.id) })).id;
+      for (let i = 0; i < 300; i++) {
+        const res = await ankamon.io.Api.get(`/jobs/${id}`);
+        const targets = (res.job && res.job.targets) || [];
+        if (targets.length && !targets.some(t => ["queued", "running"].includes(t.status))) {
+          const sum = {};
+          targets.filter(t => t.status === "ok").forEach(t => Object.entries(JSON.parse(t.output || "{}")).forEach(([name, mb]) => {
+            sum[name] = (sum[name] || 0) + mb;
+          }));
+          return sum;
+        }
+        await new Promise(r => setTimeout(r, 500));
+      }
+      throw new Error("zaman aşımı");
     },
 
     __update() {
