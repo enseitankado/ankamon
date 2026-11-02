@@ -35,6 +35,9 @@
  *
  * Düğme: simgeye basmak grubun birincil işini yapar (primary yoksa ya da o an uygulanamıyorsa menüyü açar); ▾ aynı
  * türdeki bütün işleri açar. Güç gibi tek basışta tehlikeli işlerde bilerek primary yoktur.
+ *
+ * Çubuğun başında görünüm bölümü (addViewControls): ne gösterildiğini seçer, menüden gelmez. Çubuk sayfanın üstünde
+ * ayrı bir panel görünür (bkz. __panel): kendi zemini, çerçevesi ve gölgesi vardır, işler ayırıcılarla kümelenir.
  */
 qx.Class.define("ankamon.ui.boards.ActionBar", {
   extend: qx.ui.container.Composite,
@@ -47,15 +50,15 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       { id: "lock", label: "Kilit", icon: "lock", primary: "Kilitle" },
       { id: "cast", label: "Yansıt", icon: "cast" },
       { id: "shot", label: "Görüntü al", icon: "camera", primary: "Ekran görüntüsü al" },
-      { id: "command", label: "Komut", icon: "terminal2", primary: "Hazır / Serbest komut çalıştır" },
+      { id: "command", label: "Komut", icon: "terminal2", primary: "Hazır / Serbest komut çalıştır", sep: true },
       { id: "users", label: "Kullanıcılar", icon: "users" },
       { id: "files", label: "Dosyalar", icon: "folders", primary: "Dosya yöneticisi" },
       { id: "taskmgr", label: "Görevler", icon: "activity", primary: "Görev yöneticisi" },
-      { id: "web", label: "Web sitesi", icon: "worldWww", primary: "Web sitesi aç…" },
+      { id: "web", label: "Web sitesi", icon: "worldWww", primary: "Web sitesi aç…", sep: true },
       { id: "webfilter", label: "Web Filtre", icon: "filter" },
       { id: "wifi", label: "Wi-Fi", icon: "wifi", primary: "Wi-Fi Monitör" },
       { id: "chat", label: "Sohbet", icon: "messages", primary: "Sohbet" },
-      { id: "power", label: "Güç", icon: "power" },
+      { id: "power", label: "Güç", icon: "power", sep: true },
       { id: "info", label: "Bilgi", icon: "infoCircle", primary: "Bilgi kartı" },
       { id: "record", label: "Kayıt", icon: "edit", noSelection: ["Tahta ekle…"] },
       { id: "select", label: "Seçim", icon: "checkbox", primary: "Tümünü işaretle", noSelection: ["Tümünü işaretle", "İşaretleri kaldır"] },
@@ -94,7 +97,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     this.__getMenu = getMenu;
     this.__getSelected = getSelected;
     this.__widgets = new Map();
-    this.set({ appearance: "toolbar", padding: [2, 6] });
+    this.set({ padding: [3, 8], margin: [6, 8, 8, 8], decorator: this.__panel() });
     this.__build();
     this.__count = new qx.ui.basic.Label("").set({ textColor: "app-muted", alignY: "middle", marginLeft: 10 });
     this.add(this.__count);
@@ -115,6 +118,72 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     __open: null,
     __stateKey: null,
 
+    /**
+     * Panel görünümü: sayfadan ayrı dursun diye zemin temanın yüzey renginden biraz koyu (koyu temada açık), çerçeve ve
+     * gölge var. Tema değişince sayfa yeniden yüklenir; renk bir kez hesaplanır.
+     */
+    __panel() {
+      const mgr = qx.theme.manager.Color.getInstance();
+      const name = ["surface", "background-application", "background"].find(n => mgr.isDynamic(n));
+      const rgb = qx.util.ColorUtil.cssStringToRgb(mgr.resolve(name || "#ffffff"));
+      const light = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 >= 128;
+      const shade = rgb.slice(0, 3).map(c => Math.round(light ? c * 0.94 : c + (255 - c) * 0.1));
+      return new qx.ui.decoration.Decorator().set({
+        width: 1, color: "app-border", radius: 8,
+        backgroundColor: `rgb(${shade.join(",")})`,
+        shadowHorizontalLength: 0, shadowVerticalLength: 2, shadowBlurRadius: 7,
+        shadowColor: light ? "rgba(0,0,0,0.16)" : "rgba(0,0,0,0.45)"
+      });
+    },
+
+    /** Kümeleri ayıran ince dikey çizgi. */
+    __separator() {
+      return new qx.ui.core.Widget().set({
+        width: 1, height: 40, allowGrowY: false, alignY: "middle", backgroundColor: "app-border", marginLeft: 5, marginRight: 5
+      });
+    },
+
+    /**
+     * Çubuğun başına görünüm bölümü ekler. @param items {Array} [{id, label, icon, tip, group?}]: group verilenler aynı anda
+     * biri seçili iki durumlu, verilmeyenler açılıp kapanan düğmedir. @param onChange {Function} (id, açık mı)
+     * @return {Map} id → düğme (setValue, setEnabled)
+     */
+    addViewControls(items, onChange) {
+      const mgr = qx.theme.manager.Color.getInstance();
+      const accentName = ["primary", "background-selected", "selected-start", "table-row-background-selected"].find(n => mgr.isDynamic(n));
+      // Temaların "basılı" görünümü çoğunda belirgin değil (kullanıcı bildirimi): seçili düğme her temada dolu renkli.
+      const on = new qx.ui.decoration.Decorator().set({ radius: 5, backgroundColor: accentName || "#0067c0" });
+      const buttons = new Map();
+      const radio = new qx.ui.form.RadioGroup();
+      const paint = button => {
+        if (button.getValue()) {
+          button.set({ decorator: on, textColor: "white" });
+        } else {
+          button.resetDecorator();
+          button.resetTextColor();
+        }
+      };
+      items.forEach((item, index) => {
+        const html = `${ankamon.ui.boards.ActionIcons.svg(item.icon)}` +
+          `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(item.label)}</div>`;
+        const button = item.group ? new qx.ui.toolbar.RadioButton(html) : new qx.ui.toolbar.CheckBox(html);
+        button.set({ rich: true, show: "label", center: true, padding: [4, 6], minWidth: 58, toolTipText: item.tip });
+        if (item.group) {
+          radio.add(button);
+        }
+        button.addListener("changeValue", e => {
+          paint(button);
+          onChange(item.id, e.getData());
+        });
+        // Görünüm bölümü işlerden önce gelir: sırayla başa.
+        this.addAt(button, index);
+        buttons.set(item.id, button);
+        paint(button);
+      });
+      this.addAt(this.__separator(), items.length);
+      return buttons;
+    },
+
     /** Yetkiye göre var olan düğmeler: sentetik çevrimiçi ve çevrimdışı tahtanın menülerinden. */
     __build() {
       const present = new Set();
@@ -130,6 +199,9 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     },
 
     __addButton(group) {
+      if (group.sep) {
+        this.add(this.__separator());
+      }
       const box = new qx.ui.container.Composite(new qx.ui.layout.HBox(0).set({ alignY: "middle" }));
       const html = `${ankamon.ui.boards.ActionIcons.svg(group.icon)}` +
         `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(group.label)}</div>`;

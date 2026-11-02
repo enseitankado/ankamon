@@ -152,7 +152,7 @@ qx.Class.define("ankamon.page.Boards", {
       { rows: () => (this.__rows || []).map(r => r.cells) });
 
     // Tek ekran, iki görünüm (sekme yok, kullanıcı isteği): grid'deki tahtaların canlı ekran önizlemeleri (varsayılan) ya da
-    // "Liste" işaretliyken grid. Sağ menü işlemleri işaretli tahtalara ikisinden de uygulanır. "screen" yetkisi yoksa yalnız grid.
+    // "Liste" seçiliyken grid (araç çubuğunun başındaki görünüm bölümü). Sağ menü işlemleri işaretli tahtalara ikisinden de uygulanır. "screen" yetkisi yoksa yalnız grid.
     this.__views = new qx.ui.container.Stack();
     const listPage = new qx.ui.container.Composite(new qx.ui.layout.VBox(8)).set({ padding: [8, 8, 0, 8] });
     listPage.add(this.__table, { flex: 1 });
@@ -161,9 +161,8 @@ qx.Class.define("ankamon.page.Boards", {
     this.__views.add(listPage);
     this.__listPage = listPage;
     if (this._can("screen")) {
-      this.add(this.__createScreensToolbar());
       this.__views.add(this.__createScreensPage());
-      this.__showListView(this.__listBox.getValue());
+      this.__showListView(this.__createViewControls());
     }
     this.add(this.__views, { flex: 1 });
 
@@ -242,8 +241,8 @@ qx.Class.define("ankamon.page.Boards", {
     __columns: null,
     __filterFields: null,
     __views: null,
-    __listBox: null,
-    __viewOptions: null,
+    __viewButtons: null,
+    __viewReady: false,
     __listPage: null,
     __actionBar: null,
 
@@ -263,8 +262,8 @@ qx.Class.define("ankamon.page.Boards", {
       if (!("status" in opts)) {
         return;
       }
-      if (this.__listBox) {
-        this.__listBox.setValue(true);
+      if (this.__viewButtons) {
+        this.__viewButtons.get("list").setValue(true);
       }
       const fields = this.__filterFields || {};
       if (!fields.status) {
@@ -466,48 +465,45 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * Görünümlerin üstündeki seçimler — "Göster:" + onay kutuları (Başarım seçimi tarayıcıda kalıcı):
-     *  - Sensörler (her açılışta işaretli): kutucukların altındaki CPU/RAM/HDD/fan/pil barı.
-     *  - Başarım: kutucuğun ekran alanında htop'un üst panelleri, saniyelik (bkz. screen/index.html
-     *    Tile.syncPerf, worker/ankamon/screen/perf.py — yalnız açıkken ve görünen tahtalar için SSH açılır).
-     *  - Liste (satırın sonunda, varsayılan işaretsiz; seçim kullanıcı başına kalıcı): ekran kutucukları yerine grid.
-     *    Listedeyken kutucuklara ait ilk ikisi devre dışıdır.
-     * Eskiden toolbar CheckBox'tı: basılı hali temaların çoğunda belirgin değildi, saydamlıkla ayırt
-     * ediliyordu ve kötü görünüyordu (kullanıcı bildirimi) — düz onay kutusu her temada açık seçik.
+     * Araç çubuğunun başındaki görünüm bölümü (bkz. ui.boards.ActionBar.addViewControls):
+     *  - Ekranlar | Liste: iki durumlu; ekran kutucukları ya da grid (seçim kullanıcı başına kalıcı).
+     *  - Sensörler (her açılışta açık): kutucukların altındaki CPU/RAM/HDD/fan/pil barı.
+     *  - Başarım: kutucuğun ekran alanında htop'un üst panelleri, saniyelik (bkz. screen/index.html Tile.syncPerf,
+     *    worker/ankamon/screen/perf.py — yalnız açıkken ve görünen tahtalar için SSH açılır; seçim tarayıcıda kalıcı).
+     * Sensörler ve Başarım kutucuklara ait olduğundan Liste'deyken devre dışıdır.
      */
-    __createScreensToolbar() {
-      const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(16).set({ alignY: "middle" })).set({ padding: [2, 4, 6, 4] });
-      bar.add(new qx.ui.basic.Label("Göster:").set({ textColor: "app-muted", alignY: "middle" }));
-      const saved = this.__loadScreenView();
-      const make = (label, tip, key) => {
-        const box = new qx.ui.form.CheckBox(label).set({ value: saved[key], toolTipText: tip, alignY: "middle" });
-        box.addListener("changeValue", e => {
-          this.__screenView[key] = e.getData();
+    __createViewControls() {
+      this.__screenView = this.__loadScreenView();
+      const list = (this._user.ui_prefs || {})["boards.listView"] === true;
+      this.__viewButtons = this.__actionBar.addViewControls([
+        { id: "screens", label: "Ekranlar", icon: "layoutGrid", group: true, tip: "Tahtaların canlı ekran kutucukları" },
+        { id: "list", label: "Liste", icon: "list", group: true, tip: "Tahtaları tablo olarak gösterir" },
+        { id: "stats", label: "Sensörler", icon: "temperature", tip: "Kutucukların altında işlemci, bellek, disk sıcaklığı, fan ve pil voltajı barı" },
+        { id: "perf", label: "Başarım", icon: "gauge", tip: "Ekran alanında tahtanın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)" }
+      ], (id, on) => {
+        if (!this.__viewReady) {
+          return;     // açılışta kayıtlı seçim uygulanıyor: yeniden kaydedilmez
+        }
+        if (id === "list") {
+          this.__showListView(on);
+          ankamon.page.Base.savePref(this._user, "boards.listView", on);
+        } else if (id === "stats" || id === "perf") {
+          this.__screenView[id] = on;
           this.__saveScreenView();
           this.__pushView();
-        });
-        bar.add(box);
-      };
-      this.__screenView = saved;
-      make("Sensörler", "Kutucukların altında işlemci, bellek, disk sıcaklığı, fan ve pil voltajı barı", "stats");
-      make("Başarım", "Ekran alanında tahtanın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)", "perf");
-      this.__viewOptions = bar.getChildren().filter(w => w instanceof qx.ui.form.CheckBox);
-      this.__listBox = new qx.ui.form.CheckBox("Liste").set({
-        value: (this._user.ui_prefs || {})["boards.listView"] === true, alignY: "middle",
-        toolTipText: "Ekran kutucukları yerine tahtaları tablo olarak gösterir"
+        }
       });
-      this.__listBox.addListener("changeValue", e => {
-        this.__showListView(e.getData());
-        ankamon.page.Base.savePref(this._user, "boards.listView", e.getData());
-      });
-      bar.add(this.__listBox);
-      return bar;
+      this.__viewButtons.get("stats").setValue(this.__screenView.stats);
+      this.__viewButtons.get("perf").setValue(this.__screenView.perf);
+      this.__viewButtons.get(list ? "list" : "screens").setValue(true);
+      this.__viewReady = true;
+      return list;
     },
 
-    /** Liste / ekran görünümü arasında geçer (bkz. __createScreensToolbar). */
+    /** Liste / ekran görünümü arasında geçer; kutucuğa ait düğmeler Liste'de devre dışı. */
     __showListView(list) {
       this.__views.setSelection([list ? this.__listPage : this.__screensPage]);
-      this.__viewOptions.forEach(box => box.setEnabled(!list));
+      ["stats", "perf"].forEach(id => this.__viewButtons.get(id).setEnabled(!list));
     },
 
     __loadScreenView() {
