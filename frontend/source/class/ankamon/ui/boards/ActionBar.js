@@ -130,6 +130,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     __tools: null,
     __iconOnly: false,
     __fullWidth: 0,
+    __selectedCount: 0,
 
     /**
      * Panel görünümü: sayfadan ayrı dursun diye zemin temanın yüzey renginden biraz koyu (koyu temada açık), çerçeve ve
@@ -157,7 +158,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     /** Panel düğmesi düz: yalnız üzerine gelince ya da basılıyken renklenir (temanın kutulu görünümü panelde kalabalık duruyordu). */
     __flatten(button) {
       const flat = this.__flatDecorator || (this.__flatDecorator = new qx.ui.decoration.Decorator().set({ radius: 5 }));
-      button.set({ decorator: flat, backgroundColor: "transparent", showToolTipWhenDisabled: true });
+      // Kenar boşluğu sıfır: bazı temalar (Simple) düğme başına 10 piksel ekliyor, çubuk sığmıyordu.
+      button.set({ decorator: flat, backgroundColor: "transparent", margin: 0, showToolTipWhenDisabled: true });
       button.getChildControl("label").setTextColor(this.__colors.text);
       const paint = color => {
         if (!button.getUserData("ankamon.checked")) {
@@ -192,6 +194,17 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       }
     },
 
+    /** Durum yazısı. Simge kipinde yer açmak için seçim yoksa gizli, varsa yalnız sayı (ayrıntı ipucunda). */
+    __showCount() {
+      const n = this.__selectedCount;
+      const text = n ? `${n} seçili` : "Seçim yok";
+      this.__count.set({
+        value: this.__iconOnly ? String(n) : text,
+        visibility: this.__iconOnly && !n ? "excluded" : "visible",
+        toolTipText: n ? `${n} tahta seçili` : "Tahta seçili değil"
+      });
+    },
+
     __registerTool(button, icon) {
       button.setUserData("ankamon.fullLabel", button.getLabel());
       button.setUserData("ankamon.iconLabel", icon);
@@ -209,12 +222,15 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       }
       const insets = this.getInsets();
       const inner = bounds.width - insets.left - insets.right;
+      let wrapped = false;
       if (!this.__iconOnly) {
         const shown = this.getChildren().filter(w => w.getVisibility() !== "excluded");
         this.__fullWidth = shown.reduce((sum, w) => sum + w.getSizeHint().width + w.getMarginLeft() + w.getMarginRight() + 1, 0);
+        const first = shown[0].getBounds();
+        wrapped = !!first && shown.some(w => w.getBounds() && w.getBounds().top >= first.top + first.height);
       }
-      // Dönüşte küçük pay: seçim sayısı yazısı uzayınca kip gidip gelmesin.
-      const iconOnly = this.__iconOnly ? inner < this.__fullWidth + 12 : inner < this.__fullWidth;
+      // Geçiş ölçüye değil gerçek sarılmaya bakar; dönüşte küçük pay: seçim sayısı uzayınca kip gidip gelmesin.
+      const iconOnly = this.__iconOnly ? inner < this.__fullWidth + 4 : wrapped;
       if (iconOnly === this.__iconOnly) {
         return false;
       }
@@ -223,6 +239,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         button.setLabel(button.getUserData(iconOnly ? "ankamon.iconLabel" : "ankamon.fullLabel"));
         button.setMinWidth(iconOnly ? 34 : 46);
       });
+      this.__showCount();
       return true;
     },
 
@@ -384,7 +401,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         this.__dropMenu(cur.menu);
       }
       this.__queueSeparators();
-      this.__count.setValue(boards.length ? `${boards.length} seçili` : "Seçim yok");
+      this.__selectedCount = boards.length;
+      this.__showCount();
     },
 
     __tip(group, leaves) {
