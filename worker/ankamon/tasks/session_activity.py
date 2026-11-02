@@ -52,6 +52,12 @@ _REPEAT = datetime.timedelta(minutes=10)   # süren yüksek yük her 5 dk'da bir
 # Aynı adresten aynı hesaba sık tekrarlanan SSH girişi otomatik iştir (izleme yazılımı, eski Ankamon adresi): zincirin yalnız ilki.
 _SSH_CHAIN = datetime.timedelta(minutes=5)
 _ssh_last: dict = {}
+_GROUP_CHAIN = datetime.timedelta(seconds=60)  # hesap başına art arda usermod: tek satır
+# polkit reddi ile pkexec'in "Error executing command" satırı aynı olaydır: polkit'inki kalır, onu izleyen pkexec satırı atlanır.
+_POLKIT_PAIR = datetime.timedelta(seconds=3)
+_polkit_failed: dict = {}
+# Oturumun sahibinden başkası da komut çalıştırabilir (SSH'tan root, su): bu türlerde satır olayı yapanındır.
+_ACTOR_KINDS = {"komut", "yetki"}
 
 
 def _local_addresses() -> set[str]:
@@ -129,6 +135,7 @@ def _from_logs(conn, by_host) -> None:
             return
         sessions = _Sessions(conn, rows[0]["received_at"], rows[-1]["received_at"])
         out = []
+        groups: dict = {}
         for r in rows:
             host = (r["host"] or "").lower()
             message = r["message"] or ""
@@ -150,10 +157,29 @@ def _from_logs(conn, by_host) -> None:
                 _ssh_last[key] = r["received_at"]
                 if previous and r["received_at"] - previous <= _SSH_CHAIN:
                     continue
+            if r["program"] == "polkitd" and hit[1].startswith("Yetki doğrulaması başarısız"):
+                _polkit_failed[(host, hit[2])] = r["received_at"]
+            elif rules.is_failed_pkexec(r["program"], hit[1]):
+                previous = _polkit_failed.get((host, hit[2]))
+                if previous and r["received_at"] - previous <= _POLKIT_PAIR:
+                    continue
             board = by_host.get(host)
-            out.append((r["received_at"], board["id"] if board else None, board["name"] if board else r["host"],
-                        session["id"] if session else None, session["username"] if session else hit[2],
-                        hit[0], hit[1], message[:1000], r["program"]))
+            username = hit[2] if hit[2] and hit[0] in _ACTOR_KINDS else (session["username"] if session else hit[2])
+            row = (r["received_at"], board["id"] if board else None, board["name"] if board else r["host"],
+                   session["id"] if session else None, username,
+                   hit[0], hit[1], rules.mask_secrets(message)[:1000], r["program"])
+            if rules.is_group_add(hit[1]):
+                member, group = hit[1].removeprefix("Gruba eklendi: ").split(" → ", 1)
+                chain = groups.get((host, member))
+                if chain and r["received_at"] - chain["at"] <= _GROUP_CHAIN:
+                    chain["at"] = r["received_at"]
+                    if group not in chain["names"]:
+                        chain["names"].append(group)
+                    first = out[chain["index"]]
+                    out[chain["index"]] = (*first[:6], f"Gruplara eklendi: {member} → {', '.join(chain['names'])}"[:400], *first[7:])
+                    continue
+                groups[(host, member)] = {"at": r["received_at"], "names": [group], "index": len(out)}
+            out.append(row)
         with conn.transaction():
             _insert(conn, out)
             _save_cursor(conn, "session_activity.logs", rows[-1]["received_at"])
@@ -162,12 +188,15 @@ def _from_logs(conn, by_host) -> None:
 
 
 def _from_ankamon(conn, by_id) -> None:
-    """Ankamon'dan o tahtaya yapılan işlemler: komutlar, ekran izleme, dosya işlemleri, ekran görüntüsü, sohbet."""
+    """Ankamon'dan o tahtaya yapılan işlemler: komutlar, ekran izleme, dosya işlemleri, ekran görüntüsü, sohbet.
+
+    command_log'un source='local' satırları (028_local_command_log.sql: tahtadaki sudo/pkexec/su) burada ALINMAZ: aynı olaylar
+    _from_logs'ta ham log satırıyla (detail) ve ret bilgisiyle "yetki" türünde üretilir, ikisi birden çift satır olurdu."""
     since = _cursor(conn, "session_activity.ankamon")
     rows = conn.execute(
         """SELECT at, board_id, board_name, kind, text, source FROM (
              SELECT time AS at, board_id, board_name, 'komut' AS kind, username || ': ' || left(command, 240) AS text, source
-               FROM command_log WHERE time > %(s)s AND board_id IS NOT NULL
+               FROM command_log WHERE time > %(s)s AND board_id IS NOT NULL AND source IS DISTINCT FROM 'local'
              UNION ALL SELECT taken_at, board_id, board_name, 'goruntu', taken_by || ': ekran görüntüsü aldı', 'screenshot'
                FROM screenshots WHERE taken_at > %(s)s AND board_id IS NOT NULL
              UNION ALL SELECT sent_at, board_id, board_name, 'sohbet', author || ': sohbet iletisi', 'chat'
@@ -180,13 +209,6 @@ def _from_ankamon(conn, by_id) -> None:
     for r in rows:
         session = sessions.board(r["board_id"], r["at"])
         username = session["username"] if session else None
-        if r["source"] == "local":
-            # Tahtada yazılan komut (bkz. 028_local_command_log.sql): kullanıcının kendi hareketi; otomatik işler atlanır.
-            if rules.is_automated(r["text"]):
-                continue
-            out.append((r["at"], r["board_id"], r["board_name"], session["id"] if session else None,
-                        username or r["text"].split(":", 1)[0], "komut", "Komut: " + r["text"].split(":", 1)[-1].strip(), None, r["source"]))
-            continue
         out.append((r["at"], r["board_id"], r["board_name"], session["id"] if session else None,
                     username, "ankamon", "Ankamon — " + r["text"], None, r["source"]))
     with conn.transaction():

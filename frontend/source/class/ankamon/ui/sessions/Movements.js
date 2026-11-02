@@ -202,7 +202,8 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
       this.__rows = data.events.map(e => [e.id, F.dateTime(e.at * 1000), e.board_name, e.username || "", K[e.kind] || e.kind, e.summary, e.detail || ""]);
       this.__apply();
       this.__status.setValue(`${data.events.length} olay` + (data.limited ? " (en yeni kayıtlar; daraltmak için süzgeç kullanın)" : "") +
-        ". Tahta logları her uygulama açılışını kaydetmez: yalnız logda ya da sensörde izi olan hareketler listelenir.");
+        ". Tahta logları her uygulama açılışını kaydetmez: yalnız logda ya da sensörde izi olan hareketler listelenir. " +
+        "Kabuk komutları yalnız \"Kabuk komut kaydını aç\" hazır işlemi uygulanmış tahtalardan gelir.");
     },
 
     __apply() {
