@@ -52,7 +52,7 @@ import logging
 import os
 import sys
 
-from . import no_login, ntp_unsynced
+from . import cmos_battery, no_login, ntp_unsynced, temp_high
 
 log = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ def _extension_rules() -> list:
     return found
 
 
-RULES = [no_login, ntp_unsynced] + _extension_rules()
+RULES = [no_login, ntp_unsynced, temp_high.cpu_rule, temp_high.disk_rule, cmos_battery] + _extension_rules()
 
 # Her turda yeniden hesaplanan geriye dönük pencere (geç gelen loglar/oturum kayıtları için).
 WINDOW = datetime.timedelta(days=1)

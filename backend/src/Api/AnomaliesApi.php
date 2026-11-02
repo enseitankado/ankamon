@@ -58,6 +58,21 @@ final class AnomaliesApi
             'description' => 'Tahtanın saati en az 15 dakikadır NTP sunucusuyla eşitlenmiyor (eşitleme kapalı, sunucuya ulaşılamıyor) ya da saati Ankamon sunucusundan 30 sn\'den fazla sapıyor.',
             'scan' => true,
         ],
+        'cpu_temp_high' => [
+            'label' => 'İşlemci sıcaklığı yüksek',
+            'description' => 'İşlemci sıcaklığı en az 15 dakikadır tahtanın kendi ortalamasının %30 üzerinde (ortalama: son 30 günün saatlik ortalamaları; en az 24 saatlik geçmiş gerekir).',
+            'scan' => true,
+        ],
+        'disk_temp_high' => [
+            'label' => 'Disk sıcaklığı yüksek',
+            'description' => 'Disk sıcaklığı en az 15 dakikadır tahtanın kendi ortalamasının %30 üzerinde (ortalama: son 30 günün saatlik ortalamaları; en az 24 saatlik geçmiş gerekir).',
+            'scan' => true,
+        ],
+        'cmos_battery_low' => [
+            'label' => 'BIOS pili zayıf',
+            'description' => 'BIOS (CMOS) pilinin gerilimi 2,4 V\'un altında. Sağlam bir okuma gelene (pil değişene) dek sürer. Yalnız pil sensörü etkinleştirilmiş tahtalarda ölçülür.',
+            'scan' => true,
+        ],
     ];
 
     /**
