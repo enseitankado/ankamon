@@ -58,7 +58,9 @@ qx.Class.define("ankamon.page.Settings", {
 
   construct(user) {
     super(user, "Ayarlar");
-    this.__body = new qx.ui.container.Composite(new qx.ui.layout.VBox(12)).set({ maxWidth: 620 });
+    // Genişlik sınırı yok: sekme başlıkları kalan genişliği kullanır, kaydırma düğmeleri yalnız alan daralınca çıkar.
+    // Form bölümlerinin okunaklı genişliği __section'da korunur.
+    this.__body = new qx.ui.container.Composite(new qx.ui.layout.VBox(12));
     this.add(this.__body, { flex: 1 });
   },
 
@@ -256,6 +258,7 @@ qx.Class.define("ankamon.page.Settings", {
     __section(target, title, hint, form) {
       const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(10)).set({
         padding: 16,
+        maxWidth: 620,
         backgroundColor: "surface",
         decorator: new qx.ui.decoration.Decorator().set({ radius: 8, width: 1, color: "app-border" })
       });

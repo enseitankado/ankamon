@@ -36,8 +36,9 @@ qx.Class.define("ankamon.ui.boards.RelayDialog", {
     /**
      * @param source {Map} görüntüsü aktarılacak tahta
      * @param selected {Array} sağ menünün uygulandığı tahtalar
+     * @param user {Map?} oturum sahibi (çıktı penceresindeki "bir daha gösterme" tercihi)
      */
-    async open(source, selected) {
+    async open(source, selected, user) {
       const name = b => b.label || b.hostname || b.ip || "#" + b.id;
       let boards;
       try {
@@ -65,9 +66,8 @@ qx.Class.define("ankamon.ui.boards.RelayDialog", {
       go.addListener("execute", () => {
         const ids = list.getChecked();
         win.close();
-        ankamon.ui.Jobs.show(
-          ankamon.io.Api.post("/jobs", { type: "relay_start", source_board_id: source.id, board_ids: ids }).then(res => res.id),
-          `Ekranı aktar — ${name(source)}`);
+        ankamon.ui.BoardOps.hideableJob({ type: "relay_start", source_board_id: source.id, board_ids: ids },
+          `Ekranı aktar — ${name(source)}`, "relay_start", "aktarım", user);
       });
       ankamon.ui.Dialog.buttons(win, [go]);
       win.open();

@@ -36,6 +36,14 @@ qx.Class.define("ankamon.ui.chat.Window", {
   statics: {
     __open: new Map(),
 
+    /** Message Bus konusu: açık sohbetler değişti (Ekranlar o tahtaların akışını yüksek çözünürlüğe alır). */
+    CHANGED: "ankamon.chatWindows",
+
+    /** Sohbet penceresi açık tahtaların kimlikleri. */
+    openIds() {
+      return [...this.__open.keys()];
+    },
+
     /** @param board {Map} en az {id, label|hostname|ip} */
     open(board) {
       const existing = this.__open.get(board.id);
@@ -46,9 +54,13 @@ qx.Class.define("ankamon.ui.chat.Window", {
       }
       const win = new ankamon.ui.chat.Window(board);
       this.__open.set(board.id, win);
-      win.addListener("close", () => this.__open.delete(board.id));
+      win.addListener("close", () => {
+        this.__open.delete(board.id);
+        qx.event.message.Bus.dispatchByName(this.CHANGED, this.openIds());
+      });
       qx.core.Init.getApplication().getRoot().add(win);
       win.open();
+      qx.event.message.Bus.dispatchByName(this.CHANGED, this.openIds());
       return win;
     }
   },

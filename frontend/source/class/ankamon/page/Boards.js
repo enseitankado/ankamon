@@ -116,6 +116,10 @@ qx.Class.define("ankamon.page.Boards", {
       new ankamon.ui.table.SessionRenderer());
     // İşaretler Ekranlar kutucuklarına yansır — bkz. __updateActionState.
     this.__table.getTableModel().addListener("dataChanged", this.__updateActionState, this);
+    // Satır menüsünün simgeli karşılığı; Liste ve Ekranlar sekmelerinin üstünde (bkz. ui.boards.ActionBar).
+    this.__actionBar = new ankamon.ui.boards.ActionBar((board, boards) => this.__rowMenu(board, boards, this.__barSessionOps()),
+      () => this._checkedIds(this.__table).map(id => this.__boards && this.__boards.get(id)).filter(Boolean));
+    this.add(this.__actionBar);
     this.__table.addListener("cellDbltap", e => {
       if (this._can("boards.manage")) {
         const id = this.__table.getTableModel().getValue(0, e.getRow());
@@ -228,6 +232,9 @@ qx.Class.define("ankamon.page.Boards", {
     if (this.__onScreenWindows) {
       qx.event.message.Bus.unsubscribe(ankamon.ui.BoardOps.SCREEN_WINDOWS, this.__onScreenWindows, this);
     }
+    if (this.__onChatWindows) {
+      qx.event.message.Bus.unsubscribe(ankamon.ui.chat.Window.CHANGED, this.__onChatWindows, this);
+    }
   },
 
   members: {
@@ -238,6 +245,13 @@ qx.Class.define("ankamon.page.Boards", {
     __filterFields: null,
     __tabView: null,
     __listPage: null,
+    __actionBar: null,
+
+    /** Ekranlar sekmesi açıkken araç çubuğu da sağ menü gibi sonucu kutucuklarda gösterir. */
+    __barSessionOps() {
+      const screens = this.__screensPage && this.__tabView && this.__tabView.getSelection()[0] === this.__screensPage;
+      return screens ? this.__sessionOps() : null;
+    },
 
     /**
      * Shell OPEN_PAGE (Genel bakış kartları): Liste sekmesine geçer ve Durum süzgecini verilen
@@ -288,6 +302,7 @@ qx.Class.define("ankamon.page.Boards", {
       ]);
       this.__boards = new Map(boards.boards.map(b => [b.id, b]));
       this.__metrics = metrics.latest || {};
+      ankamon.ui.BoardOps.syncScreenLocks(boards.boards);
       const unit = (v, suffix) => v === null || v === undefined ? "" : v + suffix;
       const mbit = v => v === null || v === undefined ? "" : v.toFixed(v < 10 ? 2 : 1);   // birim sütun başlığında
       // cells[0]=kimlik, cells[1]=onay kutusu, cells[2..]=sütunlar.
@@ -315,6 +330,7 @@ qx.Class.define("ankamon.page.Boards", {
         };
       });
       this.__apply();
+      this.__actionBar.refresh();
       this.__note.setValue(boards.boards.length ? "" :
         "Henüz kayıtlı tahta yok. Tahtalar log göndermeye başladığında kendiliğinden listelenir; elle de ekleyebilirsiniz.");
     },
@@ -396,6 +412,7 @@ qx.Class.define("ankamon.page.Boards", {
           }
           this.__pushSelection();
           this.__pushPopped();
+          this.__pushChat();
         } else if (e.data.type === "tm-select") {
           this.__checkFromPreview(e.data.ids || []);
         } else if (e.data.type === "tm-click") {
@@ -438,6 +455,9 @@ qx.Class.define("ankamon.page.Boards", {
       // Ayrı pencerede açık ekranlar (BoardOps.screen): o tahtaların önizlemesi durur, yerine not yazar.
       this.__onScreenWindows = () => this.__pushPopped();
       qx.event.message.Bus.subscribe(ankamon.ui.BoardOps.SCREEN_WINDOWS, this.__onScreenWindows, this);
+      // Sohbet açık tahtanın kutucuğu yüksek çözünürlükte akar: tahtadaki sohbet penceresi okunur.
+      this.__onChatWindows = () => this.__pushChat();
+      qx.event.message.Bus.subscribe(ankamon.ui.chat.Window.CHANGED, this.__onChatWindows, this);
 
       // Görünürlük yoklaması: hem sekme değişimini hem Shell'deki sayfa değişimini yakalar.
       this.__screensTimer = new qx.event.Timer(1000);
@@ -630,8 +650,16 @@ qx.Class.define("ankamon.page.Boards", {
     __pushPopped() {
       const el = this.__iframeEl();
       if (el && el.contentWindow) {
-        el.contentWindow.postMessage({ type: "tm-popped", ids: ankamon.ui.BoardOps.screenWindowIds() },
-          window.location.origin);
+        // frames: kapanan pencerelerin son kareleri, kutucuk "Bağlanıyor…" yerine onları gösterir (bkz. Tile.setLastFrame).
+        el.contentWindow.postMessage({ type: "tm-popped", ids: ankamon.ui.BoardOps.screenWindowIds(),
+          frames: ankamon.ui.BoardOps.takeLastFrames() }, window.location.origin);
+      }
+    },
+
+    __pushChat() {
+      const el = this.__iframeEl();
+      if (el && el.contentWindow) {
+        el.contentWindow.postMessage({ type: "tm-chat", ids: ankamon.ui.chat.Window.openIds() }, window.location.origin);
       }
     },
 
@@ -1124,6 +1152,9 @@ qx.Class.define("ankamon.page.Boards", {
         return; // __checkFromPreview satır satır işaretlerken her satırda değil, sonunda bir kez
       }
       this.__pushSelection();
+      if (this.__actionBar) {
+        this.__actionBar.refresh();
+      }
     },
 
     __edit(board) {

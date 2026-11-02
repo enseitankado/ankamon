@@ -26,8 +26,8 @@
  */
 
 /**
- * Zaman çizelgesindeki ekran görüntüsünü açan kalıcı (modal) pencere: görüntü normal boyutunda (ekrana sığmazsa kaydırılır,
- * pencere büyütülebilir); "Tam ekran" tarayıcı tam ekranına geçirir (Esc ile döner). Kimlik bilgileri başlıkta da görünür.
+ * Zaman çizelgesindeki ekran görüntüsünü açan kalıcı (modal) pencere: "Yay" işaretliyken (varsayılan) görüntü oranı korunarak pencereye sığar;
+ * işareti kaldırınca özgün boyutunda görünür ve kaydırma çubukları ya da sol tuşla sürükleme ile gezilir. "Tam ekran" tarayıcı tam ekranına geçirir (Esc ile döner). Kimlik bilgileri başlıkta da görünür.
  */
 qx.Class.define("ankamon.ui.sessions.ScreenshotViewer", {
   type: "static",
@@ -55,6 +55,8 @@ qx.Class.define("ankamon.ui.sessions.ScreenshotViewer", {
       bar.add(new qx.ui.basic.Label(
         `<b>${esc(shot.board_name)}</b> · ${who} ·${F.dateTime(shot.taken_at * 1000)} · çeken: ${esc(shot.taken_by)} · ${F.bytes(shot.bytes)}`
       ).set({ rich: true, alignY: "middle", selectable: true }), { flex: 1 });
+      const stretch = new qx.ui.form.CheckBox("Yay").set({ value: true, alignY: "middle", toolTipText: "Görüntüyü pencereye sığdır; kaldırınca özgün boyut" });
+      bar.add(stretch);
       const full = new qx.ui.form.Button("⛶ Tam ekran");
       bar.add(full);
       if (canDelete) {
@@ -80,9 +82,51 @@ qx.Class.define("ankamon.ui.sessions.ScreenshotViewer", {
 
       const url = `/api/screenshots/${shot.id}/image`;
       const html = new qx.ui.embed.Html(
-        `<div class="tm-shot-box" style="width:100%;height:100%;overflow:auto;background:#111;text-align:center">` +
-        `<img src="${url}" alt="" style="display:inline-block;max-width:none"></div>`);
+        `<div class="tm-shot-box" style="width:100%;height:100%;background:#111;text-align:center">` +
+        `<img src="${url}" alt="" draggable="false"></div>`);
       win.add(html, { flex: 1 });
+      const applyStretch = () => {
+        const dom = html.getContentElement().getDomElement();
+        const box = dom && dom.querySelector(".tm-shot-box");
+        const img = box && box.querySelector("img");
+        if (!img) {
+          return;
+        }
+        const on = stretch.getValue();
+        box.style.overflow = on ? "hidden" : "auto";
+        box.style.cursor = on ? "default" : "grab";
+        Object.assign(img.style, on
+          ? { display: "block", width: "100%", height: "100%", objectFit: "contain", maxWidth: "none" }
+          : { display: "inline-block", width: "auto", height: "auto", objectFit: "", maxWidth: "none" });
+      };
+      stretch.addListener("changeValue", applyStretch);
+      // Özgün boyutta sol tuşla sürükleme: kaydırma çubuklarıyla aynı konumu değiştirir.
+      html.addListenerOnce("appear", () => {
+        applyStretch();
+        const box = html.getContentElement().getDomElement().querySelector(".tm-shot-box");
+        let drag = null;
+        const move = e => {
+          box.scrollLeft = drag.left - (e.clientX - drag.x);
+          box.scrollTop = drag.top - (e.clientY - drag.y);
+          e.preventDefault();
+        };
+        const up = () => {
+          drag = null;
+          box.style.cursor = stretch.getValue() ? "default" : "grab";
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
+        };
+        box.addEventListener("pointerdown", e => {
+          if (e.button !== 0 || stretch.getValue()) {
+            return;
+          }
+          drag = { x: e.clientX, y: e.clientY, left: box.scrollLeft, top: box.scrollTop };
+          box.style.cursor = "grabbing";
+          window.addEventListener("pointermove", move);
+          window.addEventListener("pointerup", up);
+          e.preventDefault();
+        });
+      });
       full.addListener("execute", () => {
         const box = html.getContentElement().getDomElement().querySelector(".tm-shot-box");
         if (document.fullscreenElement) {

@@ -229,9 +229,20 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       }
     },
 
-    __suggest() {
+    /** Kuruluş sayfa açıkken Ayarlar'dan kaydedilmiş olabilir: yüklenmiş kopya değil, sunucudaki güncel değer okunur. */
+    async __suggest() {
       const N = ankamon.ui.anomaly.Notifications;
-      const org = (this.__data && this.__data.organization) || {};
+      let org = (this.__data && this.__data.organization) || {};
+      try {
+        const fresh = await ankamon.io.Api.get("/ntfy");
+        if (this.isDisposed()) {
+          return;
+        }
+        this.__data = fresh;
+        org = fresh.organization || {};
+      } catch (e) {
+        // Okunamazsa eldeki değerle sürülür: öneri yine üretilir.
+      }
       const prefix = [N.slug(org.name).split("-").slice(0, 3).join("-"), N.slug(org.code)].filter(Boolean).join("-");
       if (!prefix) {
         ankamon.ui.Dialog.alert("Ayarlar ▸ Kuruluş'ta ad ve kod tanımlı değil; yalnız rastgele ek önerildi. Tanımlarsanız konu daha kolay hatırlanır.");

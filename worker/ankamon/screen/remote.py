@@ -50,6 +50,7 @@ from ..executor import display
 PROFILES = {
     "view": {"max_width": 1920, "wait": 20},    # tek tahta, büyük pencere
     "thumb": {"max_width": 480, "wait": 250},   # çoklu önizleme kutucukları (~4 kare/sn)
+    "chat": {"max_width": 1920, "wait": 100},   # sohbet açıkken: yazı okunsun, ~10 kare/sn yeter (bkz. screen/index.html)
 }
 
 # Çıkış kodları (köprü bunları WebSocket kapanış kodlarına çevirir).

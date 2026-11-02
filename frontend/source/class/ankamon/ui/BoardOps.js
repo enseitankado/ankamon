@@ -212,7 +212,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
      * önizlemesini durdurup "Ayrı pencerede izleniyor" yazar (bkz. Boards.js, screen/index.html "tm-popped").
      */
     screen(boards, user, manage = false) {
-      const list = boards.map(b => ({ id: b.id, name: b.label || b.hostname || b.ip || "#" + b.id }));
+      const list = boards.map(b => ({ id: b.id, name: b.label || b.hostname || b.ip || "#" + b.id, locks: b.input_locks || [] }));
       if (!list.length) {
         return;
       }
@@ -232,7 +232,9 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         open.win.close(); // izleme → yönetim: aynı tahtaya iki akış açık kalmasın
       }
-      const spec = { boards: list, q: list.length > 1 ? "thumb" : "view", control, manage };
+      // input: başlıktaki klavye ve fare/dokunmatik kilidi düğmeleri. chat: sohbeti açık tahtalar yüksek çözünürlükte akar.
+      const input = !!user && (user.is_admin || user.features.includes("screen.input"));
+      const spec = { boards: list, q: list.length > 1 ? "thumb" : "view", control, manage, input, chat: ankamon.ui.chat.Window.openIds() };
       const hash = btoa(unescape(encodeURIComponent(JSON.stringify(spec))));
       const caption = list.length > 1 ? `Ekranlar (${list.length} tahta)`
         : (manage ? "Ekran yönetimi — " : "Ekran — ") + list[0].name;
@@ -253,13 +255,33 @@ qx.Class.define("ankamon.ui.BoardOps", {
       // Müdahale tam ekranda (kullanıcı isteği): pencerenin içinde "🖱 Müdahale" açılınca sayfa "tm-maximize"
       // gönderir, pencere büyür (bkz. screen/index.html); "Ekranı yönet" zaten büyütülmüş açılır.
       const onMessage = e => {
-        if (e.origin === location.origin && e.data && e.data.type === "tm-maximize" && e.source === frame.getWindow()) {
+        if (e.origin !== location.origin || !e.data || e.source !== frame.getWindow()) {
+          return;
+        }
+        if (e.data.type === "tm-maximize") {
           win.maximize();
+        } else if (e.data.type === "tm-inputlock" && input) {
+          this.__toggleInputLock(e.data.id, e.data.device, e.data.lock, e.data.locks || [], frame);
         }
       };
       window.addEventListener("message", onMessage);
+      const onChat = () => {
+        const target = frame.getWindow();
+        if (target) {
+          target.postMessage({ type: "tm-chat", ids: ankamon.ui.chat.Window.openIds() }, location.origin);
+        }
+      };
+      qx.event.message.Bus.subscribe(ankamon.ui.chat.Window.CHANGED, onChat, this);
       win.addListener("close", () => {
         window.removeEventListener("message", onMessage);
+        qx.event.message.Bus.unsubscribe(ankamon.ui.chat.Window.CHANGED, onChat, this);
+        // Son kare Ekranlar kutucuğuna geçer: kutucuk "Bağlanıyor…" göstermeden yeni akışını kurar (bkz. takeLastFrames).
+        if (single !== null) {
+          const shot = this.__captureFrame(frame);
+          if (shot) {
+            this.__lastFrames.set(single, shot);
+          }
+        }
         frame.setSource("about:blank"); // WebSocket'ler hemen kapansın (tahtadaki x11vnc de biter)
         if (single !== null && this.__screenWins.get(single)?.win === win) {
           this.__screenWins.delete(single);
@@ -278,7 +300,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         win.maximize();
       }
       if (single !== null) {
-        this.__screenWins.set(single, { win, manage });
+        this.__screenWins.set(single, { win, manage, frame });
         this.__announceScreenWindows();
       }
     },
@@ -296,6 +318,85 @@ qx.Class.define("ankamon.ui.BoardOps", {
 
     __announceScreenWindows() {
       qx.event.message.Bus.dispatchByName(this.SCREEN_WINDOWS, this.screenWindowIds());
+    },
+
+    /** Kapanan ekran pencerelerinin son kareleri: tahta id → JPEG veri adresi. */
+    __lastFrames: new Map(),
+
+    /** Bekleyen son kareleri verir ve unutur (bkz. page.Boards.__pushPopped). */
+    takeLastFrames() {
+      const frames = Object.fromEntries(this.__lastFrames);
+      this.__lastFrames.clear();
+      return frames;
+    },
+
+    /** Pencerenin canlı tuvalinden küçültülmüş son kare; alınamazsa null (kutucuk o durumda olağan yoldan bağlanır). */
+    __captureFrame(frame) {
+      try {
+        const src = frame.getWindow().document.querySelector(".tile.live .screen canvas");
+        if (!src || !src.width || !src.height) {
+          return null;
+        }
+        const scale = Math.min(1, 960 / src.width);
+        const copy = document.createElement("canvas");
+        copy.width = Math.round(src.width * scale);
+        copy.height = Math.round(src.height * scale);
+        copy.getContext("2d").drawImage(src, 0, 0, copy.width, copy.height);
+        return copy.toDataURL("image/jpeg", 0.75);
+      } catch (e) {
+        return null;
+      }
+    },
+
+    /** Tahta listesi tazelendi: açık ekran pencerelerindeki kilit düğmeleri güncel duruma gelsin. */
+    syncScreenLocks(boards) {
+      this.__screenWins.forEach((open, id) => {
+        const board = boards.find(b => b.id === id);
+        const target = open.frame.getWindow();
+        if (board && target) {
+          target.postMessage({ type: "tm-locks", id, locks: board.input_locks || [] }, location.origin);
+        }
+      });
+    },
+
+    /**
+     * Ekran penceresi başlığındaki kilit düğmesi: iş penceresi açılmaz, düğme işin sonucunu gösterir. Fare kilidi dokunmayı da
+     * tuttuğundan (bkz. worker executor/inputlock.py) düğme ikisini birlikte temsil eder: açarken ayrı dokunmatik kilidi de kalkar.
+     */
+    async __toggleInputLock(id, device, lock, locks, frame) {
+      const devices = !lock && device === "mouse" && locks.includes("touch") ? ["mouse", "touch"] : [device];
+      // İş bitti denince tahta listesi henüz eski olabilir: başarılı işin sonucu bilinen durumdur, listeden okunmaz.
+      let result = null;
+      try {
+        for (const dev of devices) {
+          const jobId = (await ankamon.io.Api.post("/jobs", { type: "input_lock", device: dev, lock, board_ids: [id] })).id;
+          let target = null;
+          for (let i = 0; i < 60 && !target; i++) {
+            const res = await ankamon.io.Api.get(`/jobs/${jobId}`);
+            const t = ((res.job && res.job.targets) || [])[0];
+            if (t && !["queued", "running"].includes(t.status)) {
+              target = t;
+            } else {
+              await new Promise(r => setTimeout(r, 500));
+            }
+          }
+          if (!target || target.status !== "ok") {
+            throw new Error((target && target.output) || "İşlem zaman aşımına uğradı");
+          }
+        }
+        result = lock ? [...new Set(locks.concat([device]))] : locks.filter(d => !devices.includes(d));
+      } catch (e) {
+        ankamon.ui.Dialog.error(e);
+        // Başarısız: hangi durumda kaldığı tahta listesinden okunur; okunamazsa eski durum gösterilir.
+        result = await ankamon.io.Api.get("/boards").then(res => {
+          const board = res.boards.find(b => b.id === id);
+          return board ? board.input_locks || [] : locks;
+        }).catch(() => locks);
+      }
+      const target = frame.getWindow();
+      if (target) {
+        target.postMessage({ type: "tm-locks", id, locks: result, done: true }, location.origin);
+      }
     },
 
     /** İşaretlenmiş görev sonucu ("facts" görevinin output'u — JSON metin) için ayrıştırılmış
@@ -558,6 +659,11 @@ qx.Class.define("ankamon.ui.BoardOps", {
      * @param kind {String} tercih anahtarı öneki ("wol" | "shutdown" | "reboot")
      * @param verb {String} kutu metnindeki işlem adı ("uyandırma" …)
      */
+    /** Çıktı penceresinin altında "bir daha gösterme" kutusu olan iş (bkz. __powerJob) — başka sınıflar için. */
+    hideableJob(body, caption, kind, verb, user) {
+      this.__powerJob(body, caption, kind, verb, user);
+    },
+
     __powerJob(body, caption, kind, verb, user, opts = {}) {
       const job = ankamon.io.Api.post("/jobs", body).then(res => res.id);
       const key = kind + ".hideUntil";
@@ -660,6 +766,9 @@ qx.Class.define("ankamon.ui.BoardOps", {
         `<span style="display:inline-block;width:1.4em;text-align:center">${icon || ""}</span>` +
         qx.bom.String.escape(label), null, null, submenu);
       btn.getChildControl("label").setRich(true);
+      // Araç çubuğu maddeyi bu anahtarla tanır (etiket, tahta sayısı eki olmadan — bkz. ui.boards.ActionBar).
+      btn.setUserData("ankamon.menuKey", label.replace(/ \(\d+( tahta)?\)$/, ""));
+      btn.setUserData("ankamon.menuIcon", icon);
       if (handler) {
         btn.addListener("execute", handler, this);
       }
@@ -804,9 +913,9 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         // Ekran aktarımı: sağ tıklanan tahtanın ekranı başka tahtalarda (bkz. ui.boards.RelayDialog, executor/relay.py).
         if (can("screen.relay")) {
-          subAdd(screens, ICON.relay, "Ekranı başka bilgisayara aktar…", () => ankamon.ui.boards.RelayDialog.open(board, online));
+          subAdd(screens, ICON.relay, "Ekranı başka bilgisayara aktar…", () => ankamon.ui.boards.RelayDialog.open(board, online, user));
           stateAdd(screens, ICON.relayStop, "Ekran aktarımını durdur", online.filter(b => b.relay_source || b.relay_is_source || b.relay_source === undefined),
-            list => this.__job({ type: "relay_stop", board_ids: list.map(b => b.id) }, "Ekran aktarımını durdur"));
+            list => this.__powerJob({ type: "relay_stop", board_ids: list.map(b => b.id) }, "Ekran aktarımını durdur", "relay_stop", "durdurma", user));
         }
         // Klavye/fare/dokunmatik kilidi: seçili tahtaların yalnız uygun olanlarına (bkz. worker executor/inputlock.py). Klavye
         // kilidi ekran klavyesini, fare kilidi dokunmayı da kapatır. Durumu bilinmeyen tahta iki maddede de sayılır.

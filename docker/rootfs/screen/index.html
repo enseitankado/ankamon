@@ -54,12 +54,17 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   .tile .title button.snd:hover { color: #ffd54f; border-color: #ffd54f; }
   .tile .title button.snd.on { background: #ffc107; color: #1f2630; }
   .tile .title button.snd.err { color: #ff6b5e; border-color: #ff6b5e; }
+  /* Klavye ve fare/dokunmatik kilidi: hoparlörle aynı biçim; kilitliyken kırmızı dolu. */
+  .tile .title button.lk { display: inline-flex; align-items: center; padding: 1px 6px; color: #ffc107; border: 1px solid #ffc107; border-radius: 4px; }
+  .tile .title button.lk:hover { color: #ffd54f; border-color: #ffd54f; }
+  .tile .title button.lk.on { background: #d93025; border-color: #d93025; color: #fff; }
+  .tile .title button.lk.busy { opacity: .5; cursor: progress; }
   .tile .view { flex: 1; min-height: 0; position: relative; }
   /* Her akış kendi katmanında (bkz. Tile.connect/reconnect): kip/kalite değişiminde yeni akış eski
      görüntünün ALTINDA kurulur, ilk karesi gelince eskisi kaldırılır — ekran kararmaz. */
   .tile .view > .screen { position: absolute; inset: 0; }
   /* Duraklatılmış akışın son karesi (bkz. Tile.freeze) — noVNC'nin ölçekli tuvaliyle aynı yerleşim. */
-  .tile .view > .screen > canvas.frozen { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+  .tile .view > .screen > canvas.frozen, .tile .view > .screen > img.frozen { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
   /* noVNC tahtanın imlecini tuvale satır içi stil olarak yazar (salt izlemede de); müdahale kapalıyken
      görüntü alanında fare imleci değişmesin (kullanıcı isteği) — !important satır içi stili ezer. */
   .tile:not(.control) .view, .tile:not(.control) .view * { cursor: default !important; }
@@ -215,6 +220,8 @@ import RFB from "./novnc/core/rfb.js";
 
 const PROFILE = {
   view:  { quality: 6, compression: 2, retry: 4000 },
+  // Sohbet açıkken: tahtadaki sohbet penceresinin yazısı okunsun (tam çözünürlük, yüksek kalite; bkz. Tile.applyQuality).
+  chat:  { quality: 8, compression: 2, retry: 4000 },
   thumb: { quality: 4, compression: 6, retry: 15000 }
 };
 const MESSAGES = {
@@ -254,6 +261,10 @@ if (!embed) {
   grid.style.gridAutoRows = `minmax(0, 1fr)`;
 }
 
+// Kilit düğmesi simgeleri: Tabler Icons (MIT, github.com/tabler/tabler-icons, © 2020-2026 Paweł Kuna; LICENSES/MIT.txt).
+const LINE_ICON = paths => `<svg viewBox='0 0 24 24' width='18' height='18' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'>${paths}</svg>`;
+const KEYBOARD_ICON = LINE_ICON("<path d='M2 8a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2l0 -8'/><path d='M6 10l0 .01'/><path d='M10 10l0 .01'/><path d='M14 10l0 .01'/><path d='M18 10l0 .01'/><path d='M6 14l0 .01'/><path d='M18 14l0 .01'/><path d='M10 14l4 .01'/>");
+const MOUSE_ICON = LINE_ICON("<path d='M6 7a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-4a4 4 0 0 1 -4 -4l0 -10'/><path d='M12 7l0 4'/>");
 // Hoparlör simgeleri: yazı tipi emojisi CSS rengini almaz, sarı görünmesi için çizim.
 const SPEAKER_OFF = "<svg viewBox='0 0 24 24' width='18' height='18' fill='currentColor' aria-hidden='true'><path d='M3 9v6h4l5 5V4L7 9H3z'/><path d='M16 9l5 6m0-6l-5 6' stroke='currentColor' stroke-width='2' fill='none'/></svg>";
 const SPEAKER_ON = "<svg viewBox='0 0 24 24' width='18' height='18' fill='currentColor' aria-hidden='true'><path d='M3 9v6h4l5 5V4L7 9H3z'/><path d='M15 8.5a5 5 0 0 1 0 7M17.5 6a8.5 8.5 0 0 1 0 12' stroke='currentColor' stroke-width='2' fill='none' stroke-linecap='round'/></svg>";
@@ -262,7 +273,8 @@ class Tile {
   constructor(board) {
     this.board = board;
     this.base = spec.q in PROFILE ? spec.q : "view";
-    this.q = this.base;
+    this.q = chatting.has(board.id) ? "chat" : this.base;
+    this.isFs = false;        // kutucuk tam ekranda
     this.wanted = false;      // görünür + sekme açık + tahta çevrimiçi (ilk refreshWanted bağlar)
     this.inView = true;       // kutucuk görünür alanda (IntersectionObserver)
     this.rfb = null;
@@ -273,6 +285,7 @@ class Tile {
     this.control = false;     // fare/klavye ile müdahale (yalnız "screen.control" yetkisiyle; sunucu da denetler)
     this.el.innerHTML = `<div class="title"><span class="dot"></span><span class="name"></span>
       ${embed ? "" : `<button class="snd" title="Tahtanın sesini bu bilgisayara aktar (kapalı)">${SPEAKER_OFF}</button>`}
+      ${!embed && spec.input ? `<button class="lk" data-device="keyboard">${KEYBOARD_ICON}</button><button class="lk" data-device="mouse">${MOUSE_ICON}</button>` : ""}
       ${spec.control ? '<button class="ctl" title="Fare ve klavye ile tahtayı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
       <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div><div class="sleep"><div>Ekran güç tasarrufu kipinde<div class="sd"></div>${embed ? '<div class="wk">Uyandırmak için tıklayın</div>' : ""}</div></div>
       <div class="whoami" hidden></div></div><div class="stats"></div>`;
@@ -294,6 +307,9 @@ class Tile {
     this.el.querySelector("button.fs").addEventListener("click", () => toggleFullscreen(single ? document.documentElement : this.el));
     const snd = this.el.querySelector("button.snd");
     if (snd) snd.addEventListener("click", () => this.setAudio(!this.audioWs));
+    this.locks = board.locks || [];
+    this.el.querySelectorAll("button.lk").forEach(btn => btn.addEventListener("click", () => this.toggleLock(btn)));
+    this.showLocks();
     const ctl = this.el.querySelector("button.ctl");
     // Müdahale tam ekranda yapılır (kullanıcı isteği): Ekranlar sekmesinde (gömülü) kutucuğun kendisi değil,
     // o tahtanın "Ekranı yönet" penceresi büyütülmüş açılır (üst sayfa — bkz. Boards.js "tm-manage"); ekran
@@ -708,7 +724,7 @@ class Tile {
       this.setState("popped", "Ayrı pencerede izleniyor");
       return;
     }
-    if (wasPopped) this.setState("connecting", "Bağlanıyor…");
+    if (wasPopped && !this.frozen) this.setState("connecting", "Bağlanıyor…");
     this.setWanted(!document.hidden && !paused && this.inView);
   }
 
@@ -1017,12 +1033,53 @@ class Tile {
     window.parent.postMessage({ type: "tm-wake", id: this.board.id }, location.origin);
   }
 
-  /** Önizlemedeki kutucuk tam ekrana geçince yüksek kaliteye, çıkınca önizleme kalitesine döner. */
-  setQuality(q) {
-    if (this.control) q = "view";
+  /** Akış kalitesi: müdahale ve tam ekran en akıcı kipte, sohbet açıkken yazı okunacak kipte, yoksa kutucuğun kendi kalitesinde. */
+  applyQuality() {
+    const q = this.control || this.isFs ? "view" : chatting.has(this.board.id) ? "chat" : this.base;
     if (q === this.q) return;
     this.q = q;
     this.reconnect();
+  }
+
+  /** Kilit düğmelerinin görünümü; fare kilidi dokunmatiği de tuttuğundan düğme ikisini birlikte gösterir. */
+  showLocks() {
+    this.el.querySelectorAll("button.lk").forEach(btn => {
+      const mouse = btn.dataset.device === "mouse";
+      const on = mouse ? this.locks.includes("mouse") || this.locks.includes("touch") : this.locks.includes("keyboard");
+      const name = mouse ? "Fare ve dokunmatik" : "Klavye";
+      btn.classList.toggle("on", on);
+      btn.title = on ? `${name} kilitli (açmak için tıklayın)` : `${name} kilidi kapalı (kilitlemek için tıklayın)`;
+    });
+  }
+
+  /** İşi üst sayfa yürütür (bkz. BoardOps.__toggleInputLock); sonuç "tm-locks" ile gelir. */
+  toggleLock(btn) {
+    if (btn.classList.contains("busy")) return;
+    btn.classList.add("busy");
+    window.parent.postMessage({ type: "tm-inputlock", id: this.board.id, device: btn.dataset.device, lock: !btn.classList.contains("on"),
+      locks: this.locks }, location.origin);
+  }
+
+  /** done: bu düğmenin işi bitti. Tahta listesi tazelemesi iş sürerken düğmeyi serbest bırakmaz. */
+  setLocks(locks, done) {
+    this.locks = locks;
+    if (done) this.el.querySelectorAll("button.lk").forEach(btn => btn.classList.remove("busy"));
+    this.showLocks();
+  }
+
+  /** Ayrı pencere kapandı: pencerenin son karesi kutucukta kalır, yeni akış onun altında kurulur (bkz. connect). */
+  setLastFrame(url) {
+    if (this.frozen) Tile.dropLayer(this.frozen);
+    const wrap = document.createElement("div");
+    wrap.className = "screen";
+    const img = document.createElement("img");
+    img.className = "frozen";
+    img.alt = "";
+    img.src = url;
+    wrap.appendChild(img);
+    this.view.insertBefore(wrap, this.view.firstChild);
+    this.frozen = { rfb: null, wrap };
+    this.setState("live", "");
   }
 }
 // Kesintisiz geçişte yeni akış "connect" olduktan sonra eski görüntünün kaldırılmadan önce
@@ -1073,6 +1130,7 @@ function toggleFullscreen(el) {
 }
 
 const tiles = new Map();   // tahta id → Tile
+let chatting = new Set(spec.chat || []);   // sohbet penceresi açık tahtalar (üst sayfadan "tm-chat")
 let popped = new Set();     // ekranı ayrı pencerede açık tahtalar (üst sayfadan "tm-popped")
 // Üst sayfada Ekranlar sekmesi bir süredir görünmüyor ("tm-pause"): akışlar durur, kutucuklar ve son
 // görüntüler yerinde kalır (sayfa yeniden kurulmaz); sekme görününce kaldığı yerden sürer.
@@ -1371,11 +1429,23 @@ document.addEventListener("fullscreenchange", () => {
       // giren kutucuk için görünürlüğü burada kesin olarak doğru işaretle.
       t.inView = true;
     }
-    t.setQuality(fs === t.el ? "view" : t.base);
+    t.isFs = fs === t.el;
+    t.applyQuality();
   });
 });
 // Yalnız görünen kutucuklar bağlı kalır (onlarca tahtalık önizlemede kaydırılan kutucuklar akış tutmaz).
 document.addEventListener("visibilitychange", () => tiles.forEach(t => t.refreshWanted()));
+
+// Gömülü kipte de ayrı pencerede de: açık sohbetler ve kilit durumu üst sayfadan gelir.
+window.addEventListener("message", e => {
+  if (e.source !== window.parent || e.origin !== location.origin || !e.data) return;
+  if (e.data.type === "tm-chat") {
+    chatting = new Set(e.data.ids || []);
+    tiles.forEach(t => t.applyQuality());
+  } else if (e.data.type === "tm-locks" && tiles.has(e.data.id)) {
+    tiles.get(e.data.id).setLocks(e.data.locks || [], !!e.data.done);
+  }
+});
 
 if (embed) {
   // Üst sayfa (Tahtalar) grid'deki tahta listesini her değiştiğinde gönderir.
@@ -1390,6 +1460,10 @@ if (embed) {
     }
     else if (e.data.type === "tm-popped") {
       popped = new Set(e.data.ids || []);
+      Object.entries(e.data.frames || {}).forEach(([id, url]) => {
+        const tile = tiles.get(+id);
+        if (tile && !popped.has(+id)) tile.setLastFrame(url);
+      });
       tiles.forEach(t => t.refreshWanted());
     }
     else if (e.data.type === "tm-view") {
