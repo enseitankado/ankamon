@@ -97,7 +97,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     this.__getMenu = getMenu;
     this.__getSelected = getSelected;
     this.__widgets = new Map();
-    this.set({ padding: [3, 8], margin: [6, 8, 8, 8], decorator: this.__panel() });
+    this.set({ padding: [3, 8], margin: [6, 8, 8, 8] });
+    this.__applyPanel();
     this.__build();
     this.__count = new qx.ui.basic.Label("").set({ textColor: "app-muted", alignY: "middle", marginLeft: 10 });
     this.add(this.__count);
@@ -117,23 +118,44 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     __count: null,
     __open: null,
     __stateKey: null,
+    __colors: null,
+    __flatDecorator: null,
 
     /**
      * Panel görünümü: sayfadan ayrı dursun diye zemin temanın yüzey renginden biraz koyu (koyu temada açık), çerçeve ve
-     * gölge var. Tema değişince sayfa yeniden yüklenir; renk bir kez hesaplanır.
+     * gölge var. Temalarda parçanın kendi arka plan rengi süslemenin (decorator) renginin önüne geçer: renk parçaya verilir.
+     * Tema değişince sayfa yeniden yüklenir; renkler bir kez hesaplanır.
      */
-    __panel() {
+    __applyPanel() {
       const mgr = qx.theme.manager.Color.getInstance();
-      const name = ["surface", "background-application", "background"].find(n => mgr.isDynamic(n));
-      const rgb = qx.util.ColorUtil.cssStringToRgb(mgr.resolve(name || "#ffffff"));
+      const name = ["surface", "background"].find(n => mgr.isDynamic(n));
+      const rgb = qx.util.ColorUtil.cssStringToRgb(mgr.resolve(name || "#ffffff")).slice(0, 3);
       const light = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 >= 128;
-      const shade = rgb.slice(0, 3).map(c => Math.round(light ? c * 0.94 : c + (255 - c) * 0.1));
-      return new qx.ui.decoration.Decorator().set({
-        width: 1, color: "app-border", radius: 8,
-        backgroundColor: `rgb(${shade.join(",")})`,
-        shadowHorizontalLength: 0, shadowVerticalLength: 2, shadowBlurRadius: 7,
-        shadowColor: light ? "rgba(0,0,0,0.16)" : "rgba(0,0,0,0.45)"
+      const shade = amount => `rgb(${rgb.map(c => Math.round(light ? c * (1 - amount) : c + (255 - c) * amount)).join(",")})`;
+      this.__colors = { hover: shade(0.13), pressed: shade(0.2) };
+      this.set({
+        backgroundColor: shade(0.055),
+        decorator: new qx.ui.decoration.Decorator().set({
+          width: 1, color: "app-border", radius: 8,
+          shadowHorizontalLength: 0, shadowVerticalLength: 2, shadowBlurRadius: 7,
+          shadowColor: light ? "rgba(0,0,0,0.16)" : "rgba(0,0,0,0.45)"
+        })
       });
+    },
+
+    /** Panel düğmesi düz: yalnız üzerine gelince ya da basılıyken renklenir (temanın kutulu görünümü panelde kalabalık duruyordu). */
+    __flatten(button) {
+      const flat = this.__flatDecorator || (this.__flatDecorator = new qx.ui.decoration.Decorator().set({ radius: 5 }));
+      button.set({ decorator: flat, backgroundColor: "transparent" });
+      const paint = color => {
+        if (!button.getUserData("ankamon.checked")) {
+          button.setBackgroundColor(color);
+        }
+      };
+      button.addListener("pointerover", () => button.getEnabled() && paint(this.__colors.hover));
+      button.addListener("pointerout", () => paint("transparent"));
+      button.addListener("pointerdown", () => button.getEnabled() && paint(this.__colors.pressed));
+      button.addListener("pointerup", () => button.getEnabled() && paint(this.__colors.hover));
     },
 
     /** Kümeleri ayıran ince dikey çizgi. */
@@ -150,24 +172,22 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
      */
     addViewControls(items, onChange) {
       const mgr = qx.theme.manager.Color.getInstance();
-      const accentName = ["primary", "background-selected", "selected-start", "table-row-background-selected"].find(n => mgr.isDynamic(n));
-      // Temaların "basılı" görünümü çoğunda belirgin değil (kullanıcı bildirimi): seçili düğme her temada dolu renkli.
-      const on = new qx.ui.decoration.Decorator().set({ radius: 5, backgroundColor: accentName || "#0067c0" });
+      const accent = ["primary", "background-selected"].find(n => mgr.isDynamic(n)) || "#0067c0";
       const buttons = new Map();
       const radio = new qx.ui.form.RadioGroup();
+      // Temaların "basılı" görünümü çoğunda belirgin değil (kullanıcı bildirimi): seçili düğme her temada dolu renkli, yazısı beyaz.
       const paint = button => {
-        if (button.getValue()) {
-          button.set({ decorator: on, textColor: "white" });
-        } else {
-          button.resetDecorator();
-          button.resetTextColor();
-        }
+        const on = button.getValue();
+        button.setUserData("ankamon.checked", on);
+        button.setBackgroundColor(on ? accent : "transparent");
+        button.getChildControl("label").setTextColor(on ? "white" : null);
       };
       items.forEach((item, index) => {
         const html = `${ankamon.ui.boards.ActionIcons.svg(item.icon)}` +
           `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(item.label)}</div>`;
         const button = item.group ? new qx.ui.toolbar.RadioButton(html) : new qx.ui.toolbar.CheckBox(html);
         button.set({ rich: true, show: "label", center: true, padding: [4, 6], minWidth: 58, toolTipText: item.tip });
+        this.__flatten(button);
         if (item.group) {
           radio.add(button);
         }
@@ -207,6 +227,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(group.label)}</div>`;
       const main = new qx.ui.toolbar.Button(html).set({ rich: true, show: "label", center: true, padding: [4, 6], minWidth: 58 });
       const arrow = new qx.ui.toolbar.Button("▾").set({ show: "label", padding: [4, 2], minWidth: 14, toolTipText: `${group.label}: tüm seçenekler` });
+      this.__flatten(main);
+      this.__flatten(arrow);
       main.addListener("execute", () => this.__pressMain(group, main));
       arrow.addListener("execute", () => this.__openMenu(group, arrow));
       box.add(main);
