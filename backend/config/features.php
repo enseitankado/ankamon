@@ -34,6 +34,7 @@ return [
     'anomalies' => 'Anomaliler: tahtalardaki sıra dışı durumları (ör. açık ama oturum açılmamış tahta) anlık izleme ve geçmişe dönük raporlama',
     'anomalies.notify' => 'Anomaliler ▸ Bildirimler: ntfy konusunu ve bildirim kurallarını düzenleme, bildirim geçmişini silme — bildirim metni dış sunucuya gider',
     'screen.web' => 'Oturumu açık tahtada varsayılan tarayıcıyla web sitesi açma (sağ menü "Web sitesi aç")',
+    'boards.webfilter' => 'ETAP Pardus tahtalarda eta-kisit ile kara/beyaz liste web filtresi tanımlama, kapatma, adres başına ziyaret ve engel sayılarını görme (sağ menü "Web Filtre")',
     'diagnose' => 'Bakım (sorun tespiti): seçili tahtalarda donanım, disk sağlığı (SMART), sıcaklık ve sistem denetimi çalıştırma',
     'boards.users' => 'Tahtaya kullanıcı hesabı ekleme (hazır işlem "Kullanıcı ekle") ve hesapları silme, isteğe bağlı tüm dosyalarıyla (sağ menü "Kullanıcılar ▸ Kullanıcı sil…" ve hazır işlem "Kullanıcı sil") — silme geri alınamaz',
     'boards.passwords' => 'Tahtadaki kullanıcı hesaplarının parolasını ayarlama, tek tek ya da topluca (sağ menü "Kullanıcılar ▸ Parola ayarla…" ve hazır işlem "Kullanıcı parolası ayarla") — etapadmin ve root hariç',

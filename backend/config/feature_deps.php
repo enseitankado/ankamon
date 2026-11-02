@@ -32,6 +32,7 @@ return [
     'anomalies' => 'boards',
     'anomalies.notify' => 'anomalies',
     'screen.web' => 'screen',
+    'boards.webfilter' => 'boards',
     'boards.passwords' => 'boards',
     'boards.passwords.etapadmin' => 'boards.passwords',
     'boards.passwords.root' => 'boards.passwords',

@@ -182,6 +182,9 @@ final class JobsApi
             'password_change' => $this->adminPasswordJob($request, true),
             // Sağ menü "Web sitesi aç" (bkz. worker executor/open_url.py).
             'open_url' => $this->openUrlJob($request),
+            // Sağ menü "Web Filtre" (bkz. worker executor/eta_kisit_webfilter.py, frontend ui/boards/EtaKisitWebFilter.js).
+            'webfilter_status' => ['boards.webfilter', 'Web Filtre durumu', [], true],
+            'webfilter_apply' => $this->webFilterJob($request),
             // Anomaliler ▸ Bildirimler ▸ Deneme gönder (tahtasız; bkz. worker executor/ntfy.py).
             'ntfy_test' => ['anomalies.notify', 'ntfy deneme bildirimi', [], false],
             // Anomaliler ▸ Tarama (bkz. worker/ankamon/anomaly/scan.py): seçilen kurallar seçilen tahtalarda anlık.
@@ -354,6 +357,43 @@ final class JobsApi
             throw ApiError::badRequest('Adres http:// ya da https:// ile başlamalı, boşluk ve tırnak içermemeli.');
         }
         return ['screen.web', 'Web sitesi aç: ' . mb_strimwidth($url, 0, 80, '…'), ['url' => $url], true];
+    }
+
+    /** Alan adları tahtaya gider: worker eta_kisit_webfilter.DOMAIN_RE ile AYNI kural. Verilmeyen liste tahtada korunur. */
+    private function webFilterJob(Request $request): array
+    {
+        $mode = (string) $request->input('mode', '');
+        $labels = ['off' => 'Kapat', 'denylist' => 'Kara liste', 'allowlist' => 'Beyaz liste'];
+        if (!isset($labels[$mode])) {
+            throw ApiError::badRequest('Geçersiz filtre modu.');
+        }
+        $params = ['mode' => $mode, 'denylist' => null, 'allowlist' => null];
+        foreach (['denylist', 'allowlist'] as $key) {
+            $list = $request->input($key);
+            if ($list === null) {
+                continue;
+            }
+            if (!is_array($list)) {
+                throw ApiError::badRequest('Geçersiz adres listesi.');
+            }
+            $clean = [];
+            foreach ($list as $domain) {
+                $domain = is_string($domain) ? strtolower(trim($domain)) : '';
+                if (!preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/D', $domain)) {
+                    throw ApiError::badRequest('Geçersiz alan adı: ' . mb_strimwidth($domain, 0, 80, '…'));
+                }
+                $clean[$domain] = true;
+            }
+            if (count($clean) > 500) {
+                throw ApiError::badRequest('Listede en çok 500 adres olabilir.');
+            }
+            $params[$key] = array_keys($clean);
+        }
+        if ($mode !== 'off' && !$params[$mode]) {
+            throw ApiError::badRequest('Adres listesi boş.');
+        }
+        $title = 'Web Filtre: ' . $labels[$mode] . ($mode === 'off' ? '' : ' (' . count($params[$mode]) . ' adres)');
+        return ['boards.webfilter', $title, $params, true];
     }
 
     /** Klavye/fare/dokunmatik kilidi: aygıt ve yön (bkz. worker executor/inputlock.py). */

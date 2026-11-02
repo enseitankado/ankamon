@@ -1002,6 +1002,16 @@ qx.Class.define("ankamon.ui.BoardOps", {
           add(ICON.web, "Web sitesi aç…" + webCount, () => this.openWebsite(withSession));
           menu.getChildren()[menu.getChildren().length - 1].setEnabled(withSession.length > 0);
         }
+        // Web Filtre: ETAP Pardus'taki eta-kisit ile kara/beyaz liste ve DNS sayıları (bkz. ui.boards.EtaKisitWebFilter).
+        if (can("boards.webfilter")) {
+          const webFilter = ankamon.ui.boards.EtaKisitWebFilter;
+          const filter = sub();
+          subAdd(filter, ICON.webFilter, "Kara liste…" + count, () => webFilter.open(online, boards, "denylist"));
+          subAdd(filter, ICON.webFilter, "Beyaz liste…" + count, () => webFilter.open(online, boards, "allowlist"));
+          subAdd(filter, ICON.webFilter, "Filtreyi kapat" + count, () => webFilter.turnOff(online));
+          subAdd(filter, ICON.info, "Durum ve sayılar…" + count, () => webFilter.open(online, boards));
+          group(ICON.webFilter, "Web Filtre", filter);
+        }
         // Wi-Fi Monitör: kart, bağlantı, çevredeki ağlar ve Bluetooth cihazları; kapalı radyo geçici açılır, sağ tıklanan tahta (bkz. ui.boards.WifiMonitor).
         if (can("screen")) {
           add(ICON.wifi, "Wi-Fi Monitör", () => ankamon.ui.boards.WifiMonitor.open(board));

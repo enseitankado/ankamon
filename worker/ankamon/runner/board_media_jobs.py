@@ -35,15 +35,16 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import db
-from ..executor import board_password, homesize, inputlock, ntfy, open_url, relay, screenshot, whoami
+from ..executor import board_password, eta_kisit_webfilter, homesize, inputlock, ntfy, open_url, relay, screenshot, whoami
 from ..executor.jobs import _board_access, _write_one
 from . import stream
 
 TYPES = ("screenshot", "input_lock", "relay_start", "relay_stop", "home_sizes",
-         "password_status", "password_verify", "password_change", "open_url", "ntfy_test")
+         "password_status", "password_verify", "password_change", "open_url", "ntfy_test",
+         "webfilter_status", "webfilter_apply")
 
 # Çıktısı JSON olan görevlerde canlı pencereye yazılmaz (arayüz okur, pencere açılmaz).
-_QUIET = ("home_sizes", "password_status")
+_QUIET = ("home_sizes", "password_status", "webfilter_status")
 
 
 def _parallel(conn, job, targets, names, results, work, after=None) -> None:
@@ -103,6 +104,12 @@ def run(conn, job, targets, names, results) -> None:
     elif kind == "open_url":
         url = params.get("url", "")
         _parallel(conn, job, targets, names, results, lambda t: open_url.open_site(t, user, password, url))
+    elif kind == "webfilter_status":
+        _parallel(conn, job, targets, names, results, lambda t: eta_kisit_webfilter.read_status(t, user, password))
+    elif kind == "webfilter_apply":
+        mode, deny, allow = params.get("mode", ""), params.get("denylist"), params.get("allowlist")
+        _parallel(conn, job, targets, names, results,
+                  lambda t: eta_kisit_webfilter.apply(t, user, password, mode, deny, allow))
     elif kind == "input_lock":
         device, lock = params.get("device", ""), bool(params.get("lock", True))
         _parallel(conn, job, targets, names, results, lambda t: inputlock.apply(t, user, password, device, lock),
