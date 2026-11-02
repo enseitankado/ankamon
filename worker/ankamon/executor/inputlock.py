@@ -29,7 +29,7 @@ Tahtada xinput yok; X'ten bağımsız, daha güçlü yol kullanılır: bekçi (s
 EVIOCGRAB ile tek başına tutar — olaylar X'e de metin konsoluna da ulaşmaz; X yeniden başlasa, oturum değişse ya da aygıt
 sonradan takılsa da (2 sn'de bir yeniden taranır) kilit sürer, yeniden açılışta da devam eder.
 Kilitler birbirinden bağımsızdır, birkaçı birlikte tutulabilir:
-  keyboard: klavye sınıfı aygıtlar + ekran klavyesi (eta-keyboard süreci çalışmaz; yazdığı sanal klavye de tutulur).
+  keyboard: klavye sınıfı aygıtlar, aynı USB klavyenin ses/medya/uyku düğümleri + ekran klavyesi (eta-keyboard çalışmaz).
   mouse:    fare + dokunma (fare kilidi dokunmayı da kapatır).
   touch:    yalnız dokunma; fare çalışır.
 "Ekranı yönet" (x11vnc, XTEST) bu kilitlerden etkilenmez: yönetici kilitli tahtaya müdahale edebilir.
@@ -96,6 +96,26 @@ def classes(node):
     return out
 
 
+def usb_parent(node):
+    """Aynı fiziksel aygıtın düğümlerinde ortak ön ek ("usb-0000:00:12.0-1"); bilinmiyorsa ""."""
+    try:
+        with open("/sys/class/input/%s/device/phys" % node) as f:
+            phys = f.read().strip()
+    except OSError:
+        return ""
+    return phys.split("/input")[0] if phys.startswith("usb-") else ""
+
+
+def classify(nodes):
+    """Düğüm -> sınıflar. Klavyenin ses/medya düğümleri KEY_A taşımaz: aynı USB aygıtındaki sınıfsız tuş düğümleri klavye sayılır."""
+    found = {n: classes(n) for n in nodes}
+    parents = {usb_parent(n) for n, c in found.items() if "keyboard" in c} - {""}
+    for n, c in found.items():
+        if not c and usb_parent(n) in parents and bits("/sys/class/input/%s/device/capabilities/key" % n):
+            c.add("keyboard")
+    return found
+
+
 def wanted():
     flags = {d for d in ("keyboard", "mouse", "touch") if os.path.exists(os.path.join(DIR, d))}
     if "mouse" in flags:
@@ -134,9 +154,11 @@ while not stopping:
     want = wanted()
     if not want:
         break
-    for path in glob.glob("/dev/input/event*"):
+    paths = glob.glob("/dev/input/event*")
+    found = classify([os.path.basename(p) for p in paths])
+    for path in paths:
         node = os.path.basename(path)
-        cls = classes(node)
+        cls = found[node]
         grab = bool(cls & want)
         if grab and path not in held:
             try:

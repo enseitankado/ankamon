@@ -128,7 +128,7 @@ def sync(conn) -> None:
         os.rename(path + ".tmp", path)
 
 
-def _remember_root(conn, board: dict, secret: str, general: str) -> None:
+def remember_root(conn, board: dict, secret: str, general: str) -> None:
     if secret == general:
         conn.execute("DELETE FROM board_credentials WHERE board_id = %s", (board["board_id"],))
     else:
@@ -157,14 +157,14 @@ def verify(conn, board: dict, user: str, general: str, account: str, current: st
     res = _run(board, user, general, {"op": "verify", "account": account, "current": current})
     if res["status"] == "ok":
         if account == "root" and user == "root":
-            _remember_root(conn, board, current, general)   # tahtaya bağlanan parola bilinsin
+            remember_root(conn, board, current, general)   # tahtaya bağlanan parola bilinsin
         return {"status": "ok", "rc": 0, "output": "Mevcut parola doğru."}
     if res["rc"] == 3:
         return {"status": "failed", "rc": 3, "output": "Mevcut parola yanlış."}
     if res["rc"] == 5 and account == "root" and user == "root":
         direct = _run(board, "root", current, {"op": "verify", "account": "root", "current": current}, direct=True)
         if direct["status"] == "ok":
-            _remember_root(conn, board, current, general)
+            remember_root(conn, board, current, general)
             return {"status": "ok", "rc": 0, "output": "Mevcut parola doğru; tahtaya erişim bu parolayla sürecek."}
         return {"status": "failed", "rc": 3, "output": "Mevcut parola yanlış."}
     if res["rc"] == 5:
@@ -183,7 +183,7 @@ def change(conn, board: dict, user: str, general: str, account: str, current: st
         return {"status": "ok", "rc": 0, "output": f"{account} parolası bu tahtada değiştirildi."}
     # root: artık bağlantı parolası da bu. Önce sınanır, sonra kaydedilir; sınanamazsa açıkça söylenir.
     probe = _run(board, "root", new, {"op": "verify", "account": "root", "current": new}, direct=True)
-    _remember_root(conn, board, new, general)
+    remember_root(conn, board, new, general)
     if probe["status"] != "ok":
         return {"status": "failed", "rc": probe["rc"],
                 "output": "Parola değişti ve kaydedildi, fakat yeni parolayla bağlantı sınanamadı: " + probe["output"]}

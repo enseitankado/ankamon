@@ -37,7 +37,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import activity, db
-from ..executor import (accounts, backup, cast, diagnose, display, home_restore, hwfacts, screenlock, session_probe,
+from ..executor import (accounts, backup, board_password, cast, diagnose, display, home_restore, hwfacts, screenlock, session_probe,
                         tools, whoami, wol)
 from ..anomaly import scan as anomaly_scan_mod
 from ..executor.jobs import _action_dir, _board_access, _claim, _targets, _write_one, _write_results
@@ -206,6 +206,11 @@ def _run_job(job) -> None:
                     # göstersin (kısmi başarıda da — bazı hesaplar silinmiş olabilir).
                     if action in ("user-add", "user-delete"):
                         accounts.invalidate(wconn, t["board_id"])
+                    # Parola ayarla ile root değişti: Ankamon'un bağlantısı kopmasın, tahtaya özel kaydedilir.
+                    if action == "user-password" and result["status"] == "ok" and user == "root":
+                        values = (job["params"] or {}).get("values") or {}
+                        if "root" in str(values.get("KULLANICILAR", "")).split():
+                            board_password.remember_root(wconn, t, str(values.get("PAROLA", "")), password)
                     return result
                 finally:
                     wconn.close()

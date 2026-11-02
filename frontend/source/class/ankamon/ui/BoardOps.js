@@ -1090,8 +1090,8 @@ qx.Class.define("ankamon.ui.BoardOps", {
         const box = new qx.ui.form.CheckBox(`<b>${name}</b> parolasını da ayarla (ayrı parola)`).set({ rich: true });
         group.add(box);
         if (name === "root") {
-          group.add(new qx.ui.basic.Label('<span style="color:#c42b1c">Ankamon tahtalara root ile bağlanır. root parolası ' +
-            "değişen tahtaya, Ayarlar ▸ Tahta erişimi'ndeki SSH parolası da aynı yapılmadıkça erişilemez.</span>")
+          group.add(new qx.ui.basic.Label('<span style="color:#c42b1c">Ankamon tahtalara root ile bağlanır: yeni parola bu tahtalar ' +
+            "için kaydedilir, bağlantı onunla sürer. Genel parola (Ayarlar ▸ SSH erişimi) değişmez.</span>")
             .set({ rich: true, wrap: true }));
         }
         const pair = pairBox();
@@ -1193,7 +1193,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
           lines.push(`${names.length} kullanıcı (aynı parola): ` + names.map(esc).join(", "));
         }
         picked.forEach(a => lines.push(`<b style="color:#c42b1c">${a.name}</b> — ayrı parola` +
-          (a.name === "root" ? ' <span style="color:#c42b1c">(Ankamon\'un SSH erişimi etkilenir)</span>' : "")));
+          (a.name === "root" ? ' <span style="color:#c42b1c">(Ankamon bu tahtalara yeni parolayla bağlanır)</span>' : "")));
         const ok = await ankamon.ui.Dialog.confirm(
           `<b>${where}</b> üzerinde şu hesapların parolası değiştirilsin mi?<br><br>${lines.map(l => "• " + l).join("<br>")}` +
           "<br><br>Açık oturumlar kapanmaz; yeni parola bir sonraki girişte geçerli olur.", "Parolayı ayarla");

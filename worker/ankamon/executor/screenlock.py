@@ -48,6 +48,9 @@ Bekçi (lock.py, root, systemd Restart=always): yarım saniyede bir etkin VT'ye 
 Kilit penceresi (cover.py): override-redirect (POPUP) tam ekran pencere, saniyede bir en üste çıkar ve
 yakalamayı yeniler (başka bir uygulamanın açık menüsü o an yakalamayı tutuyorsa bir sonraki turda alınır).
 Ekran güç tasarrufuna girebilir; dokunulunca uyanır, kilit ekranı görünür.
+Açılışta kilit penceresi pencere yöneticisinden (compositor, giriş ekranıyla gelir) önce başlar; compositor sonradan
+açılınca pencere en üstte görünse de ekrana çizilmiyordu (Arge 1'de 2026-11-02'de yeniden üretildi). Bu yüzden
+pencere bileşim durumu değişince kapanır, bekçi onu hemen yeniden açar.
 
 Oturum yoklaması (executor/session_probe.py) SCRIPT'teki "L" satırıyla kilit durumunu okur
 (boards.screen_locked — göç 035); Tahtalar grid'inin "Oturum" hücresi "… / Kilitli" yazar.
@@ -264,7 +267,14 @@ gw.set_cursor(Gdk.Cursor.new_for_display(gw.get_display(), Gdk.CursorType.BLANK_
 seat = gw.get_display().get_default_seat()
 
 
+composited = scr.is_composited()
+
+
 def tick():
+    # Compositor sonradan açıldı/kapandı: bu pencere çizilmez olur; bekçi yeniden başlatır (bkz. modül notu).
+    if scr.is_composited() != composited:
+        Gtk.main_quit()
+        return False
     # Tam ekran (ekran çözünürlüğü değişmiş olabilir), en üstte ve tüm girişler bu pencerede.
     if (scr.get_width(), scr.get_height()) != win.get_size():
         win.resize(scr.get_width(), scr.get_height())
