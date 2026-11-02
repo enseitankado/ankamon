@@ -142,7 +142,7 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
         this.__add(this.__board, String(f.board_id), f.board_name || "#" + f.board_id);
       }
       if (f.username && !this.__user.getSelectables(true).some(i => i.getModel() === f.username)) {
-        this.__add(this.__user, f.username, f.username);
+        this.__add(this.__user, f.username, f.username === "-" ? "(oturumsuz)" : f.username);
       }
       this.__select(this.__board, f.board_id ? String(f.board_id) : "");
       this.__select(this.__user, f.username || "");

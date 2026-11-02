@@ -763,7 +763,12 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         }
       } else {
         const i = key.indexOf(":");
-        menu.add(ops.menuButton(icon.sessions, `Yalnız bu kullanıcı (${key.slice(i + 1)})`, () => this.__pickKey(key)));
+        // "(oturum yok)" satırı: yalnız oturumsuz çekilen ekran görüntülerini taşır, süzülecek bir kullanıcı yoktur.
+        if (key.slice(i + 1)) {
+          menu.add(ops.menuButton(icon.sessions, `Yalnız bu kullanıcı (${key.slice(i + 1)})`, () => this.__pickKey(key)));
+        } else {
+          menu.add(ops.menuButton(icon.movements, "Oturumsuz hareketler", () => this.__page.showMovements({ username: "-" })));
+        }
         if (key.startsWith("board:") && key.slice(i + 1)) {
           // Tahta süzgeci seçiliyse o tahtadaki, değilse bütün tahtalardaki hareketleri.
           const pick = this.__value(this.__board);
