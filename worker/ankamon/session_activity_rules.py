@@ -36,7 +36,7 @@ import re
 
 KINDS = {
     "oturum": "Oturum", "yetki": "Yetki", "usb": "USB", "ag": "Ağ", "uygulama": "Uygulama", "ssh": "SSH",
-    "guc": "Güç", "hesap": "Hesap", "sistem": "Sistem", "ankamon": "Ankamon", "sensor": "Sensör",
+    "guc": "Güç", "hesap": "Hesap", "sistem": "Sistem", "komut": "Komut", "ankamon": "Ankamon", "sensor": "Sensör",
 }
 
 # Log gönderen uygulamalar: oturumda ilk görüldüğünde "açıldı" sayılır (bkz. tasks/session_activity.py).
@@ -55,6 +55,10 @@ _PKEXEC = re.compile(r"^(\S+): Executing command .*COMMAND=([^\]]*)\]?")
 _PKEXEC_DENIED = re.compile(r"^(\S+): Error executing command")
 _DBUS_APP = re.compile(r"^\[session uid=\d+ pid=\d+\] Activating service name='([^']+)'")
 _DBUS_SKIP = re.compile(r"^(org\.freedesktop|org\.gtk|org\.a11y|ca\.desrt|org\.cinnamon|org\.gnome\.keyring|com\.canonical)")
+
+
+def is_automated(text: str) -> bool:
+    return bool(_AUTOMATED.search(text))
 
 
 def classify(program: str, message: str):

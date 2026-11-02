@@ -32,12 +32,23 @@ bilen herkes okuyabilir, bu yüzden tahmin edilemez olmalıdır (arayüz öneri 
 from __future__ import annotations
 
 import json
+import os
 import re
+import ssl
 import urllib.error
 import urllib.request
 
 TOPIC_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 DEFAULT_SERVER = "https://ntfy.sh"
+# MEB filtresi HTTPS'i kendi sertifikasıyla keser (hedef okullar da aynı filtrenin arkasında): kök sertifikası da güvenilir.
+_MEB_CA = "/opt/ankamon/certs/meb-ca.crt"
+
+
+def _tls() -> ssl.SSLContext:
+    ctx = ssl.create_default_context()
+    if os.path.exists(_MEB_CA):
+        ctx.load_verify_locations(_MEB_CA)
+    return ctx
 
 
 def config(conn) -> dict:
@@ -54,7 +65,7 @@ def publish(server: str, topic: str, title: str, body: str, tags: list[str] | No
     req = urllib.request.Request(server + "/", data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), method="POST",
                                  headers={"Content-Type": "application/json", "User-Agent": "Ankamon"})
     try:
-        with urllib.request.urlopen(req, timeout=15):
+        with urllib.request.urlopen(req, timeout=15, context=_tls()):
             return None
     except urllib.error.HTTPError as e:
         return f"Sunucu yanıtı: HTTP {e.code}"

@@ -105,10 +105,10 @@ qx.Class.define("ankamon.page.Sessions", {
       }
     },
 
-    /** "Oturum hareketleri": Hareketler sekmesine süzülmüş geçer. @param filter {Map} bkz. ui.sessions.Movements.show */
+    /** "Oturum hareketleri": Hareketler sekmesine süzülmüş geçer. @param filter {Map} bkz. ui.sessions.Movements.applyFilter */
     showMovements(filter) {
       this.__tabs.setSelection([this.__movements]);
-      this.__movements.show(filter);
+      this.__movements.applyFilter(filter);
     },
 
     /** Kullanıcılar sekmesine geçip o kullanıcının oturum geçmişini gösterir (grid sağ menüsü). */

@@ -29,7 +29,7 @@
  * Oturumlar sayfasının "Hareketler" sekmesi: o bilgisayardan gelen log, sensör ve Ankamon işlemlerinden ayıklanan olaylar,
  * kronolojik (bkz. worker tasks/session_activity.py, backend SessionActivityApi). Süzgeçler serbestçe birleşir: tek oturum, bir
  * tahta + kullanıcı, bir tahtanın bütün hareketleri, bir kullanıcının bütün tahtalardaki hareketleri. Zaman çizelgesi ve
- * Oturumlar grid'inin sağ menüsündeki "Oturum hareketleri" buraya süzülmüş gelir (show).
+ * Oturumlar grid'inin sağ menüsündeki "Oturum hareketleri" buraya süzülmüş gelir (applyFilter).
  */
 qx.Class.define("ankamon.ui.sessions.Movements", {
   extend: qx.ui.tabview.Page,
@@ -93,7 +93,7 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
 
   statics: {
     KINDS: { oturum: "Oturum", yetki: "Yetki", usb: "USB", ag: "Ağ", uygulama: "Uygulama", ssh: "SSH", guc: "Güç", hesap: "Hesap",
-      sistem: "Sistem", ankamon: "Ankamon", sensor: "Sensör" }
+      sistem: "Sistem", komut: "Komut", ankamon: "Ankamon", sensor: "Sensör" }
   },
 
   members: {
@@ -131,7 +131,7 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
     /**
      * Süzülmüş açar. @param f {Map} {session?: {id, label}, board_id?, board_name?, username?, days?}: verilmeyen süzgeç "tümü" olur.
      */
-    show(f) {
+    applyFilter(f) {
       this.__quiet = true;
       this.__session = f.session || null;
       this.__scope.setVisibility(f.session ? "visible" : "excluded");

@@ -49,6 +49,9 @@ _EPOCH = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 
 NET_MB = 200       # 5 dakikada bu kadar MB ağ trafiği "yoğun" sayılır
 _REPEAT = datetime.timedelta(minutes=10)   # süren yüksek yük her 5 dk'da bir ayrı olay olmasın
+# Aynı adresten aynı hesaba sık tekrarlanan SSH girişi otomatik iştir (izleme yazılımı, eski Ankamon adresi): zincirin yalnız ilki.
+_SSH_CHAIN = datetime.timedelta(minutes=5)
+_ssh_last: dict = {}
 
 
 def _local_addresses() -> set[str]:
@@ -141,6 +144,12 @@ def _from_logs(conn, by_host) -> None:
                 hit = rules.classify(r["program"], message)
             if not hit or (r["program"] == "sshd" and any(f"({ip})" in hit[1] for ip in own)):
                 continue
+            if r["program"] == "sshd":
+                key = (host, hit[1])
+                previous = _ssh_last.get(key)
+                _ssh_last[key] = r["received_at"]
+                if previous and r["received_at"] - previous <= _SSH_CHAIN:
+                    continue
             board = by_host.get(host)
             out.append((r["received_at"], board["id"] if board else None, board["name"] if board else r["host"],
                         session["id"] if session else None, session["username"] if session else hit[2],
@@ -170,8 +179,16 @@ def _from_ankamon(conn, by_id) -> None:
     out = []
     for r in rows:
         session = sessions.board(r["board_id"], r["at"])
+        username = session["username"] if session else None
+        if r["source"] == "local":
+            # Tahtada yazılan komut (bkz. 028_local_command_log.sql): kullanıcının kendi hareketi; otomatik işler atlanır.
+            if rules.is_automated(r["text"]):
+                continue
+            out.append((r["at"], r["board_id"], r["board_name"], session["id"] if session else None,
+                        username or r["text"].split(":", 1)[0], "komut", "Komut: " + r["text"].split(":", 1)[-1].strip(), None, r["source"]))
+            continue
         out.append((r["at"], r["board_id"], r["board_name"], session["id"] if session else None,
-                    session["username"] if session else None, "ankamon", "Ankamon — " + r["text"], None, r["source"]))
+                    username, "ankamon", "Ankamon — " + r["text"], None, r["source"]))
     with conn.transaction():
         _insert(conn, out)
         _save_cursor(conn, "session_activity.ankamon", rows[-1]["at"])

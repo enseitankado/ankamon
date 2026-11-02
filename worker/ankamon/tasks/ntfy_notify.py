@@ -49,6 +49,7 @@ from ..executor import ntfy
 log = logging.getLogger(__name__)
 
 _EVERY_SECONDS = 30
+_PAUSE_AFTER_FAILURE = 300     # sunucuya ulaşılamıyorsa her turda hata kaydı birikmesin
 _last = 0.0
 
 _LABELS = {
@@ -218,6 +219,11 @@ def run(conn) -> None:
     _last = time.monotonic()
     cfg = ntfy.config(conn)
     if not cfg["topic"]:
+        return
+    failed = conn.execute(
+        "SELECT 1 FROM ntfy_messages WHERE status = 'failed' AND rule_id IS NOT NULL AND sent_at > now() - make_interval(secs => %s) LIMIT 1",
+        (_PAUSE_AFTER_FAILURE,)).fetchone()
+    if failed:
         return
     rules = conn.execute("SELECT * FROM ntfy_rules WHERE enabled ORDER BY id").fetchall()
     if not rules:
