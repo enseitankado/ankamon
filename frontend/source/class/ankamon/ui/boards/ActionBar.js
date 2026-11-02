@@ -43,6 +43,9 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
   extend: qx.ui.container.Composite,
 
   statics: {
+    /** Kapalı düğme: yazı rengi tam kalır, yalnız bu opaklık uygulanır (temanın soluk yazısıyla çarpılınca okunmuyordu). */
+    OFF_OPACITY: 0.42,
+
     /** Düğmeler, soldan sağa. noSelection: hiç tahta seçili değilken de çalışan maddeler. */
     GROUPS: [
       { id: "watch", label: "Ekran", icon: "deviceDesktop", primary: "Ekranı göster" },
@@ -132,7 +135,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       const rgb = qx.util.ColorUtil.cssStringToRgb(mgr.resolve(name || "#ffffff")).slice(0, 3);
       const light = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 >= 128;
       const shade = amount => `rgb(${rgb.map(c => Math.round(light ? c * (1 - amount) : c + (255 - c) * amount)).join(",")})`;
-      this.__colors = { hover: shade(0.13), pressed: shade(0.2) };
+      // Yazı rengi de buradan: temaların araç çubuğu yazı rengi koyu zeminde koyu kalabiliyor (Liste ve Başarım okunmuyordu).
+      this.__colors = { hover: shade(0.13), pressed: shade(0.2), text: light ? "#242424" : "#f2f2f2" };
       this.set({
         backgroundColor: shade(0.055),
         decorator: new qx.ui.decoration.Decorator().set({
@@ -147,6 +151,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     __flatten(button) {
       const flat = this.__flatDecorator || (this.__flatDecorator = new qx.ui.decoration.Decorator().set({ radius: 5 }));
       button.set({ decorator: flat, backgroundColor: "transparent" });
+      button.getChildControl("label").setTextColor(this.__colors.text);
       const paint = color => {
         if (!button.getUserData("ankamon.checked")) {
           button.setBackgroundColor(color);
@@ -176,11 +181,13 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       const buttons = new Map();
       const radio = new qx.ui.form.RadioGroup();
       // Temaların "basılı" görünümü çoğunda belirgin değil (kullanıcı bildirimi): seçili düğme her temada dolu renkli, yazısı beyaz.
+      // Kapalı düğme (Liste görünümünde Sensörler) değerini korur ama seçili görünmez.
       const paint = button => {
-        const on = button.getValue();
+        const on = button.getValue() && button.getEnabled();
         button.setUserData("ankamon.checked", on);
         button.setBackgroundColor(on ? accent : "transparent");
-        button.getChildControl("label").setTextColor(on ? "white" : null);
+        button.setOpacity(button.getEnabled() ? 1 : ankamon.ui.boards.ActionBar.OFF_OPACITY);
+        button.getChildControl("label").setTextColor(on ? "white" : this.__colors.text);
       };
       items.forEach((item, index) => {
         const html = `${ankamon.ui.boards.ActionIcons.svg(item.icon)}` +
@@ -195,6 +202,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
           paint(button);
           onChange(item.id, e.getData());
         });
+        button.addListener("changeEnabled", () => paint(button));
         // Görünüm bölümü işlerden önce gelir: sırayla başa.
         this.addAt(button, index);
         buttons.set(item.id, button);
@@ -223,6 +231,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         this.add(this.__separator());
       }
       const box = new qx.ui.container.Composite(new qx.ui.layout.HBox(0).set({ alignY: "middle" }));
+      box.setBackgroundColor("transparent");   // temanın "widget" zemini panelde kutu gibi görünüyordu
       const html = `${ankamon.ui.boards.ActionIcons.svg(group.icon)}` +
         `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(group.label)}</div>`;
       const main = new qx.ui.toolbar.Button(html).set({ rich: true, show: "label", center: true, padding: [4, 6], minWidth: 58 });
@@ -291,7 +300,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         const on = leaves.some(l => l.getEnabled());
         [w.main, w.arrow].forEach(b => {
           b.setEnabled(on);
-          b.setOpacity(on ? 1 : ankamon.ui.BoardOps.DISABLED_OPACITY);
+          b.setOpacity(on ? 1 : ankamon.ui.boards.ActionBar.OFF_OPACITY);
         });
         w.arrow.setVisibility(leaves.length > 1 || !group.primary ? "visible" : "excluded");
         w.main.setToolTipText(this.__tip(group, leaves));
