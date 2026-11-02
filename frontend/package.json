@@ -12,6 +12,6 @@
     "@qooxdoo/framework": "7.9.3"
   },
   "dependencies": {
-    "vis-timeline": "^8.5.4"
+    "vis-timeline": "^8.5.6"
   }
 }
