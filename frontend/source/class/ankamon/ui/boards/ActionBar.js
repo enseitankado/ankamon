@@ -100,6 +100,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     this.__getMenu = getMenu;
     this.__getSelected = getSelected;
     this.__widgets = new Map();
+    this.__tools = [];
     this.set({ padding: [3, 6], margin: [6, 8, 8, 8] });
     this.__applyPanel();
     this.__build();
@@ -126,6 +127,9 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     __flatDecorator: null,
     __separators: null,
     __separatorTimer: null,
+    __tools: null,
+    __iconOnly: false,
+    __fullWidth: 0,
 
     /**
      * Panel görünümü: sayfadan ayrı dursun diye zemin temanın yüzey renginden biraz koyu (koyu temada açık), çerçeve ve
@@ -153,7 +157,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     /** Panel düğmesi düz: yalnız üzerine gelince ya da basılıyken renklenir (temanın kutulu görünümü panelde kalabalık duruyordu). */
     __flatten(button) {
       const flat = this.__flatDecorator || (this.__flatDecorator = new qx.ui.decoration.Decorator().set({ radius: 5 }));
-      button.set({ decorator: flat, backgroundColor: "transparent" });
+      button.set({ decorator: flat, backgroundColor: "transparent", showToolTipWhenDisabled: true });
       button.getChildControl("label").setTextColor(this.__colors.text);
       const paint = color => {
         if (!button.getUserData("ankamon.checked")) {
@@ -179,9 +183,47 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       if (!this.__separatorTimer) {
         this.__separatorTimer = qx.event.Timer.once(() => {
           this.__separatorTimer = null;
-          this.__tidySeparators();
-        }, this, 0);
+          if (this.__fitLabels()) {
+            this.__queueSeparators();   // düğmeler yeniden yerleşsin, ayırıcılar ona göre bakılsın
+          } else {
+            this.__tidySeparators();
+          }
+        }, this, 30);
       }
+    },
+
+    __registerTool(button, icon) {
+      button.setUserData("ankamon.fullLabel", button.getLabel());
+      button.setUserData("ankamon.iconLabel", icon);
+      this.__tools.push(button);
+    },
+
+    /**
+     * Yazılarla tek satıra sığmayan çubuk yalnız simge gösterir: işlev adı ipucunda kalır, düğmeler satır satır sarılmaz.
+     * Yer açılınca yazılar döner. @return {Boolean} kip değişti mi
+     */
+    __fitLabels() {
+      const bounds = this.getBounds();
+      if (!bounds) {
+        return false;
+      }
+      const insets = this.getInsets();
+      const inner = bounds.width - insets.left - insets.right;
+      if (!this.__iconOnly) {
+        const shown = this.getChildren().filter(w => w.getVisibility() !== "excluded");
+        this.__fullWidth = shown.reduce((sum, w) => sum + w.getSizeHint().width + w.getMarginLeft() + w.getMarginRight() + 1, 0);
+      }
+      // Dönüşte küçük pay: seçim sayısı yazısı uzayınca kip gidip gelmesin.
+      const iconOnly = this.__iconOnly ? inner < this.__fullWidth + 12 : inner < this.__fullWidth;
+      if (iconOnly === this.__iconOnly) {
+        return false;
+      }
+      this.__iconOnly = iconOnly;
+      this.__tools.forEach(button => {
+        button.setLabel(button.getUserData(iconOnly ? "ankamon.iconLabel" : "ankamon.fullLabel"));
+        button.setMinWidth(iconOnly ? 34 : 46);
+      });
+      return true;
     },
 
     /** Çubuk sarılınca satır başına ya da sonuna düşen ayırıcı gizlenir. Yeri korunur: yerleşim değişmez, boyut döngüsü olmaz. */
@@ -226,6 +268,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         const button = item.group ? new qx.ui.toolbar.RadioButton(html) : new qx.ui.toolbar.CheckBox(html);
         button.set({ rich: true, show: "label", center: true, padding: [4, 3], minWidth: 46, toolTipText: item.tip });
         this.__flatten(button);
+        this.__registerTool(button, ankamon.ui.boards.ActionIcons.svg(item.icon));
         if (item.group) {
           radio.add(button);
         }
@@ -268,6 +311,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       const main = new qx.ui.toolbar.Button(html).set({ rich: true, show: "label", center: true, padding: [4, 3], minWidth: 46 });
       const arrow = new qx.ui.toolbar.Button("▾").set({ show: "label", padding: [4, 1], minWidth: 12, toolTipText: `${group.label}: tüm seçenekler` });
       this.__flatten(main);
+      this.__registerTool(main, ankamon.ui.boards.ActionIcons.svg(group.icon));
       this.__flatten(arrow);
       main.addListener("execute", () => this.__pressMain(group, main));
       arrow.addListener("execute", () => this.__openMenu(group, arrow));
