@@ -27,6 +27,7 @@ ext/<ad>/
 │   └── source/class/ankamonext/<ad>/Extension.js
 ├── backend/
 │   ├── routes.php                 config/routes.php biçiminde rota dizisi döndürür
+│   ├── boot.php                   (isteğe bağlı) her istekte bir kez yüklenir — genel kanca kaydı için
 │   └── src/…                      AnkamonExt\<Ad>\… sınıfları (src/ altındaki yola göre yüklenir)
 └── worker/
     └── tasks.py                   TASKS = [run(conn) tanımlayan modüller]
@@ -40,6 +41,10 @@ ext/<ad>/
   sürekli görünen öğeler (ör. alt çubuk) kancaları yeniden sorar.
 - **API:** `backend/routes.php` rotaları çekirdek rotalarının ardına eklenir; erişim düzeyleri aynıdır
   (bkz. `Core\Router`). Yetki denetimi sunucuda yapılır, arayüzde gizlemek koruma değildir.
+- **Backend başlatma:** `backend/boot.php` varsa her istekte rotalardan önce bir kez yüklenir; rota
+  tanımlamayan genel kancalara geri çağrı bağlamak içindir (ör. `Core\Audit::setPolicy(...)` ile denetim
+  kaydı ilkesi). Çekirdek kancaları istekte başlık ekleme (`ankamon.ext.Extensions.handle("api.headers", …)`,
+  bkz. arayüz `io.Api`) gibi hep genel adlıdır; kanca hiçbir eklentiyi adıyla anmaz.
 - **Worker:** `worker/tasks.py`'deki görevler çekirdek periyodik görevleriyle aynı turda çalışır.
   Eklentinin `worker/` dizini import yoluna eklenir.
 

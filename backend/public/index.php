@@ -51,6 +51,13 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+// Eklenti backend'i başlatma: varsa her ext/<ad>/backend/boot.php bir kez yüklenir (rota dışı genel kanca
+// kaydı için — ör. bir çekirdek kancasına geri çağrı bağlamak). Eklenti yoksa ya da boot.php yoksa hiçbir
+// şey olmaz. Dağıtımda çekirdek rotalarından önce çalışır; bkz. ext/README.md.
+foreach (glob(EXT_DIR . '/*/backend/boot.php') ?: [] as $bootFile) {
+    require $bootFile;
+}
+
 // Eklentiler (public depoda yok): her ext/<ad>/backend/routes.php, config/routes.php ile aynı biçimde rota
 // dizisi döndürür ve çekirdek rotalarının ardına eklenir. Eklenti yoksa liste değişmez.
 function ankamon_routes(): array

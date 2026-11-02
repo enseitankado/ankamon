@@ -59,6 +59,9 @@ qx.Class.define("ankamon.io.Api", {
         credentials: "same-origin",
         headers: { "X-Requested-With": "ankamon" }
       };
+      // Eklentiler isteğe ek başlık koyabilir (başlık nesnesini yerinde değiştirir); çekirdek başlığın
+      // anlamını bilmez. Kayıtlı işleyici yoksa işlemsizdir. Eklenti yoksa da bu çağrı güvenlidir.
+      ankamon.ext.Extensions.handle("api.headers", options.headers, method, path);
       if (body !== undefined) {
         options.headers["Content-Type"] = "application/json";
         options.body = JSON.stringify(body);
