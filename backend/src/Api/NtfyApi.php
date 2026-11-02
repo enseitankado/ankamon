@@ -43,14 +43,12 @@ use Ankamon\Core\Storage;
  */
 final class NtfyApi
 {
-    private const MODES = ['live', 'scan', 'history', 'summary'];
+    private const MODES = ['live', 'summary'];
 
     /** Çalışma biçimine göre seçilebilen aralıklar (dakika): worker'da bu değerlerle çalışır, arayüz aynı listeyi gösterir. */
     public const INTERVALS = [
         'live' => [0, 15, 60, 240, 1440],
-        'scan' => [15, 30, 60, 180, 360, 1440],
-        'history' => [60, 180, 360, 1440],
-        'summary' => [360, 1440, 10080],
+        'summary' => [60, 180, 360, 1440, 10080],
     ];
 
     public function index(): array
@@ -108,9 +106,6 @@ final class NtfyApi
             throw ApiError::badRequest('Bu çalışma biçimi için geçersiz aralık.');
         }
         $kinds = array_values(array_intersect(array_keys(AnomaliesApi::kinds()), array_map('strval', (array) $request->input('kinds', []))));
-        if ($mode === 'scan' && $kinds && !array_intersect($kinds, array_keys(AnomaliesApi::scannable()))) {
-            throw ApiError::badRequest('Seçilen türler taranamıyor.');
-        }
         return [
             $name,
             '{' . implode(',', array_map('intval', (array) $request->input('board_ids', []))) . '}',
@@ -137,7 +132,7 @@ final class NtfyApi
         $values = $this->ruleInput($request);
         $n = Db::exec(
             'UPDATE ntfy_rules SET name = ?, board_ids = ?::int[], kinds = ?::text[], mode = ?, interval_minutes = ?, max_per_hour = ?,
-                    enabled = ?::boolean, last_run_at = NULL, pending_job = NULL WHERE id = ?',
+                    enabled = ?::boolean, last_run_at = NULL WHERE id = ?',
             [...$values, $request->arg('id')]
         );
         if (!$n) {

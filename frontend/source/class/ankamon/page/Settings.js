@@ -107,7 +107,7 @@ qx.Class.define("ankamon.page.Settings", {
         value: settings.screen_vnc_autoinstall !== false
       });
       this.__section(access, "Ekran izleme",
-        "Ekranlar sekmesinde önizleme ve fare/klavye ile müdahale için tahtada x11vnc gerekir. Bu seçenek " +
+        "Tahtalar sayfasındaki ekran önizlemesi ve fare/klavye ile müdahale için tahtada x11vnc gerekir. Bu seçenek " +
         "açıkken, ağda olan ama x11vnc'si kurulu olmayan tahtaya hazır işlemlerdeki \"Ekran istemcisini (x11vnc) " +
         "kur\" arka planda kendiliğinden uygulanır; kurulum sürerken önizlemede \"İstemci yükleniyor…\" yazar.", vncAuto);
       access.add(new qx.ui.basic.Label(

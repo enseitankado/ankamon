@@ -25,11 +25,9 @@
 
 """Anomaliler ▸ Bildirimler kuralları: anomali verisinden ntfy bildirimi (bkz. executor/ntfy.py, 037_session_activity_ntfy.sql).
 
-Kural, anomali sayfasının dört çalışma biçiminden birine bağlıdır:
-  live    (Anlık):  süren yeni anomali görülünce; aynı tahta + tür için tekrar sınırı seçilir.
-  scan    (Tarama): seçilen aralıkta tahtalar "anomaly_scan" göreviyle yoklanır, anomali bulunanlar bildirilir.
-  history (Geçmiş): seçilen aralıkta yeni başlayan kayıtların dökümü.
-  summary (Özet):   seçilen aralıkta tahta başına sayı ve süre özeti.
+Kural iki çalışma biçiminden birine bağlıdır (bkz. 038_ntfy_rule_modes.sql):
+  live    (Anomali başlayınca): süren yeni anomali görülünce; aynı tahta + tür için tekrar sınırı seçilir.
+  summary (Düzenli özet):       seçilen aralıkta süren anomalilerin tahta ve tür başına sayısı.
 Saatlik üst sınır (max_per_hour) her kuralda geçerlidir: dolunca canlı bildirimler bekler, gürültü telefona taşmaz.
 """
 
@@ -41,9 +39,6 @@ import json
 import logging
 import time
 
-from psycopg.types.json import Jsonb
-
-from ..anomaly import scan as anomaly_scan
 from ..executor import ntfy
 
 log = logging.getLogger(__name__)
@@ -133,21 +128,6 @@ def _live(conn, rule, cfg, labels, title_prefix) -> None:
             return      # sunucuya ulaşılamıyor: bir sonraki tura kalır
 
 
-def _history(conn, rule, cfg, labels, title_prefix) -> None:
-    if not _due(conn, rule):
-        return
-    where, args = _where(rule)
-    rows = conn.execute(
-        f"""SELECT a.kind, a.host, COALESCE(NULLIF(b.label, ''), NULLIF(a.board_name, '')) AS board, a.started_at
-            FROM anomalies a LEFT JOIN boards b ON b.id = a.board_id
-            WHERE a.started_at >= %s {where} ORDER BY a.started_at""", (rule["last_run_at"], *args)).fetchall()
-    conn.execute("UPDATE ntfy_rules SET last_run_at = now() WHERE id = %s", (rule["id"],))
-    if rows and _room(conn, rule) > 0:
-        lines = [f"{a['started_at']:%d.%m %H:%M} {_name(a)}: {labels.get(a['kind'], a['kind'])}" for a in rows[:30]]
-        more = f"\n… {len(rows) - 30} kayıt daha" if len(rows) > 30 else ""
-        ntfy.send_logged(conn, cfg, rule["id"], rule["name"], f"{title_prefix}{len(rows)} yeni anomali", "\n".join(lines) + more)
-
-
 def _summary(conn, rule, cfg, labels, title_prefix) -> None:
     if not _due(conn, rule):
         return
@@ -163,53 +143,7 @@ def _summary(conn, rule, cfg, labels, title_prefix) -> None:
         ntfy.send_logged(conn, cfg, rule["id"], rule["name"], f"{title_prefix}Anomali özeti ({sum(r['n'] for r in rows)} kayıt)", "\n".join(lines))
 
 
-def _scan(conn, rule, cfg, labels, title_prefix) -> None:
-    if rule["pending_job"]:
-        job = conn.execute("SELECT status FROM jobs WHERE id = %s", (rule["pending_job"],)).fetchone()
-        if job and job["status"] in ("queued", "running"):
-            return
-        found = []
-        if job:
-            for t in conn.execute(
-                    """SELECT t.board_id, t.output, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS name
-                       FROM job_targets t JOIN boards b ON b.id = t.board_id WHERE t.job_id = %s AND t.status = 'ok'""",
-                    (rule["pending_job"],)).fetchall():
-                try:
-                    results = json.loads(t["output"] or "{}").get("results", {})
-                except ValueError:
-                    continue
-                for kind, res in results.items():
-                    if res.get("anomaly") is True:
-                        found.append((t["board_id"], t["name"], kind, res.get("summary") or ""))
-        conn.execute("UPDATE ntfy_rules SET pending_job = NULL WHERE id = %s", (rule["id"],))
-        room = _room(conn, rule)
-        for board_id, name, kind, text in found:
-            if room <= 0:
-                break
-            label = labels.get(kind, kind)
-            if ntfy.send_logged(conn, cfg, rule["id"], rule["name"], f"{title_prefix}Tarama: {label}", f"{name}: {text or label}", board_id, kind):
-                room -= 1
-        return
-    if not _due(conn, rule):
-        return
-    kinds = [k for k in (rule["kinds"] or list(anomaly_scan.SCANNABLE)) if k in anomaly_scan.SCANNABLE]
-    boards = conn.execute(
-        "SELECT id FROM boards WHERE online AND ip IS NOT NULL AND (%s OR id = ANY(%s))",
-        (not rule["board_ids"], rule["board_ids"])).fetchall()
-    conn.execute("UPDATE ntfy_rules SET last_run_at = now() WHERE id = %s", (rule["id"],))
-    if not kinds or not boards:
-        return
-    with conn.transaction():
-        job_id = conn.execute(
-            "INSERT INTO jobs (type, title, params) VALUES ('anomaly_scan', %s, %s) RETURNING id",
-            (f"Bildirim taraması: {rule['name']}", Jsonb({"kinds": kinds}))).fetchone()["id"]
-        for b in boards:
-            conn.execute("INSERT INTO job_targets (job_id, board_id) VALUES (%s, %s)", (job_id, b["id"]))
-        conn.execute("UPDATE ntfy_rules SET pending_job = %s WHERE id = %s", (job_id, rule["id"]))
-        conn.execute("SELECT pg_notify('ankamon_jobs', %s)", (str(job_id),))
-
-
-_HANDLERS = {"live": _live, "history": _history, "summary": _summary, "scan": _scan}
+_HANDLERS = {"live": _live, "summary": _summary}
 
 
 def run(conn) -> None:

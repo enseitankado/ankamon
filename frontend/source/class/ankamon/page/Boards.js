@@ -116,7 +116,7 @@ qx.Class.define("ankamon.page.Boards", {
       new ankamon.ui.table.SessionRenderer());
     // İşaretler Ekranlar kutucuklarına yansır — bkz. __updateActionState.
     this.__table.getTableModel().addListener("dataChanged", this.__updateActionState, this);
-    // Satır menüsünün simgeli karşılığı; Liste ve Ekranlar sekmelerinin üstünde (bkz. ui.boards.ActionBar).
+    // Satır menüsünün simgeli karşılığı; liste ve ekran görünümünün üstünde (bkz. ui.boards.ActionBar).
     this.__actionBar = new ankamon.ui.boards.ActionBar((board, boards) => this.__rowMenu(board, boards, this.__barSessionOps()),
       () => this._checkedIds(this.__table).map(id => this.__boards && this.__boards.get(id)).filter(Boolean));
     this.add(this.__actionBar);
@@ -151,23 +151,21 @@ qx.Class.define("ankamon.page.Boards", {
     this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply,
       { rows: () => (this.__rows || []).map(r => r.cells) });
 
-    // İki sekme: "Liste" (grid) ve "Ekranlar" (grid'deki tahtaların canlı ekran önizlemeleri).
-    // Sağ menü işlemleri işaretli tahtalara her iki sekmeden de uygulanır.
-    const tabs = new qx.ui.tabview.TabView().set({ contentPadding: 0 });
-    const listPage = new qx.ui.tabview.Page("Liste");
-    listPage.setLayout(new qx.ui.layout.VBox(8));
-    listPage.setPadding([8, 8, 0, 8]);
+    // Tek ekran, iki görünüm (sekme yok, kullanıcı isteği): grid'deki tahtaların canlı ekran önizlemeleri (varsayılan) ya da
+    // "Liste" işaretliyken grid. Sağ menü işlemleri işaretli tahtalara ikisinden de uygulanır. "screen" yetkisi yoksa yalnız grid.
+    this.__views = new qx.ui.container.Stack();
+    const listPage = new qx.ui.container.Composite(new qx.ui.layout.VBox(8)).set({ padding: [8, 8, 0, 8] });
     listPage.add(this.__table, { flex: 1 });
     this.__note = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true, wrap: true });
     listPage.add(this.__note);
-    tabs.add(listPage);
-    this.__tabView = tabs;
+    this.__views.add(listPage);
     this.__listPage = listPage;
     if (this._can("screen")) {
-      tabs.add(this.__createScreensPage());
+      this.add(this.__createScreensToolbar());
+      this.__views.add(this.__createScreensPage());
+      this.__showListView(this.__listBox.getValue());
     }
-    this._rememberTab(tabs, "boards"); // son seçili sekme (Liste / Ekranlar — bkz. Base._rememberTab)
-    this.add(tabs, { flex: 1 });
+    this.add(this.__views, { flex: 1 });
 
     // Sayfa açık kalsa bile kendiliğinden tazelenir (bkz. sınıf başı not — worker zinciriyle birlikte).
     this.__timer = new qx.event.Timer(ankamon.page.Boards.REFRESH_MS);
@@ -205,7 +203,7 @@ qx.Class.define("ankamon.page.Boards", {
     // Kilit teyidinden sonra kutucuk akışının yenilenmesi için en uzun bekleme (bkz. __refreshTile).
     TILE_REFRESH_MS: 8000,
 
-    // "Ekranlar" sekmesi görünmez olduktan (başka sekme/sayfa) bu kadar sonra önizleme akışları duraklar
+    // Ekran görünümü kapandıktan (Liste ya da başka sayfa) bu kadar sonra önizleme akışları duraklar
     // (kutucuklar son görüntüleriyle kalır — bkz. __pausePreview).
     SCREENS_STOP_MS: 10000,
 
@@ -243,18 +241,20 @@ qx.Class.define("ankamon.page.Boards", {
     __note: null,
     __columns: null,
     __filterFields: null,
-    __tabView: null,
+    __views: null,
+    __listBox: null,
+    __viewOptions: null,
     __listPage: null,
     __actionBar: null,
 
-    /** Ekranlar sekmesi açıkken araç çubuğu da sağ menü gibi sonucu kutucuklarda gösterir. */
+    /** Ekran görünümündeyken araç çubuğu da sağ menü gibi sonucu kutucuklarda gösterir. */
     __barSessionOps() {
-      const screens = this.__screensPage && this.__tabView && this.__tabView.getSelection()[0] === this.__screensPage;
+      const screens = this.__screensPage && this.__views.getSelection()[0] === this.__screensPage;
       return screens ? this.__sessionOps() : null;
     },
 
     /**
-     * Shell OPEN_PAGE (Genel bakış kartları): Liste sekmesine geçer ve Durum süzgecini verilen
+     * Shell OPEN_PAGE (Genel bakış kartları): liste görünümüne geçer ve Durum süzgecini verilen
      * metne ("Çevrimiçi" | "Kapalı" | "" = hepsi) ayarlar; diğer sütun süzgeçleri temizlenir.
      * Süzgeç kutuları başlık ilk çizildiğinde oluşur (bkz. Base._addColumnFilters) — henüz yoksa
      * kısa aralıklarla yeniden denenir.
@@ -263,7 +263,9 @@ qx.Class.define("ankamon.page.Boards", {
       if (!("status" in opts)) {
         return;
       }
-      this.__tabView.setSelection([this.__listPage]);
+      if (this.__listBox) {
+        this.__listBox.setValue(true);
+      }
       const fields = this.__filterFields || {};
       if (!fields.status) {
         if (tries < 20) {
@@ -361,11 +363,11 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * "Ekranlar" sekmesi: grid'de o an listelenen (süzülmüş) tahtaların canlı ekran önizlemeleri.
+     * Ekran görünümü: grid'de o an listelenen (süzülmüş) tahtaların canlı ekran önizlemeleri.
      * Önizlemeler /screen/ sayfasının gömülü kipidir (spec.embed, q=thumb — küçük ve düşük kare hızlı;
-     * komut loguna yazılmaz, bkz. ekran köprüsü nolog). Sekme görünmez olunca (Liste sekmesi ya da
+     * komut loguna yazılmaz, bkz. ekran köprüsü nolog). Görünüm kapanınca (Liste işaretlendi ya da
      * başka bir sayfa) SCREENS_STOP_MS sonra akışlar duraklatılır (yük tasarrufu; bkz. __pausePreview) —
-     * iframe ve kutucuklar son görüntüleriyle yerinde kalır, sekme yeniden kurulmaz; dönülünce akışlar sürer.
+     * iframe ve kutucuklar son görüntüleriyle yerinde kalır, yeniden kurulmaz; dönülünce akışlar sürer.
      * Kutucuklar alttaki slider'la topluca, kenarlarından sürükleyerek tek tek boyutlandırılır.
      * Kutucuk sağ menüsü grid satırınınkiyle AYNI (__rowMenu); "Kullanıcılar ▸ Oturumları sorgula" (bkz.
      * __openPreviewMenu, BoardOps.menu) — SSH ile anlık sorgu sonucu (bkz. __whoamiState, worker/ankamon/executor/
@@ -383,14 +385,11 @@ qx.Class.define("ankamon.page.Boards", {
      * __saveScreenOrder, AuthApi::screenOrder) — __previewList bu sırayı uygular.
      */
     __createScreensPage() {
-      const page = new qx.ui.tabview.Page("Ekranlar");
-      page.setLayout(new qx.ui.layout.VBox());
-      page.setPadding([8, 0, 0, 0]);
+      const page = new qx.ui.container.Composite(new qx.ui.layout.VBox());
       // qx.ui.embed.Iframe yerine düz <iframe> (Html bileşeni): Iframe her pointerdown'da üstüne saydam
       // bir "blocker" koyuyor ve sekme düğmesine tıklandıktan sonra bu katman açık kalıp kutucuklara
       // tıklama/sağ tığı yutuyordu (ölçüldü). Html bileşeninde böyle bir katman yok.
       this.__frame = new qx.ui.embed.Html("").set({ overflowX: "hidden", overflowY: "hidden" });
-      page.add(this.__createScreensToolbar());
       page.add(this.__frame, { flex: 1 });
       this.__screenRes = new Map(); // tahta id → ekran genişliği (px), bkz. "tm-res"
       page.add(this.__createSizeRow());
@@ -459,7 +458,7 @@ qx.Class.define("ankamon.page.Boards", {
       this.__onChatWindows = () => this.__pushChat();
       qx.event.message.Bus.subscribe(ankamon.ui.chat.Window.CHANGED, this.__onChatWindows, this);
 
-      // Görünürlük yoklaması: hem sekme değişimini hem Shell'deki sayfa değişimini yakalar.
+      // Görünürlük yoklaması: hem görünüm değişimini hem Shell'deki sayfa değişimini yakalar.
       this.__screensTimer = new qx.event.Timer(1000);
       this.__screensTimer.addListener("interval", this.__checkScreens, this);
       this.__screensTimer.start();
@@ -467,10 +466,12 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * "Ekranlar" sekmesinin üstündeki görünüm seçimleri — "Göster:" + onay kutuları (Başarım seçimi tarayıcıda kalıcı):
+     * Görünümlerin üstündeki seçimler — "Göster:" + onay kutuları (Başarım seçimi tarayıcıda kalıcı):
      *  - Sensörler (her açılışta işaretli): kutucukların altındaki CPU/RAM/HDD/fan/pil barı.
      *  - Başarım: kutucuğun ekran alanında htop'un üst panelleri, saniyelik (bkz. screen/index.html
      *    Tile.syncPerf, worker/ankamon/screen/perf.py — yalnız açıkken ve görünen tahtalar için SSH açılır).
+     *  - Liste (satırın sonunda, varsayılan işaretsiz; seçim kullanıcı başına kalıcı): ekran kutucukları yerine grid.
+     *    Listedeyken kutucuklara ait ilk ikisi devre dışıdır.
      * Eskiden toolbar CheckBox'tı: basılı hali temaların çoğunda belirgin değildi, saydamlıkla ayırt
      * ediliyordu ve kötü görünüyordu (kullanıcı bildirimi) — düz onay kutusu her temada açık seçik.
      */
@@ -490,7 +491,23 @@ qx.Class.define("ankamon.page.Boards", {
       this.__screenView = saved;
       make("Sensörler", "Kutucukların altında işlemci, bellek, disk sıcaklığı, fan ve pil voltajı barı", "stats");
       make("Başarım", "Ekran alanında tahtanın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)", "perf");
+      this.__viewOptions = bar.getChildren().filter(w => w instanceof qx.ui.form.CheckBox);
+      this.__listBox = new qx.ui.form.CheckBox("Liste").set({
+        value: (this._user.ui_prefs || {})["boards.listView"] === true, alignY: "middle",
+        toolTipText: "Ekran kutucukları yerine tahtaları tablo olarak gösterir"
+      });
+      this.__listBox.addListener("changeValue", e => {
+        this.__showListView(e.getData());
+        ankamon.page.Base.savePref(this._user, "boards.listView", e.getData());
+      });
+      bar.add(this.__listBox);
       return bar;
+    },
+
+    /** Liste / ekran görünümü arasında geçer (bkz. __createScreensToolbar). */
+    __showListView(list) {
+      this.__views.setSelection([list ? this.__listPage : this.__screensPage]);
+      this.__viewOptions.forEach(box => box.setEnabled(!list));
     },
 
     __loadScreenView() {
@@ -520,7 +537,7 @@ qx.Class.define("ankamon.page.Boards", {
       }
     },
 
-    /** "Ekranlar" sekmesinin altındaki, önizleme kutucuklarının boyutunu ayarlayan slider satırı. */
+    /** Ekran görünümünün altındaki, önizleme kutucuklarının boyutunu ayarlayan slider satırı. */
     __createSizeRow() {
       const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({
         padding: [2, 8]
@@ -698,7 +715,7 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     __checkScreens() {
-      // TabView seçili olmayan sayfayı "hidden" yapar ve isSeeable() bunu yakalamaz; Shell sayfa
+      // Stack seçili olmayan görünümü "hidden" yapar ve isSeeable() bunu yakalamaz; Shell sayfa
       // değiştirince ise üst kapsayıcı "excluded" olur ve onu isSeeable() yakalar — ikisine de bakılır.
       const page = this.__screensPage;
       const seen = page.getVisibility() === "visible" && page.isSeeable() && !document.hidden;

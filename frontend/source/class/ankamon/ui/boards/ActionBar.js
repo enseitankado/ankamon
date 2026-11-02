@@ -26,7 +26,7 @@
  */
 
 /**
- * Tahtalar ▸ Liste ve Ekranlar sekmelerinin üstündeki araç çubuğu: sağ menü işlevleri simgeli düğmeler olarak.
+ * Tahtalar sayfasının üstündeki araç çubuğu: sağ menü işlevleri simgeli düğmeler olarak.
  *
  * TEK KAYNAK sağ menüdür: düğmenin her basışında menü, o anki seçimle baştan kurulur (getMenu) ve maddeler gruplara
  * dağıtılır. Yetki, tahta durumuna göre devre dışı bırakma, çoklu seçim ve işleyiciler menüden gelir; çubukta işlev

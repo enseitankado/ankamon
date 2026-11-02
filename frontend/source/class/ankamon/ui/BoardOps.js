@@ -825,7 +825,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       // Bilgisayarı aç (WoL) + Bilgisayarı kapat: her zaman yan yana (kullanıcı isteği), çevrimiçi/
       // çevrimdışı tahtada da. Her biri seçimin yalnız uygun kısmına uygulanır (aç → kapalı olanlar,
       // kapat → açık olanlar); uygulanacak tahta yoksa madde görünür ama devre dışıdır.
-      // "Kullanıcılar" ▸ Oturum geçmişi (kullanıcı isteği): Tahtalar ▸ Oturumlar o tahtaya süzülmüş açılır
+      // "Kullanıcılar" ▸ Oturum geçmişi (kullanıcı isteği): Oturumlar sayfası o tahtaya süzülmüş açılır
       // (bkz. page.Sessions.openWith, ui.sessions.List.showBoard). Tek tahta: sağ tıklanan. Sayfa 'logs' ister.
       const sessionHistory = target => {
         if (can("logs")) {

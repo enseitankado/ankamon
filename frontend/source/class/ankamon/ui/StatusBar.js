@@ -216,7 +216,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
     /**
      * Bu oturumun o an Ankamon'da baktığı yer (alt çubuk ipucunda "Aktif"in sağında gösterilir): gezinme
      * ağacında seçili düğümün yolu + görünen sayfadaki seçili iç sekmeler + öndeki pencerenin başlığı,
-     * ör. "Tahtalar ▸ Ekranlar · Web terminal — B Blok - Arge 2". Kabuğa (ui.Shell) bağımlılık olmasın diye
+     * ör. "Tahtalar · Web terminal — B Blok - Arge 2". Kabuğa (ui.Shell) bağımlılık olmasın diye
      * görünür widget ağacından okunur: Stack'te gizli sayfalar görünür olmadığından atlanır.
      */
     __currentView() {

@@ -91,7 +91,7 @@ qx.Class.define("ankamon.ext.Extensions", {
       return this.__enabled[name] !== false;
     },
 
-    /** Bir eklenti Bakım (Tahtalar ▸ Bakım) sayfasına sekme ekler: {key, label, feature, create(user)}.
+    /** Bir eklenti Bakım sayfasına sekme ekler: {key, label, feature, create(user)}.
      * init() içinde yalnız enabled(ad) ise çağrılmalı. Hem sayfadaki sekme çubuğu hem sol ağaç bunu okur. */
     addMaintenanceTab(spec) {
       this.__maintenanceTabs.push(spec);

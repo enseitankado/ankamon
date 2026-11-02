@@ -152,15 +152,13 @@ qx.Class.define("ankamon.ui.Shell", {
     PAGES: [
       // retap: ağaçta zaten seçili düğüme yeniden tıklamak sayfayı yeniler (sayfada "Yenile" düğmesi yok).
       { id: "dashboard", label: "Genel bakış", feature: "dashboard", retap: true, create: u => new ankamon.page.Dashboard(u) },
-      // Tahtalar'ın sekmeleri ağaçta da (kullanıcı isteği): alt sayfalardan (Oturumlar, Bakım, Loglar) önce.
-      // Ekranlar sayfadaki gibi "screen" yetkisi ister.
-      { id: "boards", label: "Tahtalar", feature: "boards", create: u => new ankamon.page.Boards(u),
-        tabs: [{ key: "Liste", label: "Liste" }, { key: "Ekranlar", label: "Ekranlar", feature: "screen" }] },
-      // parent: ağaçta o sayfanın düğümünün ALTINDA (kullanıcı isteği: tahtalarla ilgili sayfalar
-      // "Tahtalar"ın altında). Üst sayfa kullanıcıya kapalıysa kökte gösterilir — bkz. __createTree.
+      // Tahtalar alt menüsüz ana menü öğesi (kullanıcı isteği): liste/ekran seçimi sayfanın içinde (bkz. page.Boards).
+      { id: "boards", label: "Tahtalar", feature: "boards", create: u => new ankamon.page.Boards(u) },
+      // parent: ağaçta o sayfanın düğümünün ALTINDA. Üst sayfa kullanıcıya kapalıysa kökte gösterilir — bkz. __createTree.
+      // collapsed: kökte olsa da katlı başlar (uzun sekme listesi menüyü doldurmasın — bkz. __rememberOpen).
       // Sekmeleri ağaçta da (kullanıcı isteği: zaman çizelgesi sol menüden açılsın). key: Oturumlar sekmesinde
       // etiket, Zaman çizelgesinde userData "key" (eski adı "Kullanıcılar" — bkz. ui.sessions.Users).
-      { id: "sessions", label: "Oturumlar", feature: "logs", parent: "boards", create: u => new ankamon.page.Sessions(u),
+      { id: "sessions", label: "Oturumlar", feature: "logs", collapsed: true, create: u => new ankamon.page.Sessions(u),
         tabs: [{ key: "Oturumlar", label: "Oturumlar" }, { key: "timeline", label: "Zaman çizelgesi" }, { key: "movements", label: "Hareketler" },
           { key: "chat", label: "Sohbet geçmişi" }] },
       // Bakım: "Bakım" (sorun tespiti) + "Sensörler" (Grafana) sekmeleri — bkz. page.Maintenance. features:
@@ -171,17 +169,16 @@ qx.Class.define("ankamon.ui.Shell", {
       // görünür kalır ve ikisi eşzamanlıdır (yaprak → Base.selectTab, sekme → TAB_CHANGED ile ağaç vurgusu).
       // key = sekmenin kimliği — sayfadaki sekmenin userData "key"i ya da etiketiyle AYNI olmalı; feature /
       // admin: o sekmenin yetkisi (sayfanın kendi sekme yetkisiyle aynı). Fonksiyon da olabilir (dinamik liste).
-      { id: "diagnose", label: "Bakım", features: ["diagnose", "metrics"], parent: "boards", create: u => new ankamon.page.Maintenance(u),
+      { id: "diagnose", label: "Bakım", features: ["diagnose", "metrics"], collapsed: true, create: u => new ankamon.page.Maintenance(u),
         tabs: () => [{ key: "diagnose", label: "Bakım", feature: "diagnose" }, { key: "metrics", label: "Sensörler", feature: "metrics" }]
           .concat(ankamon.ext.Extensions.maintenanceTabs().map(t => ({ key: t.key, label: t.label, feature: t.feature }))) },
       // Anomaliler: sıra dışı durumlar (ör. açık ama oturumsuz tahta, NTP eşitlenmemiş saat) — anlık + geçmiş
       // rapor + seçilen tahtalarda tarama (bkz. page.Anomalies). Bakım'ın altında (kullanıcı isteği); Bakım
-      // kapalı kullanıcıda Tahtalar'ın altında (bkz. __createTree).
+      // kapalı kullanıcıda kökte (bkz. __createTree).
       { id: "anomalies", label: "Anomaliler", feature: "anomalies", parent: "diagnose", create: u => new ankamon.page.Anomalies(u),
         tabs: [{ key: "Anlık", label: "Anlık" }, { key: "Tarama", label: "Tarama" }, { key: "Geçmiş", label: "Geçmiş" },
           { key: "summary", label: "Özet" }, { key: "notifications", label: "Bildirimler" }] },
-      // Loglar Tahtalar'ın altında EN SONDA (kullanıcı isteği).
-      { id: "logs", label: "Loglar", feature: "logs", parent: "boards", create: u => new ankamon.page.Logs(u),
+      { id: "logs", label: "Loglar", feature: "logs", collapsed: true, create: u => new ankamon.page.Logs(u),
         tabs: () => ankamon.ui.Shell.LOG_KINDS.map(kind => ({ key: kind.mode, label: kind.label })) },
       // Ağ envanteri: altında sunucunun bağlı olduğu fiziksel ağlar (dinamik, bkz. __fillNetworks).
       { id: "network", label: "Ağ", feature: "network", create: u => new ankamon.page.Network(u) },
@@ -290,7 +287,7 @@ qx.Class.define("ankamon.ui.Shell", {
     __createTree() {
       this.__tree = new qx.ui.tree.Tree().set({
         hideRoot: true,
-        // Kök gizliyken birinci düzey klasörlerin (Tahtalar, Ağ, Sistem) aç/kapa oku yalnız bununla
+        // Kök gizliyken birinci düzey klasörlerin (Bakım, Ağ, Sistem) aç/kapa oku yalnız bununla
         // çizilir; katlanabilirlik görünür olsun (kullanıcı isteği — durum __rememberOpen'da saklanır).
         rootOpenClose: true,
         backgroundColor: "app-nav",
@@ -303,8 +300,7 @@ qx.Class.define("ankamon.ui.Shell", {
       // üstlerinin altında PAGES'teki sabit sırayla durur; sıralanamaz.
       this.__nodes = [];
       const allowed = ankamon.ui.Shell.PAGES.filter(page => this.__allowed(page));
-      // Üst sayfa kullanıcıya kapalıysa bir üstündekinin altına (ör. Bakım kapalı → Anomaliler Tahtalar'ın
-      // altında); hiçbiri açık değilse kökte.
+      // Üst sayfa kullanıcıya kapalıysa bir üstündekinin altına; hiçbiri açık değilse kökte (ör. Bakım kapalı → Anomaliler).
       const parentOf = page => {
         for (let id = page.parent; id;) {
           if (allowed.some(p => p.id === id)) {
@@ -409,7 +405,7 @@ qx.Class.define("ankamon.ui.Shell", {
       // sekmeleri alt seçenek olan Bakım, Loglar, Disk kullanımı, Kullanıcılar, Ayarlar…) kapalı, yani 2'den
       // derin menü seviyeleri katlı başlar.
       const page = ankamon.ui.Shell.PAGES.find(p => p.id === id);
-      folder.setOpen(saved === undefined ? !(page && page.parent) : !!saved);
+      folder.setOpen(saved === undefined ? !(page && (page.parent || page.collapsed)) : !!saved);
       folder.addListener("changeOpen", e => {
         if (this.__revealing) {
           return; // bkz. __reveal: gezinme için açılış kullanıcı tercihi sayılmaz
@@ -437,7 +433,7 @@ qx.Class.define("ankamon.ui.Shell", {
 
     /**
      * Bir sayfanın ağaç düğümü: alt sayfaları varsa klasör (kendisine tıklamak yine sayfayı açar). Alt sayfalar
-     * sekme yapraklarından SONRA, kendi alt sayfalarıyla (iç içe — ör. Tahtalar ▸ Bakım ▸ Anomaliler).
+     * sekme yapraklarından SONRA, kendi alt sayfalarıyla (iç içe — ör. Bakım ▸ Anomaliler).
      * @param childrenOf {Function} sayfa id → ağaçta altında duracak sayfalar
      */
     __buildNode(page, childrenOf) {
@@ -614,7 +610,7 @@ qx.Class.define("ankamon.ui.Shell", {
       if (!page || !this.__allowed(page)) {
         return;
       }
-      // Alt düğümler de aranır (ör. "Tahtalar" altındaki "Loglar" klasörü); kip yaprakları hariç. İstenen
+      // Alt düğümler de aranır (ör. "Bakım" altındaki "Anomaliler"); kip yaprakları hariç. İstenen
       // sekmenin yaprağı varsa o (ör. Genel bakış ▸ Sensörler → Bakım ▸ Sensörler), yoksa sayfanın düğümü.
       const items = this.__tree.getRoot().getItems(true);
       const leaf = (data.tab && items.find(n => n.getUserData("page") === page && n.getUserData("tab") === data.tab)) ||

@@ -26,7 +26,7 @@
  */
 
 /**
- * Anomaliler (Tahtalar ▸ Bakım altında): ağdaki bilgisayarlarda işletim sistemi, donanım ve kullanıcı
+ * Anomaliler (Bakım altında): ağdaki bilgisayarlarda işletim sistemi, donanım ve kullanıcı
  * davranışına dair sıra dışı durumlar. Veriyi worker'ın kuralları ön hesaplar (bkz.
  * worker/ankamon/anomaly, backend AnomaliesApi). Kurallar: "Oturumsuz açık" (tahta 15 dk'dır açık,
  * oturum açılmamış), "NTP eşitlenmemiş" (saat 15 dk'dır NTP ile eşitlenmiyor ya da sunucudan sapmış).

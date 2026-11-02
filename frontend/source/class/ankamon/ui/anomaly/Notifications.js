@@ -27,8 +27,8 @@
 
 /**
  * Anomaliler ▸ Bildirimler: seçilen bilgisayarlar ve anomali türleri için telefona ntfy bildirimi (bkz. worker tasks/ntfy_notify.py).
- * Üstte konu (kuruluş adı + kodu + rastgele ekten öneri üretilir), ortada kurallar, altta gönderilen bildirimler.
- * Konu adını bilen herkes bildirimleri okuyabilir: öneri hatırlanabilir bir önek ve tahmin edilemez bir ek taşır.
+ * Üstte konu (öneri: kuruluş adının baş harfleri + kodun son 3 karakteri + rastgele 2 karakter), ortada kurallar, altta
+ * gönderilen bildirimler. Konu adını bilen herkes bildirimleri okuyabilir: kısa konu için ekranda uyarı görünür.
  */
 qx.Class.define("ankamon.ui.anomaly.Notifications", {
   extend: qx.ui.tabview.Page,
@@ -45,8 +45,8 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
     const box = new qx.ui.groupbox.GroupBox("ntfy konusu").set({ layout: new qx.ui.layout.VBox(6) });
     box.add(new qx.ui.basic.Label(
       "Telefona kurulan <b>ntfy</b> uygulamasından aynı konuya abone olduğunuzda bildirimler telefonunuza anında ulaştırılır. " +
-      "Konu adı parola gibidir: adı bilen herkes bildirimleri görebilir, bu yüzden <b>hatırlanabilir ama tahmin edilemez</b> olmalıdır. " +
-      "<b>Öner</b>, Ayarlar ▸ Kuruluş'taki ad ve koddan bir önek türetip sonuna rastgele bir ek koyar. " +
+      "Konu adı parola gibidir: adı bilen herkes bildirimleri görebilir. " +
+      "<b>Öner</b>, Ayarlar ▸ Kuruluş'taki adın baş harfleri, kodun son 3 karakteri ve rastgele 2 karakterden kısa bir ad üretir (ör. afl456k7). " +
       "Bildirim metni (bilgisayar adı ve anomali türü) seçilen sunucuya gönderilir."
     ).set({ rich: true, wrap: true, textColor: "app-muted", allowGrowX: true }));
     const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(6).set({ alignY: "middle" }));
@@ -54,7 +54,7 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
     this.__server = new qx.ui.form.TextField("https://ntfy.sh").set({ width: 190 });
     row.add(this.__server);
     row.add(new qx.ui.basic.Label("Konu:").set({ alignY: "middle", marginLeft: 8 }));
-    this.__topic = new qx.ui.form.TextField("").set({ liveUpdate: true, placeholder: "ör. okuladi-123456-k7m2xq9p" });
+    this.__topic = new qx.ui.form.TextField("").set({ liveUpdate: true, placeholder: "ör. afl456k7" });
     this.__topic.addListener("changeValue", () => this.__showStrength());
     row.add(this.__topic, { flex: 1 });
     const suggest = new qx.ui.form.Button("Öner");
@@ -85,7 +85,7 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       { id: "name", label: "Kural", width: 180 },
       { id: "boards", label: "Bilgisayarlar", width: 200 },
       { id: "kinds", label: "Anomali türleri" },
-      { id: "mode", label: "Çalışma", width: 90 },
+      { id: "mode", label: "Gönderim", width: 130 },
       { id: "interval", label: "Sıklık / sınır", width: 190 },
       { id: "max", label: "Saatte en çok", width: 100 },
       { id: "on", label: "Durum", width: 70 }
@@ -126,10 +126,8 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
 
   statics: {
     MODES: {
-      live: ["Anlık", "Süren yeni anomali görülür görülmez gönderilir. Aynı bilgisayar ve tür için tekrar sınırı seçilir."],
-      scan: ["Tarama", "Seçilen aralıkta bilgisayarlar Tarama sekmesindeki gibi yoklanır; anomali bulunanlar gönderilir. Yalnız taranabilir türler."],
-      history: ["Geçmiş", "Seçilen aralıkta yeni başlayan anomalilerin dökümü tek bildirimde gönderilir."],
-      summary: ["Özet", "Seçilen aralıkta bilgisayar ve tür başına kayıt sayısı tek bildirimde gönderilir."]
+      live: ["Anomali başlayınca", "Her yeni anomali için hemen bir bildirim gönderilir. Tekrar sınırı, aynı bilgisayar ve türde ne kadar sık bildirim gidebileceğidir.", "Tekrar sınırı:"],
+      summary: ["Düzenli özet", "Anomaliler tek tek gönderilmez; seçilen aralıkta süren anomaliler bilgisayar ve tür başına sayılarak tek bildirimde gönderilir.", "Özet sıklığı:"]
     },
 
     /** "15 dakikada bir", "1 saatte bir", "1 günde bir": ek, birime göre. */
@@ -147,15 +145,15 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       return this.every(n);
     },
 
-    /** Konu öneki: Türkçe harfler sadeleşir, yalnız a-z0-9, kelimeler - ile; rakam dizisi olan kod korunur. */
+    /** Türkçe harfler sadeleşir, yalnız a-z0-9, kelimeler - ile (baş harfler ve kodun sonu buradan alınır). */
     slug(text) {
       const map = { "İ": "i", "I": "i", "ı": "i", "Ç": "c", "ç": "c", "Ğ": "g", "ğ": "g", "Ö": "o", "ö": "o", "Ş": "s", "ş": "s", "Ü": "u", "ü": "u" };
       return String(text || "").replace(/[İIıÇçĞğÖöŞşÜü]/g, c => map[c]).normalize("NFD").replace(/[̀-ͯ]/g, "")
         .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     },
 
-    /** Karıştırılan harfler (l, 1, o, 0) yok: telefona elle yazılabilsin. 10 karakter ≈ 50 bit, tahmin edilemez. */
-    randomSuffix(length = 10) {
+    /** Karıştırılan harfler (l, 1, o, 0) yok: telefona elle yazılabilsin. */
+    randomSuffix(length = 2) {
       const alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
       const bytes = new Uint8Array(length);
       window.crypto.getRandomValues(bytes);
@@ -223,7 +221,7 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       } else if (!/^[A-Za-z0-9_-]{1,64}$/.test(t)) {
         this.__strength.setValue('<span style="color:#c42b1c">Yalnız harf, rakam, - ve _ kullanılabilir (en çok 64 karakter).</span>');
       } else if (t.length < 16) {
-        this.__strength.setValue('<span style="color:#b06000">Konu kısa: başkası tahmin edebilir. En az 16 karakter ve rastgele bir ek önerilir.</span>');
+        this.__strength.setValue(`<span style="color:#b06000">Telefonda ntfy ▸ + ▸ konu adı: <b>${qx.bom.String.escape(t)}</b> — kısa konu tahmin edilebilir; genel sunucuda bildirimleri başkası da okuyabilir. Sonuna ekleme yaparak uzatabilirsiniz.</span>`);
       } else {
         this.__strength.setValue(`<span style="color:#2fa84a">Telefonda ntfy ▸ + ▸ konu adı: <b>${qx.bom.String.escape(t)}</b></span>`);
       }
@@ -243,11 +241,12 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       } catch (e) {
         // Okunamazsa eldeki değerle sürülür: öneri yine üretilir.
       }
-      const prefix = [N.slug(org.name).split("-").slice(0, 3).join("-"), N.slug(org.code)].filter(Boolean).join("-");
+      const initials = N.slug(org.name).split("-").filter(Boolean).map(word => word[0]).join("");
+      const prefix = initials + N.slug(org.code).replace(/-/g, "").slice(-3);
       if (!prefix) {
-        ankamon.ui.Dialog.alert("Ayarlar ▸ Kuruluş'ta ad ve kod tanımlı değil; yalnız rastgele ek önerildi. Tanımlarsanız konu daha kolay hatırlanır.");
+        ankamon.ui.Dialog.alert("Ayarlar ▸ Kuruluş'ta ad ve kod tanımlı değil; \"ankamon\" ve rastgele 2 karakter önerildi. Tanımlarsanız konu kuruluşunuzdan türetilir.");
       }
-      this.__topic.setValue((prefix ? prefix.slice(0, 50) + "-" : "ankamon-") + N.randomSuffix());
+      this.__topic.setValue((prefix || "ankamon").slice(0, 62) + N.randomSuffix());
     },
 
     async __saveConfig() {
@@ -299,8 +298,9 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       const interval = new qx.ui.form.SelectBox();
       const max = new qx.ui.form.Spinner(1, rule ? rule.max_per_hour : 20, 600);
       const enabled = new qx.ui.form.CheckBox("Kural açık").set({ value: rule ? rule.enabled : true });
-      [["Kural adı:", name], ["Çalışma biçimi:", mode], ["Sıklık / sınır:", interval], ["Saatte en çok:", max]].forEach(([text, widget], i) => {
-        top.add(new qx.ui.basic.Label(text).set({ alignY: "middle" }), { row: i, column: 0 });
+      const intervalLabel = new qx.ui.basic.Label("").set({ alignY: "middle" });
+      [["Kural adı:", name], ["Ne zaman gönderilsin:", mode], [intervalLabel, interval], ["Saatte en çok:", max]].forEach(([text, widget], i) => {
+        top.add(text instanceof qx.ui.basic.Label ? text : new qx.ui.basic.Label(text).set({ alignY: "middle" }), { row: i, column: 0 });
         top.add(widget, { row: i, column: 1 });
       });
       top.add(enabled, { row: 4, column: 1 });
@@ -310,6 +310,7 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       const fillIntervals = keep => {
         const key = mode.getSelection()[0].getModel();
         hint.setValue(qx.bom.String.escape(N.MODES[key][1]));
+        intervalLabel.setValue(N.MODES[key][2]);
         interval.removeAll().forEach(i => i.dispose());
         d.intervals[key].forEach(n => interval.add(new qx.ui.form.ListItem(N.intervalText(key, n), null, n)));
         const hit = interval.getSelectables(true).find(i => i.getModel() === keep);
