@@ -57,7 +57,7 @@ FROM gtstef/filebrowser:2.1.3-beta@sha256:c91fbf4b442ba14f5d45f8687b74cf71477e36
 
 # ---------------------------------------------------------------- 1c) Ekran yansıtma aktarıcısı (MediaMTX):
 # resmi imajdan yalnız statik Go ikilisi alınır (Alpine deposunda paketi yok). Sürüm sabit tutulur.
-FROM bluenviron/mediamtx:1.21.2 AS mediamtx
+FROM bluenviron/mediamtx:1.21.3 AS mediamtx
 
 # ---------------------------------------------------------------- 2) Çalışma imajı
 FROM timescale/timescaledb:2.31.0-pg17
