@@ -1,9 +1,0 @@
-{
-  "title": "Kabuk komut kaydını aç",
-  "description": "GİZLİLİK: Bu işlem uygulandığı tahtada, tahta kullanıcılarının terminale yazdığı HER KOMUTU (kişisel dosya adları, adresler, aramalar dahil) kullanıcı adı, terminal ve çalışma diziniyle Ankamon sunucusuna gönderir; Oturumlar ▸ Hareketler ve Loglar yetkisi olan herkes görür, tahtanın /var/log/syslog dosyasına da yazılır. Kullanıcıları önceden bilgilendirin; yalnız gerçekten gerekli tahtalarda açın. Parola benzeri değerler (sshpass -p, --password=, PAROLA=, mysql -p…, curl -u, adres içi parola, chpasswd girdisi vb.) loga gitmeden tahtada maskelenir, ancak maskeleme bir desen listesidir: komut metnine başka biçimde yazılmış gizli bilgi yakalanamayabilir. Kapsam: yalnız yeni açılan etkileşimli bash kabukları; betikler, otomasyon, zsh/fish gibi kabuklar ve grafik uygulamalar kaydedilmez. Bir denetim aracı değildir: boşlukla başlayan komutları (HISTCONTROL) ve aynı komutun art arda tekrarını kaydetmez, kullanıcı kendi kabuğunda kapatabilir. Kurulum: /etc/profile.d/zz-ankamon-shell-log.sh, /usr/local/lib/ankamon-shell-log/ ve /etc/bash.bashrc sonuna tek blok. Tahtaya kendiliğinden kurulmaz; geri almak için \"Kabuk komut kaydını kapat\".",
-  "category": "Loglar",
-  "feature": "actions",
-  "confirm": true,
-  "timeout": 30,
-  "params": []
-}

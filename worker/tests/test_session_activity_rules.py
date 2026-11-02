@@ -26,7 +26,6 @@
 """Oturum hareketi kuralları: canlı log örnekleri ve parola maskeleme. python3 -m unittest discover -s worker/tests"""
 
 import os
-import subprocess
 import sys
 import unittest
 
@@ -36,7 +35,6 @@ sys.path.insert(0, os.path.join(ROOT, "worker"))
 from ankamon import session_activity_rules as rules  # noqa: E402
 
 KEPT = [
-    ("ankamon-shell", "ali : TTY=pts/0 ; PWD=/home/ali ; COMMAND=ls -la", ("komut", "Komut: ls -la", "ali")),
     ("usermod", "change user 'etapadmin' password", ("hesap", "Parola değiştirildi: etapadmin", "etapadmin")),
     ("usermod", "add 'ali' to group 'audio'", ("hesap", "Gruba eklendi: ali → audio", "ali")),
     ("groupadd", "new group: name=ogretmenler, GID=1060", ("hesap", "Grup açıldı: ogretmenler", None)),
@@ -73,8 +71,6 @@ KEPT = [
 ]
 
 NOISE = [
-    ("ankamon-shell", "root : TTY=pts/0 ; PWD=/ ; COMMAND=/opt/ankamon/x"),
-    ("ankamon-shell", "root : TTY=pts/0 ; PWD=/ ; COMMAND=systemctl status tiha-boot"),
     ("chpasswd", "pam_unix(chpasswd:chauthtok): new password not acceptable"),
     ("chpasswd", "gkr-pam: couldn't update the login keyring password: no old password was entered"),
     ("usermod", "add 'ali' to shadow group 'audio'"),
@@ -148,12 +144,6 @@ UNTOUCHED = [
 ]
 
 
-def sed_mask(text: str) -> str:
-    with open(os.path.join(ROOT, "actions/shell-command-log-on/run.sh"), encoding="utf-8") as f:
-        block = f.read().split("<<'ANKAMON_MASK_EOF'\n", 1)[1].split("\nANKAMON_MASK_EOF", 1)[0]
-    return subprocess.run(["sed", "-E", block], input=text.encode(), capture_output=True, check=True, env={"LC_ALL": "C"}).stdout.decode()
-
-
 class Rules(unittest.TestCase):
     def test_kept(self):
         for program, message, want in KEPT:
@@ -164,13 +154,16 @@ class Rules(unittest.TestCase):
         for program, message in NOISE:
             self.assertIsNone(rules.classify(program, message), message)
 
-    def test_shell_summary_is_masked(self):
-        hit = rules.classify("ankamon-shell", "ali : TTY=pts/0 ; PWD=/h ; COMMAND=sshpass -p gizli123 ssh x")
-        self.assertEqual(hit[1], "Komut: sshpass -p *** ssh x")
-
     def test_sudo_summary_is_masked(self):
         hit = rules.classify("sudo", "ali : TTY=pts/0 ; PWD=/h ; USER=root ; COMMAND=/usr/bin/sshpass -p gizli123 ssh x")
         self.assertNotIn("gizli123", hit[1])
+
+
+class NoShellHook(unittest.TestCase):
+    def test_shell_hook_not_collected(self):
+        self.assertNotIn("ankamon-shell", rules.PROGRAMS)
+        self.assertIsNone(rules.classify("ankamon-shell", "ali : TTY=pts/0 ; PWD=/h ; COMMAND=ls"))
+        self.assertFalse(os.path.exists(os.path.join(ROOT, "actions/shell-command-log-on")))
 
 
 class Masking(unittest.TestCase):
@@ -178,23 +171,10 @@ class Masking(unittest.TestCase):
         for text, secret in SECRETS:
             self.assertNotIn(secret, rules.mask_secrets(text), text)
 
-    def test_sed_hides_on_board(self):
-        for text, secret in SECRETS:
-            self.assertNotIn(secret, sed_mask(text), text)
-
-    def test_python_and_sed_agree(self):
-        for text in [t for t, _ in SECRETS] + UNTOUCHED:
-            self.assertEqual(rules.mask_secrets(text), sed_mask(text), text)
-
     def test_plain_commands_untouched(self):
         for text in UNTOUCHED:
             self.assertEqual(rules.mask_secrets(text), text)
 
-    def test_same_expressions_in_action(self):
-        with open(os.path.join(ROOT, "actions/shell-command-log-on/run.sh"), encoding="utf-8") as f:
-            block = f.read().split("<<'ANKAMON_MASK_EOF'\n", 1)[1].split("\nANKAMON_MASK_EOF", 1)[0]
-        self.assertEqual(block.split("\n"), [f"s~{p}~{r}~gI" for p, r in rules.SECRET_PATTERNS])
-        self.assertFalse(any("~" in p + r for p, r in rules.SECRET_PATTERNS), "ayırıcı")
 
 
 if __name__ == "__main__":

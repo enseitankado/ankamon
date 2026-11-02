@@ -1,9 +1,0 @@
-{
-  "title": "Kabuk komut kaydını kapat",
-  "description": "\"Kabuk komut kaydını aç\" işleminin kurduğu her şeyi kaldırır: /etc/profile.d/zz-ankamon-shell-log.sh ve /usr/local/lib/ankamon-shell-log/ silinir, /etc/bash.bashrc eski haline döner; açık kabuklar da komut göndermeyi hemen bırakır. Sunucuda daha önce biriken kayıtları silmez (Oturumlar ▸ Hareketler, Loglar).",
-  "category": "Loglar",
-  "feature": "actions",
-  "confirm": true,
-  "timeout": 30,
-  "params": []
-}

@@ -31,8 +31,8 @@ pam_sm_*, rtkit-daemon, gnome-keyring-daemon, cinnamon-session/x-session-manager
 root'un sudo/su/CRON'ları, otomatik işler (_AUTOMATED), sshd'nin Ankamon bağlantıları, açılıştaki USB sıralaması.
 classify(program, message) -> (tür, özet, olayı yapan kullanıcı|None) ya da None.
 
-Kabuk komutları syslog'a kendiliğinden gitmez: tahtada "Kabuk komut kaydını aç" hazır işlemi (actions/shell-command-log-on)
-uygulanırsa etkileşimli bash her komutu local6.info ile program "ankamon-shell" olarak gönderir.
+Sıradan kabuk komutları syslog'a gitmez ve bilerek toplanmaz (kullanıcı kararı): tahtalara komut kancası kurulmaz, yalnız
+logda olan yetkili komutlar (sudo, pkexec, su) görünür.
 """
 
 from __future__ import annotations
@@ -61,7 +61,6 @@ _POLKIT_FAILED = re.compile(r"^Operator of \S+ FAILED to authenticate to gain au
                             r"\(owned by unix-user:([^)]+)\)")
 _POLKIT_OK = re.compile(r"^Operator of \S+ successfully authenticated as unix-user:(\S+) to gain \S+ authorization for action "
                         r"\S+ for \S+ \[(.*)\] \(owned by unix-user:([^)]+)\)")
-_SHELL = re.compile(r"^(\S+) : TTY=\S* ; PWD=.*? ; COMMAND=(.*)$")
 _DBUS_APP = re.compile(r"^\[session uid=\d+ pid=\d+\] Activating service name='([^']+)'")
 _DBUS_SKIP = re.compile(r"^(org\.freedesktop|org\.gtk|org\.a11y|ca\.desrt|org\.cinnamon|org\.gnome\.keyring|com\.canonical)")
 _KERNEL_UPTIME = re.compile(r"^\[\s*(\d+)\.\d+\]")
@@ -97,11 +96,9 @@ _ACCOUNT = {
 }
 
 PROGRAMS = sorted({"lightdm", "pkexec", "polkitd", "sudo", "su", "sshd", "smbd", "CRON", "udisksd", "kernel", "NetworkManager",
-                   "wpa_supplicant", "systemd-logind", "dbus-daemon", "tiha", "ankamon-shell"} | set(_ACCOUNT) | set(APP_PROGRAMS))
+                   "wpa_supplicant", "systemd-logind", "dbus-daemon", "tiha"} | set(_ACCOUNT) | set(APP_PROGRAMS))
 
-# Komut satırındaki parola benzeri değerler: AYNI ifadeler (sed -E uyumlu) tahtada actions/shell-command-log-on/run.sh içinde de
-# çalışır, loga gitmeden maskeler; burada ikinci kez uygulanması sudo/pkexec satırları (tahtada maskelenmez) içindir. Değiştirirken
-# ikisini birlikte değiştirin (worker/tests/test_session_activity_rules.py ikisinin aynı olduğunu denetler).
+# Komut satırındaki parola benzeri değerler: sudo/pkexec satırları tahtada maskelenmeden gelir, hareket özeti ve ayrıntısında gizlenir.
 _V = r"""("[^"]*"|'[^']*'|[^ \t;&|,]+)"""
 SECRET_PATTERNS = [
     (r"\b(echo|printf)[ \t]+[^|]*\|[ \t]*(sudo[ \t]+-S|(sudo([ \t]+-[a-z]+)*[ \t]+)?([^ \t|;&]*/)?(chpasswd|passwd|smbpasswd|sshpass))", r"\1 *** | \2"),
@@ -151,11 +148,6 @@ def _account(program: str, m: str):
 
 def classify(program: str, message: str):
     m = mask_secrets(message.strip())
-    if program == "ankamon-shell":
-        hit = _SHELL.match(m)
-        if hit and not _AUTOMATED.search(m):
-            return "komut", f"Komut: {hit.group(2).strip()[:240]}", hit.group(1)
-        return None
     if program in _ACCOUNT:
         return _account(program, m)
     if program == "lightdm":
