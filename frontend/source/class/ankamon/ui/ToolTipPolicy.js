@@ -26,19 +26,22 @@
  */
 
 /**
- * İpuçları (qx ToolTip) süreyle kapanmaz, fare hareket edince kapanır (kullanıcı isteği) — Ankamon'daki TÜM
- * qx ipuçları için: setToolTipText'in ortak ipucu, zengin ToolTip nesneleri (araç çubuğu, sağ menü, Gösterge
- * kartları, alt çubuk), çekirdek ve eklentiler.
+ * İpuçları süreyle kapanmaz, fare hareket edince kapanır (kullanıcı isteği) — Ankamon'daki TÜM ipuçları için:
+ * qx ipuçları (setToolTipText'in ortak ipucu, zengin ToolTip nesneleri: araç çubuğu, sağ menü, Gösterge kartları,
+ * alt çubuk; çekirdek ve eklentiler) ve HTML "title" ipuçları (tablo hücreleri — ui.table.HintRenderer —, alt
+ * çubuk, giriş ekranı, Sorun tespiti raporu, Görev yöneticisi, Dosyalar …).
  *
  * qx.ui.tooltip.Manager ipucunu gösterirken ToolTip.hideTimeout (varsayılan 4 sn) süreli bir zamanlayıcı kurar;
- * fare kımıldamasa da süre dolunca ipucu kapanıyordu — uzun açıklamalar okunamıyordu. Burada:
- *  1) Manager bir ipucunu "current" yaptığında (gösterilmeden önce) hideTimeout en büyük değere çekilir:
- *     süreyle kapanma fiilen yok.
+ * tarayıcının "title" ipucu da birkaç saniyede kendiliğinden kapanır — uzun açıklamalar okunamıyordu. Burada:
+ *  1) Manager bir ipucunu "current" yaptığında (gösterilmeden önce) hideTimeout en büyük değere çekilir.
  *  2) İpucu görünürken fare, ipucunun açıldığı noktadan MOVE_PX'ten fazla uzaklaşırsa ipucu gizlenir.
  *     "current" bırakılmaz: aynı bileşenin içinde dolaşan fare ipucunu yeniden açmaz; bileşenden çıkıp
  *     yeniden girince (ya da başka bileşene geçince) Manager her zamanki gibi yeniden gösterir.
- * Tablo hücre ipuçları (ui.table.HintRenderer) tarayıcının kendi "title" ipucudur; zamanlamasını tarayıcı
- * belirler, bu sınıfın kapsamı dışındadır.
+ *  3) qx, bileşenin İÇİNDEKİ DOM öğeleri arasındaki geçişte de (ör. araç çubuğu düğmesinde simge → yazı)
+ *     "pointerout" ile ipucunu sıfırlıyordu (birkaç piksellik kıpırtı kapatıyordu): ipucu görünürken fare
+ *     sahibinin içinde kalıyorsa bu olay qx'e ulaşmaz.
+ *  4) "title" taşıyan öğenin üzerine gelince title, data-ankamon-title'a taşınır (tarayıcının kendi ipucu
+ *     çıkmaz) ve metin aynı kurallarla (SHOW_MS gecikme, süresiz, fare kayınca kapanır) bir qx ipucunda gösterilir.
  */
 qx.Class.define("ankamon.ui.ToolTipPolicy", {
   type: "static",
@@ -48,6 +51,8 @@ qx.Class.define("ankamon.ui.ToolTipPolicy", {
     MOVE_PX: 6,
     /** setTimeout'un kabul ettiği en büyük süre (~24,8 gün) — "süreyle kapanma yok". */
     NEVER_MS: 2147483647,
+    /** "title" ipucunun açılma gecikmesi (qx ToolTip showTimeout varsayılanı ile aynı). */
+    SHOW_MS: 700,
     __installed: false,
 
     /** Uygulama açılışında bir kez çağrılır (bkz. Application.main). */
@@ -68,23 +73,95 @@ qx.Class.define("ankamon.ui.ToolTipPolicy", {
       };
 
       const manager = qx.ui.tooltip.Manager.getInstance();
+      const Widget = qx.ui.core.Widget;
+      const moved = (pos, anchor) =>
+        Math.abs(pos.x - anchor.x) > Policy.MOVE_PX || Math.abs(pos.y - anchor.y) > Policy.MOVE_PX;
       let last = null;
-      // Yerel dinleyici (yakalama evresinde, pasif): qx olay zincirinden bağımsız, hiçbir bileşen durduramaz.
+
+      // "title" ipuçları için tek bir qx ipucu.
+      let titleTip = null;
+      let titleEl = null;
+      let titleAnchor = null;
+      let titleTimer = null;
+      const hideTitle = () => {
+        clearTimeout(titleTimer);
+        titleTimer = null;
+        if (titleTip && titleTip.isVisible()) {
+          titleTip.exclude();
+        }
+      };
+      const showTitle = (el, pos) => {
+        const text = el.getAttribute("data-ankamon-title") || "";
+        if (!text.trim() || !el.isConnected) {
+          return;
+        }
+        if (!titleTip) {
+          titleTip = new qx.ui.tooltip.ToolTip().set({ rich: true, maxWidth: 520 });
+        }
+        titleTip.setLabel(qx.bom.String.escape(text).replace(/\n/g, "<br>"));
+        titleTip.placeToPoint({ left: pos.x, top: pos.y });
+        titleTip.show();
+        titleAnchor = null;
+      };
+
+      // Yerel dinleyiciler (pencere, yakalama evresi): qx olay zincirinden önce çalışır.
       window.addEventListener("pointermove", e => {
         const pos = { x: e.clientX, y: e.clientY };
         const tip = manager.getCurrent();
         if (tip && !tip.isDisposed() && tip.isVisible()) {
           // İpucu fare dururken açılır: açıldığı nokta, görünür olduktan sonraki ilk hareketten ÖNCEKİ konumdur.
           const anchor = tip.$$ankamonTipAnchor || (tip.$$ankamonTipAnchor = last || pos);
-          if (Math.abs(pos.x - anchor.x) > Policy.MOVE_PX || Math.abs(pos.y - anchor.y) > Policy.MOVE_PX) {
+          if (moved(pos, anchor)) {
             tip.exclude();
             tip.$$ankamonTipAnchor = null;
           }
         } else if (tip) {
           tip.$$ankamonTipAnchor = null;
         }
+        if (titleTip && titleTip.isVisible()) {
+          titleAnchor = titleAnchor || last || pos;
+          if (moved(pos, titleAnchor)) {
+            hideTitle(); // titleEl kalır: aynı öğede dolaşan fare yeniden açmaz
+          }
+        }
         last = pos;
       }, { capture: true, passive: true });
+
+      window.addEventListener("pointerout", e => {
+        const tip = manager.getCurrent();
+        if (!tip || tip.isDisposed() || !tip.isVisible() || !e.relatedTarget) {
+          return;
+        }
+        const opener = tip.getOpener();
+        const to = Widget.getWidgetByElement(e.relatedTarget);
+        if (opener && to && (to === opener || Widget.contains(opener, to))) {
+          e.stopPropagation(); // sahibinin içinde kalan geçiş: qx ipucunu sıfırlamasın
+        }
+      }, { capture: true });
+
+      window.addEventListener("pointerover", e => {
+        const t = e.target;
+        const el = t && t.closest ? t.closest("[title],[data-ankamon-title]") : null;
+        if (el && el.hasAttribute("title")) {
+          el.setAttribute("data-ankamon-title", el.getAttribute("title"));
+          el.removeAttribute("title");
+        }
+        if (el === titleEl) {
+          return;
+        }
+        hideTitle();
+        titleEl = el;
+        if (el) {
+          const pos = { x: e.clientX, y: e.clientY };
+          titleTimer = setTimeout(() => {
+            if (titleEl === el) {
+              showTitle(el, last || pos);
+            }
+          }, Policy.SHOW_MS);
+        }
+      }, { capture: true, passive: true });
+
+      window.addEventListener("pointerdown", () => hideTitle(), { capture: true, passive: true });
     }
   }
 });

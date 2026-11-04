@@ -4,8 +4,9 @@
  */
 
 /**
- * Hücreye fareyle gelince tarayıcının kendi ipucunu (title) gösteren hücre çizici — ör. Bakım ▸ Ahenk'te
- * "Pulsar testi atlandı" ya da sonuç/durum açıklaması. İpucu metni satırdan üretilir (hint(cellInfo));
+ * Hücreye fareyle gelince ipucu (title) gösteren hücre çizici — ör. Bakım ▸ Ahenk'te "Pulsar testi atlandı"
+ * ya da sonuç/durum açıklaması. title'ı ui.ToolTipPolicy bir qx ipucunda gösterir (süreyle kapanmaz, fare
+ * kayınca kapanır; tarayıcının kendi ipucu çıkmaz). İpucu metni satırdan üretilir (hint(cellInfo));
  * boşsa ipucu yoktur. dot(cellInfo) bir renk dönerse metin o renkte çizilir ve soluna aynı renkte
  * küçük bir yuvarlak konur (bkz. StatusRenderer'daki aynı görünüm).
  */
