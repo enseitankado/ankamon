@@ -31,8 +31,9 @@
  * kayıt tutulmaz, son taramanın sonucu sekme yeniden açılınca gösterilir.
  *
  * Sol: tahta listesi (onay kutulu; arama, Tümü / Çevrim içi / Hiçbiri). Sağ üst: taranabilir anomali türleri.
- * Sağ alt: sonuç tablosu (tahta × anomali; Var / Yok / Taranamadı), "Yalnız bulunanlar" süzgeci; çift tık →
- * o tahtanın Geçmiş'i. Son seçimler (tahtalar, türler) kullanıcı başına hatırlanır.
+ * Sağ alt: sonuç tablosu (tahta × anomali; Var / Yok / Taranamadı), "Yalnız bulunanlar" süzgeci (varsayılan
+ * işaretli); çift tık → o tahtanın Geçmiş'i. Bölümler arasında iki ayırıcı (1 | 2, 2 / 3). Son seçimler (tahtalar,
+ * türler) ve ayırıcı konumları kullanıcı başına sunucuda hatırlanır.
  */
 qx.Class.define("ankamon.ui.anomaly.Scan", {
   extend: qx.ui.tabview.Page,
@@ -48,10 +49,24 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     this.__hasBoardPref = Array.isArray(prefs["anomalies.scan.boards"]);
     this.__kindPref = prefs["anomalies.scan.kinds"] || null;
 
+    // İki ayırıcı: 1 | (2 / 3). Konumları kullanıcı başına sunucuda (ui_prefs["anomalies.scan.split"] = {left, top}).
+    // Ayırıcı bırakılınca SplitPane sabit boyutlu ilk bölmeye setWidth/setHeight çağırır → change olayı kaydeder
+    // (pencere daralınca yalnız yerleşim küçülür, özellik değişmez: kaydedilmez — bkz. ui.Shell nav.width).
+    const saved = prefs["anomalies.scan.split"] || {};
     const split = new qx.ui.splitpane.Pane("horizontal");
     this.add(split);
-    split.add(this.__createBoardsPane(), 2);
-    split.add(this.__createRightPane(), 3);
+    const boards = this.__createBoardsPane().set({ width: saved.left || null });
+    if (!saved.left) {
+      // İlk açılış: eskisi gibi 2/5 genişlik (kullanıcı sürüklemediği için kaydedilmez).
+      this.__splitDefaulting = true;
+      split.addListenerOnce("resize", e => {
+        boards.setWidth(Math.round(e.getData().width * 0.4));
+        this.__splitDefaulting = false;
+      });
+    }
+    split.add(boards, 0);
+    split.add(this.__createRightPane(saved.top || null), 1);
+    boards.addListener("changeWidth", e => this.__saveSplit("left", e.getData()));
 
     // Sekme ilk kez açılınca tahtalar yüklenir (sayfa 30 sn'de bir yenilense de liste yalnız açıkken tazelenir).
     this.addListener("appear", () => this.__loadBoards());
@@ -114,10 +129,29 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       return box;
     },
 
-    __createRightPane() {
-      const pane = new qx.ui.container.Composite(new qx.ui.layout.VBox(10)).set({ marginLeft: 5 });
-      const box = ankamon.ui.StepBox.create(2, "Anomalileri seç ve tara", "seçili tahtalarda şu an yoklanır");
-      pane.add(box);
+    /** Ayırıcı konumunu kaydeder; sürükleme sırasında art arda gelen değişiklikler tek istekte toplanır. */
+    __saveSplit(key, value) {
+      if (!value || this.__splitDefaulting) {
+        return;
+      }
+      const user = this.__page._user;
+      const current = Object.assign({}, (user.ui_prefs || {})["anomalies.scan.split"] || {}, { [key]: value });
+      clearTimeout(this.__splitTimer);
+      this.__splitTimer = setTimeout(() => ankamon.page.Base.savePref(user, "anomalies.scan.split", current), 300);
+    },
+
+    __splitTimer: null,
+    __splitDefaulting: false,
+
+    /** @param top {Integer?} 2. bölmenin kayıtlı yüksekliği (yoksa içeriğin doğal yüksekliği) */
+    __createRightPane(top) {
+      // 2 ile 3 arasında yatay ayırıcı (1 ile 2/3 arasındaki gibi).
+      const pane = new qx.ui.splitpane.Pane("vertical").set({ marginLeft: 5 });
+      const box = ankamon.ui.StepBox.create(2, "Anomalileri seç ve tara", "seçili tahtalarda şu an yoklanır").set({
+        height: top, marginBottom: 5
+      });
+      pane.add(box, 0);
+      box.addListener("changeHeight", e => this.__saveSplit("top", e.getData()));
       this.__kindBox = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
       box.add(this.__kindBox);
 
@@ -131,11 +165,12 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       run.add(this.__status, { flex: 1 });
       box.add(run);
 
-      const results = ankamon.ui.StepBox.create(3, "Sonuçlar");
-      pane.add(results, { flex: 1 });
+      const results = ankamon.ui.StepBox.create(3, "Sonuçlar").set({ marginTop: 5 });
+      pane.add(results, 1);
       const head = results.getChildren()[0]; // başlık satırı: sağına süzgeç onay kutusu
       head.add(new qx.ui.core.Spacer(), { flex: 1 });
-      this.__onlyFound = new qx.ui.form.CheckBox("Yalnız anomali bulunanlar");
+      // Varsayılan işaretli (kullanıcı isteği): önce bulunanlar görünür.
+      this.__onlyFound = new qx.ui.form.CheckBox("Yalnız anomali bulunanlar").set({ value: true });
       this.__onlyFound.addListener("changeValue", () => this.__renderResults());
       head.add(this.__onlyFound);
 
