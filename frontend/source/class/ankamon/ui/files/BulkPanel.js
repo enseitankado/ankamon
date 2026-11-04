@@ -1037,7 +1037,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         tableColumnModel: obj => new qx.ui.table.columnmodel.Resize(obj)
       }).set({ statusBarVisible: false, columnVisibilityButtonVisible: false });
       const behavior = table.getTableColumnModel().getBehavior();
-      [180, 110, "1*", 110, 60, 90, "1*"].forEach((w, i) => behavior.setWidth(i, w));
+      [180, 110, "1*", 130, 60, 90, "1*"].forEach((w, i) => behavior.setWidth(i, w));
       // Sürmekte olan satırın durumunda dönen halka (STATES.running ile başlar).
       table.getTableColumnModel().setDataCellRenderer(3,
         new ankamon.ui.table.JobStateRenderer([ankamon.ui.files.BulkPanel.STATES.running]));
