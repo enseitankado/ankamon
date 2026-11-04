@@ -95,10 +95,19 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
    * @param getMenu {Function} (tahta, tahtalar) → qx.ui.menu.Menu|null: sağ menüyü kurar
    * @param getSelected {Function} () → seçili tahtalar
    */
-  construct(getMenu, getSelected) {
+  construct(getMenu, getSelected, config) {
     super(new qx.ui.layout.Flow(1, 2).set({ alignY: "middle" }));
     this.__getMenu = getMenu;
     this.__getSelected = getSelected;
+    // Grup/madde eşlemesi: varsayılan çekirdek statikleri (Tahtalar araç çubuğu). Bir eklenti, bu çubuğu yeniden
+    // yazmadan kendi sağ menüsüne dayalı bir araç çubuğu kurabilsin diye grupları/maddeleri config ile geçebilir
+    // (her grup kendi iconSvg'sini de verebilir — bkz. __svgIcon; örnek: ankamonext.ahenk.AhenkBar).
+    const Bar = ankamon.ui.boards.ActionBar;
+    config = config || {};
+    this.__groups = config.groups || Bar.GROUPS;
+    this.__items = config.items || Bar.ITEMS;
+    this.__containers = config.containers || Bar.CONTAINERS;
+    this.__perBoard = config.perBoard || Bar.PER_BOARD;
     this.__widgets = new Map();
     this.__tools = [];
     this.set({ padding: [3, 6], margin: [6, 8, 8, 8] });
@@ -119,6 +128,10 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
   members: {
     __getMenu: null,
     __getSelected: null,
+    __groups: null,
+    __items: null,
+    __containers: null,
+    __perBoard: null,
     __widgets: null,
     __count: null,
     __open: null,
@@ -280,12 +293,13 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         button.getChildControl("label").setTextColor(on ? onAccent : this.__colors.text);
       };
       items.forEach((item, index) => {
-        const html = `${ankamon.ui.boards.ActionIcons.svg(item.icon)}` +
+        const icon = this.__svgIcon(item);
+        const html = `${icon}` +
           `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(item.label)}</div>`;
         const button = item.group ? new qx.ui.toolbar.RadioButton(html) : new qx.ui.toolbar.CheckBox(html);
         button.set({ rich: true, show: "label", center: true, padding: [4, 3], minWidth: 46, toolTipText: item.tip });
         this.__flatten(button);
-        this.__registerTool(button, ankamon.ui.boards.ActionIcons.svg(item.icon));
+        this.__registerTool(button, icon);
         if (item.group) {
           radio.add(button);
         }
@@ -314,7 +328,12 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
           this.__dropMenu(menu);
         }
       });
-      ankamon.ui.boards.ActionBar.GROUPS.filter(g => present.has(g.id)).forEach(group => this.__addButton(group));
+      this.__groups.filter(g => present.has(g.id)).forEach(group => this.__addButton(group));
+    },
+
+    /** Grup/öğe simgesi: eklenti kendi tam <svg> dizgesini (iconSvg) verebilir; yoksa ortak simge kümesinden ada göre. */
+    __svgIcon(spec) {
+      return spec.iconSvg || ankamon.ui.boards.ActionIcons.svg(spec.icon);
     },
 
     __addButton(group) {
@@ -323,12 +342,13 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       }
       const box = new qx.ui.container.Composite(new qx.ui.layout.HBox(0).set({ alignY: "middle" }));
       box.setBackgroundColor("transparent");   // temanın "widget" zemini panelde kutu gibi görünüyordu
-      const html = `${ankamon.ui.boards.ActionIcons.svg(group.icon)}` +
+      const icon = this.__svgIcon(group);
+      const html = `${icon}` +
         `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(group.label)}</div>`;
       const main = new qx.ui.toolbar.Button(html).set({ rich: true, show: "label", center: true, padding: [4, 3], minWidth: 46 });
       const arrow = new qx.ui.toolbar.Button("▾").set({ show: "label", padding: [4, 1], minWidth: 12, toolTipText: `${group.label}: tüm seçenekler` });
       this.__flatten(main);
-      this.__registerTool(main, ankamon.ui.boards.ActionIcons.svg(group.icon));
+      this.__registerTool(main, icon);
       this.__flatten(arrow);
       main.addListener("execute", () => this.__pressMain(group, main));
       arrow.addListener("execute", () => this.__openMenu(group, arrow));
@@ -340,7 +360,6 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
 
     /** Menü → {grup kimliği → yapraklar}. Üst madde alt menüsüyle dağıtılır; alt menülü yaprak (ör. Oturum aç) olduğu gibi kalır. */
     __collect(menu) {
-      const Bar = ankamon.ui.boards.ActionBar;
       const groups = new Map();
       const push = (id, leaf) => groups.set(id, (groups.get(id) || []).concat([leaf]));
       const key = item => item.getUserData("ankamon.menuKey") || "";
@@ -349,10 +368,10 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
           return;
         }
         const name = key(item);
-        if (item.getMenu() && Bar.CONTAINERS[name]) {
-          walk(item.getMenu(), Bar.CONTAINERS[name]);
+        if (item.getMenu() && this.__containers[name]) {
+          walk(item.getMenu(), this.__containers[name]);
         } else {
-          push(Bar.ITEMS[name] || fallback || "other", item);
+          push(this.__items[name] || fallback || "other", item);
         }
       });
       walk(menu, null);
@@ -383,7 +402,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       this.__stateKey = key;
       const cur = this.__current();
       const groups = cur.menu ? this.__collect(cur.menu) : new Map();
-      ankamon.ui.boards.ActionBar.GROUPS.forEach(group => {
+      this.__groups.forEach(group => {
         const w = this.__widgets.get(group.id);
         if (!w) {
           return;
@@ -439,7 +458,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       leaves.forEach(leaf => {
         leaf.getLayoutParent().remove(leaf);
         const key = leaf.getUserData("ankamon.menuKey");
-        if (cur.boards.length > 1 && ankamon.ui.boards.ActionBar.PER_BOARD.includes(key)) {
+        if (cur.boards.length > 1 && this.__perBoard.includes(key)) {
           const each = ankamon.ui.BoardOps.menuButton(leaf.getUserData("ankamon.menuIcon"), `${key} (${cur.boards.length} tahta)`,
             () => this.__runEach(key, cur.boards));
           each.setEnabled(leaf.getEnabled());
@@ -461,7 +480,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     /** Birincil işi çalıştırır; tek tahtalık madde çoklu seçimde her tahta için. */
     __run(leaf, boards) {
       const key = leaf.getUserData("ankamon.menuKey");
-      if (boards.length > 1 && ankamon.ui.boards.ActionBar.PER_BOARD.includes(key)) {
+      if (boards.length > 1 && this.__perBoard.includes(key)) {
         this.__runEach(key, boards);
       } else {
         leaf.execute();
