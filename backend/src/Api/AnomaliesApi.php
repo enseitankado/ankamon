@@ -68,6 +68,11 @@ final class AnomaliesApi
             'description' => 'Disk sıcaklığı en az 15 dakikadır tahtanın kendi ortalamasının %30 üzerinde (ortalama: son 30 günün saatlik ortalamaları; en az 24 saatlik geçmiş gerekir).',
             'scan' => true,
         ],
+        'net_link_lost' => [
+            'label' => 'Ağ bağlantısı koptu',
+            'description' => 'Tahta açıkken ağa ulaşamadı: ağ kablosu çıkarıldı ya da ağ anahtarı/port kesildi. Bağlantı gelince tahtanın kuyrukta bekletip geç gönderdiği loglardan geriye dönük saptanır (o sürede sensör verisi de alınamamış, başka tahtalar ise ulaşıyor olmalı). Tahta kabloyu kaybettiğini logla bildirdiyse "Ağ kablosu çıkarıldı" yazar. Tarama: kablonun şu anki durumu ve son 7 gündeki kopmalar.',
+            'scan' => true,
+        ],
         'cmos_battery_low' => [
             'label' => 'BIOS pili zayıf',
             'description' => 'BIOS (CMOS) pilinin gerilimi 2,4 V\'un altında. Sağlam bir okuma gelene (pil değişene) dek sürer. Yalnız pil sensörü etkinleştirilmiş tahtalarda ölçülür.',
