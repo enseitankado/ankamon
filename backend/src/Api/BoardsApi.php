@@ -40,9 +40,11 @@ use Ankamon\Core\Storage;
 /** Tahta envanteri. Kayıtlar çoğunlukla worker tarafından (log göndereni / ağ taraması) kendiliğinden oluşur. */
 final class BoardsApi
 {
+    // facts'in disk/UEFI ayrıntıları (tahta başına ~20 KB — bkz. worker executor/hwfacts.py _DETAIL_FIELDS)
+    // listeye konmaz: grid her yenilemede bunları taşımasın; Bilgi kartı "facts" görevinden okur.
     private const COLUMNS = "b.id, b.hostname, b.mac::text AS mac, host(b.ip) AS ip, b.label, b.location, b.notes,
         b.source, b.monitor_enabled, b.exporter_port, b.online,
-        b.ssh_ok, b.exporter_ok, b.facts, b.etap,
+        b.ssh_ok, b.exporter_ok, b.facts - '{disk_layout,firmware_boot,uefi_vars}'::text[] AS facts, b.etap,
         b.session_username, b.session_locked, extract(epoch FROM b.session_checked_at)::bigint AS session_checked_at,
         b.display_state, b.netifs, b.autoshutdown, b.screen_locked, array_to_json(b.input_locks) AS input_locks,
         (SELECT r.source_board_id FROM screen_relays r WHERE r.target_board_id = b.id) AS relay_source,

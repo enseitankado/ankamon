@@ -158,6 +158,160 @@ qx.Class.define("ankamon.ui.FactsView", {
       }
     },
 
+    /** GUID, UUID, aygıt yolu gibi makine değerleri: eşit aralıklı yazı (kaçırılmış HTML). */
+    __mono(text) {
+      return `<span style="font-family:monospace">${qx.bom.String.escape(String(text))}</span>`;
+    },
+
+    /** Yüzde boş alanın rozeti: %10 altı kırmızı, %20 altı turuncu. */
+    __freeBadge(free, total) {
+      const F = ankamon.util.Format;
+      const pct = Math.round(100 * free / total);
+      return this.__badge(`${F.bytes(free)} boş / ${F.bytes(total)} (%${pct})`, pct < 10 ? "bad" : pct < 20 ? "warn" : "ok");
+    },
+
+    /**
+     * Disk başına bir bölüm: kimlik, bölüm tablosu (GPT disk GUID'i / MBR imzası, LBA aralığı,
+     * bölümlenmemiş alan, GPT denetimi, MBR açılış kodu) ve her bölümün GUID'leri, dosya sistemi ve
+     * boş alanı (bkz. worker executor/hwfacts.py _disk_layout).
+     */
+    __diskLayoutRows(disks, section, row) {
+      if (!Array.isArray(disks)) {
+        return;
+      }
+      const F = ankamon.util.Format;
+      const esc = qx.bom.String.escape;
+      const join = (...parts) => parts.filter(p => p !== null && p !== undefined && p !== "").join(" · ");
+      const has = v => v !== null && v !== undefined;
+      disks.forEach(d => {
+        section(`Disk ${d.path || d.name} — bölüm tablosu ve bölümler`);
+        row("Aygıt", join(d.model, d.size ? F.bytes(d.size) : null,
+          d.rota === false ? "SSD" : d.rota === true ? "HDD" : null, d.tran ? d.tran.toUpperCase() : null,
+          d.rm ? "çıkarılabilir" : null, d.ro ? "salt okunur" : null));
+        row("Seri no / firmware", join(d.serial, d.rev ? "firmware " + d.rev : null));
+        row("WWN", d.wwn ? { html: this.__mono(d.wwn) } : null);
+        row("Sektör boyutu", d.log_sec ? `${d.log_sec} B mantıksal / ${d.phy_sec || "?"} B fiziksel` : null);
+        const gpt = d.pttype === "gpt";
+        row("Bölüm tablosu", d.pttype ? (gpt ? "GPT" : d.pttype === "dos" ? "MBR (DOS)" : d.pttype.toUpperCase())
+          : (d.fs ? "yok (disk doğrudan dosya sistemi taşıyor)" : "yok"));
+        row(gpt ? "Disk GUID" : "Disk imzası", d.ptuuid ? { html: this.__mono(d.ptuuid) } : null);
+        row("Kullanılabilir LBA", gpt && has(d.first_lba) ? `${d.first_lba.toLocaleString("tr-TR")} – ${d.last_lba.toLocaleString("tr-TR")}` : null);
+        row("Bölümlenmemiş alan", has(d.free_bytes) ? (d.free_bytes ? F.bytes(d.free_bytes) : "yok") : null);
+        if (d.gpt_check) {
+          const ok = /No problems found/.test(d.gpt_check);
+          row("GPT denetimi", { html: this.__badge(ok ? "Sorun yok (birincil/yedek başlık ve tablo tutarlı)" : d.gpt_check, ok ? "ok" : "bad") });
+        }
+        row("MBR açılış kodu", { empty: "boş (legacy önyükleyici yok)", grub: "GRUB (legacy/BIOS açılışı)", other: "var (GRUB dışı)" }[d.mbr_code] || null);
+        if (d.fs) {
+          row("Dosya sistemi", join(d.fs.fstype, d.fs.uuid, d.fs.mount));
+        }
+        (d.partitions || []).forEach(p => {
+          const lines = [];
+          lines.push(join(`<b>${esc(p.type_name || p.type_guid || "bölüm")}</b>`, p.size ? esc(F.bytes(p.size)) : null,
+            p.fstype ? esc(join(p.fstype, p.fsver)) : "dosya sistemi yok",
+            p.label ? `etiket "${esc(p.label)}"` : null,
+            p.mount ? `bağlı: ${this.__mono(p.mount)}` : "bağlı değil",
+            p.bootable ? "etkin (açılış) bölümü" : null));
+          if (p.fs_size && has(p.fs_avail)) {
+            lines.push(this.__freeBadge(p.fs_avail, p.fs_size) + (has(p.fs_used) ? ` &nbsp;·&nbsp; dolu ${esc(F.bytes(p.fs_used))}` : ""));
+          }
+          lines.push(join(p.part_uuid ? "Bölüm GUID " + this.__mono(p.part_uuid) : null,
+            p.part_label ? `ad "${esc(p.part_label)}"` : null));
+          lines.push(join(p.type_guid ? (gpt ? "Tür GUID " : "Tür ") + this.__mono(p.type_guid) : null,
+            p.attrs ? "öznitelikler " + esc(p.attrs) : null, p.flags ? "bayraklar " + this.__mono(p.flags) : null));
+          lines.push(join(p.uuid ? "Dosya sistemi UUID " + this.__mono(p.uuid) : null,
+            has(p.start) ? `başlangıç sektörü ${p.start.toLocaleString("tr-TR")}` : null,
+            p.sectors ? `${p.sectors.toLocaleString("tr-TR")} sektör` : null));
+          (p.holders || []).forEach(h => lines.push("İçinde: " + esc(join(h.name, h.type, h.fstype, h.uuid, h.mount))));
+          row(p.name, { html: lines.filter(Boolean).join("<br>") });
+        });
+      });
+    },
+
+    /**
+     * "UEFI / önyükleme": firmware kipi ve sürümü, Secure Boot, değişken deposu (NVRAM) doluluğu, açılış
+     * sırası ve girdileri (hangi bölümden açıldığı), EFI bölümündeki önyükleyiciler, TPM, çekirdek komut
+     * satırı (bkz. worker executor/hwfacts.py _firmware_boot).
+     */
+    __firmwareRows(fw, cmdline, section, row) {
+      if (!fw) {
+        return;
+      }
+      const F = ankamon.util.Format;
+      const esc = qx.bom.String.escape;
+      const join = (...parts) => parts.filter(p => p !== null && p !== undefined && p !== "").join(" · ");
+      section("UEFI / önyükleme");
+      row("Firmware kipi", fw.mode === "uefi"
+        ? join("UEFI" + (fw.bits ? ` (${fw.bits} bit)` : ""), fw.efi_version ? "EFI " + fw.efi_version : null, fw.efi_vendor)
+        : fw.mode === "legacy" ? "Legacy BIOS (CSM) — işletim sistemi UEFI değişkenlerini okuyamaz" : null);
+      if (fw.secure_boot !== null && fw.secure_boot !== undefined) {
+        row("Secure Boot", { html: this.__badge(fw.secure_boot ? "Açık" : "Kapalı", fw.secure_boot ? "ok" : "idle") });
+      }
+      if (fw.setup_mode !== null && fw.setup_mode !== undefined) {
+        row("Anahtar kipi", fw.setup_mode ? "Kurulum kipi (Setup Mode — platform anahtarı PK yüklü değil)" : "Kullanıcı kipi (PK yüklü)");
+      }
+      if (fw.store_total) {
+        row("Değişken deposu (NVRAM)", {
+          html: this.__freeBadge(fw.store_free, fw.store_total) + ` &nbsp;·&nbsp; dolu ${esc(F.bytes(fw.store_used))}`
+        });
+      }
+      const entries = fw.boot_entries || [];
+      const desc = num => (entries.find(e => e.num === num) || {}).desc;
+      if (fw.boot_order && fw.boot_order.length) {
+        row("Açılış sırası", fw.boot_order.map(n => `${n} ${desc(n) || ""}`.trim()).join("  →  "));
+      }
+      row("Şu an açılan", fw.boot_current ? join("Boot" + fw.boot_current, desc(fw.boot_current)) : null);
+      row("Sonraki açılış (BootNext)", fw.boot_next ? join("Boot" + fw.boot_next, desc(fw.boot_next)) : null);
+      row("Menü bekleme süresi", fw.timeout !== null && fw.timeout !== undefined ? `${fw.timeout} sn` : null);
+      entries.forEach(e => {
+        const head = `<b>${esc(e.desc || "(adsız)")}</b>` + (e.active ? "" : " (devre dışı)") +
+          (e.num === fw.boot_current ? " · " + this.__badge("şu an bu girdiden açıldı", "ok") : "");
+        const path = e.path ? "<br>" + this.__mono(e.path) : "";
+        const part = e.part ? `<br>→ ${this.__mono(e.part)}${e.part_type ? " (" + esc(e.part_type) + ")" : ""}` : "";
+        row("Boot" + e.num, { html: head + path + part });
+      });
+      row("EFI bölümündeki önyükleyiciler", fw.esp_dirs ? fw.esp_dirs.map(d => "EFI/" + d).join(", ") : null);
+      const t = fw.tpm;
+      if (t) {
+        const flag = (v, yes, no) => (v === true ? yes : v === false ? no : null);
+        row("TPM", join("TPM " + (t.version || "?"), t.maker, t.firmware ? "firmware " + t.firmware : null,
+          flag(t.enabled, "etkin", "devre dışı (BIOS'ta kapalı)"), flag(t.active, "aktif", "aktif değil"),
+          flag(t.owned, "sahiplenilmiş", "sahipsiz")));
+      } else if (fw.mode) {
+        row("TPM", "bulunamadı");
+      }
+      row("Çekirdek komut satırı", cmdline ? { html: this.__mono(cmdline) } : null);
+    },
+
+    /**
+     * "UEFI değişkenleri": firmware'in NVRAM'deki tüm değişkenleri — ad, üretici GUID'i, boyut,
+     * öznitelikler, değiştirilemez mi (🔒) ve değer (standart olanlar çözülür, ötekiler ilk baytlar).
+     */
+    __uefiVarRows(vars, section, row) {
+      if (!Array.isArray(vars) || !vars.length) {
+        return;
+      }
+      const esc = qx.bom.String.escape;
+      const locked = vars.filter(v => v.immutable).length;
+      section(`UEFI değişkenleri (${vars.length})`);
+      row("Açıklama", `${vars.length} değişken, ${locked} tanesi değiştirilemez (🔒 — çekirdek bilinmeyen üretici ` +
+        "değişkenlerini kazara silinmeye karşı korur). Öznitelikler: NV kalıcı, BS açılış servisi, RT çalışma zamanı, " +
+        "AUTH imzalı yazma. Değer: standart değişkenler çözülür, ötekilerin ilk baytları onaltılık.");
+      vars.forEach(v => {
+        const parts = [v.vendor ? esc(v.vendor) : this.__mono(v.guid)];
+        if (v.size !== null && v.size !== undefined) {
+          parts.push(`${v.size.toLocaleString("tr-TR")} B`);
+        }
+        if (v.attrs) {
+          parts.push(esc(v.attrs));
+        }
+        if (v.value) {
+          parts.push(this.__mono(v.value));
+        }
+        row(v.name + (v.immutable ? " 🔒" : ""), { html: parts.join(" · ") });
+      });
+    },
+
     /**
      * @param sensors {Map|null|undefined} isteğe bağlı sensör özeti (bkz. __sensorRows); verilmezse bölüm yazılmaz
      * @return {String} facts'in bölümlü HTML tablosu
@@ -268,6 +422,8 @@ qx.Class.define("ankamon.ui.FactsView", {
           : null);
       }
 
+      this.__diskLayoutRows(f.disk_layout, section, row);
+
       section("Kablolu ağ");
       row("Arayüz", f.eth_iface ? join(f.eth_iface, f.eth_chip) : null);
       row("Durum", f.eth_state
@@ -305,8 +461,14 @@ qx.Class.define("ankamon.ui.FactsView", {
       row("Dokunmatik", f.touch);
 
       section("Anakart / BIOS");
-      row("Anakart", f.motherboard_model);
-      row("BIOS sürümü", join(f.bios_version, f.bios_date));
+      row("Anakart", join(f.motherboard_model, f.board_version ? "sürüm " + f.board_version : null));
+      row("Anakart seri no", f.board_serial);
+      row("Ürün sürümü", f.product_version);
+      row("Sistem UUID", f.product_uuid ? { html: this.__mono(f.product_uuid) } : null);
+      row("BIOS", join(f.bios_vendor, f.bios_version, f.bios_date, f.bios_release ? "revizyon " + f.bios_release : null));
+
+      this.__firmwareRows(f.firmware_boot, f.kernel_cmdline, section, row);
+      this.__uefiVarRows(f.uefi_vars, section, row);
 
       const body = sections
         .filter(s => s.rows.length)

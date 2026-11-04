@@ -414,7 +414,8 @@ qx.Class.define("ankamon.ui.BoardOps", {
 
     /**
      * "Bilgi kartı": seçili tahta(lar)ın donanım ve durum bilgisini (sistem, işlemci, bellek, disk ve
-     * boş alan, kablolu ağ, Wi-Fi kartı ve bağlantı durumu, ekran, BIOS — bkz. ui.FactsView) gösterir.
+     * boş alan, disk/bölüm GUID'leri, kablolu ağ, Wi-Fi kartı ve bağlantı durumu, ekran, BIOS, UEFI açılış
+     * girdileri ve tüm UEFI değişkenleri — bkz. ui.FactsView) gösterir.
      * Worker tahtaya SSH ile canlı bağlanıp toplar; aynı tahtaya 60 dakika içinde tekrar bağlanmaz,
      * son toplanan değeri döner (bkz. backend "facts" görev türü, worker/ankamon/executor/hwfacts.py
      * CACHE_SECONDS). Birden fazla tahta seçiliyse hepsi aynı pencerede listelenir; "Yazdır" ayrı bir

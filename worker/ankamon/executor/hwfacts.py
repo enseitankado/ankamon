@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 
 CACHE_SECONDS = 3600  # "Bilgi kartı" aynı tahtaya bu süre içinde tekrar bağlanmaz.
@@ -156,6 +157,61 @@ sdev=$(lsblk -d -n -o NAME -e 1,2,7,11 2>/dev/null | awk '$1 !~ /^zram/ {print; 
 if [ -n "$sdev" ] && command -v smartctl >/dev/null 2>&1; then
     echo "SMART_JSON=$(smartctl -j -H -A "/dev/$sdev" 2>/dev/null | tr -d '\n')"
 fi
+# --- Bilgi kartı "Diskler ve bölümler", "UEFI / önyükleme", "UEFI değişkenleri" (ayrıştırma: _disk_layout,
+# _firmware_boot, _uefi_vars). Tümü salt okunur; gerçek ETAP tahtasında bu blok ~1,5 sn sürüyor.
+# Disk ağacı (bölümler, GUID'ler, dosya sistemi boyut/boş alanı) lsblk JSON'u; bölüm tablosunun kendi
+# kaydı (disk kimliği, ilk/son LBA, bölüm öznitelikleri, MBR'de etkin bölüm) sfdisk JSON'u. Bölümlenmemiş
+# alan sfdisk -F'nin ilk satırındaki bayt; GPT'de sgdisk -v başlık/yedek tablo/çakışma denetimi yapar.
+# MBR'nin ilk 440 baytı açılış kodudur: hepsi sıfır = boş, "GRUB" geçiyorsa GRUB (legacy açılış).
+echo "DISK_LAYOUT_JSON=$(lsblk -J -b -e 1,2,7,11 -o NAME,PATH,TYPE,SIZE,FSTYPE,FSVER,LABEL,UUID,PARTUUID,PARTLABEL,PARTTYPE,PARTTYPENAME,PARTFLAGS,PTUUID,PTTYPE,MOUNTPOINT,FSSIZE,FSAVAIL,FSUSED,MODEL,SERIAL,REV,WWN,ROTA,TRAN,LOG-SEC,PHY-SEC,RO,RM 2>/dev/null | tr -d '\n')"
+for d in $(lsblk -d -n -o NAME -e 1,2,7,11 2>/dev/null | grep -v '^zram'); do
+    echo "DISK_PTABLE_JSON=$(sfdisk -J "/dev/$d" 2>/dev/null | tr -d '\n')"
+    free=$(sfdisk -F "/dev/$d" 2>/dev/null | sed -n '1s/.*, \([0-9][0-9]*\) bytes, .*/\1/p')
+    check=""
+    if [ "$(lsblk -d -n -o PTTYPE "/dev/$d" 2>/dev/null)" = gpt ] && command -v sgdisk >/dev/null 2>&1; then
+        check=$(sgdisk -v "/dev/$d" 2>/dev/null | grep -oE 'No problems found|Identified [0-9]+ problems?' | head -n 1)
+    fi
+    code=other
+    [ "$(head -c 440 "/dev/$d" 2>/dev/null | tr -d '\000' | wc -c)" -eq 0 ] && code=empty
+    head -c 440 "/dev/$d" 2>/dev/null | grep -aq GRUB && code=grub
+    echo "DISK_EXTRA=$d|$free|$code|$check"
+done
+# Firmware: UEFI mi legacy (BIOS/CSM) mi — /sys/firmware/efi yalnız UEFI açılışta var. EFI sürümü ve
+# üreticisi çekirdeğin açılış iletisinden ("efi: EFI v2.3.1 by American Megatrends"); değişken deposunun
+# toplam/dolu/boş alanı efivarfs'in df'i (firmware QueryVariableInfo). Değişkenlerin her biri: ad-GUID,
+# boyut, değiştirilemez (chattr +i, çekirdek bilinmeyen üretici değişkenlerini böyle korur) ve içeriğin
+# ilk baytları onaltılık (ilk 4 bayt öznitelik). Açılış girdileri (Boot####) tam okunur (açıklama +
+# aygıt yolu), diğerleri yalnız önizleme kadar — büyük ikili kayıtlar (MemContextNv 4 KB…) taşınmaz.
+echo "BIOS_VENDOR=$(cat /sys/class/dmi/id/bios_vendor 2>/dev/null)"
+echo "BIOS_RELEASE=$(cat /sys/class/dmi/id/bios_release 2>/dev/null)"
+echo "BOARD_VERSION=$(cat /sys/class/dmi/id/board_version 2>/dev/null)"
+echo "BOARD_SERIAL=$(cat /sys/class/dmi/id/board_serial 2>/dev/null)"
+echo "PRODUCT_VERSION=$(cat /sys/class/dmi/id/product_version 2>/dev/null)"
+echo "PRODUCT_UUID=$(cat /sys/class/dmi/id/product_uuid 2>/dev/null)"
+echo "KERNEL_CMDLINE=$(cat /proc/cmdline 2>/dev/null)"
+if [ -d /sys/firmware/efi ]; then
+    echo "FW_MODE=uefi"
+    echo "FW_BITS=$(cat /sys/firmware/efi/fw_platform_size 2>/dev/null)"
+    echo "FW_EFI=$( { dmesg 2>/dev/null; journalctl -k -b -o cat 2>/dev/null; } | sed -n 's/.*efi: EFI v\([^ ]*\) by \(.*\)$/\1|\2/p' | head -n 1)"
+    df -B1 -P /sys/firmware/efi/efivars 2>/dev/null | awk 'NR==2{printf "FW_VARSTORE=%.0f|%.0f|%.0f\n", $2, $3, $4}'
+    echo "FW_ESP_DIRS=$(ls -1 /boot/efi/EFI 2>/dev/null | tr '\n' ' ')"
+    efibootmgr -v 2>/dev/null | sed 's/^/FW_BOOTMGR=/'
+    lsattr /sys/firmware/efi/efivars 2>/dev/null | awk '$1 ~ /i/ {n=$2; sub(/.*\//, "", n); print "UEFI_IMMUTABLE=" n}'
+    for v in /sys/firmware/efi/efivars/*; do
+        [ -f "$v" ] || continue
+        n=${v##*/}
+        case "$n" in Boot[0-9A-F][0-9A-F][0-9A-F][0-9A-F]-*|Driver[0-9A-F][0-9A-F][0-9A-F][0-9A-F]-*) lim=1028 ;; *) lim=68 ;; esac
+        echo "UEFI_VAR=$n|$(stat -c %s "$v" 2>/dev/null)|$(od -An -tx1 -v -N "$lim" "$v" 2>/dev/null | tr -d ' \n')"
+    done
+else
+    echo "FW_MODE=legacy"
+fi
+# TPM: sürüm (1 = TPM 1.2, 2 = TPM 2.0); 1.2'de etkin/aktif/sahipli bayrakları ve üretici/firmware (caps).
+for t in /sys/class/tpm/tpm[0-9]*; do
+    [ -e "$t" ] || continue
+    echo "TPM_INFO=$(cat "$t/tpm_version_major" 2>/dev/null)|$(cat "$t/device/enabled" 2>/dev/null)|$(cat "$t/device/active" 2>/dev/null)|$(cat "$t/device/owned" 2>/dev/null)|$(sed -n 's/^Manufacturer: *//p' "$t/device/caps" 2>/dev/null)|$(sed -n 's/^Firmware version: *//p' "$t/device/caps" 2>/dev/null)"
+    break
+done
 """
 
 _FIELDS = {
@@ -183,6 +239,13 @@ _FIELDS = {
     "BOARD_MODEL": "motherboard_model",
     "PRODUCT": "product",
     "SERIAL": "serial",
+    "PRODUCT_VERSION": "product_version",
+    "PRODUCT_UUID": "product_uuid",
+    "BOARD_VERSION": "board_version",
+    "BOARD_SERIAL": "board_serial",
+    "BIOS_VENDOR": "bios_vendor",
+    "BIOS_RELEASE": "bios_release",
+    "KERNEL_CMDLINE": "kernel_cmdline",
     "CPU_VENDOR": "cpu_vendor",
     "CPU_MODEL": "cpu_model",
     "CPU_CORES": "cpu_cores",
@@ -235,7 +298,15 @@ _SMART_FIELDS = [
     "smart_uncorrectable",   # düzeltilemeyen hata (ATA 187/198, NVMe media_errors)
     "smart_failing",         # eşiğin altına düşmüş öznitelik adları (virgüllü) ya da None
 ]
-_ALL_FIELDS = list(_FIELDS.values()) + _SMART_FIELDS
+# Çok değerli/yapılı alanlar (bkz. _disk_layout, _firmware_boot, _uefi_vars). Tahta başına ~10-15 KB:
+# Tahtalar listesi (backend BoardsApi::COLUMNS) bunları facts'ten çıkarır, yalnız Bilgi kartı ("facts"
+# görevinin çıktısı) taşır.
+_DETAIL_FIELDS = ["disk_layout", "firmware_boot", "uefi_vars"]
+_ALL_FIELDS = list(_FIELDS.values()) + _SMART_FIELDS + _DETAIL_FIELDS
+
+# SMBIOS'ta doldurulmamış alanların üretici yer tutucuları — boş sayılır.
+_DMI_PLACEHOLDERS = {"to be filled by o.e.m.", "default string", "not specified", "system serial number",
+                     "none", "n/a", "0", "123456789", "03000200-0400-0500-0006-000700080009"}
 
 # /proc/cpuinfo vendor_id → okunur üretici adı.
 _CPU_VENDORS = {"GenuineIntel": "Intel", "AuthenticAMD": "AMD", "CentaurHauls": "VIA", "HygonGenuine": "Hygon"}
@@ -257,8 +328,263 @@ def parse(output: str) -> dict:
         facts["cpu_vendor"] = _CPU_VENDORS.get(facts["cpu_vendor"], facts["cpu_vendor"])
     if facts["wifi_freq"]:
         facts["wifi_freq"] = facts["wifi_freq"].replace(" MHz", "")
+    for field in ("serial", "product_version", "product_uuid", "board_version", "board_serial"):
+        if facts[field] and facts[field].lower() in _DMI_PLACEHOLDERS:
+            facts[field] = None
     facts.update(_smart(values.get("SMART_JSON", "")))
+    lines = output.splitlines()
+    facts["disk_layout"] = _disk_layout(values.get("DISK_LAYOUT_JSON", ""), _multi(lines, "DISK_PTABLE_JSON"),
+                                        _multi(lines, "DISK_EXTRA"))
+    facts["uefi_vars"] = _uefi_vars(_multi(lines, "UEFI_VAR"), set(_multi(lines, "UEFI_IMMUTABLE")))
+    facts["firmware_boot"] = _firmware_boot(values, _multi(lines, "FW_BOOTMGR"), facts["disk_layout"],
+                                            facts["uefi_vars"])
     return facts
+
+
+def _multi(lines: list, key: str) -> list:
+    """Aynı anahtarla birden çok kez basılan satırların değerleri (disk başına, değişken başına…)."""
+    prefix = key + "="
+    return [line[len(prefix):] for line in lines if line.startswith(prefix)]
+
+
+def _int(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _disk_layout(tree_raw: str, ptables_raw: list, extras_raw: list) -> list:
+    """Disk başına: kimlik (model/seri/firmware/WWN), bölüm tablosu (GPT/MBR, disk GUID'i ya da MBR
+    imzası, ilk/son LBA), bölümlenmemiş alan, GPT denetimi, MBR açılış kodu ve bölümler (bölüm GUID'i,
+    tür GUID'i + adı, etiket, öznitelikler, dosya sistemi türü/UUID'si/etiketi, bağlama noktası, boyut,
+    dolu/boş). lsblk ağacı ile sfdisk tablosu bölüm aygıt yolundan (/dev/sda1) birleştirilir."""
+    try:
+        tree = (json.loads(tree_raw) if tree_raw.strip() else {}).get("blockdevices") or []
+    except ValueError:
+        tree = []
+    ptables = {}
+    for raw in ptables_raw:
+        try:
+            pt = json.loads(raw).get("partitiontable") or {}
+        except ValueError:
+            continue
+        if pt.get("device"):
+            ptables[pt["device"]] = pt
+    extras = {}
+    for raw in extras_raw:
+        name, free, code, check = (raw.split("|", 3) + ["", "", "", ""])[:4]
+        extras[name] = {"free": _int(free), "code": code or None, "check": check.strip() or None}
+
+    def fs(node: dict) -> dict:
+        return {"fstype": node.get("fstype"), "fsver": node.get("fsver"), "label": node.get("label"),
+                "uuid": node.get("uuid"), "mount": node.get("mountpoint"), "fs_size": node.get("fssize"),
+                "fs_used": node.get("fsused"), "fs_avail": node.get("fsavail")}
+
+    disks = []
+    for d in tree:
+        if d.get("type") != "disk" or str(d.get("name", "")).startswith("zram"):
+            continue
+        pt = ptables.get(d.get("path"), {})
+        rows = {p.get("node"): p for p in pt.get("partitions") or []}
+        ex = extras.get(d.get("name"), {})
+        parts = []
+        for p in d.get("children") or []:
+            if p.get("type") != "part":
+                continue
+            row = rows.get(p.get("path"), {})
+            part = {"name": p.get("name"), "path": p.get("path"), "size": p.get("size"),
+                    "start": row.get("start"), "sectors": row.get("size"),
+                    "type_guid": p.get("parttype"), "type_name": p.get("parttypename"),
+                    "part_uuid": p.get("partuuid"), "part_label": p.get("partlabel"),
+                    "flags": p.get("partflags"), "attrs": row.get("attrs"), "bootable": row.get("bootable"),
+                    **fs(p)}
+            # Bölümün içindeki katmanlar (LVM, LUKS…): ad + dosya sistemi + bağlama noktası.
+            part["holders"] = [{"name": c.get("name"), "type": c.get("type"), **fs(c)}
+                               for c in p.get("children") or []] or None
+            parts.append(part)
+        disks.append({
+            "name": d.get("name"), "path": d.get("path"), "size": d.get("size"),
+            "model": (d.get("model") or "").strip() or None, "serial": d.get("serial"),
+            "rev": (d.get("rev") or "").strip() or None, "wwn": d.get("wwn"),
+            "rota": d.get("rota"), "tran": d.get("tran"), "ro": d.get("ro"), "rm": d.get("rm"),
+            "log_sec": d.get("log-sec"), "phy_sec": d.get("phy-sec"),
+            "pttype": d.get("pttype") or pt.get("label"),
+            # GPT'de disk GUID'i, MBR'de 32 bit disk imzası (0x…).
+            "ptuuid": (pt.get("id") or d.get("ptuuid") or None),
+            "first_lba": pt.get("firstlba"), "last_lba": pt.get("lastlba"),
+            "free_bytes": ex.get("free"), "gpt_check": ex.get("check"), "mbr_code": ex.get("code"),
+            # Bölüm tablosu olmadan doğrudan dosya sistemi taşıyan disk (ör. bölümsüz USB bellek).
+            **({"fs": fs(d)} if d.get("fstype") else {}),
+            "partitions": parts,
+        })
+    return disks
+
+
+# UEFI değişken öznitelik bitleri (UEFI spec 8.2, EFI_VARIABLE_*).
+_UEFI_ATTRS = [(0x1, "NV"), (0x2, "BS"), (0x4, "RT"), (0x8, "HW_ERR"), (0x10, "AUTH"), (0x20, "TIME_AUTH"),
+               (0x40, "APPEND")]
+# Bilinen üretici GUID'leri → okunur ad (kart, GUID'in yanında gösterir).
+UEFI_GUIDS = {
+    "8be4df61-93ca-11d2-aa0d-00e098032b8c": "EFI Global",
+    "d719b2cb-3d3a-4596-a3bc-dad00e67656f": "Secure Boot imza veritabanı",
+    "605dab50-e046-4300-abb6-3dd810dd8b23": "shim",
+    "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f": "systemd-boot",
+    "77fa9abd-0359-4d32-bd60-28f4e78f784b": "Microsoft",
+    "e20939be-32d4-41be-a150-897f85d49829": "TCG (MOR)",
+    "4c19049f-4137-4dd3-9c10-8b97a83ffdfa": "EDK2 bellek türleri",
+}
+_GLOBAL_GUID = "8be4df61-93ca-11d2-aa0d-00e098032b8c"
+_U8_FLAGS = {"SecureBoot", "SetupMode", "AuditMode", "DeployedMode", "VendorKeys"}
+_ASCII_VARS = {"Lang", "PlatformLang", "LangCodes", "PlatformLangCodes"}
+# u16 Boot#### numarası listesi olan değişkenler (AMI'nin LegacyDevOrder'ı gibi "…Order"lar başka yapıda).
+_ORDER_VARS = {"BootOrder", "DriverOrder", "SysPrepOrder", "DefaultBootOrder"}
+# TCG TPM üretici kimlikleri (caps "Manufacturer: 0x57454300" → "WEC").
+_TPM_VENDORS = {"WEC": "Winbond", "IFX": "Infineon", "STM": "STMicroelectronics", "NTC": "Nuvoton",
+                "ATML": "Atmel", "INTC": "Intel", "AMD": "AMD", "BRCM": "Broadcom", "NSM": "National Semi"}
+_LOAD_OPTION_NAME = re.compile(r"^(Boot|Driver|SysPrep)[0-9A-F]{4}$")
+
+
+def _load_option(data: bytes) -> tuple:
+    """EFI_LOAD_OPTION (Boot####): (etkin mi, açıklama). Yapı: öznitelik u32, yol uzunluğu u16,
+    UTF-16LE açıklama (sıfırla biter), aygıt yolu…"""
+    if len(data) < 8:
+        return None, None
+    end = 6
+    while end + 1 < len(data) and data[end:end + 2] != b"\0\0":
+        end += 2
+    desc = data[6:end].decode("utf-16-le", "replace").strip()
+    return bool(int.from_bytes(data[:4], "little") & 1), desc
+
+
+def _uefi_value(name: str, data: bytes, truncated: bool) -> str | None:
+    """Değişken içeriğinin okunur hâli: bilinen standart değişkenler çözülür; ötekiler kısa metin,
+    küçük tamsayı ya da ilk baytların onaltılık önizlemesi."""
+    if not data:
+        return None
+    if name in _ORDER_VARS and len(data) % 2 == 0 and not truncated:
+        return ", ".join(f"{int.from_bytes(data[i:i + 2], 'little'):04X}" for i in range(0, len(data), 2))
+    if name in ("BootCurrent", "BootNext") and len(data) == 2:
+        return f"Boot{int.from_bytes(data, 'little'):04X}"
+    if name == "Timeout" and len(data) == 2:
+        return f"{int.from_bytes(data, 'little')} sn"
+    if name in _U8_FLAGS and len(data) == 1:
+        return "Evet (1)" if data[0] else "Hayır (0)"
+    if _LOAD_OPTION_NAME.match(name):
+        active, desc = _load_option(data)
+        if desc is not None:
+            return f'"{desc}"' + ("" if active else " (devre dışı)")
+    text = data.rstrip(b"\0")
+    if name in _ASCII_VARS or (len(text) >= 3 and all(32 <= c < 127 for c in text)):
+        return '"' + text.decode("ascii", "replace") + '"'
+    if len(data) <= 8 and not truncated:
+        return "0x" + data[::-1].hex().upper()
+    preview = " ".join(f"{c:02X}" for c in data[:16])
+    return preview + (" …" if truncated or len(data) > 16 else "")
+
+
+def _uefi_vars(rows: list, immutable: set) -> list:
+    """efivarfs dosyaları → [{name, guid, vendor, size, attrs, immutable, value}]. efivarfs dosyasının
+    ilk 4 baytı öznitelik, kalanı veridir (size = yalnız veri). EFI Global GUID'liler önce, sonra GUID'e
+    ve ada göre sıralanır."""
+    out = []
+    for raw in rows:
+        fname, size, hexdata = (raw.split("|", 2) + ["", ""])[:3]
+        if len(fname) < 38 or fname[-37] != "-":
+            continue
+        name, guid = fname[:-37], fname[-36:].lower()
+        try:
+            blob = bytes.fromhex(hexdata)
+        except ValueError:
+            blob = b""
+        total = _int(size)
+        attrs = int.from_bytes(blob[:4], "little") if len(blob) >= 4 else None
+        data = blob[4:]
+        data_size = total - 4 if total and total >= 4 else None
+        truncated = data_size is not None and len(data) < data_size
+        out.append({
+            "name": name, "guid": guid, "vendor": UEFI_GUIDS.get(guid),
+            "size": data_size,
+            "attrs": " ".join(n for bit, n in _UEFI_ATTRS if attrs is not None and attrs & bit) or None,
+            "immutable": fname in immutable,
+            "value": _uefi_value(name, data, truncated),
+        })
+    out.sort(key=lambda v: (v["guid"] != _GLOBAL_GUID, v["guid"], v["name"].lower()))
+    return out
+
+
+def _efi_path(rest: str) -> str:
+    """efibootmgr -v satırındaki aygıt yolu: yalnız düğümler ("HD(…)/File(…)"); ardından gelen
+    üreticiye özgü ek veri (AMI'de "AMGOAMNO….") atılır."""
+    m = re.match(r"\s*((?:[A-Za-z][A-Za-z0-9_]*\([^)]*\)/?)+)", rest)
+    return m.group(1).rstrip("/") if m else rest.strip()[:120]
+
+
+def _firmware_boot(values: dict, bootmgr: list, disks: list, uefi_vars: list) -> dict:
+    """Firmware kipi, EFI sürüm/üretici, Secure Boot, değişken deposu, açılış sırası ve girdileri
+    (aygıt yolundaki GPT bölüm GUID'i tahtadaki bölüme eşlenir), EFI bölümündeki önyükleyici dizinleri,
+    TPM."""
+    mode = (values.get("FW_MODE") or "").strip() or None
+    fw: dict = {"mode": mode}
+    tpm = (values.get("TPM_INFO") or "").strip()
+    if tpm:
+        ver, enabled, active, owned, maker, fwver = (tpm.split("|") + [""] * 6)[:6]
+        name = None
+        if maker.startswith("0x"):
+            try:
+                name = bytes.fromhex(maker[2:].zfill(8)).rstrip(b"\0").decode("ascii") or None
+            except ValueError:
+                name = None
+        if name in _TPM_VENDORS:
+            name = f"{_TPM_VENDORS[name]} ({name})"
+        flag = lambda v: None if v.strip() == "" else v.strip() == "1"  # noqa: E731
+        fw["tpm"] = {"version": {"2": "2.0", "1": "1.2"}.get(ver.strip(), ver.strip() or None),
+                     "enabled": flag(enabled), "active": flag(active), "owned": flag(owned),
+                     "maker": name or maker.strip() or None, "firmware": fwver.strip() or None}
+    if mode != "uefi":
+        return fw
+    fw["bits"] = _int((values.get("FW_BITS") or "").strip())
+    efi = (values.get("FW_EFI") or "").strip()
+    if "|" in efi:
+        fw["efi_version"], fw["efi_vendor"] = (x.strip() for x in efi.split("|", 1))
+    store = [_int(x) for x in (values.get("FW_VARSTORE") or "").split("|")]
+    if len(store) == 3:
+        fw["store_total"], fw["store_used"], fw["store_free"] = store
+    fw["esp_dirs"] = (values.get("FW_ESP_DIRS") or "").split() or None
+    by_name = {v["name"]: v for v in uefi_vars if v["guid"] == _GLOBAL_GUID}
+    sb = by_name.get("SecureBoot", {}).get("value")
+    fw["secure_boot"] = None if sb is None else sb.startswith("Evet")
+    sm = by_name.get("SetupMode", {}).get("value")
+    fw["setup_mode"] = None if sm is None else sm.startswith("Evet")
+
+    part_by_uuid = {(p.get("part_uuid") or "").lower(): p for d in disks for p in d["partitions"] if p.get("part_uuid")}
+    entries = []
+    for line in bootmgr:
+        line = line.rstrip()
+        key, _, val = line.partition(":")
+        if key == "BootCurrent":
+            fw["boot_current"] = val.strip()
+        elif key == "BootNext":
+            fw["boot_next"] = val.strip()
+        elif key == "Timeout":
+            fw["timeout"] = _int((val.split() or [""])[0])
+        elif key == "BootOrder":
+            fw["boot_order"] = [x for x in val.strip().split(",") if x]
+        else:
+            m = re.match(r"Boot([0-9A-Fa-f]{4})(\*?)\s+(.*)$", line)
+            if not m:
+                continue
+            desc, _, rest = m.group(3).partition("\t")
+            path = _efi_path(rest) if rest else None
+            entry = {"num": m.group(1).upper(), "active": m.group(2) == "*", "desc": desc.strip(), "path": path}
+            g = re.search(r"HD\(\d+,GPT,([0-9a-fA-F-]{36})", path or "")
+            if g and g.group(1).lower() in part_by_uuid:
+                p = part_by_uuid[g.group(1).lower()]
+                entry["part"] = p["path"]
+                entry["part_type"] = p.get("type_name")
+            entries.append(entry)
+    fw["boot_entries"] = entries
+    return fw
 
 
 def _smart(raw: str) -> dict:
@@ -306,7 +632,7 @@ _SSH_OPTS = [
 ]
 
 
-def query(board: dict, user: str, password: str, timeout: int = 10) -> dict:
+def query(board: dict, user: str, password: str, timeout: int = 25) -> dict:
     """Tek tahtaya bağlanıp donanım bilgisini okur (whoami.query ile aynı hafif ssh+sshpass deseni —
     tek, sabit betik olduğundan ansible gerekmez). Döner: {"status","rc","output"} — başarılıysa
     output, ayrıştırılmış facts'in JSON metni (job_targets.output, frontend bunu ayrıştırır)."""
