@@ -369,7 +369,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       }
       if (richTip) {
         // Çok satırlı ipucu: okunacak kadar açık kalsın (varsayılan gizlenme süresi kısa).
-        const toolTip = new qx.ui.tooltip.ToolTip(richTip).set({ rich: true, showTimeout: 400, hideTimeout: 60000 });
+        const toolTip = new qx.ui.tooltip.ToolTip(richTip).set({ rich: true, showTimeout: 400 });
         card.setToolTip(toolTip);
         qx.util.DisposeUtil.disposeTriggeredBy(toolTip, card); // kartlar her yenilemede atılıyor
       }

@@ -90,7 +90,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
     // Oturum açmış Ankamon kullanıcıları (kullanıcı isteği): sayı + üzerine gelince ayrıntı (bkz. __pollUsers).
     // Varsayılan gizli; bir eklenti "statusBar.usersVisible" kancasıyla açar (bkz. ext.Extensions). Gizliyken
     // de yoklama sürer: bu oturumun durumu (odak, açık sayfa) göstergeyi gören başkalarına bildirilir.
-    this.__usersTip = new qx.ui.tooltip.ToolTip("").set({ rich: true, showTimeout: 300, hideTimeout: 30000 });
+    this.__usersTip = new qx.ui.tooltip.ToolTip("").set({ rich: true, showTimeout: 300 });
     this.__usersLabel = new qx.ui.basic.Label("").set({
       font: "app-mono", textColor: "app-muted", rich: true, toolTip: this.__usersTip, marginRight: 12
     });
@@ -524,7 +524,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
           // Ayrıntı (traceback, SQL, en çok CPU yiyen süreçler …): satırın üzerine gelince, eş aralıklı yazıyla.
           item.setToolTip(new qx.ui.tooltip.ToolTip(
             `<div style="font-family:monospace;white-space:pre-wrap;max-width:900px">${esc(ev.detail)}</div>`
-          ).set({ rich: true, showTimeout: 400, hideTimeout: 60000 }));
+          ).set({ rich: true, showTimeout: 400 }));
           item.setLabel(item.getLabel() + "  ⓘ");
         }
         // Renk etikete verilir: temaların liste öğesi görünümü etiketin rengini kendisi atar, öğeye verilen
