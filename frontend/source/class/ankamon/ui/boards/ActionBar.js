@@ -414,7 +414,19 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
           b.setOpacity(on ? 1 : ankamon.ui.boards.ActionBar.OFF_OPACITY);
         });
         w.arrow.setVisibility(leaves.length > 1 || !group.primary ? "visible" : "excluded");
-        w.main.setToolTipText(this.__tip(group, leaves));
+        // Birincil madde zengin ipucu taşıyorsa (userData "ankamon.menuHint", HTML — ör. Ahenk ▸ ETAP kontrol)
+        // düğmede de o gösterilir; yoksa (seçim yokken madde de yok) grubun sabit hint'i (HTML, eklenti verir).
+        // Düz toolTipText tek satırdır, uzun açıklama sığmaz.
+        const primary = group.primary && leaves.find(l => l.getUserData("ankamon.menuKey") === group.primary);
+        const rich = (primary && primary.getUserData("ankamon.menuHint")) || group.hint;
+        if (rich) {
+          w.tip = w.tip || new qx.ui.tooltip.ToolTip().set({ rich: true, maxWidth: 460 });
+          w.tip.setLabel(rich);
+          w.main.setToolTip(w.tip);
+        } else {
+          w.main.setToolTip(null);
+          w.main.setToolTipText(this.__tip(group, leaves));
+        }
       });
       if (cur.menu) {
         this.__dropMenu(cur.menu);
