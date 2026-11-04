@@ -250,13 +250,13 @@ qx.Class.define("ankamon.page.Base", {
     super(new qx.ui.layout.VBox(12));
     this._user = user;
 
-    // Başlık kendi satırında (daralan pencerede asla kesilmez).
+    // Sayfa başlığı gösterilmez: üst başlıktaki yol gösterimi ("Ankamon > Tahtalar", bkz. ui.ShellNavPath) yerini
+    // tuttu, dikey alan kazanıldı (kullanıcı isteği). Etiket yine kurulur (sayfalar değerini değiştirebiliyor, ör. Logs).
     this._toolbar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
     if (title) {
       this._toolbar.add(new qx.ui.basic.Label(title).set({ font: "headline" }));
-    } else {
-      this._toolbar.exclude();
     }
+    this._toolbar.exclude();
     this.add(this._toolbar);
 
     // Düğmeler ayrı, sarılabilen bir satırda: pencere daralınca kesilmek yerine alt satıra geçerler.

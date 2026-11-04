@@ -149,6 +149,8 @@ qx.Class.define("ankamon.ui.Shell", {
     // (bkz. page.Sessions) — "users" (Kullanıcılar, Ankamon'un KENDİ arayüz hesapları, yalnız
     // admin) ile KARIŞTIRILMASIN diye bilerek ayrı/farklı adda bir sayfa; "logs" yetkisini paylaşır
     // (log'lardan türetilen veri olduğundan).
+    // Buraya eklenen sayfa/alt sayfa/sekme ağaçla birlikte üst başlıktaki yol gösterimine ve açılır listelerine de
+    // kendiliğinden girer (bkz. ui.ShellNavPath); sayfaya ayrıca başlık yazılmaz.
     PAGES: [
       // retap: ağaçta zaten seçili düğüme yeniden tıklamak sayfayı yeniler (sayfada "Yenile" düğmesi yok).
       { id: "dashboard", label: "Genel bakış", feature: "dashboard", retap: true, create: u => new ankamon.page.Dashboard(u) },
@@ -232,6 +234,7 @@ qx.Class.define("ankamon.ui.Shell", {
     __dragItem: null,
     __networkFolder: null,
     __networkTimer: null,
+    __navPath: null,
 
     /**
      * Ağaç düğümünün temadan gelen klasör/dosya resmini gizler: düğümde yalnız etiketteki kendi
@@ -340,6 +343,11 @@ qx.Class.define("ankamon.ui.Shell", {
           // Seçim olayının içinde ağaç seçimi değiştirilemiyor (geri alınıyor): bir sonraki turda.
           qx.event.Timer.once(() => this.__selectTabLeaf(item.getUserData("page"), widget.currentTab()), this, 0);
         }
+      });
+      // Üst başlıktaki yol gösterimi ağacı izler: yeni sayfa/sekme ağaca girince orada da kendiliğinden görünür.
+      this.__navPath.attach(this.__tree, item => {
+        this.__reveal(item);
+        this.__tree.setSelection([item]);
       });
       // Seviyeye göre yazı: tema yazı tipleri ağaç görününce uygulanmış olur; tema değişince yeniden hesaplanır.
       this.__tree.addListenerOnce("appear", () => this.__styleNavLevels());
@@ -749,7 +757,9 @@ qx.Class.define("ankamon.ui.Shell", {
       // Logo simgesi: ekran çerçevesi başlık yazısının renginde (temaların koyu/mavi başlık zemininde seçilsin).
       header.add(new qx.ui.basic.Label(ankamon.ui.Logo.icon(32, "currentColor")).set({ rich: true, textColor: "app-header-text" }));
       const brand = new qx.ui.container.Composite(new qx.ui.layout.VBox()).set({ backgroundColor: "app-header" });
-      brand.add(new qx.ui.basic.Label("Ankamon").set({ font: "app-title", textColor: "app-header-text" }));
+      // "Ankamon > Bakım > Sensörler": sayfa başlıklarının yerine (bkz. ui.ShellNavPath; ağaçtan beslenir — __createTree).
+      this.__navPath = new ankamon.ui.ShellNavPath();
+      brand.add(this.__navPath);
       brand.add(this.__createBuildStampLabel());
       header.add(brand);
       header.add(new qx.ui.core.Spacer(), { flex: 1 });
