@@ -41,13 +41,15 @@ kurulmuş tahtalar ilk açılışta kalıbın adıyla log gönderebilir: tahta y
 """
 
 import datetime
+from types import SimpleNamespace
 
 KIND = "net_link_lost"
 LATE = 120                                  # sn: tahtanın olağan saat farkının üstünde bu kadar geç gelen log kuyruktan gelmiştir
 FLUSH_GAP = datetime.timedelta(seconds=120) # kuyruk boşaltması: ardışık geç loglar arasında bundan uzun ara yoksa tek boşaltma
 THRESHOLD = datetime.timedelta(minutes=5)
 SCRAPED_MAX = 0.2                           # aralığın en çok bu kadarında sensör verisi alındıysa tahta erişilebilirdi: sayılmaz
-WINDOW = datetime.timedelta(hours=6)
+WINDOW = datetime.timedelta(hours=2)
+EVERY = 300                                  # sn: kuyruk taraması pahalı, 5 dk'da bir yeter (kayıt zaten geriye dönük)
 
 _BURSTS = """
 WITH l AS (
@@ -122,7 +124,19 @@ def _minutes(delta) -> int:
     return max(1, int(delta.total_seconds() // 60))
 
 
-def detect(conn, since):
+# Log iletimi gecikti: tahtaya aynı aralıkta sensör verisi için ulaşılabildi (en az bu oranında) ama logları geç geldi.
+DELAY_SCRAPED_MIN = 0.5
+DELAY_THRESHOLD = datetime.timedelta(minutes=10)
+
+_RESOLVE = """
+SELECT count(*) AS n FROM logs
+WHERE host = %(host)s AND from_ip = %(ip)s AND program = 'rsyslogd' AND device_time BETWEEN %(s)s AND %(e)s
+  AND message ~ '(cannot resolve hostname|could not get addrinfo)'
+"""
+
+
+def _candidates(conn, since, delayed: bool):
+    """Kuyruk boşaltmaları → kayıtlar. delayed=False: tahtaya ulaşılamadı (ağ koptu); True: ulaşılabiliyordu (log yolu)."""
     boards = {}
     for r in conn.execute(_BOARDS).fetchall():
         boards[(r["host"], r["ip"])] = r
@@ -145,36 +159,64 @@ def detect(conn, since):
         boot = conn.execute(_BOOT, {**args, "s": start, "e": b["delivered"]}).fetchone()["at"]
         # Arada yeniden açıldıysa tahta bir süre kapalıydı: yalnız logla kanıtlı açık kısım.
         end = b["last_dev"] if boot else b["delivered"]
-        if end - start < THRESHOLD:
+        if end - start < (DELAY_THRESHOLD if delayed else THRESHOLD):
             continue
-        # Aynı kopukluğun ikinci kuyruk boşaltması öncekiyle birleşir.
+        # Aynı olayın ikinci kuyruk boşaltması öncekiyle birleşir.
         if previous and previous["key"] == key and start <= previous["end"] + FLUSH_GAP:
             previous["record"]["ended_at"] = max(previous["record"]["ended_at"], end)
             previous["end"] = previous["record"]["ended_at"]
             previous["record"]["detail"]["queued"] += b["n"]
             continue
         window = {"s": start, "e": end}
-        if board["monitor_enabled"]:
+        if not board["monitor_enabled"]:
+            if delayed:
+                continue   # sensör verisi yok: tahtaya ulaşılabildiği bilinemez
+            reachable = False
+        else:
             scraped = conn.execute(_SCRAPED, {**window, "board": str(board["id"])}).fetchone()["n"]
-            if scraped > SCRAPED_MAX * _minutes(end - start):
-                continue   # Ankamon tahtaya ulaşabiliyordu: gecikme log yolunda, ağ bağlantısında değil
+            ratio = scraped / _minutes(end - start)
+            if delayed and ratio < DELAY_SCRAPED_MIN:
+                continue
+            reachable = ratio > SCRAPED_MAX
+        if not delayed and reachable:
+            continue       # Ankamon tahtaya ulaşabiliyordu: gecikme log yolunda (log_delayed), ağ bağlantısında değil
         if conn.execute(_OTHERS, {**window, "host": b["host"], "board": str(board["id"])}).fetchone()["n"] == 0:
             continue       # hiçbir tahtanın logu zamanında gelmedi: sorun sunucuda ya da bütün ağda
-        carrier = conn.execute(_CARRIER, {**args, "s": start - datetime.timedelta(minutes=5),
-                                          "e": end + datetime.timedelta(minutes=15)}).fetchall()
-        cable = bool(carrier)
-        text = ("Ağ kablosu çıkarıldı (tahta taşıyıcı sinyalini kaybettiğini bildirdi)" if cable
-                else "Ağ bağlantısı koptu: kablo çıkarılmış ya da ağ anahtarı/port kesilmiş olabilir")
-        text += (f" · {_minutes(end - start)} dk ulaşılamadı; tahtada bekleyen {b['n']} log {_fmt(b['delivered'])}'de geldi"
-                 + (" · arada tahta yeniden açıldı" if boot else ""))
+        common = {"queued": b["n"], "last_ok": last_ok, "delivered": b["delivered"], "rebooted": bool(boot)}
+        if delayed:
+            resolve = conn.execute(_RESOLVE, {**args, **window}).fetchone()["n"]
+            text = (f"Tahtaya ulaşılabiliyordu ama logları {_minutes(end - start)} dk geç geldi ({b['n']} log, "
+                    f"{_fmt(b['delivered'])}'de): log iletim yolu sorunu"
+                    + (f" — tahta log sunucusunun adını ({resolve} kez) çözemedi" if resolve
+                       else " — log sunucusu adı/portu ya da tahtanın rsyslog'u"))
+            detail = dict(common, text=text, resolve_failures=resolve)
+        else:
+            carrier = conn.execute(_CARRIER, {**args, "s": start - datetime.timedelta(minutes=5),
+                                              "e": end + datetime.timedelta(minutes=15)}).fetchall()
+            cable = bool(carrier)
+            text = ("Ağ kablosu çıkarıldı (tahta taşıyıcı sinyalini kaybettiğini bildirdi)" if cable
+                    else "Ağ bağlantısı koptu: kablo çıkarılmış ya da ağ anahtarı/port kesilmiş olabilir")
+            text += (f" · {_minutes(end - start)} dk ulaşılamadı; tahtada bekleyen {b['n']} log {_fmt(b['delivered'])}'de geldi"
+                     + (" · arada tahta yeniden açıldı" if boot else ""))
+            detail = dict(common, text=text, cable=cable,
+                          carrier=[f"{c['device_time']:%H:%M:%S} {c['message'][:120]}" for c in carrier[:4]])
         record = {"host": board["host"], "board_id": board["id"], "board_name": board["name"],
-                  "started_at": start, "ended_at": end,
-                  "detail": {"text": text, "cable": cable, "queued": b["n"], "last_ok": last_ok,
-                             "delivered": b["delivered"], "rebooted": bool(boot),
-                             "carrier": [f"{c['device_time']:%H:%M:%S} {c['message'][:120]}" for c in carrier[:4]]}}
+                  "started_at": start, "ended_at": end, "detail": detail}
         found.append(record)
         previous = {"key": key, "end": end, "record": record}
     return found, scopes
+
+
+def detect(conn, since):
+    return _candidates(conn, since, delayed=False)
+
+
+def _detect_delayed(conn, since):
+    return _candidates(conn, since, delayed=True)
+
+
+# "Log iletimi gecikti": aynı kuyruk izinden, tahtaya ulaşılabildiği aralıklar (log yolu: mDNS adı, sunucu portu, rsyslog).
+delayed_rule = SimpleNamespace(KIND="log_delayed", WINDOW=WINDOW, EVERY=EVERY, detect=_detect_delayed)
 
 
 # Anlık tarama: kablolu arabirimlerin şu anki durumu ("ad:taşıyıcı:hız") ve son 7 günde NetworkManager günlüğündeki kablo

@@ -52,7 +52,7 @@ import logging
 import os
 import sys
 
-from . import cmos_battery, net_link_lost, no_login, ntp_unsynced, temp_high, uefi_nvram_high
+from . import cmos_battery, identity, net_events, net_link_lost, no_login, ntp_unsynced, temp_high, uefi_nvram_high
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ def _extension_rules() -> list:
 
 
 RULES = [no_login, ntp_unsynced, temp_high.cpu_rule, temp_high.disk_rule, cmos_battery, net_link_lost,
-         uefi_nvram_high] + _extension_rules()
+         uefi_nvram_high, net_link_lost.delayed_rule] + net_events.RULES + identity.RULES + _extension_rules()
 
 # Her turda yeniden hesaplanan geriye dönük pencere (geç gelen loglar/oturum kayıtları için).
 WINDOW = datetime.timedelta(days=1)
@@ -85,9 +85,19 @@ _EPOCH = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 def run(conn) -> None:
     for rule in RULES:
         try:
-            _apply(conn, rule)
+            if _due(conn, rule):
+                _apply(conn, rule)
         except Exception:  # noqa: BLE001 — bir kuralın hatası diğerlerini durdurmasın
             log.exception("Anomali kuralı çalışmadı: %s", rule.KIND)
+
+
+def _due(conn, rule) -> bool:
+    """Kural EVERY (sn) verdiyse en son çalışmasından o kadar geçmeden yeniden çalışmaz (log taraması pahalı kurallar)."""
+    every = getattr(rule, "EVERY", 0)
+    if not every:
+        return True
+    row = conn.execute("SELECT now() - value AS age FROM task_cursors WHERE name = %s", ("anomaly." + rule.KIND,)).fetchone()
+    return row is None or row["age"].total_seconds() >= every
 
 
 def _since(conn, rule) -> datetime.datetime:
@@ -97,6 +107,8 @@ def _since(conn, rule) -> datetime.datetime:
         return _EPOCH  # ilk çalışma: tüm geçmiş
     # Kural kendi penceresini verebilir (ör. ölçümler geç gelmez — her turda bir günü taramaya gerek yok).
     since = cursor["value"] - getattr(rule, "WINDOW", WINDOW)
+    if getattr(rule, "OPEN_FROM_WINDOW", False):
+        return since   # kural süren kaydın devamını kendisi bağlar (bkz. log_events.continue_known): geriye taramaz
     oldest_open = conn.execute(
         "SELECT min(started_at) AS at FROM anomalies WHERE kind = %s AND ended_at IS NULL", (kind,)).fetchone()["at"]
     return min(since, oldest_open) if oldest_open else since

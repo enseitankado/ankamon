@@ -50,7 +50,9 @@ _last = 0.0
 _LABELS = {
     "no_login": "Oturumsuz açık", "ntp_unsynced": "NTP eşitlenmemiş", "cpu_temp_high": "İşlemci sıcaklığı yüksek",
     "disk_temp_high": "Disk sıcaklığı yüksek", "cmos_battery_low": "BIOS pili zayıf", "uefi_nvram_high": "UEFI NVRAM dolu",
-    "net_link_lost": "Ağ bağlantısı koptu",
+    "net_link_lost": "Ağ bağlantısı koptu", "log_delayed": "Log iletimi gecikti", "ssh_bruteforce": "SSH kaba kuvvet",
+    "dhcp_issue": "DHCP adres alamadı", "nic_error": "Ağ kartı hatası", "identity_conflict": "Ad / IP çakışması",
+    "subnet_changed": "Tahta başka ağda", "clock_skew": "Tahta saati yanlış",
 }
 
 

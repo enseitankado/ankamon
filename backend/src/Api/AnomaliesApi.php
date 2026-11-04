@@ -73,6 +73,41 @@ final class AnomaliesApi
             'description' => 'Tahta açıkken ağa ulaşamadı: ağ kablosu çıkarıldı ya da ağ anahtarı/port kesildi. Bağlantı gelince tahtanın kuyrukta bekletip geç gönderdiği loglardan geriye dönük saptanır (o sürede sensör verisi de alınamamış, başka tahtalar ise ulaşıyor olmalı). Tahta kabloyu kaybettiğini logla bildirdiyse "Ağ kablosu çıkarıldı" yazar. Tarama: kablonun şu anki durumu ve son 7 gündeki kopmalar.',
             'scan' => true,
         ],
+        'log_delayed' => [
+            'label' => 'Log iletimi gecikti',
+            'description' => 'Tahtaya ulaşılabildiği halde (sensör verisi geliyordu) logları en az 10 dakika geç geldi: sorun log iletim yolunda — tahta log sunucusunun adını (istiklal.local) çözemedi, sunucunun log portu ya da tahtanın rsyslog\'u. Ağ bağlantısı kopukluğu ayrı türdür.',
+            'scan' => false,
+        ],
+        'ssh_bruteforce' => [
+            'label' => 'SSH kaba kuvvet',
+            'description' => 'Aynı kaynaktan en az 10 başarısız SSH girişi (aralarında 10 dakikadan uzun ara yok). Kaynak adres ve denenen hesaplar ayrıntıda; kaynak Ankamon\'un kendisi de olabilir (ayarlardaki parola tahtanınkinden farklıysa).',
+            'scan' => false,
+        ],
+        'dhcp_issue' => [
+            'label' => 'DHCP adres alamadı',
+            'description' => 'Tahta bir ağ arabiriminde (kablolu ya da Wi-Fi) DHCP ile adres alamadı (15 dakika içinde en az 3 kez). Yalnız NetworkManager satırlarını gönderen tahtalarda görülür.',
+            'scan' => false,
+        ],
+        'nic_error' => [
+            'label' => 'Ağ kartı hatası',
+            'description' => 'Ağ kartı sürücüsü takılma/zaman aşımı bildirdi (NETDEV WATCHDOG, tx timeout, Hardware Unit Hang). Kart, kablo ya da sürücü sorunu.',
+            'scan' => false,
+        ],
+        'identity_conflict' => [
+            'label' => 'Ad / IP çakışması',
+            'description' => 'Aynı bilgisayar adı aynı anda birden çok IP\'den log gönderdi (aynı kalıptan kurulmuş tahtalar adı değiştirilmeden) ya da iki tahta kaydı aynı IP\'yi taşıyor. Aynı IP durumu düzelene dek açık kalır.',
+            'scan' => false,
+        ],
+        'subnet_changed' => [
+            'label' => 'Tahta başka ağda',
+            'description' => 'Tahtanın logları başka bir IP ağından gelmeye başladı: tahta taşındı, başka VLAN\'a bağlandı ya da Wi-Fi\'ye geçti.',
+            'scan' => false,
+        ],
+        'clock_skew' => [
+            'label' => 'Tahta saati yanlış',
+            'description' => 'Tahtanın saati sunucununkinden en az 10 dakika sapıyor (logların tahta zamanına göre). NTP eşitlenmemiş kuralı sensör verisi olan tahtaları görür, bu kural log gönderen her tahtayı.',
+            'scan' => false,
+        ],
         'cmos_battery_low' => [
             'label' => 'BIOS pili zayıf',
             'description' => 'BIOS (CMOS) pilinin gerilimi 2,4 V\'un altında. Sağlam bir okuma gelene (pil değişene) dek sürer. Yalnız pil sensörü etkinleştirilmiş tahtalarda ölçülür.',
