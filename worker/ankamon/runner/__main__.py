@@ -347,8 +347,11 @@ def _run_job(job) -> None:
                     return accounts.lock(t, user, password, username)
             elif job["type"] == "screen_lock":
                 # Ekran ▸ Kilitle: "Kilidi aç"a dek tam ekran "Kilitli", giriş yakalanır (bkz. executor/screenlock.py).
+                # Kilit ekranı tahtanın kimliğini de yazar (takma ad, bilgisayar adı, ETAP, MAC, IP).
+                identities = screenlock.identities(conn, [t["board_id"] for t in targets])
+
                 def work(t):
-                    return screenlock.lock(t, user, password)
+                    return screenlock.lock(t, user, password, identities.get(t["board_id"]))
             elif job["type"] == "screen_unlock":
                 def work(t):
                     return screenlock.unlock(t, user, password)

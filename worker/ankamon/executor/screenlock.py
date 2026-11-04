@@ -36,7 +36,7 @@ Neden ETAP'ın kendi araçları değil (2026-10-30, Arge 2'de kaynaktan okundu):
   - `dm-tool lock` (ETAP'ın oturum kilidi) parolayla açılır — kullanıcı aşabilir.
   - eta-screen-cover kapatma düğmeli, taşınabilir bir perdedir.
 Tahtadaki paket dosyalarına dokunulmaz; kurulanlar Ankamon'un kendi dosyalarıdır ve kilit açılınca silinir:
-  /var/lib/ankamon-lock/{lock.py,cover.py,locked,log}, /etc/systemd/system/ankamon-screen-lock.service.
+  /var/lib/ankamon-lock/{lock.py,cover.py,info.json,locked,log}, /etc/systemd/system/ankamon-screen-lock.service.
 
 Bekçi (lock.py, root, systemd Restart=always): yarım saniyede bir etkin VT'ye bakar.
   - O VT'de X varsa kilit penceresini (cover.py) o ekranda çalıştırır; VT değişince (oturum açma, kullanıcı
@@ -52,11 +52,16 @@ Açılışta kilit penceresi pencere yöneticisinden (compositor, giriş ekranı
 açılınca pencere en üstte görünse de ekrana çizilmiyordu (Arge 1'de 2026-11-02'de yeniden üretildi). Bu yüzden
 pencere bileşim durumu değişince kapanır, bekçi onu hemen yeniden açar.
 
+Kilit yazısının altında tahtanın kimliği (info.json, kilitlerken Ankamon'daki kayıttan): takma ad (kod adı)
+büyükçe, altında bilgisayar adı, ETAP modeli/fazı, MAC ve IP — kilitli tahtayı bulmak/bildirmek için.
+
 Oturum yoklaması (executor/session_probe.py) SCRIPT'teki "L" satırıyla kilit durumunu okur
 (boards.screen_locked — göç 035); Tahtalar grid'inin "Oturum" hücresi "… / Kilitli" yazar.
 """
 
 from __future__ import annotations
+
+import json
 
 from .accounts import _ssh
 from .display import _ACTIVE_X
@@ -213,7 +218,7 @@ restore_xkb()
 log("kilit kapandı")
 '''
 
-_COVER = r'''import signal, warnings
+_COVER = r'''import json, signal, warnings
 import gi
 warnings.simplefilter("ignore")
 gi.require_version("Gtk", "3.0")
@@ -229,7 +234,10 @@ css.load_from_data(("""
 window.ankamon-lock { background-color: #14181d; }
 .ankamon-lock-title { color: #ffffff; font-weight: bold; font-size: %dpx; }
 .ankamon-lock-sub { color: #9aa4ae; font-size: %dpx; }
-""" % (unit, max(unit // 5, 16))).encode())
+.ankamon-lock-code { color: #ffffff; font-weight: bold; font-size: %dpx; }
+.ankamon-lock-key { color: #7d8790; font-size: %dpx; }
+.ankamon-lock-val { color: #d6dce2; font-size: %dpx; font-family: monospace; }
+""" % (unit, max(unit // 5, 16), max(unit * 2 // 5, 26), max(unit // 6, 14), max(unit // 6, 14))).encode())
 Gtk.StyleContext.add_provider_for_screen(scr, css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 10)
 
 win = Gtk.Window(type=Gtk.WindowType.POPUP)
@@ -238,7 +246,15 @@ win.move(0, 0)
 win.set_default_size(W, H)
 win.resize(W, H)
 
-box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=unit // 4, halign=Gtk.Align.CENTER,
+# Tahtanın kimliği (bkz. modül notu): kod adı büyükçe, ayrıntılar alt yazı boyunda.
+try:
+    with open("/var/lib/ankamon-lock/info.json", encoding="utf-8") as f:
+        info = json.load(f)
+except (OSError, ValueError):
+    info = {}
+rows = [r for r in info.get("rows") or [] if isinstance(r, list) and len(r) == 2 and r[1]]
+
+box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=unit // 5, halign=Gtk.Align.CENTER,
               valign=Gtk.Align.CENTER)
 icon = None
 theme = Gtk.IconTheme.get_default()
@@ -246,7 +262,7 @@ theme = Gtk.IconTheme.get_default()
 for name in ("changes-prevent-symbolic", "system-lock-screen-symbolic", "changes-prevent", "system-lock-screen"):
     if theme.has_icon(name):
         icon = Gtk.Image.new_from_icon_name(name, Gtk.IconSize.DIALOG)
-        icon.set_pixel_size(int(unit * 1.6))
+        icon.set_pixel_size(int(unit * 1.3))
         icon.get_style_context().add_class("ankamon-lock-title")
         break
 if icon is None:
@@ -259,6 +275,23 @@ box.pack_start(title, False, False, 0)
 sub = Gtk.Label(label="Bu tahta yönetici tarafından kilitlendi.")
 sub.get_style_context().add_class("ankamon-lock-sub")
 box.pack_start(sub, False, False, 0)
+code = info.get("code") or ""
+if code or rows:
+    ident = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=unit // 10, margin_top=unit // 4)
+    if code:
+        lbl = Gtk.Label(label=code)
+        lbl.get_style_context().add_class("ankamon-lock-code")
+        ident.pack_start(lbl, False, False, 0)
+    grid = Gtk.Grid(column_spacing=unit // 8, row_spacing=unit // 25, halign=Gtk.Align.CENTER)
+    for i, (k, v) in enumerate(rows):
+        kl = Gtk.Label(label=str(k), xalign=1)
+        kl.get_style_context().add_class("ankamon-lock-key")
+        vl = Gtk.Label(label=str(v), xalign=0)
+        vl.get_style_context().add_class("ankamon-lock-val")
+        grid.attach(kl, 0, i, 1, 1)
+        grid.attach(vl, 1, i, 1, 1)
+    ident.pack_start(grid, False, False, 0)
+    box.pack_start(ident, False, False, 0)
 win.add(box)
 win.show_all()
 
@@ -320,6 +353,9 @@ __DAEMON__
 ANKAMON_EOF
 cat > "$D/cover.py" <<'ANKAMON_EOF'
 __COVER__
+ANKAMON_EOF
+cat > "$D/info.json" <<'ANKAMON_EOF'
+__INFO__
 ANKAMON_EOF
 cat > /etc/systemd/system/{UNIT} <<'ANKAMON_EOF'
 {_UNIT}ANKAMON_EOF
@@ -386,9 +422,34 @@ if [ -n "$was" ]; then echo "Ekran kilidi açıldı."; else echo "Tahtada ekran 
 """.replace("__DIR__", DIR).replace("__UNIT__", UNIT).replace("__XKB_RESTORE__", _XKB_RESTORE)
 
 
-def lock(board: dict, user: str, password: str) -> dict:
-    """Ekran ▸ Kilitle. Döner: {"status", "rc", "output"} (bkz. accounts._ssh)."""
-    script = _LOCK.replace("__DAEMON__", _DAEMON).replace("__COVER__", _COVER).replace("__WAKE__", _WAKE)
+def identities(conn, board_ids: list[int]) -> dict[int, dict]:
+    """Kilit ekranında yazacak kimlik: {board_id: {"code", "rows": [[ad, değer], …]}} (boş değerler atlanır)."""
+    rows = conn.execute(
+        "SELECT id, label, hostname, mac::text AS mac, host(ip) AS ip, etap FROM boards WHERE id = ANY(%s)",
+        (board_ids,)).fetchall()
+    out = {}
+    for r in rows:
+        etap = r["etap"] or {}
+        model = ""
+        if etap.get("tahta"):
+            # util.Format.etap ile aynı ad: model (yoksa marka) ve FATİH fazı.
+            model = " · ".join(x for x in (etap.get("ad") or etap.get("marka") or "",
+                                            f"Faz {etap['faz']}" if etap.get("faz") else "") if x)
+        out[r["id"]] = {"code": (r["label"] or "").strip(),
+                        "rows": [["Bilgisayar adı", r["hostname"] or ""], ["ETAP", model],
+                                 ["MAC", (r["mac"] or "").upper()], ["IP", r["ip"] or ""]]}
+    return out
+
+
+def lock(board: dict, user: str, password: str, identity: dict | None = None) -> dict:
+    """Ekran ▸ Kilitle. Döner: {"status", "rc", "output"} (bkz. accounts._ssh). identity: bkz. identities()."""
+    info = dict(identity or {"code": "", "rows": []})
+    if board.get("ip"):
+        # Bağlanılan adres kayıttakinden günceldir.
+        info["rows"] = [[k, board["ip"] if k == "IP" else v] for k, v in info.get("rows") or [["IP", ""]]]
+    # Tek satır, yalnız ASCII (ensure_ascii): heredoc sonlandırıcısıyla ya da betikteki yer tutucularla karışmaz.
+    script = (_LOCK.replace("__DAEMON__", _DAEMON).replace("__COVER__", _COVER).replace("__WAKE__", _WAKE)
+              .replace("__INFO__", json.dumps(info)))
     return _ssh(board, user, password, script, timeout=30)
 
 
