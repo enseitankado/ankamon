@@ -227,6 +227,19 @@ def fill_labels(conn) -> int:
     return len(rows)
 
 
+def fill_board_ips(conn) -> int:
+    """IP'si olmayan tahtalara (Tahta ekle'de yalnız MAC girilmiş) ağ taramasının o MAC için bulduğu adres."""
+    rows = conn.execute(
+        """UPDATE boards b SET ip = d.ip, updated_at = now()
+           FROM net_devices d
+           WHERE b.ip IS NULL AND b.mac = d.mac AND d.ip IS NOT NULL
+           RETURNING b.id"""
+    ).fetchall()
+    if rows:
+        bump(conn)
+    return len(rows)
+
+
 def _etap_board(mac: str) -> bool:
     """MAC, ETAP faz veritabanında bilinen bir akıllı tahta modeline mi düşüyor (bkz. etap_phase)."""
     info = etap_phase.lookup(mac)

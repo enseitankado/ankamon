@@ -82,8 +82,24 @@ final class BoardsApi
     public function create(Request $request, array $user): array
     {
         $fields = self::validatedBoardFields($request);
-        if (empty($fields['ip']) && empty($fields['hostname'])) {
-            throw ApiError::badRequest('IP adresi ya da bilgisayar adı gerekli.');
+        // Takma ad ve MAC zorunlu (Tahta ekle penceresi): MAC tahtayı ağ taramasında bulur ve uzaktan uyandırmayı
+        // sağlar; bilgisayar adı elle girilmez (loglardan / donanım bilgisinden öğrenilir).
+        if (($fields['label'] ?? '') === '') {
+            throw ApiError::badRequest('Takma ad gerekli.');
+        }
+        if (empty($fields['mac'])) {
+            throw ApiError::badRequest('MAC adresi gerekli (de:ad:de:ad:de:ad).');
+        }
+        if (Db::value('SELECT 1 FROM boards WHERE mac = ?', [$fields['mac']])) {
+            throw ApiError::badRequest('Bu MAC adresiyle kayıtlı bir tahta zaten var.');
+        }
+        // IP girilmediyse ağ taramasının bu MAC için bildiği adres (yoksa tarama sonunda dolar — bkz.
+        // worker netscan/store.py fill_board_ips).
+        if (empty($fields['ip'])) {
+            $fields['ip'] = Db::value(
+                'SELECT host(ip) FROM net_devices WHERE mac = ? AND ip IS NOT NULL ORDER BY last_seen_at DESC NULLS LAST LIMIT 1',
+                [$fields['mac']]
+            );
         }
         $fields['source'] = 'manual';
         $columns = array_keys($fields);
@@ -91,7 +107,7 @@ final class BoardsApi
             'INSERT INTO boards (' . implode(', ', $columns) . ') VALUES (' . implode(', ', array_fill(0, count($columns), '?')) . ') RETURNING id',
             array_values($fields)
         );
-        Audit::log($user, $request, 'board.create', (string) ($fields['ip'] ?? $fields['hostname']));
+        Audit::log($user, $request, 'board.create', $fields['label'] . ' ' . $fields['mac']);
         return ['id' => $id];
     }
 
@@ -223,8 +239,8 @@ final class BoardsApi
         }
         if ($request->has('mac')) {
             $mac = strtolower(trim((string) $request->input('mac')));
-            if ($mac !== '' && !preg_match('/^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/', $mac)) {
-                throw ApiError::badRequest('Geçersiz MAC adresi.');
+            if ($mac !== '' && !preg_match('/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/', $mac)) {
+                throw ApiError::badRequest('Geçersiz MAC adresi: de:ad:de:ad:de:ad biçiminde olmalı.');
             }
             $fields['mac'] = $mac === '' ? null : $mac;
         }
