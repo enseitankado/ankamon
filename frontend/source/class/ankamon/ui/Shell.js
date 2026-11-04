@@ -792,12 +792,10 @@ qx.Class.define("ankamon.ui.Shell", {
         ` stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="${path}"/></svg>`;
       const UP = "M6 15l6 -6l6 6";
       const DOWN = "M6 9l6 6l6 -6";
-      const iconButton = (html, tip) => {
-        const button = new qx.ui.form.Button(html).set({ toolTipText: tip, center: true });
-        button.getChildControl("label").setRich(true);
-        return button;
-      };
+      // rich düğmenin kendisine (Atom) verilir: etikete sonradan verilince boyut düz metne göre ölçülüyor, ok kırpılıyordu.
+      const iconButton = (html, tip) => new qx.ui.form.Button(html).set({ rich: true, toolTipText: tip, center: true });
       const hide = iconButton(chevron(UP, 18), "Üst paneli gizle (yerinde kalan şeritten geri açılır)").set({ width: 36 });
+      hide.getChildControl("label").set({ minWidth: 18, minHeight: 18 });
       header.add(hide);
       const strip = new qx.ui.container.Composite(new qx.ui.layout.HBox().set({ alignX: "center", alignY: "middle" })).set({
         backgroundColor: "app-header", padding: [2, 0], cursor: "pointer", toolTipText: "Üst paneli göster"
