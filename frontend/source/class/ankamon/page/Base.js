@@ -37,6 +37,30 @@ qx.Class.define("ankamon.page.Base", {
     // Sayfanın sekmesi değişti ({page, tab}) — ui.Shell ağaçtaki sekme yaprağını vurgular.
     TAB_CHANGED: "ankamon.tabChanged",
 
+    /**
+     * Kullanıcının seçtiği sütun sıralaması veri yenilenince kaybolmasın (kullanıcı bildirimi: Tahtalar sıralaması kısa
+     * süre sonra varsayılana dönüyordu). qx Simple.setData() varsayılan olarak sıralamayı siler; sayfalar kendini
+     * tazeledikçe sıralama gidiyordu. Bu sarmalayıcıyla parametresiz setData(rows) sıralamayı korur ve yeni veriyi aynı
+     * sütun/yönde yeniden dizer. Açık parametre verenler değişmez: setData(rows, true) siler, setData(rows, false) korur
+     * ama yeniden dizmez (ör. Ağ: cihazın altındaki port satırları kendi sırasında kalsın).
+     * Yalnız _createTable'ın kendi Simple modeline uygulanır; kendi sıralamasını yöneten modeller (GroupModel) hariç.
+     */
+    keepSortOnReload(model) {
+      const setData = model.setData;
+      model.setData = function(rows, clearSorting) {
+        if (clearSorting !== undefined) {
+          return setData.call(this, rows, clearSorting);
+        }
+        const column = this.getSortColumnIndex();
+        const ascending = this.isSortAscending();
+        setData.call(this, rows, false);
+        if (column >= 0) {
+          this.sortByColumn(column, ascending);
+        }
+        return undefined;
+      };
+    },
+
     // Hazır değer listesi (süzgeç kutusunun ▾ düğmesi) en çok bu kadar farklı değerli sütunda çıkar.
     CHOICES_MAX: 25,
 
@@ -337,6 +361,9 @@ qx.Class.define("ankamon.page.Base", {
       const leadLabels = opts.checkable ? ["id", ""] : ["id"];
       const leadIds = opts.checkable ? ["id", "__checked"] : ["id"];
       const model = opts.model || new qx.ui.table.model.Simple();
+      if (!opts.model) {
+        ankamon.page.Base.keepSortOnReload(model);
+      }
       model.setColumns(leadLabels.concat(columns.map(c => c.label)), leadIds.concat(columns.map(c => c.id)));
       const table = new qx.ui.table.Table(model, {
         tableColumnModel: obj => new qx.ui.table.columnmodel.Resize(obj)
