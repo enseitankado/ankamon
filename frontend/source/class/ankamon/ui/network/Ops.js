@@ -69,7 +69,7 @@ qx.Class.define("ankamon.ui.network.Ops", {
       const load = st.load ? ` (CPU %${Math.round(st.load.cpu)}, boş bellek %${Math.round(st.load.mem_free)})` : "";
       if (st.phase === "sweeping") {
         const p = st.progress || { pct: 0, found: 0, index: 1, count: 1 };
-        out.sweep = `<b>⟳ Taranıyor:</b> ${esc(st.current || "")}` + (p.count > 1 ? ` (${p.index}/${p.count})` : "") +
+        out.sweep = `${ankamon.ui.JobSpinner.html()} <b>Taranıyor:</b> ${esc(st.current || "")}` + (p.count > 1 ? ` (${p.index}/${p.count})` : "") +
           ` — %${p.pct}`;
         out.sweepPct = p.pct;
       } else if (st.phase === "deferred") {

@@ -121,7 +121,7 @@ qx.Class.define("ankamon.ui.system.Schedules", {
         return;
       }
       this.__run.setEnabled(false);
-      this._status.setValue("Çalışıyor…");
+      this._status.setValue(ankamon.ui.JobSpinner.label("Çalışıyor…"));
       try {
         const res = await ankamon.io.Api.post("/system/jobs/run", { job_id: p.job_id });
         await this.load();

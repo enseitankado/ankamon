@@ -152,8 +152,9 @@ qx.Class.define("ankamon.page.Diagnose", {
       this.__runBox.removeAll().forEach(it => it.dispose());
       runs.forEach(r => {
         const who = r.auto ? "otomatik" : (r.created_by || "—");
-        const state = ["queued", "running"].includes(r.status) ? " · sürüyor" : "";
-        this.__runBox.add(new qx.ui.form.ListItem(`${F.dateTime(r.created_at * 1000)} · ${who} · ${r.targets} tahta${state}`, null, r.id));
+        const state = ["queued", "running"].includes(r.status) ? " · " + ankamon.ui.JobSpinner.label("sürüyor") : "";
+        this.__runBox.add(new qx.ui.form.ListItem(`${F.dateTime(r.created_at * 1000)} · ${qx.bom.String.escape(who)} · ${r.targets} tahta${state}`, null, r.id)
+          .set({ rich: true }));
       });
       const items = this.__runBox.getChildren();
       const pick = items.find(it => it.getModel() === keep) || items[0];

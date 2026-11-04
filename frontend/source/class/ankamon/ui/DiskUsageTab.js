@@ -72,6 +72,12 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
 
     const columns = spec.columns;
     this.__table = page._createTable(columns, { prefsKey: "disk." + (spec.mode || "tab") + ".columns" });
+    // Görev kuyruğu / Bakım raporları: çalışan görevin durumunda dönen halka (DiskUsage.JOB_STATUS.running).
+    const statusCol = columns.some(c => c.id === "status") ? this.__table.getTableModel().getColumnIndexById("status") : -1;
+    if (statusCol >= 0) {
+      this.__table.getTableColumnModel().setDataCellRenderer(statusCol,
+        new ankamon.ui.table.JobStateRenderer([ankamon.ui.DiskUsage.JOB_STATUS.running]));
+    }
     // Explorer tarzı seçim: düz tıklama YALNIZ o satırı seçer (öncekileri bırakır); Ctrl ile satır
     // eklenir/çıkarılır, Shift ile aralık seçilir. (_TOGGLE kipi her düz tıklamayı seçime ekleyip
     // çıkarıyordu — kullanıcı istemedi.)
