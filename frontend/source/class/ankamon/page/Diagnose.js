@@ -58,6 +58,9 @@ qx.Class.define("ankamon.page.Diagnose", {
     }
     top.add(new qx.ui.basic.Label("Rapor:").set({ marginLeft: 8 }));
     this.__runBox = new qx.ui.form.SelectBox().set({ width: 380 });
+    // Seçili raporun yazısı (süren taramada dönen halka HTML'i) kutunun kendisinde de HTML çizilsin;
+    // kip, etikete yazı konmadan verilmeli.
+    this.__runBox.getChildControl("atom").setRich(true);
     this.__runBox.addListener("changeSelection", () => {
       const it = this.__runBox.getSelection()[0];
       if (it && !this.__silent) {
@@ -153,8 +156,12 @@ qx.Class.define("ankamon.page.Diagnose", {
       runs.forEach(r => {
         const who = r.auto ? "otomatik" : (r.created_by || "—");
         const state = ["queued", "running"].includes(r.status) ? " · " + ankamon.ui.JobSpinner.label("sürüyor") : "";
-        this.__runBox.add(new qx.ui.form.ListItem(`${F.dateTime(r.created_at * 1000)} · ${qx.bom.String.escape(who)} · ${r.targets} tahta${state}`, null, r.id)
-          .set({ rich: true }));
+        // rich, etiket oluşmadan verilmeli: qx yazısı konmuş etiketin kipini değiştirmez ("The label mode cannot be
+        // modified after initial creation" — sayfa açılışını kırıyordu). Önce boş madde + rich, sonra yazı.
+        const item = new qx.ui.form.ListItem("", null, r.id);
+        item.setRich(true);
+        item.setLabel(`${F.dateTime(r.created_at * 1000)} · ${qx.bom.String.escape(who)} · ${r.targets} tahta${state}`);
+        this.__runBox.add(item);
       });
       const items = this.__runBox.getChildren();
       const pick = items.find(it => it.getModel() === keep) || items[0];
