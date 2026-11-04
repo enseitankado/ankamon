@@ -44,6 +44,9 @@
  *     çıkmaz) ve metin aynı kurallarla (SHOW_MS gecikme, süresiz, fare kayınca kapanır) bir qx ipucunda gösterilir.
  *     Tablo tazelenip hücre aynı metinle yeniden çizilince ipucu kapanmaz.
  *  5) qx menü maddelerinin ipucu engeli (blockToolTip), ipucu tanımlı maddelerde kaldırılır: sağ menü ipuçları görünür.
+ *  6) Görünür ipucu, sahibi tazelemede yeniden kurulduğu için atılırsa (ör. Genel bakış kartları) fare yerindeyse
+ *     yeni bileşenin ipucu hemen aynı yerde açılır — ipucu fare kımıldamadan kapanmaz.
+ * Devre dışı bileşenler qx'te ipucu göstermez (showToolTipWhenDisabled): bu kasıtlı davranış değiştirilmez.
  */
 qx.Class.define("ankamon.ui.ToolTipPolicy", {
   type: "static",
@@ -79,6 +82,48 @@ qx.Class.define("ankamon.ui.ToolTipPolicy", {
       const moved = (pos, anchor) =>
         Math.abs(pos.x - anchor.x) > Policy.MOVE_PX || Math.abs(pos.y - anchor.y) > Policy.MOVE_PX;
       let last = null;
+      let lastDown = 0;
+      let dismissed = null;
+      let dismissedOpener = null;
+      const show = qx.ui.tooltip.ToolTip.prototype.show;
+      qx.ui.tooltip.ToolTip.prototype.show = function () {
+        if (this === dismissed && this.getOpener() === dismissedOpener) {
+          return undefined; // fare kayınca kapatıldı, fare hâlâ sahibinin üstünde: yeniden açılmaz
+        }
+        return show.apply(this, arguments);
+      };
+
+      // Sahibi yenilemede yeniden kurulan bileşenler (ör. Genel bakış kartları her tazelemede atılır, ipucu da
+      // onunla atılır): görünür ipucu fare kımıldamadan kapanıyordu. Görünür ipucu atılınca — fare yerinde ve
+      // az önce tıklanmamışsa (sayfa değişimi değil) — farenin altındaki yeni bileşenin ipucu hemen aynı yerde açılır.
+      const retarget = anchor => {
+        if (!last || (anchor && moved(last, anchor))) {
+          return;
+        }
+        qx.ui.core.queue.Manager.flush();
+        const w = Widget.getWidgetByElement(document.elementFromPoint(last.x, last.y));
+        if (!w || w.isDisposed()) {
+          return;
+        }
+        manager.showToolTip(w);
+        const tip = manager.getCurrent();
+        if (tip && !tip.isDisposed() && !tip.isVisible()) {
+          tip.placeToPoint({ left: last.x, top: last.y });
+          tip.show();
+          tip.$$ankamonTipAnchor = anchor || last;
+        }
+      };
+      const tipProto = qx.ui.tooltip.ToolTip.prototype;
+      const dispose = tipProto.dispose;
+      tipProto.dispose = function () {
+        const shown = !this.isDisposed() && manager.getCurrent() === this && this.isVisible();
+        const anchor = this.$$ankamonTipAnchor || last;
+        const result = dispose.apply(this, arguments);
+        if (shown && Date.now() - lastDown > 1000) {
+          setTimeout(() => retarget(anchor), 0); // yeni bileşen aynı tazelemede eklenir: sonra bakılır
+        }
+        return result;
+      };
 
       // "title" ipuçları için tek bir qx ipucu.
       let titleTip = null;
@@ -109,6 +154,16 @@ qx.Class.define("ankamon.ui.ToolTipPolicy", {
       // Yerel dinleyiciler (pencere, yakalama evresi): qx olay zincirinden önce çalışır.
       window.addEventListener("pointermove", e => {
         const pos = { x: e.clientX, y: e.clientY };
+        // Fare kayınca kapatılan ipucu, fare sahibinden tamamen çıkana (ya da ipucu başka sahibe geçene) dek
+        // yeniden açılmaz: qx, sahibin iç öğeleri arasında gezinen fareye aynı ipucunu yeniden gösterebiliyordu.
+        if (dismissed) {
+          const opener = dismissed.isDisposed() ? null : dismissed.getOpener();
+          const el = dismissedOpener && !dismissedOpener.isDisposed() && dismissedOpener.getContentElement().getDomElement();
+          const r = el && el.getBoundingClientRect();
+          if (opener !== dismissedOpener || !r || pos.x < r.left || pos.x > r.right || pos.y < r.top || pos.y > r.bottom) {
+            dismissed = dismissedOpener = null;
+          }
+        }
         const tip = manager.getCurrent();
         if (tip && !tip.isDisposed() && tip.isVisible()) {
           // İpucu fare dururken açılır: açıldığı nokta, görünür olduktan sonraki ilk hareketten ÖNCEKİ konumdur.
@@ -116,6 +171,8 @@ qx.Class.define("ankamon.ui.ToolTipPolicy", {
           if (moved(pos, anchor)) {
             tip.exclude();
             tip.$$ankamonTipAnchor = null;
+            dismissed = tip;
+            dismissedOpener = tip.getOpener();
           }
         } else if (tip) {
           tip.$$ankamonTipAnchor = null;
@@ -184,7 +241,10 @@ qx.Class.define("ankamon.ui.ToolTipPolicy", {
         }
       }, { capture: true, passive: true });
 
-      window.addEventListener("pointerdown", () => hideTitle(), { capture: true, passive: true });
+      window.addEventListener("pointerdown", () => {
+        lastDown = Date.now();
+        hideTitle();
+      }, { capture: true, passive: true });
     }
   }
 });
