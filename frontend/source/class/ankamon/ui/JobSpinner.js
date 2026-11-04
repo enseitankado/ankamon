@@ -64,9 +64,15 @@ qx.Class.define("ankamon.ui.JobSpinner", {
         `style="animation-delay:-${phase}ms${color ? ";color:" + color : ""}"></span>`;
     },
 
-    /** Simge + metin (ör. "Sürüyor"); metin kaçışlanmaz, çağıran hazırlar. */
+    /**
+     * Simge + metin (ör. "Sürüyor"); metin kaçışlanmaz, çağıran hazırlar. Halka ile ilk sözcük aynı satırda
+     * kalır: dar kutuda (Sorun tespiti rapor seçimi) halka bir satırda, "sürüyor" alt satırda kalıyordu.
+     */
     label(text, color) {
-      return `${ankamon.ui.JobSpinner.html(color)}&nbsp;${text}`;
+      const cut = text.indexOf(" ");
+      const head = cut < 0 ? text : text.slice(0, cut);
+      return `<span style="white-space:nowrap">${ankamon.ui.JobSpinner.html(color)}&nbsp;${head}</span>` +
+        (cut < 0 ? "" : text.slice(cut));
     }
   }
 });
