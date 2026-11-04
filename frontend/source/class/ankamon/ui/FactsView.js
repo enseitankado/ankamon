@@ -316,7 +316,7 @@ qx.Class.define("ankamon.ui.FactsView", {
       if (!m || !Array.isArray(disks)) {
         return null;
       }
-      const [, num, kind, id, start, size] = m;
+      const [num, kind, id, start, size] = m.slice(1);
       let hit = null;
       if (kind === "GPT") {
         disks.forEach(d => (d.partitions || []).forEach(p => {
@@ -372,7 +372,7 @@ qx.Class.define("ankamon.ui.FactsView", {
       if (!m || !Array.isArray(disks)) {
         return null;
       }
-      const [, kind, id] = m;
+      const [kind, id] = m.slice(1);
       const parts = [];
       disks.forEach(d => (d.partitions || []).forEach(p => parts.push(p)));
       const key = kind === "UUID" ? "uuid" : "part_uuid";

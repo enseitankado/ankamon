@@ -546,7 +546,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const f = facts || {};
       return [["Kod adı", b.label], ["Bilgisayar adı", b.hostname], ["MAC", b.mac], ["IP", b.ip],
         ["Mimari", f.arch], ["İşlemci", f.cpu_model]]
-        .filter(([, v]) => v)
+        .filter(pair => pair[1])
         .map(([k, v]) => `${esc(k)}: <b>${esc(String(v))}</b>`)
         .join(" &nbsp;·&nbsp; ");
     },
