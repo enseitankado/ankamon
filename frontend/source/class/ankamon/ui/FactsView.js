@@ -233,7 +233,7 @@ qx.Class.define("ankamon.ui.FactsView", {
      * sırası ve girdileri (hangi bölümden açıldığı), EFI bölümündeki önyükleyiciler, TPM, çekirdek komut
      * satırı (bkz. worker executor/hwfacts.py _firmware_boot).
      */
-    __firmwareRows(fw, cmdline, section, row) {
+    __firmwareRows(fw, cmdline, section, row, disks) {
       if (!fw) {
         return;
       }
@@ -251,8 +251,10 @@ qx.Class.define("ankamon.ui.FactsView", {
         row("Anahtar kipi", fw.setup_mode ? "Kurulum kipi (Setup Mode — platform anahtarı PK yüklü değil)" : "Kullanıcı kipi (PK yüklü)");
       }
       if (fw.store_total) {
+        const usedPct = Math.round(100 * fw.store_used / fw.store_total);
         row("Değişken deposu (NVRAM)", {
-          html: this.__freeBadge(fw.store_free, fw.store_total) + ` &nbsp;·&nbsp; dolu ${esc(F.bytes(fw.store_used))}`
+          html: this.__freeBadge(fw.store_free, fw.store_total) + ` &nbsp;·&nbsp; dolu ${esc(F.bytes(fw.store_used))}` +
+            "<br>" + this.__bar(usedPct) + ` %${usedPct} dolu`
         });
       }
       const entries = fw.boot_entries || [];
@@ -268,7 +270,8 @@ qx.Class.define("ankamon.ui.FactsView", {
           (e.num === fw.boot_current ? " · " + this.__badge("şu an bu girdiden açıldı", "ok") : "");
         const path = e.path ? "<br>" + this.__mono(e.path) : "";
         const part = e.part ? `<br>→ ${this.__mono(e.part)}${e.part_type ? " (" + esc(e.part_type) + ")" : ""}` : "";
-        row("Boot" + e.num, { html: head + path + part });
+        const match = this.__bootEntryMatch(e, fw, disks);
+        row("Boot" + e.num, { html: head + path + part + (match ? "<br>" + match : "") });
       });
       row("EFI bölümündeki önyükleyiciler", fw.esp_dirs ? fw.esp_dirs.map(d => "EFI/" + d).join(", ") : null);
       const t = fw.tpm;
@@ -280,7 +283,110 @@ qx.Class.define("ankamon.ui.FactsView", {
       } else if (fw.mode) {
         row("TPM", "bulunamadı");
       }
-      row("Çekirdek komut satırı", cmdline ? { html: this.__mono(cmdline) } : null);
+      if (cmdline) {
+        const rootMatch = this.__rootMatch(cmdline, disks);
+        row("Çekirdek komut satırı", { html: this.__mono(cmdline) + (rootMatch ? "<br>" + rootMatch : "") });
+      }
+    },
+
+    /** Yatay doluluk çubuğu (yeşil); yazdırmada da renkli basılır. */
+    __bar(pct, color = "#1e8e3e") {
+      const w = Math.max(0, Math.min(100, pct));
+      return '<span style="display:inline-block;width:240px;height:10px;border:1px solid #9aa0a6;border-radius:3px;' +
+        'vertical-align:middle;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact">' +
+        `<span style="display:block;width:${w}%;height:100%;background:${color}"></span></span>`;
+    },
+
+    /** Bölüm numarası aygıt adından: sda1 → 1, nvme0n1p2 → 2, mmcblk0p1 → 1. */
+    __partNumber(name) {
+      const m = /(\d+)$/.exec(name || "");
+      return m ? Number(m[1]) : null;
+    },
+
+    /**
+     * Açılış girdisinin aygıt yolundaki disk/bölüm kimliğini tahtanın diskleriyle karşılaştırır.
+     * HD(numara, GPT, <bölüm GUID'i>, başlangıç, boyut) — MBR'de üçüncü alan disk imzası. Firmware girdiyi
+     * bu kimlikle bulur: bölüm GUID'i diskte yoksa, konumu/boyutu değiştiyse ya da File(…) önyükleyicisi EFI
+     * bölümünde yoksa girdi AÇILAMAZ (tahta açılışta "önyüklenebilir aygıt yok"a düşer ya da sonraki girdiye
+     * geçer). "uyuşmuyor" yalnız bu açılamama riskinde yazılır; uyuşuyorsa yeşil teyit.
+     * @return {String|null} rozet HTML'i; yolda disk kimliği yoksa (BBS, ağ, kabuk) null
+     */
+    __bootEntryMatch(e, fw, disks) {
+      const m = /HD\((\d+),(GPT|MBR),([^,]+),(0x[0-9a-fA-F]+),(0x[0-9a-fA-F]+)\)/.exec(e.path || "");
+      if (!m || !Array.isArray(disks)) {
+        return null;
+      }
+      const [, num, kind, id, start, size] = m;
+      let hit = null;
+      if (kind === "GPT") {
+        disks.forEach(d => (d.partitions || []).forEach(p => {
+          if ((p.part_uuid || "").toLowerCase() === id.toLowerCase()) {
+            hit = { d, p };
+          }
+        }));
+      } else {
+        const disk = disks.find(d => d.pttype === "dos" && d.ptuuid && parseInt(d.ptuuid, 16) === parseInt(id, 16));
+        const p = disk && (disk.partitions || []).find(x => this.__partNumber(x.name) === Number(num));
+        hit = p ? { d: disk, p } : null;
+      }
+      const what = kind === "GPT" ? "disk/bölüm GUID'i" : "disk imzası (MBR)";
+      if (!hit) {
+        return this.__badge(`${what} ile uyuşmuyor — bu kimlik tahtanın hiçbir diskinde yok: firmware bu ` +
+          "girdiden açamaz (disk değişmiş ya da yeniden bölümlenmiş)", "bad");
+      }
+      const problems = [];
+      if (this.__partNumber(hit.p.name) !== Number(num)) {
+        problems.push(`bölüm numarası girdide ${num}, diskte ${this.__partNumber(hit.p.name)}`);
+      }
+      if (hit.p.start !== null && hit.p.start !== undefined && parseInt(start, 16) !== hit.p.start) {
+        problems.push(`başlangıç sektörü girdide ${parseInt(start, 16)}, diskte ${hit.p.start}`);
+      }
+      if (hit.p.sectors && parseInt(size, 16) !== hit.p.sectors) {
+        problems.push(`boyut girdide ${parseInt(size, 16)}, diskte ${hit.p.sectors} sektör`);
+      }
+      const file = /File\(([^)]*)\)/.exec(e.path);
+      let fileNote = "";
+      if (file && Array.isArray(fw.esp_files) && hit.p.mount === "/boot/efi") {
+        // FAT büyük/küçük harf ayırmaz; firmware yolu ters bölüyle yazar.
+        const want = file[1].replace(/\\/g, "/").toLowerCase();
+        if (fw.esp_files.some(f => f.toLowerCase() === want)) {
+          fileNote = " · önyükleyici dosyası EFI bölümünde var";
+        } else {
+          problems.push(`önyükleyici dosyası (${file[1]}) EFI bölümünde yok`);
+        }
+      }
+      const where = `${hit.p.path}${hit.d.path ? " (" + hit.d.path + ")" : ""}`;
+      if (problems.length) {
+        return this.__badge(`${what} ile uyuşmuyor — ${problems.join("; ")}: firmware bu girdiden ` +
+          "açamayabilir", "bad");
+      }
+      return this.__badge(`${what} ile uyuşuyor — ${where}, başlangıç ve boyut aynı${fileNote}`, "ok");
+    },
+
+    /**
+     * Çekirdek komut satırındaki root=UUID=… / root=PARTUUID=… değerini disklerdeki dosya sistemi/bölüm
+     * kimlikleriyle karşılaştırır: bulunamazsa sonraki açılışta çekirdek kök dosya sistemini bulamaz.
+     */
+    __rootMatch(cmdline, disks) {
+      const m = /(?:^|\s)root=(UUID|PARTUUID)=(\S+)/.exec(cmdline || "");
+      if (!m || !Array.isArray(disks)) {
+        return null;
+      }
+      const [, kind, id] = m;
+      const parts = [];
+      disks.forEach(d => (d.partitions || []).forEach(p => parts.push(p)));
+      const key = kind === "UUID" ? "uuid" : "part_uuid";
+      const label = kind === "UUID" ? "disk/bölüm UUID'si (kök dosya sistemi)" : "disk/bölüm GUID'i (kök bölüm)";
+      const p = parts.find(x => (x[key] || "").toLowerCase() === id.toLowerCase());
+      if (!p) {
+        return this.__badge(`${label} ile uyuşmuyor — bu kimlikte dosya sistemi yok: çekirdek kök dosya ` +
+          "sistemini bulamaz, açılış durur", "bad");
+      }
+      if (p.mount !== "/") {
+        return this.__badge(`${label} ile uyuşmuyor — kimlik ${p.path} bölümünde ama kök (/) oraya bağlı ` +
+          "değil: sonraki açılışta başka bir sistem açılabilir", "bad");
+      }
+      return this.__badge(`${label} ile uyuşuyor — ${p.path} (/)`, "ok");
     },
 
     /**
@@ -467,7 +573,7 @@ qx.Class.define("ankamon.ui.FactsView", {
       row("Sistem UUID", f.product_uuid ? { html: this.__mono(f.product_uuid) } : null);
       row("BIOS", join(f.bios_vendor, f.bios_version, f.bios_date, f.bios_release ? "revizyon " + f.bios_release : null));
 
-      this.__firmwareRows(f.firmware_boot, f.kernel_cmdline, section, row);
+      this.__firmwareRows(f.firmware_boot, f.kernel_cmdline, section, row, f.disk_layout);
       this.__uefiVarRows(f.uefi_vars, section, row);
 
       const body = sections

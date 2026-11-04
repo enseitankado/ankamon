@@ -195,6 +195,8 @@ if [ -d /sys/firmware/efi ]; then
     echo "FW_EFI=$( { dmesg 2>/dev/null; journalctl -k -b -o cat 2>/dev/null; } | sed -n 's/.*efi: EFI v\([^ ]*\) by \(.*\)$/\1|\2/p' | head -n 1)"
     df -B1 -P /sys/firmware/efi/efivars 2>/dev/null | awk 'NR==2{printf "FW_VARSTORE=%.0f|%.0f|%.0f\n", $2, $3, $4}'
     echo "FW_ESP_DIRS=$(ls -1 /boot/efi/EFI 2>/dev/null | tr '\n' ' ')"
+    # EFI bölümündeki dosyalar: açılış girdisinin File(\EFI\…) yolu gerçekten var mı (yoksa girdi açılamaz).
+    mountpoint -q /boot/efi 2>/dev/null && find /boot/efi -type f 2>/dev/null | head -n 300 | sed 's#^/boot/efi#FW_ESP_FILE=#'
     efibootmgr -v 2>/dev/null | sed 's/^/FW_BOOTMGR=/'
     lsattr /sys/firmware/efi/efivars 2>/dev/null | awk '$1 ~ /i/ {n=$2; sub(/.*\//, "", n); print "UEFI_IMMUTABLE=" n}'
     for v in /sys/firmware/efi/efivars/*; do
@@ -337,7 +339,7 @@ def parse(output: str) -> dict:
                                         _multi(lines, "DISK_EXTRA"))
     facts["uefi_vars"] = _uefi_vars(_multi(lines, "UEFI_VAR"), set(_multi(lines, "UEFI_IMMUTABLE")))
     facts["firmware_boot"] = _firmware_boot(values, _multi(lines, "FW_BOOTMGR"), facts["disk_layout"],
-                                            facts["uefi_vars"])
+                                            facts["uefi_vars"], _multi(lines, "FW_ESP_FILE"))
     return facts
 
 
@@ -520,7 +522,7 @@ def _efi_path(rest: str) -> str:
     return m.group(1).rstrip("/") if m else rest.strip()[:120]
 
 
-def _firmware_boot(values: dict, bootmgr: list, disks: list, uefi_vars: list) -> dict:
+def _firmware_boot(values: dict, bootmgr: list, disks: list, uefi_vars: list, esp_files: list = ()) -> dict:
     """Firmware kipi, EFI sürüm/üretici, Secure Boot, değişken deposu, açılış sırası ve girdileri
     (aygıt yolundaki GPT bölüm GUID'i tahtadaki bölüme eşlenir), EFI bölümündeki önyükleyici dizinleri,
     TPM."""
@@ -551,6 +553,8 @@ def _firmware_boot(values: dict, bootmgr: list, disks: list, uefi_vars: list) ->
     if len(store) == 3:
         fw["store_total"], fw["store_used"], fw["store_free"] = store
     fw["esp_dirs"] = (values.get("FW_ESP_DIRS") or "").split() or None
+    # /boot/efi'ye bağlı EFI bölümünün dosyaları (bağlı değilse None — dosya denetimi yapılamaz).
+    fw["esp_files"] = esp_files or None
     by_name = {v["name"]: v for v in uefi_vars if v["guid"] == _GLOBAL_GUID}
     sb = by_name.get("SecureBoot", {}).get("value")
     fw["secure_boot"] = None if sb is None else sb.startswith("Evet")

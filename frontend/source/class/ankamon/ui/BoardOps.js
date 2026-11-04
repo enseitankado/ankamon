@@ -428,12 +428,31 @@ qx.Class.define("ankamon.ui.BoardOps", {
         return;
       }
       const name = b => b.label || b.hostname || b.ip || ("#" + b.id);
+      // Kart başlığındaki kimlik (kod adı, MAC…) için tahta kaydı: Tahtalar sayfası tam satırı verir, başka
+      // girişler (ör. Bakım ▸ Ahenk) yalnız id/ad verebilir — MAC'i eksikse liste bir kez okunur.
+      const boardById = new Map(boards.map(b => [b.id, b]));
+      if (boards.some(b => !b.mac)) {
+        ankamon.io.Api.get("/boards").then(res => {
+          (Array.isArray(res) ? res : (res.boards || [])).forEach(b => {
+            if (boardById.has(b.id)) {
+              boardById.set(b.id, Object.assign({}, b, boardById.get(b.id), { mac: b.mac }));
+            }
+          });
+          if (!stop) {
+            render();
+          }
+        }, () => {});
+      }
       const caption = boards.length > 1 ? `Bilgi kartı (${boards.length} tahta)` : "Bilgi kartı — " + name(boards[0]);
-      const win = ankamon.ui.Dialog.window(caption, 960, { maximizable: true });
+      // Geniş pencere: GUID'li satırlar, açılış girdisi denetimleri ve UEFI değişken değerleri tek satıra sığsın
+      // (ekran darsa ekranın genişliğine iner, satırlar o zaman kırılır).
+      const rootBounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 700 };
+      const win = ankamon.ui.Dialog.window(caption, Math.max(Math.min(960, rootBounds.width - 40), Math.min(1400, rootBounds.width - 60)),
+        { maximizable: true });
       // Dialog.window pencereyi içeriğin DOĞAL yüksekliğine göre boyutlandırır; Scroll'un flex:1'i
       // onsuz küçük kalır (sarılacağı sabit bir yükseklik olmadan esneyecek yer bulamaz) — bkz.
       // benzer not Base.js _createTable civarında. Sabit bir yükseklik vererek Scroll'a gerçek alan açılır.
-      win.setHeight(Math.min(560, (qx.core.Init.getApplication().getRoot().getBounds() || { height: 700 }).height - 80));
+      win.setHeight(Math.min(Math.max(560, Math.round(rootBounds.height * 0.8)), rootBounds.height - 80));
       const status = new qx.ui.basic.Label("Toplanıyor…").set({ textColor: "app-muted" });
       win.add(status);
       const body = new qx.ui.container.Composite(new qx.ui.layout.VBox(8));
@@ -463,8 +482,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
             padding: 10,
             decorator: new qx.ui.decoration.Decorator().set({ width: 1, color: "app-border" })
           });
-          card.add(new qx.ui.basic.Label(qx.bom.String.escape(t.board)).set({ font: "bold" }));
           const facts = this.__parseFacts(t);
+          card.add(new qx.ui.basic.Label(qx.bom.String.escape(t.board)).set({ font: "bold" }));
+          card.add(new qx.ui.basic.Label(this.__infoCardIdentity(boardById.get(t.board_id), facts))
+            .set({ rich: true, selectable: true, textColor: "app-muted" }));
           if (facts) {
             card.add(new qx.ui.basic.Label(ankamon.ui.FactsView.html(facts, sensors.get(t.board_id))).set({ rich: true, selectable: true, allowGrowX: true }));
           } else if (["queued", "running"].includes(t.status)) {
@@ -500,7 +521,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
           qx.event.Timer.once(tick, this, 700);
         }
       };
-      printBtn.addListener("execute", () => this.__printInfoCard(targets, sensors));
+      printBtn.addListener("execute", () => this.__printInfoCard(targets, sensors, boardById));
       win.open();
 
       try {
@@ -513,29 +534,52 @@ qx.Class.define("ankamon.ui.BoardOps", {
       tick();
     },
 
-    /** "Bilgi kartı" penceresindeki "Yazdır": qx pencere ağacı yerine YENİ, sade bir sekmede tek
-     * sayfalık bir tablo açar — qx'in mutlak konumlu kutuları tarayıcı yazdırmasında güvenilmez
-     * kırpılıyor (bkz. diğer özel görünümler: /screen/, /webshell/ — aynı "ayrı sade sayfa" deseni). */
-    __printInfoCard(targets, sensors) {
+    /**
+     * Bilgi kartı başlığındaki tahta kimliği: kod adı (takma ad), bilgisayar adı, MAC, IP, mimari, işlemci.
+     * @param board {Map|undefined} tahta kaydı (label, hostname, mac, ip)
+     * @param facts {Map|null} facts (arch, cpu_model)
+     * @return {String} kaçırılmış HTML
+     */
+    __infoCardIdentity(board, facts) {
       const esc = qx.bom.String.escape;
-      // Tahta başına bir kart (pencereyle aynı HTML, bkz. ui.FactsView); kart sayfa ortasında bölünmez.
+      const b = board || {};
+      const f = facts || {};
+      return [["Kod adı", b.label], ["Bilgisayar adı", b.hostname], ["MAC", b.mac], ["IP", b.ip],
+        ["Mimari", f.arch], ["İşlemci", f.cpu_model]]
+        .filter(([, v]) => v)
+        .map(([k, v]) => `${esc(k)}: <b>${esc(String(v))}</b>`)
+        .join(" &nbsp;·&nbsp; ");
+    },
+
+    /** "Bilgi kartı" penceresindeki "Yazdır": qx pencere ağacı yerine YENİ, sade bir sekmede
+     * yazdırılabilir sayfa açar — qx'in mutlak konumlu kutuları tarayıcı yazdırmasında güvenilmez
+     * kırpılıyor (bkz. diğer özel görünümler: /screen/, /webshell/ — aynı "ayrı sade sayfa" deseni).
+     * Her tahta yeni sayfadan başlar ve başlığında hangi tahta olduğu yazar. Kart sayfadan uzun olduğundan
+     * bölünmesine izin verilir (eskiden "bölünmesin" kuralı kartı ikinci sayfaya itip ilk sayfayı boş
+     * bırakıyordu); yalnız tablo satırları ve bölüm başlıkları sayfa sınırında bölünmez. */
+    __printInfoCard(targets, sensors, boardById = new Map()) {
+      const esc = qx.bom.String.escape;
+      const when = esc(new Date().toLocaleString("tr-TR"));
       const cards = targets.map(t => {
         const facts = this.__parseFacts(t);
-        return `<div class="card"><h2>${esc(t.board)}</h2>` +
-          (facts ? ankamon.ui.FactsView.html(facts, sensors.get(t.board_id)) : `<p>${esc(t.output || "Okunamadı")}</p>`) + "</div>";
+        const board = boardById.get(t.board_id) || {};
+        return `<section class="card"><h1>Tahta bilgi kartı — ${esc(board.label || t.board)}</h1>` +
+          `<div class="id">${this.__infoCardIdentity(board, facts)}</div><div class="when">${when}</div>` +
+          (facts ? ankamon.ui.FactsView.html(facts, sensors.get(t.board_id)) : `<p>${esc(t.output || "Okunamadı")}</p>`) +
+          "</section>";
       }).join("");
-      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Bilgi kartı</title>
+      const title = targets.length === 1 ? `Bilgi kartı — ${esc((boardById.get(targets[0].board_id) || {}).label || targets[0].board)}`
+        : `Bilgi kartı (${targets.length} tahta)`;
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
         <style>
-          body{font-family:sans-serif;margin:24px;color:#111;font-size:13px}
-          h1{font-size:18px;margin-bottom:4px}
-          h2{font-size:15px;margin:0 0 4px}
-          .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;margin-top:12px}
-          .card{border:1px solid #ccc;padding:10px;break-inside:avoid;page-break-inside:avoid}
-        </style></head><body>
-        <h1>Tahta bilgi kartı</h1>
-        <div>${esc(new Date().toLocaleString("tr-TR"))}</div>
-        <div class="cards">${cards}</div>
-        </body></html>`;
+          body{font-family:sans-serif;margin:16px;color:#111;font-size:12px}
+          h1{font-size:17px;margin:0 0 4px}
+          .id{margin-bottom:2px}
+          .when{color:#555;margin-bottom:8px}
+          .card + .card{break-before:page;page-break-before:always}
+          tr{break-inside:avoid;page-break-inside:avoid}
+          *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        </style></head><body>${cards}</body></html>`;
       const w = window.open("", "_blank");
       if (!w) {
         return;

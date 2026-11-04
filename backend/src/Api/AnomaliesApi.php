@@ -78,6 +78,11 @@ final class AnomaliesApi
             'description' => 'BIOS (CMOS) pilinin gerilimi 2,4 V\'un altında. Sağlam bir okuma gelene (pil değişene) dek sürer. Yalnız pil sensörü etkinleştirilmiş tahtalarda ölçülür.',
             'scan' => true,
         ],
+        'uefi_nvram_high' => [
+            'label' => 'UEFI NVRAM dolu',
+            'description' => 'UEFI değişken deposunun (NVRAM) doluluk oranı filodaki tahtaların ortalamasından en az 10 puan yüksek ya da boş alanı %10\'un altında. Depo dolarsa firmware yeni açılış girdisi/değişken yazamaz: güncellemede önyükleyici kaydı başarısız olabilir, tahta açılmayabilir. Değer Bilgi kartı, ilk tanıma ve haftalık otomatik sorun taramasında toplanır; ortalama için en az 3 tahtanın verisi gerekir.',
+            'scan' => true,
+        ],
     ];
 
     /**

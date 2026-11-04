@@ -49,7 +49,7 @@ _last = 0.0
 
 _LABELS = {
     "no_login": "Oturumsuz açık", "ntp_unsynced": "NTP eşitlenmemiş", "cpu_temp_high": "İşlemci sıcaklığı yüksek",
-    "disk_temp_high": "Disk sıcaklığı yüksek", "cmos_battery_low": "BIOS pili zayıf",
+    "disk_temp_high": "Disk sıcaklığı yüksek", "cmos_battery_low": "BIOS pili zayıf", "uefi_nvram_high": "UEFI NVRAM dolu",
 }
 
 
