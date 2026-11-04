@@ -789,7 +789,8 @@ qx.Class.define("ankamon.ui.Shell", {
     __foldableHeader(header) {
       const prefs = this.__user.ui_prefs || (this.__user.ui_prefs = {});
       const chevron = (path, size) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor"` +
-        ` stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="${path}"/></svg>`;
+        ` stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;pointer-events:none"><path d="${path}"/></svg>`;
+      // pointer-events:none: tıklama SVG'ye düşünce bazı temalarda (Bernstein) düğmeye iletilmiyordu; düğmenin kendi öğesi alır.
       const UP = "M6 15l6 -6l6 6";
       const DOWN = "M6 9l6 6l6 -6";
       // rich düğmenin kendisine (Atom) verilir: etikete sonradan verilince boyut düz metne göre ölçülüyor, ok kırpılıyordu.
