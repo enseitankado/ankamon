@@ -46,11 +46,23 @@ final class Db
                 getenv('PG_PORT') ?: '5432',
                 getenv('PG_DB') ?: 'ankamon'
             );
-            self::$pdo = new PDO($dsn, getenv('PG_USER') ?: 'ankamon', getenv('PG_PASSWORD') ?: '', [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-            ]);
+            // Bağlantı sınırı anlık dolarsa ("too many clients": worker'ın paralel toplu işleri) istek hemen
+            // düşmesin: kısa, artan beklemelerle (toplam ~1,5 sn) yeniden denenir. Başka hatalar hemen yükselir.
+            foreach ([100000, 250000, 500000, 650000, 0] as $wait) {
+                try {
+                    self::$pdo = new PDO($dsn, getenv('PG_USER') ?: 'ankamon', getenv('PG_PASSWORD') ?: '', [
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                        PDO::ATTR_EMULATE_PREPARES => false,
+                    ]);
+                    break;
+                } catch (\PDOException $e) {
+                    if ($wait === 0 || !str_contains($e->getMessage(), 'too many clients')) {
+                        throw $e;
+                    }
+                    usleep($wait);
+                }
+            }
         }
         return self::$pdo;
     }

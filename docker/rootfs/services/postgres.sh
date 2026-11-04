@@ -28,6 +28,7 @@ fi
 # initdb'de etkinleştirildi. Yalnız yerel dinleme.
 exec su-exec postgres postgres -D "$PGDATA" \
     -c listen_addresses=127.0.0.1 \
+    -c max_connections=100 \
     -c fsync=on -c full_page_writes=on -c synchronous_commit=on \
     -c wal_compression=on -c max_wal_size=1GB -c checkpoint_timeout=5min \
     -c shared_preload_libraries=timescaledb \
