@@ -1369,8 +1369,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
      * komut kutusu, bir hazır işlem seçiliyken onun açıklaması + parametre formu gösterilir.
      * @param boards {Array} hedef tahtalar
      * @param user {Map} oturum sahibi — hangi seçeneklerin sunulacağını (actions/shell yetkisi) belirler
+     * @param preselect {String?} pencere bu hazır işlem (actions/<id>) seçili açılır — ör. Bakım ▸ Sensörler
+     *   uyarısındaki kurulum bağlantıları; işlem listede yoksa (yetki) ilk satır kalır
      */
-    async run(boards, user) {
+    async run(boards, user, preselect = null) {
       const ids = boards.map(b => b.id);
       if (!ids.length) {
         ankamon.ui.Dialog.alert("Önce bir ya da daha fazla tahta işaretleyin.");
@@ -1445,6 +1447,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
           }
         }
       };
+      const pre = preselect && select.getChildren().find(i => i.getModel() && i.getModel().id === preselect);
+      if (pre) {
+        select.setSelection([pre]);
+      }
       select.addListener("changeSelection", showSel);
       showSel();
 

@@ -40,7 +40,9 @@ final class MetricsApi
     /**
      * GET /api/metrics/coverage — Bakım ▸ Sensörler bilgilendirmesi: tahta başına son 7 günde sensör verisi
      * (metrik izleme / node_exporter) gelmiş mi, fan ya da anakart (Super I/O) sensörü var mı. Verisi hiç
-     * olmayan tahtalarda sayfa hangi hazır komutların kurulacağını söyler.
+     * olmayan tahtalarda sayfa hangi hazır komutların kurulacağını söyler. superio_done: "Fan/pil/anakart
+     * sensörlerini etkinleştir" (actions/sensors-superio) bu tahtada başarıyla çalışmış mı — yonga
+     * desteklenmiyorsa işlem iz bırakmadan biter, sensör hiç gelmez; bu tahtaya aynı adım yeniden önerilmez.
      */
     public function coverage(): array
     {
@@ -49,7 +51,10 @@ final class MetricsApi
                     EXISTS (SELECT 1 FROM metrics m JOIN metrics_tag t USING (tag_id)
                             WHERE t.board_id = b.id::text AND m.time > now() - interval '7 days') AS has_data,
                     EXISTS (SELECT 1 FROM metrics_tag t WHERE t.board_id = b.id::text
-                            AND (t.name = 'node_hwmon_fan_rpm' OR t.chip ~ '(it87|nct6|f71)')) AS has_board_sensors
+                            AND (t.name = 'node_hwmon_fan_rpm' OR t.chip ~ '(it87|nct6|f71)')) AS has_board_sensors,
+                    EXISTS (SELECT 1 FROM job_targets jt JOIN jobs j ON j.id = jt.job_id
+                            WHERE jt.board_id = b.id AND jt.status = 'ok' AND j.type = 'action'
+                              AND j.params->>'action' = 'sensors-superio') AS superio_done
              FROM boards b ORDER BY name");
         return ['boards' => $rows];
     }

@@ -65,6 +65,7 @@ qx.Class.define("ankamon.page.Metrics", {
     // Sensör verisi hiç gelmeyen tahtalar için kurulum yönergesi (bkz. __updateNotice).
     this.__notice = new qx.ui.basic.Label("").set({ rich: true, wrap: true, selectable: true, visibility: "excluded",
       padding: [8, 12], backgroundColor: "#fff4ce", textColor: "#3b2f00" });
+    this.__notice.addListener("tap", e => this.__noticeTap(e));
     this.add(this.__notice);
     this.__frame = new qx.ui.embed.Iframe("about:blank");
     this.add(this.__frame, { flex: 1 });
@@ -73,6 +74,7 @@ qx.Class.define("ankamon.page.Metrics", {
   members: {
     __frame: null,
     __notice: null,
+    __noticeTargets: null,
     __coverage: null,
     __select: null,
     __filling: false,
@@ -90,32 +92,97 @@ qx.Class.define("ankamon.page.Metrics", {
     },
 
     /**
-     * Sensör verisi hiç olmayan tahtalar için bilgilendirme: tüm tahtalar görünümünde o tahtaların listesi,
-     * tek tahtada yalnız o tahta. Kurulum hazır komutlarla yapılır (actions/node-exporter, sensors-superio).
+     * Sensör verisi eksik tahtalar için bilgilendirme: tüm tahtalar görünümünde o tahtaların listesi, tek
+     * tahtada yalnız o tahta. İki kurulum adımı tahta başına AYRI denetlenir ve yalnız gereken adım yazılır:
+     *   1. Metrik izlemeyi kur (actions/node-exporter) — son 7 günde hiç veri gelmeyen tahtalar (has_data);
+     *   2. Fan/pil/anakart sensörlerini etkinleştir (actions/sensors-superio) — fan/anakart sensörü olmayan
+     *      ve bu işlemin henüz başarıyla çalışmadığı tahtalar (has_board_sensors, superio_done).
+     * Adımların yolu tıklanır: Komut çalıştır penceresi o adımın tahtaları için o hazır komut seçili açılır
+     * (bkz. ui.BoardOps.run). Listede kapalı tahta varsa sonuna "WoL ile aç" bağlantısı eklenir.
      */
     __updateNotice() {
       const esc = qx.bom.String.escape;
       const list = this.__coverage || [];
       const id = this.__boardId();
-      const missing = list.filter(b => !b.has_data && (id === null || b.id === id));
-      const noBoard = list.filter(b => b.has_data && !b.has_board_sensors && (id === null || b.id === id));
-      const how = "Kurmak için Tahtalar'da tahtaları işaretleyip <b>Komut çalıştır ▸ Hazır / Serbest komut çalıştır</b> " +
-        "penceresinden önce <b>Sensörler — Metrik izlemeyi kur</b> (işlemci, bellek, disk, ağ, sıcaklık), ardından fan ve " +
-        "anakart ölçümleri için <b>Sensörler — Fan/pil/anakart sensörlerini etkinleştir</b> hazır komutunu çalıştırın. " +
-        "Veri birkaç dakika içinde grafiklere gelmeye başlar.";
+      const shown = list.filter(b => id === null || b.id === id);
+      const missing = shown.filter(b => !b.has_data);
+      const noBoard = shown.filter(b => b.has_data && !b.has_board_sensors && !b.superio_done);
+      const steps = [
+        { key: "node-exporter", boards: missing, title: "Metrik izlemeyi kur",
+          what: "işlemci, bellek, disk, ağ, sıcaklık" },
+        { key: "sensors-superio", boards: shown.filter(b => !b.has_board_sensors && !b.superio_done),
+          title: "Fan/pil/anakart sensörlerini etkinleştir",
+          what: "fan devri, CMOS pili, anakart sıcaklığı; anakartın donanım izleme yongası destekleniyorsa" }
+      ].filter(st => st.boards.length);
+      const canRun = this._can("actions");
+      const link = (attr, text) => `<span ${attr} style="color:#0b57d0;text-decoration:underline;cursor:pointer">${text}</span>`;
       const names = arr => arr.slice(0, 12).map(b => esc(b.name) + (b.online ? "" : " (kapalı)")).join(", ") +
         (arr.length > 12 ? ` ve ${arr.length - 12} tahta daha` : "");
-      let html = "";
+      const wol = arr => {
+        const off = arr.filter(b => !b.online);
+        if (!off.length || !this._can("power")) {
+          return "";
+        }
+        const text = id !== null ? "tahtayı WoL ile aç" : `${off.length} kapalı tahtayı WoL ile aç`;
+        return " — " + link(`data-sensor-wol="${off.map(b => b.id).join(",")}"`, text);
+      };
+
+      const lines = [];
       if (missing.length) {
-        html = (id === null
-          ? `<b>${missing.length} tahtada hiç sensör verisi yok:</b> ${names(missing)}.<br>`
-          : "<b>Bu tahtada hiç sensör verisi yok:</b> sensör istemcisi (metrik izleme) kurulu değil ya da çalışmıyor.<br>") + how;
-      } else if (id !== null && noBoard.length) {
-        html = "Bu tahtada fan / anakart sensörü verisi yok. <b>Komut çalıştır ▸ Sensörler — Fan/pil/anakart sensörlerini etkinleştir</b> " +
-          "hazır komutu anakartın donanım izleme yongası destekleniyorsa bunları açar.";
+        lines.push(id === null
+          ? `<b>${missing.length} tahtada hiç sensör verisi yok:</b> ${names(missing)}${wol(missing)}.`
+          : "<b>Bu tahtada hiç sensör verisi yok:</b> sensör istemcisi (metrik izleme) kurulu değil ya da çalışmıyor" +
+            (missing[0].online ? "" : " (tahta kapalı" + wol(missing) + ")") + ".");
       }
+      if (noBoard.length) {
+        lines.push(id === null
+          ? `<b>${noBoard.length} tahtada fan / anakart sensörü verisi yok:</b> ${names(noBoard)}${wol(noBoard)}.`
+          : "<b>Bu tahtada fan / anakart sensörü verisi yok.</b>" + (noBoard[0].online ? "" : " Tahta kapalı" + wol(noBoard) + "."));
+      }
+      this.__noticeTargets = {};
+      if (steps.length) {
+        const path = st => {
+          const text = `Komut çalıştır ▸ Hazır / Serbest komut çalıştır ▸ Sensörler — ${esc(st.title)}`;
+          this.__noticeTargets[st.key] = st.boards.map(b => b.id);
+          return canRun ? link(`data-sensor-run="${st.key}"`, text) : `<b>${text}</b>`;
+        };
+        const count = st => {
+          if (id !== null) {
+            return "";
+          }
+          const off = st.boards.filter(b => !b.online).length;
+          return ` — ${st.boards.length} tahta` + (off ? ` (${off} kapalı: önce açılmalı)` : "");
+        };
+        lines.push((steps.length > 1 ? "Kurmak için Tahtalar'da tahtaları işaretleyip sırasıyla şu hazır komutları çalıştırın" :
+          "Kurmak için Tahtalar'da tahtaları işaretleyip şu hazır komutu çalıştırın") +
+          (canRun ? " (bağlantı pencereyi bu tahtalar için açar):" : ":"));
+        steps.forEach((st, i) => lines.push(`${steps.length > 1 ? i + 1 + ". " : "• "}${path(st)} (${st.what})${count(st)}`));
+        lines.push("Veri birkaç dakika içinde grafiklere gelmeye başlar.");
+      }
+      const html = lines.join("<br>");
       this.__notice.setValue(html);
       this.__notice.setVisibility(html ? "visible" : "excluded");
+    },
+
+    /** Uyarıdaki bağlantılar (bkz. __updateNotice): hazır komut penceresi ya da WoL ile açma. */
+    __noticeTap(e) {
+      const el = e.getOriginalTarget();
+      const hit = el && el.closest ? el.closest("[data-sensor-run],[data-sensor-wol]") : null;
+      if (!hit) {
+        return;
+      }
+      const run = hit.getAttribute("data-sensor-run");
+      if (run) {
+        const ids = (this.__noticeTargets || {})[run] || [];
+        ankamon.ui.BoardOps.run(ids.map(i => ({ id: i })), this._user, run);
+        return;
+      }
+      const ids = hit.getAttribute("data-sensor-wol").split(",").map(Number);
+      ankamon.io.Api.post("/jobs", { type: "wol", board_ids: ids })
+        .then(() => ankamon.ui.Dialog.alert(
+          `${ids.length} tahtaya uyandırma (Wake-on-LAN) paketi gönderildi. WoL kurulumu yapılmışsa birkaç dakika ` +
+          "sonra tahtalar açılacaktır.", "Uyandırma (WoL)"))
+        .catch(err => ankamon.ui.Dialog.error(err));
     },
 
     /** Panoyu yalnız adres değiştiyse yükler (sekmeye her dönüşte Grafana baştan çizilmesin). */
