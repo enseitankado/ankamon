@@ -1124,6 +1124,24 @@ function setTileSize(px, reset) {
   }
 }
 
+/**
+ * Varsayılan boyut (üst sayfada Boyut yazısına çift tık, ya da hiç boyut seçilmemişse): satıra cols kutucuk sığacak
+ * genişlik. Kaydırma çubuğu henüz yoksa da payı düşülür; kutucuklar çoğalıp çubuk çıkınca son kutucuk alta kaymasın.
+ */
+function fitTileWidth(cols) {
+  const style = getComputedStyle(grid);
+  const gap = parseFloat(style.columnGap) || 0;
+  let width = grid.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  if (grid.scrollHeight <= grid.clientHeight) {
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;top:-999px;width:100px;height:50px;overflow:scroll";
+    document.body.appendChild(probe);
+    width -= probe.offsetWidth - probe.clientWidth;
+    probe.remove();
+  }
+  return Math.floor((width - gap * (cols - 1)) / cols);
+}
+
 function toggleFullscreen(el) {
   if (document.fullscreenElement) document.exitFullscreen();
   else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
@@ -1454,6 +1472,7 @@ if (embed) {
     if (e.data.type === "tm-boards") { setBoards(e.data.boards || []); markLoaded(); }
     else if (e.data.type === "tm-selection") setSelected((e.data.ids || []).filter(id => tiles.has(id)), true);
     else if (e.data.type === "tm-size") setTileSize(e.data.px, !!e.data.reset);
+    else if (e.data.type === "tm-fit") window.parent.postMessage({ type: "tm-fit", px: fitTileWidth(e.data.cols) }, location.origin);
     else if (e.data.type === "tm-pause") {
       paused = !!e.data.paused;
       tiles.forEach(t => t.refreshWanted());

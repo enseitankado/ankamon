@@ -287,6 +287,10 @@ qx.Class.define("ankamon.page.Boards", {
     __onMessage: null,
     __screenRes: null,
     __sizeLabel: null,
+    __autoSize: false,
+    __fitting: false,
+    __fitReset: false,
+    __fitResizeId: null,
     __shownBoards: null,
     __whoamiState: null,
     __liveQueue: null,
@@ -404,6 +408,13 @@ qx.Class.define("ankamon.page.Boards", {
           this.__previewKey = null; // sayfa yeni yüklendi: güncel listeyi yeniden gönder
           this.__pushPreview();
           this.__pushSize(false);
+          if (this.__autoSize) {
+            this.__requestFit(false);
+          }
+          if (!this.__fitResizeId) {
+            // Varsayılan boyuttayken pencere/kenar çubuğu genişliği değişince satırdaki ekran sayısı korunur.
+            this.__fitResizeId = this.__frame.addListener("resize", () => this.__autoSize && this.__requestFit(false));
+          }
           this.__pushView();
           if (this.__screensPaused) {
             this.__pausePreview(true);
@@ -443,6 +454,8 @@ qx.Class.define("ankamon.page.Boards", {
           this.__queueLiveWhoami(e.data.id);
         } else if (e.data.type === "tm-refreshed") {
           this.__tileRefreshed(e.data.id);
+        } else if (e.data.type === "tm-fit") {
+          this.__applyFit(e.data.px);
         } else if (e.data.type === "tm-res") {
           // Tahtanın ekran çözünürlüğü (VNC çerçeve boyutu): slider'ın yanındaki % değeri buna göre.
           this.__screenRes.set(e.data.id, e.data.w);
@@ -538,11 +551,12 @@ qx.Class.define("ankamon.page.Boards", {
       const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({
         padding: [2, 8]
       });
-      row.add(new qx.ui.basic.Label("Boyut:").set({ font: "small", textColor: "app-muted" }));
+      const caption = new qx.ui.basic.Label("Boyut:").set({ font: "small", textColor: "app-muted" });
+      row.add(caption);
       // İnce ve narin (kullanıcı isteği): temanın kalın slider'ı yerine 2 px'lik ray + küçük yuvarlak tutamaç.
       // Renkler etkin temadan (ray app-border, tutamaç temanın seçim rengi); tema değişince yeniden boyanır.
       const slider = new qx.ui.form.Slider().set({
-        minimum: 140, maximum: 640, singleStep: 10, value: this.__loadTileSize(), width: 200,
+        minimum: 140, maximum: 640, singleStep: 10, value: this.__loadTileSize() || 300, width: 200,
         height: 12, maxHeight: 12, allowGrowY: false, alignY: "middle", decorator: null, padding: 0,
         toolTipText: "Bütün kutucukları aynı boyuta getirir (tek tek boyut: kutucuğun kenarından sürükleyin)"
       });
@@ -563,8 +577,13 @@ qx.Class.define("ankamon.page.Boards", {
       paint();
       this.__sliderThemeListener = qx.theme.manager.Meta.getInstance().addListener("changeTheme", () => qx.event.Timer.once(paint, this, 0));
       this.__sizeSlider = slider;
+      this.__autoSize = !this.__loadTileSize();
       slider.addListener("changeValue", e => {
+        if (this.__fitting) {
+          return;     // varsayılan boyut uygulanıyor: kaydedilmez, gönderimi __applyFit yapar
+        }
         const v = e.getData();
+        this.__autoSize = false;
         this.__tileSize = v;
         this.__saveTileSize(v);
         this.__pushSize(true);
@@ -574,8 +593,53 @@ qx.Class.define("ankamon.page.Boards", {
       row.add(slider);
       this.__sizeLabel = new qx.ui.basic.Label("").set({ font: "small", textColor: "app-muted", minWidth: 36 });
       row.add(this.__sizeLabel);
+      // Çift tık: hepsi varsayılan boyuta (satırdaki ekran sayısı ekran çözünürlüğünden), tek tek boyutlar silinir.
+      [caption, this.__sizeLabel].forEach(label => label.addListener("dblclick", () => this.__resetTileSize()));
+      caption.setToolTipText(`Çift tıklayın: hepsi varsayılan boyuta (satırda ${this.__defaultColumns()} ekran)`);
       this.__updateSizeLabel();
       return row;
+    },
+
+    /** Varsayılan boyutta satırdaki ekran sayısı: kullanıcının ekran genişliğinden (1920 → 5, 1366 → 4, 2560 → 7). */
+    __defaultColumns() {
+      return Math.min(8, Math.max(2, Math.round(window.screen.width / 384)));
+    },
+
+    __resetTileSize() {
+      this.__autoSize = true;
+      try {
+        localStorage.removeItem("ankamon.boards.screenTileSize");
+      } catch (e) {
+        // sorun değil
+      }
+      this.__requestFit(true);
+    },
+
+    /** Genişliği iframe ölçer (kaydırma çubuğu, boşluklar onda); yanıt "tm-fit" ile __applyFit'e gelir. */
+    __requestFit(reset) {
+      this.__fitReset = this.__fitReset || reset;
+      const el = this.__iframeEl();
+      if (el && el.contentWindow) {
+        el.contentWindow.postMessage({ type: "tm-fit", cols: this.__defaultColumns() }, window.location.origin);
+      }
+    },
+
+    __applyFit(px) {
+      const value = Math.min(640, Math.max(140, Math.floor(px)));
+      const reset = this.__fitReset;
+      this.__fitReset = false;
+      if (!this.__autoSize || (value === this.__tileSize && !reset)) {
+        return;
+      }
+      this.__fitting = true;
+      try {
+        this.__sizeSlider.setValue(value);
+      } finally {
+        this.__fitting = false;
+      }
+      this.__tileSize = value;
+      this.__pushSize(reset);
+      this.__updateSizeLabel();
     },
 
     /**
@@ -599,7 +663,8 @@ qx.Class.define("ankamon.page.Boards", {
       });
       const pct = Math.max(1, Math.round(this.__tileSize * 100 / width));
       this.__sizeLabel.setValue("%" + pct);
-      this.__sizeLabel.setToolTipText(`Kutucuk genişliği ${this.__tileSize} px, tahta ekranı ${width} px genişlikte (%${pct} oranında)`);
+      this.__sizeLabel.setToolTipText(`Kutucuk genişliği ${this.__tileSize} px, tahta ekranı ${width} px genişlikte (%${pct} oranında)` +
+        (this.__autoSize ? " · varsayılan boyut" : ` · çift tıklayın: varsayılan boyut (satırda ${this.__defaultColumns()} ekran)`));
     },
 
     __loadTileSize() {
@@ -611,7 +676,7 @@ qx.Class.define("ankamon.page.Boards", {
       } catch (e) {
         // localStorage erişilemiyor olabilir — varsayılana düş.
       }
-      return 300;
+      return null;    // kayıt yok: varsayılan boyut (bkz. __defaultColumns)
     },
 
     __saveTileSize(v) {
