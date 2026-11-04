@@ -779,18 +779,33 @@ qx.Class.define("ankamon.ui.Shell", {
     },
 
     /**
-     * Üst panel katlanabilir (kullanıcı isteği: dikey alan). Katlıyken yerinde ince bir şerit kalır; şerite tıklayınca
-     * panel geri açılır. Durum kullanıcı başına sunucuda (users.ui_prefs["header.folded"], bkz. AuthApi::prefs).
+     * Üst panel katlanabilir (kullanıcı isteği: dikey alan). Katlıyken yerinde ince bir şerit ve ortasında "Üst paneli göster"
+     * düğmesi kalır; şeride ya da düğmeye tıklayınca panel geri açılır. Durum kullanıcı başına sunucuda kaydedilir ve girişte
+     * oradan yüklenir (users.ui_prefs["header.folded"], bkz. AuthApi::prefs ve /auth/me).
+     *
+     * Oklar SVG (Tabler Icons chevron-up/down, MIT): "▴/▾" karakterleri bazı temaların yazı tipinde (ör. macOS) neredeyse
+     * görünmüyordu (kullanıcı bildirimi). Düğmeler temanın kendi düğme görünümünde: her temada seçilir.
      */
     __foldableHeader(header) {
       const prefs = this.__user.ui_prefs || (this.__user.ui_prefs = {});
-      const strip = new qx.ui.container.Composite(new qx.ui.layout.HBox().set({ alignX: "center", alignY: "middle" })).set({
-        backgroundColor: "app-header", height: 12, allowGrowY: false, cursor: "pointer", toolTipText: "Üst paneli göster"
-      });
-      // Yazı tipi adı vermeden küçük ok (her temada tanımlı küçük yazı tipi yok).
-      strip.add(new qx.ui.basic.Label('<span style="font-size:10px;line-height:10px">▾</span>').set({ rich: true, textColor: "app-header-text" }));
-      const hide = new qx.ui.form.Button("▴").set({ toolTipText: "Üst paneli gizle (ince şeride tıklayınca geri gelir)", width: 30 });
+      const chevron = (path, size) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor"` +
+        ` stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="${path}"/></svg>`;
+      const UP = "M6 15l6 -6l6 6";
+      const DOWN = "M6 9l6 6l6 -6";
+      const iconButton = (html, tip) => {
+        const button = new qx.ui.form.Button(html).set({ toolTipText: tip, center: true });
+        button.getChildControl("label").setRich(true);
+        return button;
+      };
+      const hide = iconButton(chevron(UP, 18), "Üst paneli gizle (yerinde kalan şeritten geri açılır)").set({ width: 36 });
       header.add(hide);
+      const strip = new qx.ui.container.Composite(new qx.ui.layout.HBox().set({ alignX: "center", alignY: "middle" })).set({
+        backgroundColor: "app-header", padding: [2, 0], cursor: "pointer", toolTipText: "Üst paneli göster"
+      });
+      const showButton = iconButton(
+        `<span style="display:inline-flex;align-items:center;gap:6px">${chevron(DOWN, 16)}` +
+        '<span style="font-size:12px;line-height:16px">Üst paneli göster</span></span>', "Üst paneli göster").set({ padding: [1, 12] });
+      strip.add(showButton);
       const apply = folded => {
         header.setVisibility(folded ? "excluded" : "visible");
         strip.setVisibility(folded ? "visible" : "excluded");
@@ -803,7 +818,12 @@ qx.Class.define("ankamon.ui.Shell", {
         });
       };
       hide.addListener("execute", () => set(true));
-      strip.addListener("tap", () => set(false));
+      showButton.addListener("execute", () => set(false));
+      strip.addListener("tap", e => {
+        if (e.getTarget() === strip) {
+          set(false); // şeridin boş yeri; düğmenin kendi tıklaması execute ile
+        }
+      });
       apply(!!prefs["header.folded"]);
       const box = new qx.ui.container.Composite(new qx.ui.layout.VBox());
       box.add(header);
