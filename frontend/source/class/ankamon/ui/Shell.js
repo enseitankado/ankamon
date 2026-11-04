@@ -755,7 +755,12 @@ qx.Class.define("ankamon.ui.Shell", {
       });
       header.add(fold);
       // Logo simgesi: ekran çerçevesi başlık yazısının renginde (temaların koyu/mavi başlık zemininde seçilsin).
-      header.add(new qx.ui.basic.Label(ankamon.ui.Logo.icon(32, "currentColor")).set({ rich: true, textColor: "app-header-text" }));
+      // Tıklanınca geliştiriciye anonim mesaj penceresi (bkz. ui.DeveloperContactWindow).
+      const logo = new qx.ui.basic.Label(ankamon.ui.Logo.icon(32, "currentColor")).set({
+        rich: true, textColor: "app-header-text", cursor: "pointer", toolTipText: "Geliştiriciye yazın: eleştiri, öneri, teşekkür…"
+      });
+      logo.addListener("tap", () => ankamon.ui.DeveloperContactWindow.open());
+      header.add(logo);
       const brand = new qx.ui.container.Composite(new qx.ui.layout.VBox()).set({ backgroundColor: "app-header" });
       // "Ankamon > Bakım > Sensörler": sayfa başlıklarının yerine (bkz. ui.ShellNavPath; ağaçtan beslenir — __createTree).
       this.__navPath = new ankamon.ui.ShellNavPath();
@@ -770,7 +775,40 @@ qx.Class.define("ankamon.ui.Shell", {
         qx.event.message.Bus.dispatchByName(ankamon.io.Api.UNAUTHORIZED);
       });
       header.add(logout);
-      return header;
+      return this.__foldableHeader(header);
+    },
+
+    /**
+     * Üst panel katlanabilir (kullanıcı isteği: dikey alan). Katlıyken yerinde ince bir şerit kalır; şerite tıklayınca
+     * panel geri açılır. Durum kullanıcı başına sunucuda (users.ui_prefs["header.folded"], bkz. AuthApi::prefs).
+     */
+    __foldableHeader(header) {
+      const prefs = this.__user.ui_prefs || (this.__user.ui_prefs = {});
+      const strip = new qx.ui.container.Composite(new qx.ui.layout.HBox().set({ alignX: "center", alignY: "middle" })).set({
+        backgroundColor: "app-header", height: 12, allowGrowY: false, cursor: "pointer", toolTipText: "Üst paneli göster"
+      });
+      // Yazı tipi adı vermeden küçük ok (her temada tanımlı küçük yazı tipi yok).
+      strip.add(new qx.ui.basic.Label('<span style="font-size:10px;line-height:10px">▾</span>').set({ rich: true, textColor: "app-header-text" }));
+      const hide = new qx.ui.form.Button("▴").set({ toolTipText: "Üst paneli gizle (ince şeride tıklayınca geri gelir)", width: 30 });
+      header.add(hide);
+      const apply = folded => {
+        header.setVisibility(folded ? "excluded" : "visible");
+        strip.setVisibility(folded ? "visible" : "excluded");
+      };
+      const set = folded => {
+        apply(folded);
+        prefs["header.folded"] = folded;
+        ankamon.io.Api.put("/auth/prefs", { key: "header.folded", value: folded }).catch(() => {
+          // Kalıcılık kaybı önemsiz: bir sonraki katlamada yeniden gönderilir.
+        });
+      };
+      hide.addListener("execute", () => set(true));
+      strip.addListener("tap", () => set(false));
+      apply(!!prefs["header.folded"]);
+      const box = new qx.ui.container.Composite(new qx.ui.layout.VBox());
+      box.add(header);
+      box.add(strip);
+      return box;
     }
   }
 });

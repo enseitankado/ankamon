@@ -156,7 +156,7 @@ qx.Class.define("ankamon.page.Boards", {
     this.__views = new qx.ui.container.Stack();
     const listPage = new qx.ui.container.Composite(new qx.ui.layout.VBox(8)).set({ padding: [8, 8, 0, 8] });
     listPage.add(this.__table, { flex: 1 });
-    this.__note = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true, wrap: true });
+    this.__note = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true, wrap: true, visibility: "excluded" });
     listPage.add(this.__note);
     this.__views.add(listPage);
     this.__listPage = listPage;
@@ -341,6 +341,8 @@ qx.Class.define("ankamon.page.Boards", {
       this.__actionBar.refresh();
       this.__note.setValue(boards.boards.length ? "" :
         "Henüz kayıtlı tahta yok. Tahtalar log göndermeye başladığında kendiliğinden listelenir; elle de ekleyebilirsiniz.");
+      // Boş not yer kaplamasın: tablo pencerenin altına kadar uzansın (kullanıcı isteği).
+      this.__note.setVisibility(boards.boards.length ? "excluded" : "visible");
     },
 
     /** Her sütunun altındaki metin kutularını (Excel tarzı sütun filtresi) uygular. */

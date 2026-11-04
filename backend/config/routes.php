@@ -34,6 +34,8 @@ use Ankamon\Api;
 return [
     ['GET',    '/api/health',            [Api\HealthApi::class, 'health'],     'public'],
     ['GET',    '/api/surum-damgasi',     [Api\HealthApi::class, 'surumDamgasi'], 'user'],
+    // Ankamon simgesi → geliştiriciye anonim mesaj (ntfy ankamon-iletisim; bkz. DeveloperContactApi).
+    ['POST',   '/api/developer-contact', [Api\DeveloperContactApi::class, 'send'], 'user'],
     // Giriş ekranı durum satırı: yalnız sayılar (bkz. LoginStatusApi).
     ['GET',    '/api/login-status',      [Api\LoginStatusApi::class, 'status'], 'public'],
 
