@@ -128,7 +128,7 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
       };
       show(null);
       this.__note.setValue((failed.length ? "Hesapları alınamayan tahtalar: " + qx.bom.String.escape(failed.join(", ")) + ". " : "") +
-        (union.size ? "Boyutlar ölçülüyor…" : ""));
+        (union.size ? ankamon.ui.JobSpinner.label("Boyutlar ölçülüyor…") : ""));
       const failNote = failed.length ? "Hesapları alınamayan tahtalar: " + qx.bom.String.escape(failed.join(", ")) : "";
       let sizes = null;
       try {

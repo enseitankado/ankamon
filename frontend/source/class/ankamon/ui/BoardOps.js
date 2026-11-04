@@ -453,7 +453,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       // onsuz küçük kalır (sarılacağı sabit bir yükseklik olmadan esneyecek yer bulamaz) — bkz.
       // benzer not Base.js _createTable civarında. Sabit bir yükseklik vererek Scroll'a gerçek alan açılır.
       win.setHeight(Math.min(Math.max(560, Math.round(rootBounds.height * 0.8)), rootBounds.height - 80));
-      const status = new qx.ui.basic.Label("Toplanıyor…").set({ textColor: "app-muted" });
+      const status = new qx.ui.basic.Label(ankamon.ui.JobSpinner.label("Toplanıyor…")).set({ textColor: "app-muted", rich: true });
       win.add(status);
       const body = new qx.ui.container.Composite(new qx.ui.layout.VBox(8));
       const scroll = new qx.ui.container.Scroll();
@@ -489,7 +489,8 @@ qx.Class.define("ankamon.ui.BoardOps", {
           if (facts) {
             card.add(new qx.ui.basic.Label(ankamon.ui.FactsView.html(facts, sensors.get(t.board_id))).set({ rich: true, selectable: true, allowGrowX: true }));
           } else if (["queued", "running"].includes(t.status)) {
-            card.add(new qx.ui.basic.Label("Toplanıyor…").set({ textColor: "app-muted" }));
+            card.add(new qx.ui.basic.Label(t.status === "running" ? ankamon.ui.JobSpinner.label("Toplanıyor…") : "Sırada")
+              .set({ textColor: "app-muted", rich: true }));
           } else {
             card.add(new qx.ui.basic.Label("Okunamadı: " + qx.bom.String.escape(t.output || ""))
               .set({ textColor: "app-error", rich: true, wrap: true }));
@@ -515,7 +516,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         targets = (res.job && res.job.targets) || [];
         render();
         const running = res.job.status === "queued" || res.job.status === "running";
-        status.setValue(running ? "Toplanıyor…" : "");
+        status.setValue(running ? ankamon.ui.JobSpinner.label("Toplanıyor…") : "");
         printBtn.setEnabled(!running);
         if (running) {
           qx.event.Timer.once(tick, this, 700);

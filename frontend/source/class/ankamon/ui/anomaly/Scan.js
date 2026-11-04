@@ -383,7 +383,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
           } else {
             text = t.status === "unreachable" ? "Tahtaya ulaşılamadı (kapalı olabilir): " + (t.output || "") : (t.output || "Taranamadı");
           }
-          rows.push({ id: t.board_id + ":" + kind, board: t.board, kind, state, text });
+          rows.push({ id: t.board_id + ":" + kind, board: t.board, kind, state, text, running: t.status === "running" });
         });
       });
       return rows;
@@ -403,7 +403,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       this.__resultTable.getTableModel().setData(rows.map(r => {
         const [text, color] = label[r.state];
         return [r.id, r.board, (this.__kindLabels || {})[r.kind] || r.kind,
-          color ? S.html(text, color) : text, r.text || ""];
+          r.running ? ankamon.ui.JobSpinner.label("Taranıyor") : (color ? S.html(text, color) : text), r.text || ""];
       }));
       if (!job) {
         this.__status.setValue("Tahtaları ve anomalileri seçip Tara'ya basın.");
@@ -415,7 +415,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       const found = all.filter(r => r.state === "found").length;
       const unreachable = job.targets.filter(t => !["queued", "running", "ok"].includes(t.status)).length;
       const when = ankamon.util.Format.dateTime((job.finished_at || job.created_at) * 1000);
-      let html = pending ? `Taranıyor: ${boards - pending} / ${boards} tahta tamamlandı…`
+      let html = pending ? ankamon.ui.JobSpinner.label(`Taranıyor: ${boards - pending} / ${boards} tahta tamamlandı…`)
         : `<span style="font-weight:bold;color:${found ? red : green}">` +
           (found ? `${foundBoards} tahtada ${found} anomali bulundu` : "Anomali bulunmadı") + "</span>";
       html += ` <span style="opacity:.75">· ${boards} tahta` + (unreachable ? `, ${unreachable} tanesine ulaşılamadı` : "") +

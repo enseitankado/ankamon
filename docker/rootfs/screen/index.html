@@ -157,6 +157,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
   .tile .whoami[hidden] { display: none; }
   .tile .whoami.querying { font-style: italic; }
+  /* Sürmekte olan iş (oturum aç/kapat, kilitle, uyut…): yazının önünde dönen halka — durağan yazı işin
+     ilerlediği hissini vermiyordu (panelde aynısı: ui.JobSpinner). */
+  .tile .whoami.querying::before { content: ""; display: inline-block; box-sizing: border-box; width: .85em;
+    height: .85em; margin-right: 6px; vertical-align: -.1em; border: 2px solid currentColor;
+    border-right-color: transparent; border-radius: 50%; animation: whoami-job-spin .9s linear infinite; }
+  @keyframes whoami-job-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .tile .whoami.querying::before { animation-duration: 2.4s; } }
   .tile .whoami.error { background: rgba(140, 20, 20, .75); }
   /* Alt bar (yalnız Ekranlar sekmesi — gömülü kip): üst başlık çubuğunun aynısı; tahtanın son
      işlemci/bellek kullanımı ve işlemci sıcaklığı (bkz. Tile.setStats, Boards.js __previewList).

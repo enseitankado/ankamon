@@ -105,7 +105,7 @@ qx.Class.define("ankamon.ui.boards.EtaKisitWebFilter", {
       const win = ankamon.ui.Dialog.window(`Web Filtre — ${title}`, 780, { maximizable: true });
       win.setHeight(680);
 
-      const boardStates = new qx.ui.basic.Label("Tahtalar okunuyor…").set({ rich: true, wrap: true, selectable: true, allowGrowX: true });
+      const boardStates = new qx.ui.basic.Label(ankamon.ui.JobSpinner.label("Tahtalar okunuyor…")).set({ rich: true, wrap: true, selectable: true, allowGrowX: true });
       win.add(boardStates);
 
       const modeRow = new qx.ui.container.Composite(new qx.ui.layout.HBox(16));
@@ -333,7 +333,7 @@ qx.Class.define("ankamon.ui.boards.EtaKisitWebFilter", {
           return;
         }
         setBusy(true);
-        boardStates.setValue("Uygulanıyor…");
+        boardStates.setValue(ankamon.ui.JobSpinner.label("Uygulanıyor…"));
         try {
           const targets = await this.__runJob({
             type: "webfilter_apply", mode: key, denylist: lists.denylist, allowlist: lists.allowlist, board_ids: usable

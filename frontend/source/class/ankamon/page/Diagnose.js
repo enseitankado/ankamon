@@ -192,7 +192,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       const done = targets.filter(t => !["queued", "running"].includes(t.status)).length;
       const running = ["queued", "running"].includes(res.job.status);
       this.__progress.set({ maximum: Math.max(1, targets.length), value: done, visibility: running ? "visible" : "excluded" });
-      this.__status.setValue(running ? `Denetleniyor: ${done} / ${targets.length} tahta tamamlandı…` : "");
+      this.__status.setValue(running ? ankamon.ui.JobSpinner.label(`Denetleniyor: ${done} / ${targets.length} tahta tamamlandı…`) : "");
       this.__updateBoardFilter(targets);
       this.__render();
       if (running) {
@@ -379,7 +379,7 @@ qx.Class.define("ankamon.page.Diagnose", {
         const open = canOpen(t) && this.__expanded.has(key);
         let state, counts = ["", "", ""], top = "";
         if (pending(t)) {
-          state = `<i style="opacity:.7">${t.status === "running" ? "Denetleniyor…" : "Sırada"}</i>`;
+          state = t.status === "running" ? ankamon.ui.JobSpinner.label("Denetleniyor…") : `<i style="opacity:.7">Sırada</i>`;
         } else if (halted(t)) {
           state = badge("warn") + " <span style=\"opacity:.8\">yarıda kaldı</span>";
           top = "Görev bu tahtada tamamlanamadan kesildi (ör. Ankamon yeniden başlatıldı); denetimi yeniden çalıştırın.";

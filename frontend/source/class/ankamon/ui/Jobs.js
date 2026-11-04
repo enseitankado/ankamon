@@ -34,7 +34,7 @@
  * vardır; seçilen tahtanın ayrıntısı sağdadır. Tek tahtada liste gizlenir.
  *
  * Komut/hazır işlemde tahtalar PARALEL, kaynak yetmezse grup grup çalışır (bkz. runner/__main__.py):
- * liste duruma göre gruplanır ve renklenir — önce çalışanlar (mavi ▶), sonra sırada bekleyenler
+ * liste duruma göre gruplanır ve renklenir — önce çalışanlar (mavi, dönen halka: ui.JobSpinner), sonra sırada bekleyenler
  * (gri ⏳), en sonda bitenler (yeşil ✓ / kırmızı ✕ / turuncu ⚠); üst satırda sayıları. "Tümü"
  * görünümünde her satır [tahta] önekli; bir tahta bitmeden araya başkası girebildiğinden boş satırlı
  * ayraç yalnız önceki tahta bitmişse konur (sıralı görevlerde eskisi gibi tahta tahta okunur).
@@ -238,8 +238,9 @@ qx.Class.define("ankamon.ui.Jobs", {
           const pct = t.status === "running" && percent.has(t.board_id) ? ` — %${percent.get(t.board_id)}` : "";
           const color = ankamon.ui.Jobs.STATUS_COLOR[t.status] || "inherit";
           item.setRich(true);
+          const mark = t.status === "running" ? ankamon.ui.JobSpinner.html() : (icon[t.status] || "•");
           item.setLabel(`<span style="color:${color}${t.status === "running" ? ";font-weight:600" : ""}">` +
-            `${icon[t.status] || "•"} ${qx.bom.String.escape(t.board)}${code}${pct}</span>`);
+            `${mark} ${qx.bom.String.escape(t.board)}${code}${pct}</span>`);
         });
         // Grup sırası: çalışanlar üstte, sonra sıradakiler, en altta bitenler (her grupta ad sırası).
         const rank = st => ankamon.ui.Jobs.STATUS_RANK[st] ?? 2;
@@ -327,7 +328,7 @@ qx.Class.define("ankamon.ui.Jobs", {
         const C = ankamon.ui.Jobs.STATUS_COLOR;
         const failed = count("failed") + count("unreachable");
         const counts = res.targets.length > 1
-          ? ` — <span style="color:${C.running}">▶ ${count("running")} çalışıyor</span> · ` +
+          ? ` — <span style="color:${C.running}">${ankamon.ui.JobSpinner.html()} ${count("running")} çalışıyor</span> · ` +
             `<span style="color:${C.queued}">⏳ ${count("queued")} sırada</span> · ` +
             `<span style="color:${C.ok}">✓ ${count("ok")} başarılı</span>` +
             (failed ? ` · <span style="color:${C.failed}">✕ ${failed} başarısız</span>` : "")

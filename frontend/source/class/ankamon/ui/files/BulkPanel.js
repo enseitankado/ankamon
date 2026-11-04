@@ -65,7 +65,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
     },
 
     STATES: {
-      queued: "⏸ Sırada", running: "⏳ Sürüyor", ok: "✔ Tamam", done: "✔ Tamam", partial: "⚠ Kısmen",
+      queued: "⏸ Sırada", running: "Sürüyor", ok: "✔ Tamam", done: "✔ Tamam", partial: "⚠ Kısmen",
       failed: "✖ Hata", skipped: "– Atlandı", cancelled: "⏹ İptal"
     }
   },
@@ -884,7 +884,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
           this.__lastReq = req;
           res = await this.__uploadAndDistribute(req);
         } else {
-          this.__phase.setValue(dry ? "Önizleme: tahtalarda neyin toplanacağı sayılıyor (hiçbir şey aktarılmaz)…" : "Toplanıyor…");
+          this.__phase.setValue(ankamon.ui.JobSpinner.label(dry ? "Önizleme: tahtalarda neyin toplanacağı sayılıyor (hiçbir şey aktarılmaz)…" : "Toplanıyor…"));
           res = await ankamon.ui.files.Api.post("/bulk/collect", Object.assign(req, this.__whatRequest().body, {
             move: this.__move.getValue(), dry: !!dry
           }));
@@ -905,13 +905,13 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
     /** Dağıt: dosyaları yükler (kesilmişse kaldığı dosyadan sürer — bkz. BulkIo.upload) ve işi başlatır. */
     async __uploadAndDistribute(req) {
       const fmt = ankamon.util.Format.bytes;
-      this.__phase.setValue("Dosyalar sunucuya yükleniyor…");
+      this.__phase.setValue(ankamon.ui.JobSpinner.label("Dosyalar sunucuya yükleniyor…"));
       const token = await ankamon.ui.files.BulkIo.upload(this.__files, (done, total) => {
         this.__bar.setValue(total ? Math.floor((done / total) * 100) : 100);
         this.__progressText.setValue(`Yükleme: ${fmt(done)} / ${fmt(total)}`);
       }, this.__upload);
       this.__upload = null;
-      this.__phase.setValue("Dağıtılıyor…");
+      this.__phase.setValue(ankamon.ui.JobSpinner.label("Dağıtılıyor…"));
       return ankamon.ui.files.Api.post("/bulk/distribute", Object.assign({}, req, {
         token, conflict: this.__conflict.getSelection()[0].getModel(), relay: this.__relay.getValue()
       }));
@@ -977,7 +977,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
           } else {
             await ankamon.ui.files.Api.post(`/bulk/${this.__job.id}/resume`, {});
             this.__job.state = "running";
-            this.__phase.setValue("Sürdürülüyor…");
+            this.__phase.setValue(ankamon.ui.JobSpinner.label("Sürdürülüyor…"));
           }
         } catch (e) {
           if (e.aborted) {
@@ -1038,6 +1038,9 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       }).set({ statusBarVisible: false, columnVisibilityButtonVisible: false });
       const behavior = table.getTableColumnModel().getBehavior();
       [180, 110, "1*", 110, 60, 90, "1*"].forEach((w, i) => behavior.setWidth(i, w));
+      // Sürmekte olan satırın durumunda dönen halka (STATES.running ile başlar).
+      table.getTableColumnModel().setDataCellRenderer(3,
+        new ankamon.ui.table.JobStateRenderer([ankamon.ui.files.BulkPanel.STATES.running]));
       this.__table = table;
       page.add(table, { flex: 1 });
       // Önizlemede tablo yerine dosya ağacı: bilgisayar ▸ kullanıcı (ikisi açık) ▸ klasörler (kapalı) ▸ dosyalar.
