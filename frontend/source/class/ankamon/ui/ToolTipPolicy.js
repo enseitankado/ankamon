@@ -42,6 +42,8 @@
  *     sahibinin içinde kalıyorsa bu olay qx'e ulaşmaz.
  *  4) "title" taşıyan öğenin üzerine gelince title, data-ankamon-title'a taşınır (tarayıcının kendi ipucu
  *     çıkmaz) ve metin aynı kurallarla (SHOW_MS gecikme, süresiz, fare kayınca kapanır) bir qx ipucunda gösterilir.
+ *     Tablo tazelenip hücre aynı metinle yeniden çizilince ipucu kapanmaz.
+ *  5) qx menü maddelerinin ipucu engeli (blockToolTip), ipucu tanımlı maddelerde kaldırılır: sağ menü ipuçları görünür.
  */
 qx.Class.define("ankamon.ui.ToolTipPolicy", {
   type: "static",
@@ -141,6 +143,20 @@ qx.Class.define("ankamon.ui.ToolTipPolicy", {
 
       window.addEventListener("pointerover", e => {
         const t = e.target;
+        // qx menü maddeleri ipucunu varsayılan olarak engeller (menu.AbstractButton blockToolTip: true): sağ menüde
+        // tanımlı ipuçları (ör. Ahenk ▸ ETAP kontrol, Etap adlarını senkronize et) hiç görünmüyordu. İpucu tanımlı
+        // maddede engel, qx olayı işlemeden önce kaldırılır; ipucu aynı kurallarla (fare kayınca) kapanır.
+        for (let w = Widget.getWidgetByElement(t); w; w = w.getLayoutParent()) {
+          if (w instanceof qx.ui.menu.AbstractButton) {
+            if (w.isBlockToolTip() && (w.getToolTip() || w.getToolTipText())) {
+              w.setBlockToolTip(false);
+            }
+            break;
+          }
+          if (w instanceof qx.ui.menu.Menu) {
+            break;
+          }
+        }
         const el = t && t.closest ? t.closest("[title],[data-ankamon-title]") : null;
         if (el && el.hasAttribute("title")) {
           el.setAttribute("data-ankamon-title", el.getAttribute("title"));
@@ -149,13 +165,20 @@ qx.Class.define("ankamon.ui.ToolTipPolicy", {
         if (el === titleEl) {
           return;
         }
+        // Tablo tazelenince (ör. Ahenk 15 sn'de bir) fare kımıldamasa da hücre DOM'u yenilenir: önceki öğe
+        // DOM'dan düşmüş ve yenisi aynı metni taşıyorsa bu aynı ipucunun devamıdır — kapatılıp yeniden açılmaz.
+        if (el && titleEl && !titleEl.isConnected &&
+            el.getAttribute("data-ankamon-title") === titleEl.getAttribute("data-ankamon-title")) {
+          titleEl = el;
+          return;
+        }
         hideTitle();
         titleEl = el;
         if (el) {
           const pos = { x: e.clientX, y: e.clientY };
-          titleTimer = setTimeout(() => {
-            if (titleEl === el) {
-              showTitle(el, last || pos);
+          const token = titleTimer = setTimeout(() => {
+            if (titleTimer === token && titleEl) {
+              showTitle(titleEl, last || pos);
             }
           }, Policy.SHOW_MS);
         }
