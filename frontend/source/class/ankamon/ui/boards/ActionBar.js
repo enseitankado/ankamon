@@ -46,19 +46,23 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     /** Kapalı düğme: yazı rengi tam kalır, yalnız bu opaklık uygulanır (temanın soluk yazısıyla çarpılınca okunmuyordu). */
     OFF_OPACITY: 0.42,
 
-    /** Düğmeler, soldan sağa. noSelection: hiç tahta seçili değilken de çalışan maddeler. */
+    /**
+     * Düğmeler, soldan sağa. noSelection: hiç tahta seçili değilken de çalışan maddeler. single: yalnız TEK tahta
+     * seçiliyken kullanılabilir (kullanıcı isteği, 2026-11-05: Ekran düğmesi; çoklu izleme Ekranlar sekmesindedir).
+     * Sağ menüyle eşleşme (2026-11-05): menüdeki "Yönet" grubu → Yönet düğmesi (Bilgisayarı yönet + Web Filtre), Kilit;
+     * menüdeki "Ekran" grubu → Yansıt (yansıt, aktar, aktarımı durdur), Ekran görüntüsü al → Ekran düğmesinin altında;
+     * Uyandır/Uyut → Güç düğmesinin altında.
+     */
     GROUPS: [
-      { id: "watch", label: "Ekran", icon: "deviceDesktop", primary: "Ekranı göster" },
-      { id: "display", label: "Uyku", icon: "zzz", primary: "Uyut" },
+      { id: "watch", label: "Ekran", icon: "deviceDesktop", primary: "Ekranı göster", single: true },
+      { id: "manage", label: "Yönet", icon: "mouse", primary: "Bilgisayarı yönet" },
       { id: "lock", label: "Kilit", icon: "lock", primary: "Kilitle" },
       { id: "cast", label: "Yansıt", icon: "cast" },
-      { id: "shot", label: "Görüntü al", icon: "camera", primary: "Ekran görüntüsü al" },
       { id: "command", label: "Komut", icon: "terminal2", primary: "Hazır / Serbest komut çalıştır", sep: true },
       { id: "users", label: "Kullanıcılar", icon: "users" },
       { id: "files", label: "Dosyalar", icon: "folders", primary: "Dosya yöneticisi" },
       { id: "taskmgr", label: "Görevler", icon: "activity", primary: "Görev yöneticisi" },
       { id: "web", label: "Web sitesi", icon: "worldWww", primary: "Web sitesi aç…", sep: true },
-      { id: "webfilter", label: "Web Filtre", icon: "filter" },
       { id: "wifi", label: "Wi-Fi", icon: "wifi", primary: "Wi-Fi Monitör" },
       { id: "chat", label: "Sohbet", icon: "messages", primary: "Sohbet" },
       { id: "power", label: "Güç", icon: "power", sep: true },
@@ -69,16 +73,16 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     ],
 
     /** Alt menüsü düğmelere dağıtılan üst maddeler → içindeki bilinmeyen maddenin grubu. */
-    CONTAINERS: { "Komut çalıştır": "command", "Ekran": "watch", "Kullanıcılar": "users", "Dosyalar": "files", "Web Filtre": "webfilter", "Web Filtre…": "webfilter" },
+    CONTAINERS: { "Komut çalıştır": "command", "Yönet": "manage", "Ekran": "cast", "Kullanıcılar": "users", "Dosyalar": "files",
+      "Web Filtre": "manage", "Web Filtre…": "manage" },
 
     /** Menü maddesi → grup (menüdeki etiket, tahta sayısı eki olmadan — bkz. BoardOps.menuButton). */
     ITEMS: {
-      "Ekranı göster": "watch", "Ekranı yönet": "watch",
-      "Uyandır": "display", "Uyut": "display",
+      "Ekranı göster": "watch", "Ekran görüntüsü al": "watch", "Bilgisayarı yönet": "manage",
+      "Uyandır": "power", "Uyut": "power",
       "Kilitle": "lock", "Kilidi aç": "lock", "Klavyeyi kilitle": "lock", "Klavye kilidini aç": "lock", "Fareyi kilitle": "lock",
       "Fare kilidini aç": "lock", "Dokunmatiği kilitle": "lock", "Dokunmatik kilidini aç": "lock",
       "Ekranımı yansıt": "cast", "Ekranı başka bilgisayara aktar…": "cast", "Ekran aktarımını durdur": "cast",
-      "Ekran görüntüsü al": "shot",
       "Görev yöneticisi": "taskmgr", "Web sitesi aç…": "web", "Wi-Fi Monitör": "wifi", "Sohbet": "chat",
       "Bilgisayarı aç (WoL)": "power", "Bilgisayarı kapat": "power", "Bilgisayarı yeniden başlat": "power",
       "Bilgi kartı": "info", "Logları göster": "info",
@@ -87,7 +91,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     },
 
     /** Menüde tek tahtaya uygulanan maddeler: çoklu seçimde her tahta için ayrı açılır (pencere başına tahta). */
-    PER_BOARD: ["Ekranı yönet", "Görev yöneticisi", "Wi-Fi Monitör", "Sohbet", "Dosya yöneticisi", "Düzenle"],
+    PER_BOARD: ["Bilgisayarı yönet", "Görev yöneticisi", "Wi-Fi Monitör", "Sohbet", "Dosya yöneticisi", "Düzenle"],
     PER_BOARD_CONFIRM: 6
   },
 
@@ -408,7 +412,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
           return;
         }
         const leaves = this.__leaves(group, groups, cur.none);
-        const on = leaves.some(l => l.getEnabled());
+        const single = !group.single || boards.length === 1;
+        const on = single && leaves.some(l => l.getEnabled());
         [w.main, w.arrow].forEach(b => {
           b.setEnabled(on);
           b.setOpacity(on ? 1 : ankamon.ui.boards.ActionBar.OFF_OPACITY);
@@ -419,7 +424,10 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         // Düz toolTipText tek satırdır, uzun açıklama sığmaz.
         const primary = group.primary && leaves.find(l => l.getUserData("ankamon.menuKey") === group.primary);
         const rich = (primary && primary.getUserData("ankamon.menuHint")) || group.hint;
-        if (rich) {
+        if (!single) {
+          w.main.setToolTip(null);
+          w.main.setToolTipText(`${group.label}: yalnız tek tahta seçiliyken`);
+        } else if (rich) {
           w.tip = w.tip || new qx.ui.tooltip.ToolTip().set({ rich: true, maxWidth: 460 });
           w.tip.setLabel(rich);
           w.main.setToolTip(w.tip);

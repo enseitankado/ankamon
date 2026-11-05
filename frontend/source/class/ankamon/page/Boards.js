@@ -172,6 +172,39 @@ qx.Class.define("ankamon.page.Boards", {
     this.__timer.start();
 
     this.__updateActionState(); // başlangıçta hiç satır işaretli değil: ilgili düğmeler devre dışı.
+
+    // Ctrl/⌘+A sayfa düzeyinde (kullanıcı isteği, 2026-11-05): odak tabloda ya da Ekranlar iframe'inde değilken
+    // (ör. araç çubuğuna tıkladıktan sonra) tarayıcının kendi "tümünü seç"i Ekranlar alanını mavi saydam kutuyla
+    // kaplıyordu. Görünen (süzülmüş) bütün tahtalar işaretlenir; Ekranlar'da işaretler kutucukların seçim
+    // çerçevesine yansır (bkz. __pushSelection). Tablo odaktaysa Base'in kendi Ctrl+A'sı, iframe odaktaysa
+    // screen/index.html'inki çalışır (ikisi de aç/kapa).
+    this.__onSelectAllKey = e => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== "a" || !this.isSeeable()) {
+        return;
+      }
+      const el = document.activeElement;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT|IFRAME)$/.test(el.tagName))) {
+        return;
+      }
+      const focused = qx.ui.core.FocusHandler.getInstance().getFocusedWidget();
+      for (let w = focused; w; w = w.getLayoutParent()) {
+        if (w === this.__table || w instanceof qx.ui.window.Window) {
+          return;   // tablonun kendi işleyicisi / başka bir pencere (ör. terminal)
+        }
+      }
+      e.preventDefault();
+      const rows = this.__table.getTableModel().getRowCount();
+      const all = rows > 0 && this._checkedIds(this.__table).length === rows;
+      this._checkAll(this.__table, !all);
+      if (this.__views.getSelection()[0] === this.__listPage) {
+        if (all) {
+          this.__table.getSelectionModel().resetSelection();
+        } else if (rows) {
+          this.__table.getSelectionModel().setSelectionInterval(0, rows - 1);
+        }
+      }
+    };
+    window.addEventListener("keydown", this.__onSelectAllKey, true);
   },
 
   statics: {
@@ -226,6 +259,9 @@ qx.Class.define("ankamon.page.Boards", {
     if (this.__onMessage) {
       window.removeEventListener("message", this.__onMessage);
     }
+    if (this.__onSelectAllKey) {
+      window.removeEventListener("keydown", this.__onSelectAllKey, true);
+    }
     if (this.__sliderThemeListener) {
       qx.theme.manager.Meta.getInstance().removeListenerById(this.__sliderThemeListener);
     }
@@ -248,6 +284,7 @@ qx.Class.define("ankamon.page.Boards", {
     __viewReady: false,
     __listPage: null,
     __actionBar: null,
+    __onSelectAllKey: null,
 
     /** Ekran görünümündeyken araç çubuğu da sağ menü gibi sonucu kutucuklarda gösterir. */
     __barSessionOps() {
@@ -602,6 +639,14 @@ qx.Class.define("ankamon.page.Boards", {
       [caption, this.__sizeLabel].forEach(label => label.addListener("dblclick", () => this.__resetTileSize()));
       caption.setToolTipText(`Çift tıklayın: hepsi varsayılan boyuta (satırda ${this.__defaultColumns()} ekran)`);
       this.__updateSizeLabel();
+      // Yardım: önizleme ve veri toplama bağlantıları — paylaşılan yayın, müdahale, kullanıcı başına bağlantılar (bkz. ui.boards.ScreenFeedHelp).
+      row.add(new qx.ui.core.Spacer(), { flex: 1 });
+      const help = new qx.ui.form.Button("?").set({
+        width: 26, minWidth: 26, padding: [1, 0], font: "bold",
+        toolTipText: "Ekranlar ve veri toplama: tahtalara hangi bağlantılar açılır, kullanıcı sayısı yükü artırır mı?"
+      });
+      help.addListener("execute", () => ankamon.ui.boards.ScreenFeedHelp.open());
+      row.add(help);
       return row;
     },
 

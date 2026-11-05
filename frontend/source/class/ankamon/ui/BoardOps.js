@@ -914,15 +914,18 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         group(ICON.run, "Komut çalıştır" + count, commands);
 
-        // Ekran ▸ Ekranı göster, Ekranı yönet, Uyandır, Uyut, Kilitle, Kilidi aç, Ekranımı yansıt ▸ <kalite> + Ses
-        // (ayar penceresi sorulmaz — bkz. cast()).
+        // Yönet ▸ Ekranı göster, Bilgisayarı yönet, Uyandır, Uyut, Kilitle, Kilidi aç, giriş kilitleri, Web Filtre ▸ …
+        // Ekran ▸ Ekranımı yansıt ▸ <kalite> + Ses, Ekran görüntüsü al, Ekranı başka bilgisayara aktar…, Ekran aktarımını
+        // durdur (kullanıcı isteği, 2026-11-05: eski "Ekran" grubu "Yönet" oldu, görüntü iletimi ayrı "Ekran" grubunda).
+        // Araç çubuğu (ui.boards.ActionBar) aynı maddeleri kendi düğmelerine dağıtır — değişiklik orada da gözden geçirilir.
         const screens = sub();
+        const display = sub();
         if (can("screen")) {
           subAdd(screens, ICON.screen, "Ekranı göster" + count, () => this.screen(boards, user));
         }
         if (can("screen") && can("screen.control")) {
           // Fare/klavye ile müdahale tek tahtada anlamlı: çoklu seçimde de yalnız sağ tıklanan tahta.
-          subAdd(screens, ICON.screenControl, "Ekranı yönet", () => this.screen([board], user, true));
+          subAdd(screens, ICON.screenControl, "Bilgisayarı yönet", () => this.screen([board], user, true));
         }
         // Uyandır: güç tasarrufuna girmiş (önizlemede siyah) ekranı uyandırır — çoklu seçimde tüm açık
         // tahtalar (bkz. worker executor/display.py). Ekranlar önizlemesinde iş penceresi açılmaz.
@@ -950,17 +953,17 @@ qx.Class.define("ankamon.ui.BoardOps", {
             : this.__job({ type: "screen_unlock", board_ids: list.map(b => b.id) }, "Ekran kilidini aç")));
         }
         if (can("cast")) {
-          screens.add(this.menuButton(ICON.cast, "Ekranımı yansıt" + count, null, this.__castMenu(online)));
+          display.add(this.menuButton(ICON.cast, "Ekranımı yansıt" + count, null, this.__castMenu(online)));
         }
         // Ekran görüntüsü: Oturumlar ▸ Zaman çizelgesi'nde işaret olarak görünür (bkz. worker executor/screenshot.py).
         if (can("screen.screenshot")) {
-          subAdd(screens, ICON.screenshot, "Ekran görüntüsü al" + count, () => this.__powerJob(
+          subAdd(display, ICON.screenshot, "Ekran görüntüsü al" + count, () => this.__powerJob(
             { type: "screenshot", board_ids: online.map(b => b.id) }, "Ekran görüntüsü", "screenshot", "görüntü alma", user));
         }
         // Ekran aktarımı: sağ tıklanan tahtanın ekranı başka tahtalarda (bkz. ui.boards.RelayDialog, executor/relay.py).
         if (can("screen.relay")) {
-          subAdd(screens, ICON.relay, "Ekranı başka bilgisayara aktar…", () => ankamon.ui.boards.RelayDialog.open(board, online, user));
-          stateAdd(screens, ICON.relayStop, "Ekran aktarımını durdur", online.filter(b => b.relay_source || b.relay_is_source || b.relay_source === undefined),
+          subAdd(display, ICON.relay, "Ekranı başka bilgisayara aktar…", () => ankamon.ui.boards.RelayDialog.open(board, online, user));
+          stateAdd(display, ICON.relayStop, "Ekran aktarımını durdur", online.filter(b => b.relay_source || b.relay_is_source || b.relay_source === undefined),
             list => this.__powerJob({ type: "relay_stop", board_ids: list.map(b => b.id) }, "Ekran aktarımını durdur", "relay_stop", "durdurma", user));
         }
         // Klavye/fare/dokunmatik kilidi: seçili tahtaların yalnız uygun olanlarına (bkz. worker executor/inputlock.py). Klavye
@@ -982,7 +985,20 @@ qx.Class.define("ankamon.ui.BoardOps", {
               { type: "input_lock", device, lock: false, board_ids: list.map(b => b.id) }, off));
           });
         }
-        group(ICON.screen, "Ekran" + count, screens);
+        // Yönet ▸ Web Filtre (kullanıcı isteği): ETAP Pardus'taki eta-kisit ile kara/beyaz liste ve DNS sayıları (bkz. ui.boards.EtaKisitWebFilter).
+        if (can("boards.webfilter")) {
+          const webFilter = ankamon.ui.boards.EtaKisitWebFilter;
+          const filter = sub();
+          subAdd(filter, ICON.webFilter, "Kara liste…" + count, () => webFilter.open(online, boards, "denylist"));
+          subAdd(filter, ICON.webFilter, "Beyaz liste…" + count, () => webFilter.open(online, boards, "allowlist"));
+          subAdd(filter, ICON.webFilter, "Filtreyi kapat" + count, () => webFilter.turnOff(online));
+          subAdd(filter, ICON.info, "Durum ve sayılar…" + count, () => webFilter.open(online, boards));
+          if (filter.getChildren().length) {
+            screens.add(this.menuButton(ICON.webFilter, "Web Filtre", null, filter));
+          }
+        }
+        group(ICON.screenControl, "Yönet" + count, screens);
+        group(ICON.screen, "Ekran" + count, display);
 
         // "Bilgi kartı" burada değil: Tahtalar sayfasındaki "Logları göster"in hemen altında (kullanıcı
         // isteği) — bkz. page.Boards __rowMenu.
@@ -1047,16 +1063,6 @@ qx.Class.define("ankamon.ui.BoardOps", {
           const webCount = withSession.length > 1 ? ` (${withSession.length} tahta)` : "";
           add(ICON.web, "Web sitesi aç…" + webCount, () => this.openWebsite(withSession));
           menu.getChildren()[menu.getChildren().length - 1].setEnabled(withSession.length > 0);
-        }
-        // Web Filtre: ETAP Pardus'taki eta-kisit ile kara/beyaz liste ve DNS sayıları (bkz. ui.boards.EtaKisitWebFilter).
-        if (can("boards.webfilter")) {
-          const webFilter = ankamon.ui.boards.EtaKisitWebFilter;
-          const filter = sub();
-          subAdd(filter, ICON.webFilter, "Kara liste…" + count, () => webFilter.open(online, boards, "denylist"));
-          subAdd(filter, ICON.webFilter, "Beyaz liste…" + count, () => webFilter.open(online, boards, "allowlist"));
-          subAdd(filter, ICON.webFilter, "Filtreyi kapat" + count, () => webFilter.turnOff(online));
-          subAdd(filter, ICON.info, "Durum ve sayılar…" + count, () => webFilter.open(online, boards));
-          group(ICON.webFilter, "Web Filtre", filter);
         }
         // Wi-Fi Monitör: kart, bağlantı, çevredeki ağlar ve Bluetooth cihazları; kapalı radyo geçici açılır, sağ tıklanan tahta (bkz. ui.boards.WifiMonitor).
         if (can("screen")) {
