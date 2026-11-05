@@ -47,7 +47,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
     refresh.addListener("execute", () => this.load());
     bar.add(refresh);
     bar.add(new qx.ui.basic.Label("Sırala:").set({ alignY: "middle", marginLeft: 8 }));
-    this.__sort = new qx.ui.form.SelectBox().set({ width: 260 });
+    this.__sort = new qx.ui.form.SelectBox().set({ width: 300 });
     ankamon.ui.sessions.BreakLeague.BREAK_SORTS.forEach(([key, label]) => {
       const item = new qx.ui.form.ListItem(label);
       item.setUserData("key", key);
@@ -79,7 +79,8 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
       ["session", "Oturum açıkken geçen süre"],
       ["nosession", "Oturum kapalıyken geçen süre"]
     ],
-    BREAK_COLORS: { session: "#e8833a", idle: "#3b82c4" }
+    BREAK_COLORS: { session: "#e8833a", idle: "#3b82c4" },
+    BREAK_LIST_LIMIT: 10 // API'nin varsayılan limit'i (bkz. BreakLeagueApi)
   },
 
   destruct() {
@@ -133,7 +134,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
       const F = ankamon.util.Format;
       const share = r.break_seconds ? Math.round(r.seconds / r.break_seconds * 100) : 0;
       return `${rank}. ${r.board}` + (r.board !== r.host ? ` (${r.host})` : "") +
-        `\nTeneffüste açık: ${F.duration(r.seconds)} (teneffüs süresinin %${share}'i)` +
+        `\nTeneffüste açık: ${F.duration(r.seconds)} (teneffüs payı %${share})` +
         `\n  oturum açıkken: ${F.duration(r.session_seconds)}\n  oturum kapalıyken: ${F.duration(r.idle_seconds)}` +
         `\n${r.days} gün`;
     },
@@ -174,7 +175,8 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
         const bars = rows.map((r, i) =>
           `<div class="lg-row${i === 0 ? " lg-lead" : ""}" title="${esc(this.__breakTip(r, i + 1))}">` +
           `<span class="lg-rank" ${i < 3 ? `style="background:${medals[i]};color:#fff"` : ""}>${i + 1}</span>` +
-          `<span class="lg-name">${esc(r.board)}<small>${r.days} gün · teneffüsün %${r.break_seconds ? Math.round(r.seconds / r.break_seconds * 100) : 0}'i</small></span>` +
+          // "%24'ü/%51'i" ekleri sayıya göre değişir (ses uyumu): eksiz yazılır.
+          `<span class="lg-name">${esc(r.board)}<small>${r.days} gün · teneffüs payı %${r.break_seconds ? Math.round(r.seconds / r.break_seconds * 100) : 0}</small></span>` +
           `<span class="lg-track bl-track">` +
           `<span class="bl-seg" style="width:${(r.session_seconds / scale * 100).toFixed(1)}%;background:${C.session}"></span>` +
           `<span class="bl-seg" style="width:${(r.idle_seconds / scale * 100).toFixed(1)}%;background:${C.idle}"></span></span>` +
@@ -182,7 +184,9 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
         const idle = p.total_seconds - p.total_session_seconds;
         const foot = `<div class="lg-foot">${p.participants}${boardCount ? ` / ${boardCount}` : ""} tahta teneffüste açık kaldı · ` +
           `toplam ${esc(F.duration(p.total_seconds))} (oturum açık ${esc(F.duration(p.total_session_seconds))}, ` +
-          `kapalı ${esc(F.duration(idle))})` + (p.participants > rows.length ? ` · ilk ${rows.length} gösteriliyor` : "") + `</div>`;
+          `kapalı ${esc(F.duration(idle))})` +
+          // Liste yalnız sınırda (API limit 10) kesilmiştir; daha kısaysa ölçütte süresi olan tahtaların hepsidir.
+          (rows.length >= ankamon.ui.sessions.BreakLeague.BREAK_LIST_LIMIT ? ` · ilk ${rows.length} gösteriliyor` : "") + `</div>`;
         return `<div class="lg-card">${head}<div class="lg-podium">${podium}</div><div class="lg-bars">${bars}</div>${foot}</div>`;
       };
 
