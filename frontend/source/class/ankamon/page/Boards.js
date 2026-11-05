@@ -339,12 +339,13 @@ qx.Class.define("ankamon.page.Boards", {
 
     async _refresh() {
       const F = ankamon.util.Format;
-      // Kendiliğinden tazelemede kullanıcının o anki işaretlemeleri kaybolmasın.
-      const wasChecked = this.__table ? new Set(this._checkedIds(this.__table)) : new Set();
       const [boards, metrics] = await Promise.all([
         ankamon.io.Api.get("/boards"),
         ankamon.io.Api.get("/metrics/latest")
       ]);
+      // Kendiliğinden tazelemede kullanıcının o anki işaretlemeleri kaybolmasın. İstek SONRASI okunur: önce okununca
+      // istek sürerken yapılan işaretleme (fare, Ctrl+A) yanıt gelince eski listeyle geri alınıyordu (2026-11-05).
+      const wasChecked = this.__table ? new Set(this._checkedIds(this.__table)) : new Set();
       this.__boards = new Map(boards.boards.map(b => [b.id, b]));
       this.__metrics = metrics.latest || {};
       ankamon.ui.BoardOps.syncScreenLocks(boards.boards);
