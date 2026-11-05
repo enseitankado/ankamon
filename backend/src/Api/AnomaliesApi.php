@@ -177,9 +177,12 @@ final class AnomaliesApi
             $dir = defined('EXT_DIR') ? EXT_DIR : '/opt/ankamon/ext';
             foreach (glob($dir . '/*/anomaly_kinds.json') ?: [] as $file) {
                 $extra = json_decode((string) file_get_contents($file), true);
+                // origin: kaydı üreten eklenti (Anomaliler ▸ Anlık "Tetikleyen") — extension.json başlığı, yoksa dizin adı.
+                $meta = json_decode((string) @file_get_contents(dirname($file) . '/extension.json'), true);
+                $origin = is_array($meta) && !empty($meta['title']) ? (string) $meta['title'] : basename(dirname($file));
                 foreach (is_array($extra) ? $extra : [] as $kind => $def) {
                     if (is_string($kind) && is_array($def) && !isset($kinds[$kind])) {
-                        $kinds[$kind] = $def;
+                        $kinds[$kind] = $def + ['origin' => $origin];
                     }
                 }
             }

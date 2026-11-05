@@ -129,6 +129,16 @@ WHERE lower(host) = lower(%s) AND ended_at IS NOT NULL
 """
 
 
+def _span(minutes: int) -> str:
+    """242 → "4 saat 2 dk"; 0 olan birimler yazılmaz (ay = 30 gün, hafta = 7 gün)."""
+    parts = []
+    for size, unit in ((43200, "ay"), (10080, "hafta"), (1440, "gün"), (60, "saat"), (1, "dk")):
+        n, minutes = divmod(minutes, size)
+        if n:
+            parts.append(f"{n} {unit}")
+    return " ".join(parts) or "0 dk"
+
+
 def evaluate(values: dict, ctx: dict) -> dict:
     """PROBE çıktısı → {"anomaly", "summary", "detail"}. Oturum yoksa boşta geçen süre: açılıştan ya da
     (açılıştan sonraysa) son oturumun kapanışından beri (board_sessions)."""
@@ -152,5 +162,5 @@ def evaluate(values: dict, ctx: dict) -> dict:
     since = "açılıştan beri" if reason == "boot" else "son oturum kapandıktan sonra"
     detail = {"reason": reason, "idle_min": idle_min, "threshold_min": threshold}
     if idle_min >= threshold:
-        return {"anomaly": True, "summary": f"Oturum yok: {since} {idle_min} dk açık", "detail": detail}
-    return {"anomaly": False, "summary": f"Oturum yok, {since} {idle_min} dk (eşik {threshold} dk)", "detail": detail}
+        return {"anomaly": True, "summary": f"Oturum yok: {since} {_span(idle_min)} açık", "detail": detail}
+    return {"anomaly": False, "summary": f"Oturum yok, {since} {_span(idle_min)} (eşik {threshold} dk)", "detail": detail}

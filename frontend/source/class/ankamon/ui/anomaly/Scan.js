@@ -80,6 +80,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
   members: {
     __page: null,
     __mainSplit: null,
+    __rightSplit: null,
     __checked: null,
     __hasBoardPref: false,
     __kindPref: null,
@@ -146,7 +147,9 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     __splitDefaulting: false,
 
     /**
-     * Kaydırma çubuğu 1/2 ayırıcısıyla aynı görünür (kalınlık ve zemin rengi o ayırıcıdan okunur — her temada eşleşir).
+     * Tür listesinin dikey kaydırma çubuğu ve 2/3 arasındaki YATAY ayırıcı 1/2 ayırıcısıyla aynı kalınlıkta ve
+     * renkte görünür (kalınlık ve zemin rengi o ayırıcıdan okunur — her temada eşleşir). Yatay ayırıcının
+     * kalınlığı yüksekliğidir (kullanıcı isteği: dikey kaydırma çubuğunun kalınlığıyla aynı).
      * @param scroll {qx.ui.container.Scroll}
      */
     __matchScrollbar(scroll) {
@@ -154,9 +157,12 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       const width = (splitter.getBounds() || {}).width || splitter.getSizeHint().width;
       const bar = scroll.getChildControl("scrollbar-y");
       bar.set({ width, minWidth: width, maxWidth: width });
+      const across = this.__rightSplit.getChildControl("splitter");
+      across.set({ height: width, minHeight: width, maxHeight: width });
       const color = splitter.getBackgroundColor();
       if (color) {
         bar.setBackgroundColor(color);
+        across.setBackgroundColor(color);
       }
     },
 
@@ -164,6 +170,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     __createRightPane(top) {
       // 2 ile 3 arasında yatay ayırıcı (1 ile 2/3 arasındaki gibi).
       const pane = new qx.ui.splitpane.Pane("vertical").set({ marginLeft: 5 });
+      this.__rightSplit = pane;
       const box = ankamon.ui.StepBox.create(2, "Anomalileri seç ve tara", "seçili tahtalarda şu an yoklanır").set({
         height: top, marginBottom: 5
       });
@@ -172,11 +179,12 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       this.__kindBox = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
       // Tür listesi kaydırmalı: 2. bölgenin en küçük yüksekliği artık listeye bağlı değil, 2/3 ayırıcısı serbestçe
       // yukarı çekilebilir (eskiden ~670 px'in altına inmiyordu); liste sığmazsa dikey kaydırma çubuğu çıkar.
-      const kindScroll = new qx.ui.container.Scroll(this.__kindBox).set({ minHeight: 40 });
+      // Başlıkla ilk tür arasında boşluk (kullanıcı isteği: "Oturumsuz açık" başlığa yapışık görünüyordu).
+      const kindScroll = new qx.ui.container.Scroll(this.__kindBox).set({ minHeight: 40, marginTop: 8 });
       kindScroll.addListenerOnce("appear", () => this.__matchScrollbar(kindScroll));
       box.add(kindScroll, { flex: 1 });
 
-      const run = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ marginTop: 4 });
+      const run = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ marginTop: 12 });
       this.__scanButton = new qx.ui.form.Button("Tara").set({ minWidth: 90 });
       this.__scanButton.addListener("execute", () => this.__start());
       run.add(this.__scanButton);

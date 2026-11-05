@@ -103,6 +103,28 @@ qx.Class.define("ankamon.util.Format", {
       return `${seconds} sn`;
     },
 
+    /**
+     * Uzun süreler için: "1 ay 4 gün 17 saat 20 dk" — 0 olan birimler yazılmaz (ay = 30 gün, hafta = 7 gün);
+     * bir dakikadan kısa ise saniye. worker anomaly/no_login._span ile aynı biçim.
+     * @param seconds {Number}
+     */
+    span(seconds) {
+      seconds = Math.max(0, Math.round(seconds));
+      if (seconds < 60) {
+        return `${seconds} sn`;
+      }
+      let minutes = Math.floor(seconds / 60);
+      const parts = [];
+      [[43200, "ay"], [10080, "hafta"], [1440, "gün"], [60, "saat"], [1, "dk"]].forEach(([size, unit]) => {
+        const n = Math.floor(minutes / size);
+        minutes -= n * size;
+        if (n) {
+          parts.push(`${n} ${unit}`);
+        }
+      });
+      return parts.join(" ");
+    },
+
     /** @param ms {Number} epoch milisaniye */
     dateTime(ms) {
       if (!ms) {

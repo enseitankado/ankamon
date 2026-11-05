@@ -28,7 +28,10 @@
 /**
  * Anomaliler ▸ Anlık: şu an süren anomaliler (bkz. page.Anomalies — veriyi sayfa 30 sn'de bir çeker).
  * Üstte özet satırı (kaç tahtada sürüyor) ve yardım simgesi: türlerin açıklaması, kaynağı ve sıklığı (eskiden tablonun
- * altında sürekli duruyordu — kullanıcı isteğiyle simgeye alındı). Tabloda her kaydın Kaynak ve Sıklık sütunu.
+ * altında sürekli duruyordu — kullanıcı isteğiyle simgeye alındı). Tabloda her kaydın Kaynak ve Sıklık sütunu ve
+ * Tetikleyen: kaydı hangi süreç üretti — Ankamon'un otomatik tespit süreci (worker, çekirdek kuralı) ya da bir eklentinin
+ * kuralı (bkz. backend AnomaliesApi::kinds "origin"). Sütunlar sıralanır (Başlangıç/Süre ham zamana göre) ve başlıktaki
+ * süzgeçlerle (az çeşitli sütunlarda hazır değer listesi) süzülür.
  */
 qx.Class.define("ankamon.ui.anomaly.Live", {
   extend: qx.ui.tabview.Page,
@@ -52,6 +55,7 @@ qx.Class.define("ankamon.ui.anomaly.Live", {
     this.__columns = [
       { id: "board", label: "Tahta", width: 200 },
       { id: "kind", label: "Anomali", width: 140 },
+      { id: "trigger", label: "Tetikleyen", width: 210 },
       { id: "started", label: "Başlangıç", width: 150 },
       { id: "duration", label: "Süre", width: 110 },
       { id: "source", label: "Kaynak", width: 90 },
@@ -59,6 +63,15 @@ qx.Class.define("ankamon.ui.anomaly.Live", {
       { id: "detail", label: "Ayrıntı" }
     ];
     this.__table = page._createTable(this.__columns, { prefsKey: "anomalies.live.columns" });
+    this.__filterFields = page._addColumnFilters(this.__table, this.__columns, () => this.__apply(),
+      { rows: () => (this.__rows || []).map(r => r.cells) });
+    // Başlangıç ve Süre metin olarak dizilmesin: ham başlangıç zamanına göre (Süre ters yönde).
+    const model = this.__table.getTableModel();
+    const at = row => (this.__startedAt || {})[row[0]] || 0;
+    const col = id => this.__columns.findIndex(c => c.id === id) + 1;
+    const byStart = (a, b) => at(a) - at(b);
+    model.setSortMethods(col("started"), { ascending: byStart, descending: (a, b) => byStart(b, a) });
+    model.setSortMethods(col("duration"), { ascending: (a, b) => byStart(b, a), descending: byStart });
     this.add(this.__table, { flex: 1 });
   },
 
@@ -66,6 +79,9 @@ qx.Class.define("ankamon.ui.anomaly.Live", {
     __status: null,
     __columns: null,
     __table: null,
+    __filterFields: null,
+    __rows: null,
+    __startedAt: null,
     __kinds: null,
     __help: null,
     __helpLabel: null,
@@ -76,15 +92,28 @@ qx.Class.define("ankamon.ui.anomaly.Live", {
       const F = ankamon.util.Format;
       const now = Date.now() / 1000;
       this.__kinds = kinds;
-      this.__table.getTableModel().setData(rows.map(a => {
+      this.__startedAt = {};
+      this.__rows = rows.map(a => {
         const k = kinds[a.kind] || {};
-        return [a.id, a.board, a.kindLabel, F.dateTime(a.started_at * 1000), F.duration(now - a.started_at),
-          k.source || "—", k.every || "—", a.text];
-      }));
+        this.__startedAt[a.id] = a.started_at;
+        const trigger = k.origin ? `${k.origin} eklentisi (otomatik tespit)` : "Ankamon otomatik tespit (worker)";
+        return { cells: [a.id, a.board, a.kindLabel, trigger, F.dateTime(a.started_at * 1000), F.span(now - a.started_at),
+          k.source || "—", k.every || "—", a.text] };
+      });
+      this.__apply();
       const boards = new Set(rows.map(a => a.host)).size;
       const color = rows.length ? "#d93025" : "#1e8e3e";
       this.__status.setValue(`<span style="font-size:14px;font-weight:bold;color:${color}">` +
         (rows.length ? `Şu an ${boards} tahtada ${rows.length} anomali sürüyor` : "Şu an süren anomali yok") + "</span>");
+    },
+
+    __apply() {
+      const filters = this.__columns
+        .map((column, index) => ({ index: index + 1, text: (this.__filterFields[column.id].getValue() || "").toLowerCase().trim() }))
+        .filter(f => f.text);
+      const shown = (this.__rows || []).filter(({ cells }) =>
+        filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
+      this.__table.getTableModel().setData(shown.map(r => r.cells));
     },
 
     /** Tür listesi (açıklama, kaynak, sıklık) — yardım simgesinin altında açılır, dışına tıklayınca kapanır. */

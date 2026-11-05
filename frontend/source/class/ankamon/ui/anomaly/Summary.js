@@ -105,7 +105,7 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
         .sort((x, y) => groups[y].total - groups[x].total)
         .map(key => {
           const g = this.__raw[key] = groups[key];
-          return [key, g.board, g.kind, g.count, F.duration(g.total), F.duration(g.longest),
+          return [key, g.board, g.kind, g.count, F.span(g.total), F.span(g.longest),
             F.dateTime(g.lastAt * 1000), g.open ? "Sürüyor" : ""];
         });
       this.__apply();

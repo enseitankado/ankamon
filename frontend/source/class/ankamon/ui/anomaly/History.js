@@ -72,7 +72,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
           cells: [
             a.id, a.board, a.kindLabel, F.dateTime(a.started_at * 1000),
             a.ended_at ? F.dateTime(a.ended_at * 1000) : "—",
-            F.duration(seconds) + (a.ended_at ? "" : " (sürüyor)"),
+            F.span(seconds) + (a.ended_at ? "" : " (sürüyor)"),
             a.text
           ]
         };
@@ -97,7 +97,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
         filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
       this.__table.getTableModel().setData(shown.map(r => r.cells));
       const total = shown.reduce((sum, r) => sum + r.seconds, 0);
-      this.__count.setValue(`${shown.length} / ${this.__rows.length} kayıt · toplam süre ${ankamon.util.Format.duration(total)}`);
+      this.__count.setValue(`${shown.length} / ${this.__rows.length} kayıt · toplam süre ${ankamon.util.Format.span(total)}`);
     }
   }
 });
