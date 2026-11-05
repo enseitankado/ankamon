@@ -32,7 +32,7 @@ olarak eklenir. Kullanılan işaretler:
   noktalarının ek ağları da yerel yönetimli adres kullanır: zayıf kanıt.
 - Bluetooth: BlueZ'in sınıfa göre verdiği simge (Icon: phone), Class of Device ana sınıfı 2 (telefon), üretici verisi
   (Apple 0x004c: iPhone/AirPods/Saat; Samsung 0x0075; Google 0x00e0; Xiaomi 0x038f; Huawei 0x027d), rastgele BLE adresi.
-- Wi-Fi yoklaması: bağlı olmayan, Wi-Fi'si açık cihaz. Rastgele (yerel yönetimli) adres telefon/tablet/dizüstünde olağandır;
+- Wi-Fi arayan cihaz (yoklama): bağlı olmayan, Wi-Fi'si açık cihaz. Rastgele (yerel yönetimli) adres telefon/tablet/dizüstünde olağandır;
   sabit adresin üreticisi telefon üreticisiyse güçlü kanıt.
 """
 
@@ -75,7 +75,7 @@ def annotate_wifi_ap(row: dict) -> None:
         hints.append("ağ adı telefon paylaşım noktasına benziyor")
         phone = "yes"
     if row["vendor"] and _PHONE_VENDOR_RE.search(row["vendor"]):
-        hints.append(f"telefon üreticisi ({row['vendor']})")
+        hints.append("telefon üreticisi")  # adı ön yüzde ayrı "Üretici" sütununda
         phone = "yes"
     if row["random"]:
         hints.append("rastgele adres (Android paylaşım noktası olabilir)")
@@ -97,7 +97,7 @@ def annotate_bluetooth(row: dict) -> None:
             hints.append(f"{name} yayını (telefon, kulaklık ya da saat)")
             phone = phone or "maybe"
     if row["vendor"] and _PHONE_VENDOR_RE.search(row["vendor"]) and not phone:
-        hints.append(f"telefon üreticisi ({row['vendor']})")
+        hints.append("telefon üreticisi")
         phone = "maybe"
     if row.get("random"):
         hints.append("rastgele BLE adresi (birkaç dakikada bir değişir)")
@@ -105,7 +105,7 @@ def annotate_bluetooth(row: dict) -> None:
 
 
 def annotate_probe(row: dict) -> None:
-    hints = ["Wi-Fi'si açık, bağlı olmayan cihaz ağ arıyor"]
+    hints = []  # "bağlanacak ağ araştırıyor" ipucunu ön yüz ekler (title'ında aradığı ağlar)
     addr = row.get("addr") or ""
     row["random"] = oui.is_random(addr)
     row["vendor"] = _vendor(addr)
@@ -113,6 +113,6 @@ def annotate_probe(row: dict) -> None:
     if row["random"]:
         hints.append("rastgele adres (telefon/tablet olağan)")
     if row["vendor"] and _PHONE_VENDOR_RE.search(row["vendor"]):
-        hints.append(f"telefon üreticisi ({row['vendor']})")
+        hints.append("telefon üreticisi")
         phone = "yes"
     row["hints"], row["phone"] = hints, phone

@@ -43,7 +43,8 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
     PROBE_KEEP_MS: 5 * 60 * 1000,
 
     HELP: "Bu pencere seçili tahtaların çevresindeki kablosuz vericileri gösterir. Sınıfın/okulun olağan ağlarını ve cihazlarını " +
-      "<b>sabit</b> işaretleyin (en kolayı: sınıflar boşken <i>Görünenleri sabit yap</i>); sonra gerisi <b>yabancı</b> olarak öne " +
+      "<b>güvenilir</b> (sabit) işaretleyin — satırdaki <i>Bu sınıfta güvenilir AP</i> / <i>Okul genelinde güvenilir AP</i> " +
+      "düğmeleriyle ya da toptan (sınıflar boşken) <i>Görünenleri sabit yap</i> ile; sonra gerisi <b>yabancı</b> olarak öne " +
       "çıkar. <b>Neler görülebilir:</b> telefonun paylaşım noktası (hotspot) açıksa Wi-Fi ağı olarak; Bluetooth'u açıksa Bluetooth " +
       "cihazı olarak (iPhone'lar ve çoğu Android sürekli BLE yayını yapar); Wi-Fi'si açık ama bağlı değilse, ara ara gönderdiği " +
       "<b>yoklamalarla</b> (probe request — yalnız tahtanın Wi-Fi kartı bir ağa bağlı DEĞİLSE dinlenir; dinleme sırasında kart birkaç " +
@@ -183,7 +184,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         } else if (d.phase === "data") {
           feed.data = d;
           const sniff = probeBox.getValue() && d.device;
-          feed.status = sniff ? "Yoklamalar dinleniyor…" : `Son tarama ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}`;
+          feed.status = sniff ? "Ortamdaki Wi-Fi trafiği koklanıyor…" : `Son tarama ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}`;
           feed.notes = [cardLine(d), wifiNote(d.info || {}, watching), btNote((d.info || {}).bt, false)];
           if (!sniff) {
             feed.initialKeys = feed.initialKeys || new Set(d.rows.map(Classify.rowKey));

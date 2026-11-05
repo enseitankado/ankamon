@@ -41,7 +41,7 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
       common: { label: "Ortak", color: "#6b7280", bg: "rgba(107,114,128,.10)", tip: "Sabit değil ama seçili tahtaların çoğu bu ağ adını duyuyor: okul ağı olası." },
       fixed: { label: "Sabit", color: "#6b7280", bg: "transparent", tip: "Sabit listesinde (ya da tahtanın bağlı olduğu ağ)." }
     },
-    KIND_LABEL: { wifi: "Wi-Fi ağı", bt: "Bluetooth", probe: "Wi-Fi yoklaması" },
+    KIND_LABEL: { wifi: "Wi-Fi ağı", bt: "Bluetooth", probe: "Wi-Fi arayan cihaz" },
     PROBE_NOTE: {
       nodev: "Wi-Fi kartı yok; yoklama dinlenemedi.",
       tools: "Tahtada iw ya da python3 yok; yoklama dinlenemedi.",
@@ -72,7 +72,7 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
         `margin-right:4px;border-radius:4px;border:1px solid rgba(127,127,127,.5);background:rgba(127,127,127,.12);color:inherit;cursor:pointer">${text}</button>`;
     },
 
-    /** Satırın işlem düğmeleri: sabitle (bu sınıf / okul geneli) ya da sabitten çıkar. */
+    /** Satırın işlem düğmeleri: güvenilir (sabit) işaretle — bu sınıfta / okul genelinde — ya da sabitten çıkar. */
     __actions(item, boardId, canEdit) {
       if (!canEdit || item.row.active) {
         return "";
@@ -87,12 +87,17 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
       }
       const kind = row.kind === "wifi" ? "bssid" : row.kind;
       const base = `data-kind="${kind}" data-value="${esc(row.addr)}" data-label="${esc(row.name || "")}"`;
-      let html = this.__button("fix", "Sabit: bu sınıf", "Yalnız bu tahtada sabit sayılır.", `${base} data-board="${boardId}"`);
+      // Wi-Fi ağında "AP" (erişim noktası), Bluetooth/Wi-Fi arayan cihazda "cihaz" denir.
+      const what = row.kind === "wifi" ? "AP" : "cihaz";
+      let html = this.__button("fix", `Bu sınıfta güvenilir ${what}`,
+        `Bu ${row.kind === "wifi" ? "erişim noktası" : "cihaz"} yalnız bu tahtada güvenilir (sabit) sayılır.`, `${base} data-board="${boardId}"`);
       if (row.kind === "wifi" && row.name) {
-        html += this.__button("fix", "Okul ağı", `"${row.name}" adlı bütün erişim noktaları bütün tahtalarda sabit sayılır.`,
+        html += this.__button("fix", "Okul genelinde güvenilir AP",
+          `"${row.name}" adlı bütün erişim noktaları bütün tahtalarda güvenilir (sabit) sayılır (ör. okulun kendi ağı).`,
           `data-kind="ssid" data-value="${esc(row.name)}" data-label="${esc(row.name)}" data-board=""`);
       } else if (row.kind !== "wifi") {
-        html += this.__button("fix", "Okul geneli", "Bu cihaz bütün tahtalarda sabit sayılır (ör. öğretmen dizüstü bilgisayarı).", `${base} data-board=""`);
+        html += this.__button("fix", "Okul genelinde güvenilir cihaz",
+          "Bu cihaz bütün tahtalarda güvenilir (sabit) sayılır (ör. öğretmen dizüstü bilgisayarı).", `${base} data-board=""`);
       }
       return html;
     },
@@ -114,37 +119,54 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
       return parts.join(" ");
     },
 
+    /** Kanıt sütunu: yalnız telefon kanıtları ve durum gerekçeleri (üretici adı ayrı "Üretici" sütununda). */
     __evidence(item) {
       const esc = qx.bom.String.escape;
       const row = item.row;
-      const hints = (row.hints || []).slice();
+      const parts = (row.hints || []).map(h => esc(h));
+      if (row.kind === "probe") {
+        const ssids = row.ssids || [];
+        const tip = ssids.length ? "Yoklama yaptığı ağlar:\n" + ssids.join("\n")
+          : "Ağ adı vermeden yoklama yapıyor (çevredeki bütün ağları soruyor).";
+        parts.unshift(`<span title="${esc(tip)}" style="text-decoration:underline dotted;cursor:help">bağlanacak ağ araştırıyor</span>`);
+        if (row.count) {
+          parts.push(esc(`${row.count} yoklama`));
+        }
+      }
       if (item.commonCount) {
-        hints.push(`${item.commonCount} tahtada görülüyor (okul ağı olası)`);
-      }
-      if (row.kind === "probe" && row.ssids && row.ssids.length) {
-        hints.push("aradığı ağlar: " + row.ssids.join(", "));
-      }
-      if (row.kind === "probe" && row.count) {
-        hints.push(`${row.count} yoklama`);
+        parts.push(esc(`${item.commonCount} tahtada görülüyor (okul ağı olası)`));
       }
       if (item.fixed) {
-        hints.unshift("sabit: " + (item.fixed.kind === "ssid" ? `"${item.fixed.value}" ağ adı` : "adres") +
-          (item.fixed.board_id ? " (bu sınıf)" : " (okul geneli)"));
+        parts.unshift(esc("sabit: " + (item.fixed.kind === "ssid" ? `"${item.fixed.value}" ağ adı` : "adres") +
+          (item.fixed.board_id ? " (bu sınıf)" : " (okul geneli)")));
       }
-      const vendor = row.vendor ? `<b>${esc(row.vendor)}</b>` : "";
-      const text = hints.map(h => esc(h)).join(" · ");
-      return [vendor, text].filter(Boolean).join(" · ");
+      return parts.join(" · ");
+    },
+
+    /**
+     * Üretici sütunu: adresin OUI'sinden (worker: Wireshark manuf; Bluetooth'ta üretici verisi) bulunan ad. Yerel yönetimli
+     * (rastgele) adreste OUI yoktur — "Rastgele" yazılır; kalıcı adres OUI listesinde yoksa "—".
+     */
+    __vendor(row) {
+      const esc = qx.bom.String.escape;
+      if (row.vendor) {
+        return `<b>${esc(row.vendor)}</b>`;
+      }
+      if (row.random) {
+        return `<span style="opacity:.75" title="Rastgele (yerel yönetimli) adres: üretici kodu (OUI) taşımaz, üretici belirlenemez.">Rastgele</span>`;
+      }
+      return `<span style="opacity:.5" title="Adresin üretici kodu (OUI) listede bulunamadı.">—</span>`;
     },
 
     __table(items, boardId, canEdit, now) {
       const esc = qx.bom.String.escape;
       const th = "text-align:left;padding:3px 6px;border-bottom:1px solid rgba(127,127,127,.4);font-weight:600;white-space:nowrap";
       const td = "padding:3px 6px;vertical-align:top";
-      const head = ["Durum", "Tür", "Ad", "Sinyal", "Kanıt / üretici", "Adres", "Görülme", ""].map(h => `<th style="${th}">${h}</th>`).join("");
+      const head = ["Durum", "Tür", "Ad", "Sinyal", "Kanıt", "Üretici", "Adres", "Son görülme", ""].map(h => `<th style="${th}">${h}</th>`).join("");
       const body = items.map(item => {
         const row = item.row;
         const lv = this.LEVELS[item.level];
-        const name = row.kind === "probe" ? (row.ssids && row.ssids.length ? "" : "(ağ adı vermeden arıyor)")
+        const name = row.kind === "probe" ? (row.ssids && row.ssids.length ? row.ssids.join(", ") : "(ağ adı vermeden arıyor)")
           : row.name || (row.kind === "wifi" ? "(gizli ağ)" : "(adsız)");
         const dim = item.level === "fixed" ? "opacity:.55;" : "";
         return `<tr style="${dim}background:${lv.bg}">` +
@@ -153,6 +175,7 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
           `<td style="${td};font-weight:${item.level === "fixed" ? 400 : 600}">${esc(name)}</td>` +
           `<td style="${td};white-space:nowrap">${this.bar(row.signal)}</td>` +
           `<td style="${td};font-size:12px">${this.__evidence(item)}</td>` +
+          `<td style="${td};font-size:12px;white-space:nowrap">${this.__vendor(row)}</td>` +
           `<td style="${td};font-family:monospace;font-size:11px;opacity:.75;white-space:nowrap">${esc(row.addr || "")}</td>` +
           `<td style="${td};white-space:nowrap;font-size:12px">${this.__seen(item, now)}</td>` +
           `<td style="${td};white-space:nowrap">${this.__actions(item, boardId, canEdit)}</td></tr>`;
