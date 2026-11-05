@@ -33,6 +33,12 @@
  * bir kez kendiliğinden tarar (bkz. worker/ankamon/tasks/diagnose_schedule.py). Raporlar /api/diagnose'dan
  * gelir (bkz. backend DiagnoseApi); "Rapor" seçicisinden önceki taramalar da açılabilir.
  *
+ * Açılışta "Son durum" görünür: her tahtanın EN SON denetimi tek tabloda (GET /api/diagnose/latest). Otomatik
+ * zamanlayıcı yalnız vadesi gelen tahtaları taradığından tek bir otomatik tarama çoğu kez 1-2 tahtalıktır; açılışta
+ * en son taramayı göstermek "yalnız bu tahta mı taranıyor?" karışıklığı yaratıyordu (kullanıcı geri bildirimi).
+ * Tek tek taramalar seçicide kalır. Sayfanın ne yaptığı en üstte kısaca, ayrıntısı Bakım ▸ Yardım sekmesinde
+ * (bkz. ui.MaintenanceHelp).
+ *
  * Rapor tek tablodur: her tahta bir özet satırı, bulguları satıra tıklayınca hemen altında açılır
  * (varsayılan kapalı; başlıktaki ok tümünü açar/kapatır). Süzgeç (düzey + tahta) ikisine de uygulanır;
  * sunucuya gitmeden son rapor verisinden yeniden çizilir (bkz. __render).
@@ -44,6 +50,13 @@ qx.Class.define("ankamon.page.Diagnose", {
     // Başlık yok; düğmeler, rapor seçici, başlatılma bilgisi ve ilerleme tek satırda (kullanıcı isteği).
     super(user, null);
     this._actions.exclude();
+    // Ne işe yaradığı — sayfaya ilk gelen kullanıcı için (kullanıcı isteği: "hiçbir şey anlaşılmıyor").
+    this.add(new qx.ui.basic.Label(
+      "<b>Bakım</b>, tahtaların donanım ve sistem sağlığını SSH ile denetler: disk (SMART) ve boş alan, işlemci ve kasa " +
+      "sıcaklığı, fan, CMOS pili, RAM, güncellemeler, başarısız servisler, saat… Her tahta bir satırdır; " +
+      "satıra tıklayınca bulguları ve önerileri açılır. Tarama haftada bir kendiliğinden yapılır, " +
+      "<b>Şimdi tara</b> ile hemen yapılabilir. Ayrıntılar: <b>Yardım</b> sekmesi."
+    ).set({ rich: true, wrap: true, marginBottom: 6 }));
     const top = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" }));
     const button = (label, handler) => {
       const b = new qx.ui.form.Button(label);
@@ -57,7 +70,7 @@ qx.Class.define("ankamon.page.Diagnose", {
         .set({ toolTipText: "O an çevrimiçi olan tüm tahtaları denetler (sistem kaynaklarına göre birden çok tahta aynı anda)" });
     }
     top.add(new qx.ui.basic.Label("Rapor:").set({ marginLeft: 8 }));
-    this.__runBox = new qx.ui.form.SelectBox().set({ width: 380 });
+    this.__runBox = new qx.ui.form.SelectBox().set({ width: 480 });
     // Seçili raporun yazısı (süren taramada dönen halka HTML'i) kutunun kendisinde de HTML çizilsin;
     // kip, etikete yazı konmadan verilmeli.
     this.__runBox.getChildControl("atom").setRich(true);
@@ -150,17 +163,26 @@ qx.Class.define("ankamon.page.Diagnose", {
 
     __fillRuns(runs) {
       const F = ankamon.util.Format;
+      const esc = s => qx.bom.String.escape(String(s ?? ""));
       const keep = this.__jobId;
       this.__silent = true;
       this.__runBox.removeAll().forEach(it => it.dispose());
+      // İlk seçenek ve varsayılan: her tahtanın en son denetimi (bkz. DiagnoseApi::latest).
+      const latest = new qx.ui.form.ListItem("", null, "latest");
+      latest.setRich(true);
+      latest.setLabel("<b>Son durum — tüm tahtalar</b> (her tahtanın en son denetimi)");
+      this.__runBox.add(latest);
       runs.forEach(r => {
-        const who = r.auto ? "otomatik" : (r.created_by || "—");
+        // Otomatik tarama yalnız vadesi gelen tahtaları kapsar; az tahtalıysa adları da yazılsın.
+        const who = r.auto ? "otomatik" : "elle: " + esc(r.created_by || "—");
+        const names = r.targets <= 3 && r.names ? ": " + esc(r.names) : "";
+        const failed = r.failed ? ` · <span style="color:#c5221f">${r.failed} denetlenemedi</span>` : "";
         const state = ["queued", "running"].includes(r.status) ? " · " + ankamon.ui.JobSpinner.label("sürüyor") : "";
         // rich, etiket oluşmadan verilmeli: qx yazısı konmuş etiketin kipini değiştirmez ("The label mode cannot be
         // modified after initial creation" — sayfa açılışını kırıyordu). Önce boş madde + rich, sonra yazı.
         const item = new qx.ui.form.ListItem("", null, r.id);
         item.setRich(true);
-        item.setLabel(`${F.dateTime(r.created_at * 1000)} · ${qx.bom.String.escape(who)} · ${r.targets} tahta${state}`);
+        item.setLabel(`${F.dateTime(r.created_at * 1000)} · ${who} · ${r.targets} tahta${names}${failed}${state}`);
         this.__runBox.add(item);
       });
       const items = this.__runBox.getChildren();
@@ -187,7 +209,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       this.__jobId = jobId;
       let res;
       try {
-        res = await ankamon.io.Api.get(`/diagnose/${jobId}`);
+        res = await ankamon.io.Api.get(jobId === "latest" ? "/diagnose/latest" : `/diagnose/${jobId}`);
       } catch (e) {
         this.__status.setValue("Rapor alınamadı: " + qx.bom.String.escape(e.message || String(e)));
         return;
@@ -225,7 +247,11 @@ qx.Class.define("ankamon.page.Diagnose", {
       if (!j) {
         return "Henüz tarama yapılmadı.";
       }
-      return j.auto ? "Otomatik tarama (kaynaklar müsaitken)"
+      if (j.latest) {
+        return `<span style="opacity:.8">${j.targets.length} / ${j.boards} tahtanın en son denetimi — ` +
+          "tarihi her satırın sağında</span>";
+      }
+      return j.auto ? "Otomatik tarama (yalnız denetim zamanı gelen tahtalar)"
         : `Elle başlatan: <b>${qx.bom.String.escape(String(j.created_by || "—"))}</b>`;
     },
 
@@ -237,13 +263,20 @@ qx.Class.define("ankamon.page.Diagnose", {
       const sc = this.__schedule;
       if (sc) {
         s += `<span style="opacity:.75">Otomatik tarama: her tahta en az ${sc.interval_days} günde bir, sunucu yükü ve ağ ` +
-          "trafiği düşükken; tahta yalnız açıkken taranabilir.";
+          "trafiği düşükken; tahta yalnız açıkken taranabilir. Her tahtanın zamanı ayrı işlediğinden otomatik taramalar " +
+          "çoğu kez yalnız birkaç tahtayı kapsar.";
         if (sc.never_scanned) {
           s += ` Hiç taranmamış ${sc.never_scanned} tahta ilk uygun anda taranacak.`;
         } else if (sc.next_from) {
           s += ` Sıradaki: ${esc(F.dateTime(sc.next_from * 1000))} sonrasında uygun ilk an, en geç ${esc(F.dateTime(sc.next_by * 1000))}.`;
         }
         s += "</span>";
+        if (sc.failing && sc.failing.length) {
+          s += `<br><span style="color:#c5221f">Denetlenemeyen: ${esc(sc.failing.join(", "))}</span>` +
+            `<span style="opacity:.75"> — ${sc.retry_hours} saatte bir yeniden denenir. Nedeni satırda yazar; ` +
+            "\"SSH parolası reddedildi\" ise tahtanın root parolası genel paroladan farklıdır: Tahtalar ▸ sağ menü ▸ Kullanıcılar ▸ " +
+            "Parola ayarla… ▸ Yönetici hesapları ile tahtaya özel parolayı kaydedin.</span>";
+        }
       }
       return s;
     },
@@ -353,7 +386,9 @@ qx.Class.define("ankamon.page.Diagnose", {
       const when = t => {
         const r = this.__parse(t);
         const ts = (r && r.collected_at) || t.finished_at;
-        return ts ? esc(F.dateTime(ts * 1000)) : "";
+        const src = this.__job && this.__job.latest
+          ? `<div style="opacity:.6;font-size:12px">${t.run_auto ? "otomatik" : "elle: " + esc(t.run_by || "—")}</div>` : "";
+        return (ts ? esc(F.dateTime(ts * 1000)) : "") + src;
       };
       let h = `<div style="${css}">`;
 

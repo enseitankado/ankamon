@@ -146,6 +146,7 @@ return [
 
     ['GET',    '/api/actions',           [Api\ActionsApi::class, 'index'],     'user'],
     ['GET',    '/api/diagnose',          [Api\DiagnoseApi::class, 'runs'],    'diagnose'],
+    ['GET',    '/api/diagnose/latest',   [Api\DiagnoseApi::class, 'latest'],  'diagnose'],
     ['GET',    '/api/diagnose/{id}',     [Api\DiagnoseApi::class, 'show'],    'diagnose'],
     ['GET',    '/api/jobs',              [Api\JobsApi::class, 'index'],        'user'],
     ['POST',   '/api/jobs',              [Api\JobsApi::class, 'create'],       'user'],

@@ -27,7 +27,7 @@
 
 /**
  * Bakım (sol menüde Tahtalar > Bakım): sekmeler — "Bakım" (sorun tespiti raporu, page.Diagnose),
- * "Sensörler" (Grafana panosu, page.Metrics) ve "Ahenk" (Ahenk kontrol sonuçları, page.Ahenk). Kullanıcı isteğiyle Sensörler ayrı menü öğesi olmaktan
+ * "Sensörler" (Grafana panosu, page.Metrics), eklenti sekmeleri (ör. "Ahenk") ve en sonda "Yardım" (page.MaintenanceHelp). Kullanıcı isteğiyle Sensörler ayrı menü öğesi olmaktan
  * çıkıp buraya taşındı. Her sekme yalnız kendi yetkisiyle görünür ("diagnose" / "metrics"); sayfa
  * ikisinden biri olan kullanıcıya açılır (bkz. ui.Shell PAGES features).
  *
@@ -43,7 +43,7 @@ qx.Class.define("ankamon.page.Maintenance", {
     this._actions.exclude();
     this.__tabs = new qx.ui.tabview.TabView();
     const add = (key, label, feature, create) => {
-      if (!this._can(feature)) {
+      if (feature && !this._can(feature)) {
         return;
       }
       const tab = new qx.ui.tabview.Page(label).set({ layout: new qx.ui.layout.Grow(), padding: 8 });
@@ -57,6 +57,9 @@ qx.Class.define("ankamon.page.Maintenance", {
     // Eklentiler Bakım'a sekme ekleyebilir (bkz. ankamon.ext.Extensions.addMaintenanceTab). Ahenk artık bir
     // eklenti (ext/ankamon-ahenk) ve kendi init'inde etkinse bu sekmeyi kaydeder; burada yalnız yetki bakılır.
     ankamon.ext.Extensions.maintenanceTabs().forEach(t => add(t.key, t.label, t.feature, t.create));
+    // Yardım en sonda: Bakım raporunun ne olduğu, nasıl okunduğu, taramaların ne zaman yapıldığı (bkz. page.MaintenanceHelp).
+    // Yetki: sayfayı açabilen herkes (Bakım ya da Sensörler) — feature null.
+    add("help", "Yardım", null, u => new ankamon.page.MaintenanceHelp(u));
     this._rememberTab(this.__tabs, "maintenance"); // son seçili sekme (dinleyiciden önce: activate tetiklenmesin)
     this.__tabs.addListener("changeSelection", () => {
       const page = this.__current();

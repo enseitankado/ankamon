@@ -37,6 +37,10 @@ yükü, boş belleği ve ağ trafiğine bakılarak belirlenir:
   - süresi dolmuş   (≥ 7 gün):    gevşek eşikler (aşırı yük yoksa)
   - bir gün daha gecikmiş (≥ 8 gün): yalnız bellek kontrolü — "haftada en az bir kez" garantisi için
 Tahtalar yalnız açıkken taranabilir; açılmayan tahta ilk açıldığı uygun anda taranır.
+Denetimi BAŞARISIZ olan tahta (ör. root parolası genel paroladan farklı → "SSH parolası reddedildi") son
+denemesinin üzerinden RETRY_SECONDS (6 sa) geçmeden yeniden denenmez. Bu bekleme yokken başarılı denetimi hiç
+olmayan tek tahta her TICK'te (1 dk) yeni bir "1 tahta" taraması açıyordu — Bakım raporu listesi aynı
+tahtanın dakikalık hatalarıyla doluyordu (günde ~1400 görev).
 Tarama hafiftir (tahta başına tek SSH turu, ~1-2 sn) — eşikler sunucudaki diğer işleri korumak içindir.
 """
 
@@ -54,6 +58,7 @@ log = logging.getLogger(__name__)
 INTERVAL_SECONDS = float(os.environ.get("DIAGNOSE_INTERVAL_DAYS", "7")) * 86400
 EARLY_FRACTION = 0.85
 FORCE_AFTER_SECONDS = INTERVAL_SECONDS + 86400
+RETRY_SECONDS = float(os.environ.get("DIAGNOSE_RETRY_HOURS", "6")) * 3600
 
 # (1 dk yük / çekirdek, boş bellek oranı, ağ trafiği bayt/sn) üst/alt sınırları
 _STRICT = {"load": 0.5, "mem": 0.25, "net": 2 * 1024 * 1024}
@@ -99,16 +104,21 @@ def run(conn) -> None:
     if res is None:
         return
 
+    # last: son BAŞARILI denetim; tried: son deneme (sonucu ne olursa olsun) — başarısız tahta beklesin.
     rows = conn.execute(
-        """SELECT b.id, extract(epoch FROM max(j.created_at))::float8 AS last
+        """SELECT b.id,
+                  extract(epoch FROM max(j.created_at) FILTER (WHERE t.status = 'ok'))::float8 AS last,
+                  extract(epoch FROM max(j.created_at))::float8 AS tried
            FROM boards b
-           LEFT JOIN job_targets t ON t.board_id = b.id AND t.status = 'ok'
+           LEFT JOIN job_targets t ON t.board_id = b.id
            LEFT JOIN jobs j ON j.id = t.job_id AND j.type = 'diagnose'
            WHERE b.online AND b.ip IS NOT NULL
            GROUP BY b.id"""
     ).fetchall()
     now = time.time()
-    due = [(r["id"], now - (r["last"] or 0)) for r in rows if now - (r["last"] or 0) >= INTERVAL_SECONDS * EARLY_FRACTION]
+    due = [(r["id"], now - (r["last"] or 0)) for r in rows
+           if now - (r["last"] or 0) >= INTERVAL_SECONDS * EARLY_FRACTION
+           and (r["tried"] is None or r["tried"] == r["last"] or now - r["tried"] >= RETRY_SECONDS)]
     if not due:
         return
     # Kuyrukta/çalışan bir görev varsa (elle başlatılmış tarama dahil) araya girme.

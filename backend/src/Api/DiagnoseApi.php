@@ -49,11 +49,41 @@ final class DiagnoseApi
             "SELECT j.id, j.status, extract(epoch FROM j.created_at)::bigint AS created_at,
                     extract(epoch FROM j.finished_at)::bigint AS finished_at,
                     COALESCE((j.params->>'auto')::boolean, false) AS auto, u.username AS created_by,
-                    (SELECT count(*) FROM job_targets t WHERE t.job_id = j.id) AS targets
+                    (SELECT count(*) FROM job_targets t WHERE t.job_id = j.id) AS targets,
+                    (SELECT count(*) FROM job_targets t WHERE t.job_id = j.id
+                       AND t.status NOT IN ('ok', 'queued', 'running')) AS failed,
+                    -- Küçük taramalarda (otomatik tarama çoğu kez 1-2 tahtalık) seçicide tahta adları da yazılsın.
+                    (SELECT string_agg(COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)), ', ')
+                       FROM (SELECT * FROM job_targets t WHERE t.job_id = j.id LIMIT 4) t
+                       JOIN boards b ON b.id = t.board_id) AS names
              FROM jobs j LEFT JOIN users u ON u.id = j.created_by
              WHERE j.type = 'diagnose' ORDER BY j.id DESC LIMIT 30"
         );
         return ['runs' => $runs, 'schedule' => self::schedule()];
+    }
+
+    /**
+     * "Son durum": her tahtanın EN SON biten denetimi tek raporda (hangi taramada yapıldığından bağımsız).
+     * Otomatik zamanlayıcı yalnız vadesi gelen tahtaları tarar — tek bir otomatik tarama çoğu kez 1-2 tahtalıktır;
+     * sayfa açılışında o taramayı göstermek "yalnız bu tahta mı taranıyor?" karışıklığı yaratıyordu. Şu an
+     * kayıtlı olmayan tahtalar ve sürmekte olan denetimler (queued/running) katılmaz. Biçim show() ile aynı;
+     * tahta satırında ek olarak hangi taramadan geldiği (run_id, run_auto, run_by).
+     */
+    public function latest(): array
+    {
+        $targets = Db::all(
+            "SELECT DISTINCT ON (t.board_id) t.board_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS board,
+                    host(b.ip) AS ip, t.status, t.output, extract(epoch FROM t.finished_at)::bigint AS finished_at,
+                    j.id AS run_id, COALESCE((j.params->>'auto')::boolean, false) AS run_auto, u.username AS run_by
+             FROM job_targets t
+             JOIN jobs j ON j.id = t.job_id AND j.type = 'diagnose'
+             JOIN boards b ON b.id = t.board_id
+             LEFT JOIN users u ON u.id = j.created_by
+             WHERE t.status NOT IN ('queued', 'running')
+             ORDER BY t.board_id, t.finished_at DESC NULLS LAST, j.id DESC"
+        );
+        return ['job' => ['id' => 'latest', 'status' => 'done', 'latest' => true, 'auto' => false, 'created_by' => null,
+            'targets' => $targets, 'boards' => (int) Db::value('SELECT count(*) FROM boards')]];
     }
 
     public function show(Request $request): array
@@ -92,11 +122,23 @@ final class DiagnoseApi
              GROUP BY b.id"
         );
         $lasts = array_map(fn($r) => $r['last'] === null ? null : (int) $r['last'], $rows);
+        // Son denemesi başarısız olan tahtalar (bağlanılamadı, parola reddedildi…): zamanlayıcı bunları
+        // DIAGNOSE_RETRY_HOURS'ta bir yeniden dener (bkz. worker diagnose_schedule RETRY_SECONDS).
+        $failing = Db::all(
+            "SELECT board FROM (
+                SELECT DISTINCT ON (t.board_id) COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS board, t.status
+                FROM job_targets t JOIN jobs j ON j.id = t.job_id AND j.type = 'diagnose' JOIN boards b ON b.id = t.board_id
+                WHERE t.status NOT IN ('queued', 'running')
+                ORDER BY t.board_id, t.finished_at DESC NULLS LAST, j.id DESC) x
+             WHERE status <> 'ok' ORDER BY board"
+        );
         $never = count(array_filter($lasts, fn($l) => $l === null));
         $known = array_filter($lasts, fn($l) => $l !== null);
         return [
             'interval_days' => $days,
             'boards' => count($rows),
+            'retry_hours' => (float) (getenv('DIAGNOSE_RETRY_HOURS') ?: 6),
+            'failing' => array_column($failing, 'board'),
             'never_scanned' => $never,
             // En eski denetimli tahtanın "uygun an aranır" ve "en geç" zamanları.
             'next_from' => $known ? (int) (min($known) + $days * 86400 * 0.85) : null,
