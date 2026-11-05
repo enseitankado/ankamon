@@ -91,7 +91,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     },
 
     /** Menüde tek tahtaya uygulanan maddeler: çoklu seçimde her tahta için ayrı açılır (pencere başına tahta). */
-    PER_BOARD: ["Bilgisayarı yönet", "Görev yöneticisi", "Wi-Fi Monitör", "Sohbet", "Dosya yöneticisi", "Düzenle"],
+    PER_BOARD: ["Bilgisayarı yönet", "Görev yöneticisi", "Sohbet", "Dosya yöneticisi", "Düzenle"],
     PER_BOARD_CONFIRM: 6
   },
 

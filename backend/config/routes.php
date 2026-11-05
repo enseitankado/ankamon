@@ -166,6 +166,10 @@ return [
     ['GET',    '/api/extensions',          [Api\ExtensionsApi::class, 'list'],         'admin'],
     ['GET',    '/api/extensions/active',   [Api\ExtensionsApi::class, 'active'],       'user'],
     ['PUT',    '/api/extensions/settings', [Api\ExtensionsApi::class, 'saveSettings'], 'admin'],
+    // Wi-Fi Monitör "sabit" vericileri (sınıfın/okulun olağan ağları ve cihazları; bkz. WifimonFixedEmittersApi).
+    ['GET',    '/api/wifimon/fixed',     [Api\WifimonFixedEmittersApi::class, 'index'],  'screen'],
+    ['POST',   '/api/wifimon/fixed',     [Api\WifimonFixedEmittersApi::class, 'create'], 'screen'],
+    ['DELETE', '/api/wifimon/fixed',     [Api\WifimonFixedEmittersApi::class, 'delete'], 'screen'],
     ['GET',    '/api/lesson-times',      [Api\LessonTimesApi::class, 'show'],   'user'],
     ['PUT',    '/api/lesson-times',      [Api\LessonTimesApi::class, 'update'], 'admin'],
     ['GET',    '/api/audit',             [Api\AuditApi::class, 'index'],       'admin'],

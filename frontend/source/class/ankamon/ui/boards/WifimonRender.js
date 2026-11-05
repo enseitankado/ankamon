@@ -1,0 +1,222 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Ankamon — ETAP akıllı tahtaları için merkezi log, izleme ve yönetim sunucusu
+ * Copyright (C) 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * https://github.com/enseitankado/ankamon
+ *
+ * Bu program özgür yazılımdır: Free Software Foundation tarafından yayımlanan
+ * GNU Affero Genel Kamu Lisansı'nın 3. sürümü ya da (tercihinize bağlı olarak)
+ * daha sonraki herhangi bir sürümü koşulları altında yeniden dağıtabilir ve/veya
+ * değiştirebilirsiniz.
+ *
+ * Bu program yararlı olması umuduyla dağıtılmaktadır, ancak HİÇBİR GARANTİSİ
+ * YOKTUR; satılabilirlik veya belirli bir amaca uygunluk garantisi dahi
+ * verilmez. Ayrıntılar için GNU Affero Genel Kamu Lisansı'na bakınız.
+ *
+ * Bu programla birlikte GNU Affero Genel Kamu Lisansı'nın bir kopyasını (LICENSE
+ * dosyası) almış olmalısınız. Almadıysanız <https://www.gnu.org/licenses/>
+ * adresine bakınız.
+ *
+ * Bu dosyadan (sınıf, işlev ya da işlev içi kod bloğu dahil) alınan her türlü
+ * parça da AGPL-3.0-or-later ile lisanslıdır: parçayı kullanan türev eser aynı
+ * lisansla yayımlanmalı, bu telif/atıf bildirimi ve değişiklik notu
+ * korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
+ * kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
+ */
+
+/**
+ * Wi-Fi Monitör: çoklu tahta penceresinin HTML'i (bkz. ui.boards.WifiMonitor, ui.boards.WifimonClassify).
+ * Tahta başına bir bölüm: başlıkta sayılar (telefon kanıtı, olası, yabancı, ortak, sabit), altında sabit olmayan vericiler
+ * öne çıkarılmış tablo. Düğmeler data-act öznitelikli; tıklamaları pencere tek dinleyiciyle karşılar.
+ */
+qx.Class.define("ankamon.ui.boards.WifimonRender", {
+  type: "static",
+
+  statics: {
+    LEVELS: {
+      phone: { label: "Telefon", color: "#d93025", bg: "rgba(217,48,37,.16)", tip: "Sabit değil ve telefon olduğuna dair güçlü kanıt var." },
+      maybe: { label: "Olası", color: "#e8710a", bg: "rgba(232,113,10,.14)", tip: "Sabit değil; telefon/tablet olabilir (zayıf kanıt)." },
+      foreign: { label: "Yabancı", color: "#b08000", bg: "rgba(232,162,0,.12)", tip: "Sabit listesinde değil." },
+      common: { label: "Ortak", color: "#6b7280", bg: "rgba(107,114,128,.10)", tip: "Sabit değil ama seçili tahtaların çoğu bu ağ adını duyuyor: okul ağı olası." },
+      fixed: { label: "Sabit", color: "#6b7280", bg: "transparent", tip: "Sabit listesinde (ya da tahtanın bağlı olduğu ağ)." }
+    },
+    KIND_LABEL: { wifi: "Wi-Fi ağı", bt: "Bluetooth", probe: "Wi-Fi yoklaması" },
+    PROBE_NOTE: {
+      nodev: "Wi-Fi kartı yok; yoklama dinlenemedi.",
+      tools: "Tahtada iw ya da python3 yok; yoklama dinlenemedi.",
+      radio: "Wi-Fi açılamadığından yoklama dinlenemedi.",
+      busy: "Wi-Fi kartı bir ağa bağlı/bağlanıyor; bağlantı kesilmesin diye yoklama dinlenmedi.",
+      nomon: "Wi-Fi kartı monitör kipini desteklemiyor; yoklama dinlenemedi.",
+      shared: "Bu tahtada başka bir pencere yoklama dinliyor; bu turda atlandı.",
+      monfail: "Monitör arabirimi kurulamadı; yoklama dinlenemedi."
+    },
+
+    chip(text, color, bg, tip) {
+      return `<span title="${qx.bom.String.escape(tip || "")}" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;` +
+        `font-weight:600;color:${color};background:${bg};border:1px solid ${color}55;white-space:nowrap">${text}</span>`;
+    },
+
+    bar(signal) {
+      if (signal === null || signal === undefined) {
+        return "";
+      }
+      const color = signal >= 60 ? "#2fa84a" : signal >= 35 ? "#e8a200" : "#d93025";
+      return `<span style="display:inline-block;width:56px;height:8px;background:rgba(127,127,127,.25);border-radius:4px;vertical-align:middle">` +
+        `<span style="display:block;width:${signal}%;height:100%;background:${color};border-radius:4px"></span></span> ` +
+        `${signal}% <span style="opacity:.7">${ankamon.ui.boards.WifimonClassify.proximity(signal)}</span>`;
+    },
+
+    __button(act, text, tip, attrs) {
+      return `<button data-act="${act}" ${attrs} title="${qx.bom.String.escape(tip)}" style="font:inherit;font-size:11px;padding:1px 6px;` +
+        `margin-right:4px;border-radius:4px;border:1px solid rgba(127,127,127,.5);background:rgba(127,127,127,.12);color:inherit;cursor:pointer">${text}</button>`;
+    },
+
+    /** Satırın işlem düğmeleri: sabitle (bu sınıf / okul geneli) ya da sabitten çıkar. */
+    __actions(item, boardId, canEdit) {
+      if (!canEdit || item.row.active) {
+        return "";
+      }
+      const esc = qx.bom.String.escape;
+      const row = item.row;
+      if (item.fixed) {
+        return this.__button("unfix", "Sabitten çıkar", "Bu kaydı sabit listesinden siler.", `data-id="${item.fixed.id}"`);
+      }
+      if (row.kind !== "wifi" && row.random) {
+        return `<span style="opacity:.6;font-size:11px" title="Rastgele adres birkaç dakikada bir değiştiğinden sabitlenemez.">sabitlenemez</span>`;
+      }
+      const kind = row.kind === "wifi" ? "bssid" : row.kind;
+      const base = `data-kind="${kind}" data-value="${esc(row.addr)}" data-label="${esc(row.name || "")}"`;
+      let html = this.__button("fix", "Sabit: bu sınıf", "Yalnız bu tahtada sabit sayılır.", `${base} data-board="${boardId}"`);
+      if (row.kind === "wifi" && row.name) {
+        html += this.__button("fix", "Okul ağı", `"${row.name}" adlı bütün erişim noktaları bütün tahtalarda sabit sayılır.`,
+          `data-kind="ssid" data-value="${esc(row.name)}" data-label="${esc(row.name)}" data-board=""`);
+      } else if (row.kind !== "wifi") {
+        html += this.__button("fix", "Okul geneli", "Bu cihaz bütün tahtalarda sabit sayılır (ör. öğretmen dizüstü bilgisayarı).", `${base} data-board=""`);
+      }
+      return html;
+    },
+
+    __seen(item, now) {
+      const row = item.row;
+      const parts = [];
+      if (item.isNew) {
+        parts.push(this.chip("yeni", "#1a73e8", "rgba(26,115,232,.14)",
+          "Bu tahtada son 24 saatte ilk kez görüldü ya da bu pencere açıldıktan sonra belirdi."));
+      }
+      if (row.seen_days > 1) {
+        parts.push(`<span title="İlk görülme: ${new Date(row.first_seen * 1000).toLocaleString("tr-TR")}">${row.seen_days} günde</span>`);
+      }
+      if (item.lastAt) {
+        const ago = Math.max(0, Math.round((now - item.lastAt) / 1000));
+        parts.push(`<span style="opacity:.7">${ago < 60 ? ago + " sn" : Math.round(ago / 60) + " dk"} önce</span>`);
+      }
+      return parts.join(" ");
+    },
+
+    __evidence(item) {
+      const esc = qx.bom.String.escape;
+      const row = item.row;
+      const hints = (row.hints || []).slice();
+      if (item.commonCount) {
+        hints.push(`${item.commonCount} tahtada görülüyor (okul ağı olası)`);
+      }
+      if (row.kind === "probe" && row.ssids && row.ssids.length) {
+        hints.push("aradığı ağlar: " + row.ssids.join(", "));
+      }
+      if (row.kind === "probe" && row.count) {
+        hints.push(`${row.count} yoklama`);
+      }
+      if (item.fixed) {
+        hints.unshift("sabit: " + (item.fixed.kind === "ssid" ? `"${item.fixed.value}" ağ adı` : "adres") +
+          (item.fixed.board_id ? " (bu sınıf)" : " (okul geneli)"));
+      }
+      const vendor = row.vendor ? `<b>${esc(row.vendor)}</b>` : "";
+      const text = hints.map(h => esc(h)).join(" · ");
+      return [vendor, text].filter(Boolean).join(" · ");
+    },
+
+    __table(items, boardId, canEdit, now) {
+      const esc = qx.bom.String.escape;
+      const th = "text-align:left;padding:3px 6px;border-bottom:1px solid rgba(127,127,127,.4);font-weight:600;white-space:nowrap";
+      const td = "padding:3px 6px;vertical-align:top";
+      const head = ["Durum", "Tür", "Ad", "Sinyal", "Kanıt / üretici", "Adres", "Görülme", ""].map(h => `<th style="${th}">${h}</th>`).join("");
+      const body = items.map(item => {
+        const row = item.row;
+        const lv = this.LEVELS[item.level];
+        const name = row.kind === "probe" ? (row.ssids && row.ssids.length ? "" : "(ağ adı vermeden arıyor)")
+          : row.name || (row.kind === "wifi" ? "(gizli ağ)" : "(adsız)");
+        const dim = item.level === "fixed" ? "opacity:.55;" : "";
+        return `<tr style="${dim}background:${lv.bg}">` +
+          `<td style="${td}">${this.chip(lv.label, lv.color, "transparent", lv.tip)}</td>` +
+          `<td style="${td};white-space:nowrap">${this.KIND_LABEL[row.kind] || row.kind}${row.active ? " (bağlı)" : ""}</td>` +
+          `<td style="${td};font-weight:${item.level === "fixed" ? 400 : 600}">${esc(name)}</td>` +
+          `<td style="${td};white-space:nowrap">${this.bar(row.signal)}</td>` +
+          `<td style="${td};font-size:12px">${this.__evidence(item)}</td>` +
+          `<td style="${td};font-family:monospace;font-size:11px;opacity:.75;white-space:nowrap">${esc(row.addr || "")}</td>` +
+          `<td style="${td};white-space:nowrap;font-size:12px">${this.__seen(item, now)}</td>` +
+          `<td style="${td};white-space:nowrap">${this.__actions(item, boardId, canEdit)}</td></tr>`;
+      }).join("");
+      return `<table style="border-collapse:collapse;width:100%;font-size:13px"><tr>${head}</tr>${body}</table>`;
+    },
+
+    /** Tahta bölümü. view: WifimonClassify.board() sonucu. */
+    section(feed, view, opts) {
+      const esc = qx.bom.String.escape;
+      const L = this.LEVELS;
+      const c = view.counts;
+      const chips = [];
+      if (c.phone) {
+        chips.push(this.chip(`Telefon ${c.phone}`, L.phone.color, L.phone.bg, L.phone.tip));
+      }
+      if (c.maybe) {
+        chips.push(this.chip(`Olası ${c.maybe}`, L.maybe.color, L.maybe.bg, L.maybe.tip));
+      }
+      if (c.foreign) {
+        chips.push(this.chip(`Yabancı ${c.foreign}`, L.foreign.color, L.foreign.bg, L.foreign.tip));
+      }
+      if (c.common) {
+        chips.push(this.chip(`Ortak ${c.common}`, L.common.color, L.common.bg, L.common.tip));
+      }
+      chips.push(this.chip(`Sabit ${c.fixed}`, L.fixed.color, "rgba(127,127,127,.08)", L.fixed.tip));
+      const pi = feed.probeInfo;
+      if (pi && !pi.note) {
+        chips.push(this.chip(`Yoklama ≈${pi.devices} cihaz`, "#1a73e8", "rgba(26,115,232,.10)",
+          `Son ${pi.secs || "?"} sn dinlemede ağ arayan cihaz kestirimi (rastgele adresler parmak izine göre birleştirildi).`));
+      }
+      const hot = c.phone + c.maybe + c.foreign;
+      const border = c.phone ? L.phone.color : hot ? L.maybe.color : "rgba(127,127,127,.35)";
+      const busy = feed.busy ? ankamon.ui.JobSpinner.html() + " " : "";
+      const header = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px;background:rgba(127,127,127,.10)">` +
+        `<b style="font-size:14px;margin-right:6px">${esc(feed.name)}</b>${chips.join(" ")}<span style="flex:1"></span>` +
+        `<span style="font-size:12px;opacity:.85">${busy}${feed.status || ""}</span></div>`;
+      const notes = (feed.notes || []).filter(Boolean);
+      const noteHtml = notes.length ? `<div style="padding:4px 10px;font-size:12px">${notes.join("<br>")}</div>` : "";
+      const visible = view.rows.filter(item => opts.showFixed || item.level !== "fixed");
+      let table;
+      if (!feed.data && !view.rows.length) {
+        table = "";
+      } else if (!visible.length) {
+        table = `<div style="padding:6px 10px;color:#2fa84a;font-weight:600">Yabancı verici yok.</div>`;
+      } else {
+        table = `<div style="padding:2px 4px 6px">${this.__table(visible, feed.board.id, opts.canEdit, opts.now)}</div>`;
+      }
+      return `<div id="wifimon-board-${feed.board.id}" style="margin:0 0 12px;border:1px solid ${border};border-left-width:4px;border-radius:6px;overflow:hidden">` +
+        header + noteHtml + table + "</div>";
+    },
+
+    /** Pencerenin üst özeti: tahta başına sabit olmayan verici sayısı; tıklanınca o tahtanın bölümüne gider. */
+    summary(entries) {
+      const esc = qx.bom.String.escape;
+      const L = this.LEVELS;
+      return entries.map(({ feed, view }) => {
+        const c = view.counts;
+        const lv = c.phone ? L.phone : c.maybe ? L.maybe : c.foreign ? L.foreign : null;
+        const text = `${esc(feed.name)}: ${c.phone + c.maybe + c.foreign}`;
+        return `<span data-act="goto" data-board="${feed.board.id}" style="cursor:pointer;margin:0 4px 4px 0;display:inline-block">` +
+          (lv ? this.chip(text, lv.color, lv.bg, "Sabit olmayan verici sayısı; tıklayınca tahtanın bölümüne gider.")
+            : this.chip(text, "#2fa84a", "rgba(47,168,74,.10)", "Sabit olmayan verici yok; tıklayınca tahtanın bölümüne gider.")) + "</span>";
+      }).join("");
+    }
+  }
+});

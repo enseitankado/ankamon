@@ -1064,9 +1064,9 @@ qx.Class.define("ankamon.ui.BoardOps", {
           add(ICON.web, "Web sitesi aç…" + webCount, () => this.openWebsite(withSession));
           menu.getChildren()[menu.getChildren().length - 1].setEnabled(withSession.length > 0);
         }
-        // Wi-Fi Monitör: kart, bağlantı, çevredeki ağlar ve Bluetooth cihazları; kapalı radyo geçici açılır, sağ tıklanan tahta (bkz. ui.boards.WifiMonitor).
+        // Wi-Fi Monitör: seçili çevrim içi tahtalar tek pencerede (sınıfta telefon arama; sabit/yabancı verici) — bkz. ui.boards.WifiMonitor.
         if (can("screen")) {
-          add(ICON.wifi, "Wi-Fi Monitör", () => ankamon.ui.boards.WifiMonitor.open(board));
+          add(ICON.wifi, "Wi-Fi Monitör" + count, () => ankamon.ui.boards.WifiMonitor.open(online));
         }
         // Sohbet: her bilgisayar için ayrı pencere; çoklu seçimde sağ tıklanan tahta (bkz. ui.chat.Window).
         if (can("boards.chat")) {

@@ -34,14 +34,22 @@ Program /run/ankamon-wifimon/prog.sh olarak yazılıp sh (dash) ile çalışır.
   gelen stdin kalp atışını okur: EOF (SSH koptu, durdurma istendi), LEASE saniye sessizlik (ağ koptu) ya da ana sürecin ölmesi
   (kill -9) durumunda devreye girer. stdout'u /dev/null'dur; SSH oturumunu açık tutmaz.
 - Bluetooth: /sys/class/bluetooth/hci* varsa rfkill, servis ve güç açısından gerekirse geçici açılır, durum aynı şekilde döner. Yoksa atlanır.
+- Yoklama dinleme (PROBE=1, bkz. wifimon_probe_sniffer.py): Wi-Fi kartı BAĞLI DEĞİLSE (durum 20/30) kart NetworkManager'dan geçici
+  bırakılır (`managed no`, çalışma zamanı ayarı; açılışta kendiliğinden döner), arabirim indirilir, monitör kipinde ankamon-mon0
+  eklenir ve dinlenir; sonra arabirim silinir, kart yeniden `managed yes` olur (autoconnect "no" korunur, Arge 2'de denendi).
+  Kart bağlıysa ya da bağlanıyorsa dinlenmez (bağlantı kesilirdi). Aynı tahtada tek oturum dinler (flock -n). Geri alma işaretli
+  ($D/unmanaged): finish, bekçi ve restore_orig sahibi ölmüş/biten işareti temizler.
 
 Bilinen sınır: geçici açıkken tahtanın gücü kesilirse trap da bekçi de çalışamaz; NetworkManager radyoyu açık hatırlar ve /run açılışta
 silindiğinden sonraki oturum da bunu bilemez.
 
-Çıktı: önce @@INFO + @@START; her tarama @@RADIO/@@DEV/@@LIST/@@BT/@@INFO bölümleri + @@END; sonda @@RESTORED + @@DONE.
+Çıktı: önce @@INFO + @@START; her tarama @@RADIO/@@DEV/@@LIST/@@BT/@@INFO bölümleri + @@END; yoklama dinlendiyse ardından
+@@PROBE (JSON satırları) + @@PROBEINFO + @@PEND; sonda @@RESTORED + @@DONE.
 """
 
 from __future__ import annotations
+
+from .wifimon_probe_sniffer import WIFIMON_PROBE_SNIFFER_SOURCE
 
 _WIFIMON_PROGRAM = r"""
 export LC_ALL=C.UTF-8 PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -50,6 +58,7 @@ O=$D/orig
 L=$D/lock
 LEASE=25
 SELF=$0
+MON=ankamon-mon0
 
 n() { timeout 15 nmcli "$@" 2>/dev/null; }
 b() { timeout 5 bluetoothctl "$@" </dev/null 2>/dev/null; }
@@ -123,7 +132,46 @@ open_radios() {
   fi
 }
 
+# Yoklama dinlemesinin geri alınması: $1 boşsa sahibi ne olursa olsun, değilse yalnız o sürecin ya da ölmüş sürecin işareti.
+probe_undo() {
+  [ -f "$D/unmanaged" ] || { iw dev "$MON" del >/dev/null 2>&1; return 0; }
+  read -r u_dev u_pid < "$D/unmanaged"
+  if [ -n "$1" ] && [ "$u_pid" != "$1" ] && kill -0 "$u_pid" 2>/dev/null; then return 0; fi
+  iw dev "$MON" del >/dev/null 2>&1
+  n device set "$u_dev" managed yes >/dev/null && rm -f "$D/unmanaged"
+}
+
+# $1 saniye dinler, sonuç $PTMP'de; PROBE_NOTE: neden dinlenmediği (boşsa dinlendi).
+probe_sniff() {
+  : > "$PTMP"; PROBE_NOTE=
+  [ -n "$W_DEV" ] || { PROBE_NOTE=nodev; return 0; }
+  { command -v iw && command -v python3; } >/dev/null 2>&1 || { PROBE_NOTE=tools; return 0; }
+  [ "$(wifi_radio)" = enabled ] || { PROBE_NOTE=radio; return 0; }
+  case "$(wifi_state "$W_DEV")" in 20|30) ;; *) PROBE_NOTE=busy; return 0 ;; esac
+  phy=$(iw dev "$W_DEV" info 2>/dev/null | sed -n 's/.*wiphy \([0-9]*\).*/phy\1/p')
+  iw phy "$phy" info 2>/dev/null | grep -q '^[[:space:]]*\* monitor$' || { PROBE_NOTE=nomon; return 0; }
+  exec 8>"$D/probe.lock"
+  flock -n 8 || { exec 8>&-; PROBE_NOTE=shared; return 0; }
+  probe_undo
+  echo "$W_DEV $ME" > "$D/unmanaged"
+  if n device set "$W_DEV" managed no >/dev/null && ip link set "$W_DEV" down 2>/dev/null &&
+     iw phy "$phy" interface add "$MON" type monitor >/dev/null 2>&1 && ip link set "$MON" up 2>/dev/null; then
+    timeout $(($1+5)) python3 "$D/probe.py" "$MON" "$1" > "$PTMP" & CUR=$!; wait $CUR; CUR=
+  else
+    PROBE_NOTE=monfail
+  fi
+  probe_undo "$ME"
+  exec 8>&-
+  i=0
+  while [ $i -lt 10 ]; do
+    s=$(wifi_state "$W_DEV"); [ -n "$s" ] && [ "$s" -ge 30 ] 2>/dev/null && break
+    sleep 1 & CUR=$!; wait $CUR; CUR=; i=$((i+1))
+  done
+  block_connect
+}
+
 restore_orig() {
+  probe_undo
   [ -f "$O" ] || { echo none; return 0; }
   . "$O"
   ok=1
@@ -179,9 +227,10 @@ guard() {
   kill -TERM "$M" 2>/dev/null
   i=0
   while kill -0 "$M" 2>/dev/null && [ $i -lt 6 ]; do sleep 1; i=$((i+1)); done
+  probe_undo "$M"
   release "$M" >/dev/null
   kill -KILL "$M" 2>/dev/null
-  rm -f "$D/list.$M"
+  rm -f "$D/list.$M" "$D/probe.$M"
 }
 
 bt_info() {
@@ -196,8 +245,9 @@ finish() {
   trap '' TERM HUP INT PIPE
   [ -n "$CUR" ] && kill "$CUR" 2>/dev/null
   [ -n "$BTP" ] && kill "$BTP" 2>/dev/null
+  probe_undo "$ME"
   res=$(release "$ME")
-  rm -f "$TMP"
+  rm -f "$TMP" "$PTMP"
   echo '@@RESTORED'
   echo "result=$res"
   echo "wifi_temp=$W_TEMP"
@@ -280,13 +330,24 @@ scan_once() {
   fi
   info
   echo '@@END'
+  [ "$PROBE" = 1 ] || return 0
+  probe_sniff "$PROBE_SECS"
+  echo '@@PROBE'; cat "$PTMP"
+  echo '@@PROBEINFO'
+  echo "note=$PROBE_NOTE"
+  echo "secs=$PROBE_SECS"
+  echo '@@PEND'
 }
 
 main() {
   WATCH=$1
+  PROBE=$2
+  PROBE_SECS=15
+  [ "$WATCH" = 1 ] && PROBE_SECS=20
   ME=$$
   TMP=$D/list.$ME
-  CUR=; BTP=; W_DEV=; W_TEMP=0; W_FAIL=; BT_PRESENT=0; BT_TEMP=0; BT_FAIL=; DISCONNECTED=0
+  PTMP=$D/probe.$ME
+  CUR=; BTP=; PROBE_NOTE=; W_DEV=; W_TEMP=0; W_FAIL=; BT_PRESENT=0; BT_TEMP=0; BT_FAIL=; DISCONNECTED=0
   exec 2>/dev/null 3<&0 </dev/null
   trap finish TERM HUP INT PIPE
   setsid sh "$SELF" guard "$ME" <&3 3<&- >/dev/null 2>&1 &
@@ -298,21 +359,24 @@ main() {
   while :; do
     scan_once
     [ "$WATCH" = 1 ] || break
+    # Yoklama dinlendiyse tarama arası beklemesi o süre içinde geçti.
+    { [ "$PROBE" = 1 ] && [ -z "$PROBE_NOTE" ]; } && continue
     sleep 6 & CUR=$!; wait $CUR; CUR=
   done
   finish
 }
 
 case "$1" in
-  main) main "$2" ;;
+  main) main "$2" "$3" ;;
   guard) guard "$2" ;;
   btcollect) bt_collect ;;
 esac
 """
 
 
-def wifimon_remote_command(watch: bool) -> str:
-    """SSH ile tahtaya verilecek komut: programı /run altına yazar, çalıştırır. Çıkış: 49 nmcli yok, 48 /run yazılamıyor."""
+def wifimon_remote_command(watch: bool, probe: bool = False) -> str:
+    """SSH ile tahtaya verilecek komut: programı (ve yoklama dinleyicisini) /run altına yazar, çalıştırır.
+    Çıkış: 49 nmcli yok, 48 /run yazılamıyor."""
     return (
         "command -v nmcli >/dev/null 2>&1 || { echo NO_NMCLI >&2; exit 49; }\n"
         "umask 077; mkdir -p /run/ankamon-wifimon 2>/dev/null || exit 48\n"
@@ -320,5 +384,7 @@ def wifimon_remote_command(watch: bool) -> str:
         + _WIFIMON_PROGRAM
         + "ANKAMON_WIFIMON_EOF\n"
         "mv -f /run/ankamon-wifimon/prog.$$ /run/ankamon-wifimon/prog.sh || exit 48\n"
-        f"exec sh /run/ankamon-wifimon/prog.sh main {1 if watch else 0}\n"
+        + ("cat > /run/ankamon-wifimon/probe.py <<'ANKAMON_WIFIMON_PROBE_EOF' || exit 48"
+           + WIFIMON_PROBE_SNIFFER_SOURCE + "ANKAMON_WIFIMON_PROBE_EOF\n" if probe else "")
+        + f"exec sh /run/ankamon-wifimon/prog.sh main {1 if watch else 0} {1 if probe else 0}\n"
     )

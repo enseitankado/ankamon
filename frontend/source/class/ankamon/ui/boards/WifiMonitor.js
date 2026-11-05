@@ -26,63 +26,129 @@
  */
 
 /**
- * Sağ menü "Wi-Fi Monitör": bilgisayarın Wi-Fi kartı, bağlantısı, çevresindeki ağlar ve Bluetooth cihazları tek tabloda (bkz. worker
- * screen/wifi.py). Tahta başına bir pencere. Varsayılan tek tarama, "Yenile" yeni tarama yapar; "Sürekli izle" açıkken liste tazelenir.
- * Wi-Fi/Bluetooth kapalıysa tarama süresince tahtada geçici açılır (kayıtlı ağa bağlanmaz), sonra eski durumuna döner.
+ * Sağ menü / araç çubuğu "Wi-Fi Monitör": seçili bütün tahtalar TEK pencerede, tahta başına bir bölüm. Amaç sınıfa getirilmiş
+ * telefonları bulmak: tahtaların duyduğu Wi-Fi ağları, Bluetooth cihazları ve (kart bağlı değilse) Wi-Fi yoklamaları "sabit"
+ * listesine (sınıfın/okulun olağan vericileri, sunucuda — /api/wifimon/fixed) göre ayrılır; sabit olmayanlar telefon kanıtına göre
+ * öne çıkarılır (bkz. ui.boards.WifimonClassify, ui.boards.WifimonRender). Pencere zaten açıksa yeni tahtalar ona eklenir.
+ *
+ * Her tahta için ayrı WebSocket (worker screen/wifi.py): varsayılan tek tarama, "Yenile" yeniden tarar, "Sürekli izle" açıkken
+ * liste tazelenir. Kapalı Wi-Fi/Bluetooth tarama süresince o tahtada geçici açılır (kayıtlı ağa bağlanmaz), sonra eski durumuna
+ * döner — geri yükleme tahta başınadır, bölümün notunda görünür.
  */
 qx.Class.define("ankamon.ui.boards.WifiMonitor", {
   type: "static",
 
   statics: {
-    __open: new Map(),
+    /** Sürekli izlemede yoklama satırı son duyuluşundan bu kadar sonra listeden düşer. */
+    PROBE_KEEP_MS: 5 * 60 * 1000,
 
-    open(board) {
-      const name = board.label || board.hostname || board.ip || "#" + board.id;
-      const existing = this.__open.get(board.id);
-      if (existing) {
-        existing.open();
-        existing.focus();
+    HELP: "Bu pencere seçili tahtaların çevresindeki kablosuz vericileri gösterir. Sınıfın/okulun olağan ağlarını ve cihazlarını " +
+      "<b>sabit</b> işaretleyin (en kolayı: sınıflar boşken <i>Görünenleri sabit yap</i>); sonra gerisi <b>yabancı</b> olarak öne " +
+      "çıkar. <b>Neler görülebilir:</b> telefonun paylaşım noktası (hotspot) açıksa Wi-Fi ağı olarak; Bluetooth'u açıksa Bluetooth " +
+      "cihazı olarak (iPhone'lar ve çoğu Android sürekli BLE yayını yapar); Wi-Fi'si açık ama bağlı değilse, ara ara gönderdiği " +
+      "<b>yoklamalarla</b> (probe request — yalnız tahtanın Wi-Fi kartı bir ağa bağlı DEĞİLSE dinlenir; dinleme sırasında kart birkaç " +
+      "saniye NetworkManager'dan bırakılır). <b>Sınırlar:</b> ekranı kapalı telefon yoklamayı seyrek yapar, bir taramada " +
+      "duyulmayabilir — <i>Sürekli izle</i> açık bırakın; telefonlar rastgele adres kullandığından yoklama cihaz sayısı " +
+      "kestirimdir; uçak kipindeki ya da Wi-Fi'si ve Bluetooth'u kapalı telefon görülemez; Wi-Fi'ye bağlı telefonun kendi trafiği " +
+      "(başka ağın kanalında) dinlenmez; sinyal gücü yalnız kaba bir yakınlık ipucudur (duvar, gövde, anten yönü değiştirir), " +
+      "komşu sınıftaki telefon da duyulabilir. Okul ağına bağlı cihazlar için ağ envanterine bakın.",
+
+    __win: null,
+
+    /**
+     * @param boards {Array} tahtalar (çevrim içi olanlar)
+     */
+    open(boards) {
+      boards = (Array.isArray(boards) ? boards : [boards]).filter(Boolean);
+      if (!boards.length) {
         return;
       }
+      if (this.__win && this.__win.ctx) {
+        boards.forEach(board => this.__win.ctx.addBoard(board));
+        this.__win.open();
+        this.__win.focus();
+        return;
+      }
+      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör", 1040, { maximizable: true });
+      win.setHeight(640);
+      this.__win = win;
+      win.ctx = this.__createWifimonContext(win);
+      boards.forEach(board => win.ctx.addBoard(board));
+      win.addListener("close", () => {
+        win.ctx.closeAll();
+        win.ctx = null;
+        if (this.__win === win) {
+          this.__win = null;
+        }
+      });
+      win.open();
+      win.ctx.loadFixed();
+    },
+
+    __createWifimonContext(win) {
+      const Classify = ankamon.ui.boards.WifimonClassify;
+      const Render = ankamon.ui.boards.WifimonRender;
       const esc = qx.bom.String.escape;
-      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör — " + name, 760, { maximizable: true });
-      win.setHeight(520);
-      const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(12).set({ alignY: "middle" }));
+      const canEdit = true; // pencereyi açabilen ("screen") sabit listesini de düzenler (bkz. backend routes)
+
+      const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" }));
       const refresh = new qx.ui.form.Button("Yenile");
       const watchBox = new qx.ui.form.CheckBox("Sürekli izle").set({
-        toolTipText: "Açıkken liste sürekli tazelenir; kapalı radyo izleme bitene kadar açık kalır."
+        toolTipText: "Açıkken liste sürekli tazelenir; tahtada geçici açılan radyo izleme bitene kadar açık kalır."
       });
-      bar.add(refresh);
-      bar.add(watchBox);
+      const probeBox = new qx.ui.form.CheckBox("Yoklamaları dinle").set({
+        value: true,
+        toolTipText: "Wi-Fi'si açık ama bağlı olmayan cihazların ağ arama yoklamalarını dinler (yalnız Wi-Fi kartı bir ağa bağlı değilse)."
+      });
+      const fixedBox = new qx.ui.form.CheckBox("Sabitleri göster");
+      const baseline = new qx.ui.form.Button("Görünenleri sabit yap…").set({
+        toolTipText: "Şu an görünen bütün kalıcı adresli vericileri kendi sınıflarına sabit işaretler (sınıflar boşken yapın)."
+      });
+      const manage = new qx.ui.form.Button("Sabit listesi…");
+      const help = new qx.ui.form.Button("?").set({ toolTipText: "Neler görülebilir, sınırlar" });
+      [refresh, watchBox, probeBox, fixedBox].forEach(w => bar.add(w));
+      bar.add(new qx.ui.core.Spacer(), { flex: 1 });
+      [baseline, manage, help].forEach(w => bar.add(w));
       win.add(bar);
-      const status = new qx.ui.basic.Label("Bağlanılıyor…").set({ rich: true, wrap: true, allowGrowX: true });
-      win.add(status);
+      const summary = new qx.ui.embed.Html("").set({ height: 30, overflowY: "auto" });
+      win.add(summary);
       const html = new qx.ui.embed.Html("").set({ overflowY: "auto" });
       win.add(html, { flex: 1 });
-      this.__open.set(board.id, win);
 
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const feeds = new Map();
+      let fixed = [];
+      let fixedIndex = new Map();
       let closed = false;
-      let ws = null;
-      let line = "";
-      let lastData = null;
+      let renderQueued = false;
+
       const red = text => `<span style="color:#d93025">${esc(text)}</span>`;
-      const bars = pct => {
-        if (pct === null || pct === undefined) {
-          return "";
+      const render = () => {
+        if (renderQueued || closed) {
+          return;
         }
-        const color = pct >= 60 ? "#2fa84a" : pct >= 35 ? "#e8a200" : "#d93025";
-        return `<span style="display:inline-block;width:80px;height:9px;background:rgba(127,127,127,.25);border-radius:5px;vertical-align:middle">` +
-          `<span style="display:block;width:${pct}%;height:100%;background:${color};border-radius:5px"></span></span> ${pct}%`;
+        renderQueued = true;
+        qx.event.Timer.once(() => {
+          renderQueued = false;
+          if (closed) {
+            return;
+          }
+          const now = Date.now();
+          const list = Array.from(feeds.values());
+          const common = Classify.commonSsids(list);
+          const entries = list.map(feed => ({ feed, view: Classify.board(feed, fixedIndex, common, now) }));
+          const opts = { showFixed: fixedBox.getValue(), canEdit, now };
+          html.setHtml(entries.map(({ feed, view }) => Render.section(feed, view, opts)).join(""));
+          summary.setHtml(`<div style="font-size:12px;line-height:22px">${Render.summary(entries)}</div>`);
+          win.setCaption(`Wi-Fi Monitör — ${list.length === 1 ? list[0].name : list.length + " tahta"}`);
+        }, null, 120);
       };
+
       const btNote = (bt, ended) => {
-        if (bt === "absent") {
-          return "Bu tahtada Bluetooth adaptörü yok.";
-        }
         if (bt === "temp") {
           return ended ? "Bluetooth geçici açıldı, tarama sonrası eski durumuna döndürüldü." : "Bluetooth geçici açık.";
         }
-        return bt && bt.startsWith("fail") ? red("Bluetooth açılamadı; cihazlar listelenemedi.") : "";
+        return bt && bt.startsWith("fail") ? red("Bluetooth açılamadı; cihazlar listelenemedi.") : bt === "absent" ? "Bluetooth adaptörü yok." : "";
       };
       const wifiNote = (info, watching) => {
         if (info.wifi_fail) {
@@ -95,127 +161,230 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         }
         return watching ? "Wi-Fi izleme için geçici açık; izleme bitince kapatılacak." : "Wi-Fi geçici açık, tarama sonrası kapatılacak.";
       };
-      const summaryLine = (d, radioValue) => {
-        const radio = radioValue === "enabled" ? "açık" : radioValue === "disabled" ? "kapalı" : "bilinmiyor";
-        const wifiCount = d.rows.filter(r => r.kind === "wifi").length;
-        const btCount = d.rows.length - wifiCount;
-        const info = d.info || {};
-        const summary = d.device
-          ? `Kart: <b>${esc(d.device)}</b> · Wi-Fi <b style="color:${radioValue === "enabled" ? "inherit" : "#d93025"}">${radio}</b> · ` +
-            (d.connection ? `Bağlı: <b>${esc(d.connection)}</b>` : "bağlı değil")
-          : "Bu bilgisayarda Wi-Fi kartı görünmüyor.";
-        const counts = `${wifiCount} ağ` + (info.bt === "on" || info.bt === "temp" ? ` · ${btCount} Bluetooth` : "") +
-          ` · ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}`;
-        return `${summary} · ${counts}`;
-      };
-      const showStatus = notes => {
-        const text = notes.filter(Boolean).join(" ");
-        status.setValue(line && text ? `${line}<br>${text}` : line || text);
-      };
-      const render = d => {
-        lastData = d;
-        line = summaryLine(d, d.radio);
-        const info = d.info || {};
-        showStatus([wifiNote(info, watchBox.getValue()), btNote(info.bt, false)]);
-        const th = "text-align:left;padding:4px 8px;border-bottom:1px solid rgba(127,127,127,.4);position:sticky;top:0;background:inherit";
-        const td = "padding:3px 8px;white-space:nowrap";
-        html.setHtml(`<table style="border-collapse:collapse;font-size:13px;width:100%"><tr>` +
-          ["Tür", "Ad", "Sinyal", "Kanal", "Frekans", "Hız", "Güvenlik", "Adres"].map(h => `<th style="${th}">${h}</th>`).join("") + "</tr>" +
-          d.rows.map(n => {
-            const isWifi = n.kind === "wifi";
-            const name = n.name || (isWifi ? "(gizli ağ)" : "(adsız)");
-            const security = isWifi ? n.security || "açık" : n.security;
-            return `<tr style="${n.active ? "font-weight:600;background:rgba(26,115,232,.12)" : ""}">` +
-              `<td style="${td}">${isWifi ? "Wi-Fi" : "Bluetooth"}</td>` +
-              `<td style="${td}">${n.active ? "● " : ""}${esc(name)}</td><td style="${td}">${bars(n.signal)}</td>` +
-              `<td style="${td}">${esc(n.chan)}</td><td style="${td}">${esc(n.freq)}</td><td style="${td}">${esc(n.rate)}</td>` +
-              `<td style="${td}">${esc(security)}</td><td style="${td};opacity:.7">${esc(n.addr)}</td></tr>`;
-          }).join("") + "</table>");
-      };
-      const renderDone = d => {
-        if (lastData) {
-          line = summaryLine(lastData, d.radio);
+      const cardLine = d => {
+        if (!d.device) {
+          return red("Bu bilgisayarda Wi-Fi kartı görünmüyor.");
         }
-        const parts = [];
-        if (d.result === "fail" || d.result === "lock") {
-          parts.push(red("Tahtadaki kartın eski durumuna dönmesi doğrulanamadı; lütfen denetleyin."));
-        } else if (d.wifi_fail) {
-          parts.push(wifiNote(d, false));
-        } else if (d.wifi_temp === "1") {
-          parts.push(d.result === "shared"
-            ? "Wi-Fi geçici açıldı; bu tahtadaki başka bir tarama bitince kapatılacak."
-            : "Wi-Fi geçici açıldı, tarama sonrası kapatıldı.");
-        }
-        parts.push(btNote(d.bt, d.result !== "shared"));
-        showStatus(parts);
+        return `Kart ${esc(d.device)} · ` + (d.connection ? `bağlı: <b>${esc(d.connection)}</b>` : "bağlı değil");
       };
-      const syncControls = busy => refresh.setEnabled(!busy && !watchBox.getValue());
       const discard = sock => {
         if (sock) {
           sock.onmessage = sock.onclose = null;
           sock.close();
         }
       };
-      const connect = () => {
+      const anyBusy = () => Array.from(feeds.values()).some(f => f.ws);
+      const syncControls = () => refresh.setEnabled(!watchBox.getValue() && !anyBusy());
+
+      const onMessage = (feed, d, watching) => {
+        if (d.phase === "scanning") {
+          feed.status = "Taranıyor…";
+          feed.notes = [feed.data ? cardLine(feed.data) : "", wifiNote(d.info, watching), btNote(d.info.bt, false)];
+        } else if (d.phase === "data") {
+          feed.data = d;
+          const sniff = probeBox.getValue() && d.device;
+          feed.status = sniff ? "Yoklamalar dinleniyor…" : `Son tarama ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}`;
+          feed.notes = [cardLine(d), wifiNote(d.info || {}, watching), btNote((d.info || {}).bt, false)];
+          if (!sniff) {
+            feed.initialKeys = feed.initialKeys || new Set(d.rows.map(Classify.rowKey));
+          }
+        } else if (d.phase === "probes") {
+          const now = Date.now();
+          if (!watching) {
+            feed.probes = new Map();
+          }
+          d.rows.forEach(row => feed.probes.set(Classify.rowKey(row), { row, at: now }));
+          feed.probes.forEach((p, key) => now - p.at > this.PROBE_KEEP_MS && feed.probes.delete(key));
+          feed.probeInfo = d;
+          feed.status = `Son tarama ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}`;
+          if (d.note) {
+            feed.notes.push(Render.PROBE_NOTE[d.note] || "Yoklama dinlenemedi.");
+          }
+          if (!feed.initialKeys) {
+            feed.initialKeys = new Set(((feed.data && feed.data.rows) || []).map(Classify.rowKey));
+            feed.probes.forEach((p, key) => feed.initialKeys.add(key));
+          }
+        } else if (d.phase === "done") {
+          const parts = feed.data ? [cardLine(feed.data)] : [];
+          if (d.result === "fail" || d.result === "lock") {
+            parts.push(red("Tahtadaki kartın eski durumuna dönmesi doğrulanamadı; lütfen denetleyin."));
+          } else if (d.wifi_fail) {
+            parts.push(wifiNote(d, false));
+          } else if (d.wifi_temp === "1") {
+            parts.push(d.result === "shared" ? "Wi-Fi geçici açıldı; bu tahtadaki başka bir tarama bitince kapatılacak."
+              : "Wi-Fi geçici açıldı, tarama sonrası kapatıldı.");
+          }
+          parts.push(btNote(d.bt, d.result !== "shared"));
+          if (feed.probeInfo && feed.probeInfo.note) {
+            parts.push(Render.PROBE_NOTE[feed.probeInfo.note] || "");
+          }
+          feed.notes = parts;
+        }
+        render();
+      };
+
+      const connect = feed => {
         const watching = watchBox.getValue();
-        const sock = ws = new WebSocket(`${proto}//${location.host}/screen/ws/wifi/${board.id}${watching ? "?watch=1" : ""}`);
-        syncControls(true);
-        sock.onmessage = e => {
-          const d = JSON.parse(e.data);
-          if (d.phase === "scanning") {
-            showStatus(["Taranıyor…", wifiNote(d.info, watching), btNote(d.info.bt, false)]);
-          } else if (d.phase === "data") {
-            render(d);
-          } else if (d.phase === "done") {
-            renderDone(d);
-          }
-        };
+        const query = [watching ? "watch=1" : "", probeBox.getValue() ? "probe=1" : ""].filter(Boolean).join("&");
+        const sock = feed.ws = new WebSocket(`${proto}//${location.host}/screen/ws/wifi/${feed.board.id}${query ? "?" + query : ""}`);
+        feed.busy = true;
+        feed.status = "Bağlanılıyor…";
+        syncControls();
+        render();
+        sock.onmessage = e => onMessage(feed, JSON.parse(e.data), watching);
         sock.onclose = e => {
-          if (closed || sock !== ws) {
+          if (closed || sock !== feed.ws) {
             return;
           }
-          ws = null;
-          syncControls(false);
-          if (e.code === 1000) {
-            return;
+          feed.ws = null;
+          feed.busy = false;
+          syncControls();
+          if (e.code !== 1000) {
+            const why = { 4001: "Tahta bulunamadı.", 4002: "Tahtaya ulaşılamıyor.", 4003: "SSH girişi reddedildi.", 4009: "Tahtada nmcli yok.", 4010: "Tahtada /run dizinine yazılamıyor." };
+            const retry = watchBox.getValue() && ![4001, 4003, 4009, 4010].includes(e.code);
+            feed.status = red((why[e.code] || "Bağlantı kesildi.") + (retry ? " Yeniden deneniyor…" : ""));
+            if (retry) {
+              qx.event.Timer.once(() => !closed && !feed.ws && feeds.has(feed.board.id) && watchBox.getValue() && connect(feed), null, 5000);
+            }
+          } else if (!/Son tarama/.test(feed.status || "")) {
+            feed.status = "Bitti";
           }
-          const why = { 4001: "Tahta bulunamadı.", 4002: "Tahtaya ulaşılamıyor.", 4003: "SSH girişi reddedildi.", 4009: "Tahtada nmcli yok.", 4010: "Tahtada /run dizinine yazılamıyor." };
-          const retry = watchBox.getValue() && ![4001, 4003, 4009, 4010].includes(e.code);
-          status.setValue(red((why[e.code] || "Bağlantı kesildi.") + (retry ? " Yeniden deneniyor…" : "")));
-          if (retry) {
-            qx.event.Timer.once(() => !closed && !ws && watchBox.getValue() && connect(), null, 5000);
-          }
+          render();
         };
       };
-      refresh.addListener("execute", () => {
-        if (!ws) {
-          connect();
+
+      const restartAll = () => feeds.forEach(feed => {
+        discard(feed.ws);
+        connect(feed);
+      });
+      const stopAll = () => feeds.forEach(feed => {
+        if (feed.ws && feed.ws.readyState === WebSocket.OPEN) {
+          feed.ws.send("stop");
+          feed.status = "İzleme durduruluyor…";
+        } else if (feed.ws) {
+          discard(feed.ws);
+          feed.ws = null;
+          feed.busy = false;
         }
       });
+
+      const loadFixed = async () => {
+        try {
+          fixed = (await ankamon.io.Api.get("/wifimon/fixed")).fixed || [];
+        } catch (err) {
+          fixed = [];
+          summary.setHtml(red("Sabit listesi okunamadı: " + (err.message || err)));
+        }
+        fixedIndex = Classify.index(fixed);
+        render();
+      };
+      const addFixed = async items => {
+        if (!items.length) {
+          return;
+        }
+        try {
+          await ankamon.io.Api.post("/wifimon/fixed", { items });
+        } catch (err) {
+          ankamon.ui.Dialog.error(err);
+        }
+        await loadFixed();
+      };
+      const removeFixed = async ids => {
+        try {
+          await ankamon.io.Api.del("/wifimon/fixed", { ids });
+        } catch (err) {
+          ankamon.ui.Dialog.error(err);
+        }
+        await loadFixed();
+      };
+
+      // Görünenleri sabit yap: her tahtanın şu an duyduğu kalıcı adresli vericiler kendi sınıfına (tahtasına) sabitlenir.
+      baseline.addListener("execute", async () => {
+        const items = [];
+        feeds.forEach(feed => {
+          const rows = ((feed.data && feed.data.rows) || []).concat(Array.from(feed.probes.values()).map(p => p.row));
+          rows.forEach(row => {
+            if (!row.addr || row.active || (row.kind !== "wifi" && row.random) || Classify.fixedEntry(row, feed.board.id, fixedIndex)) {
+              return;
+            }
+            items.push({ kind: row.kind === "wifi" ? "bssid" : row.kind, value: row.addr, board_id: feed.board.id, label: row.name || "" });
+          });
+        });
+        if (!items.length) {
+          ankamon.ui.Dialog.alert("Sabit işaretlenecek yeni verici yok (rastgele adresli Bluetooth/yoklama cihazları sabitlenemez).", "Wi-Fi Monitör");
+          return;
+        }
+        const ok = await ankamon.ui.Dialog.confirm(`Şu an görünen <b>${items.length}</b> verici, görüldüğü tahtanın sınıfına sabit işaretlenecek.` +
+          "<br><br>Bunu sınıflar <b>boşken</b> (öğrenci ve telefon yokken) yapın: o anda sınıfta açık bir telefon varsa o da sabit sayılır.",
+        "Sabit yap");
+        if (ok) {
+          await addFixed(items.slice(0, 500));
+        }
+      });
+      manage.addListener("execute", () => ankamon.ui.boards.WifimonFixedDialog.open(() => fixed, removeFixed));
+      help.addListener("execute", () => ankamon.ui.Dialog.alert(this.HELP, "Wi-Fi Monitör — neler görülebilir"));
+      fixedBox.addListener("changeValue", render);
+      refresh.addListener("execute", () => feeds.forEach(feed => !feed.ws && connect(feed)));
       watchBox.addListener("changeValue", e => {
+        // Eski oturum kapanırken yenisi başlarsa tahtadaki sayım radyoyu boşuna kapatmaz (bkz. wifi_remote_scan.py).
         if (e.getData()) {
-          // Eski oturum kapanırken yenisi başlarsa tahtadaki sayım radyoyu boşuna kapatmaz (bkz. wifi_remote_scan.py).
-          discard(ws);
-          connect();
-        } else if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send("stop");
-          showStatus(["İzleme durduruluyor…"]);
-          syncControls(true);
-        } else if (ws) {
-          discard(ws);
-          ws = null;
-          syncControls(false);
+          restartAll();
         } else {
-          syncControls(false);
+          stopAll();
         }
+        syncControls();
+        render();
       });
-      win.addListener("close", () => {
-        closed = true;
-        this.__open.delete(board.id);
-        discard(ws);
+      probeBox.addListener("changeValue", () => watchBox.getValue() && restartAll());
+
+      html.addListenerOnce("appear", () => {
+        html.getContentElement().getDomElement().addEventListener("click", e => {
+          const el = e.target.closest && e.target.closest("[data-act]");
+          if (!el) {
+            return;
+          }
+          if (el.dataset.act === "fix") {
+            const boardId = el.dataset.board ? Number(el.dataset.board) : null;
+            addFixed([{ kind: el.dataset.kind, value: el.dataset.value, board_id: boardId, label: el.dataset.label || "" }]);
+          } else if (el.dataset.act === "unfix") {
+            removeFixed([Number(el.dataset.id)]);
+          }
+        });
       });
-      win.open();
-      connect();
+      summary.addListenerOnce("appear", () => {
+        summary.getContentElement().getDomElement().addEventListener("click", e => {
+          const el = e.target.closest && e.target.closest("[data-act=goto]");
+          const dom = html.getContentElement().getDomElement();
+          const target = el && dom && dom.querySelector(`#wifimon-board-${el.dataset.board}`);
+          if (target) {
+            target.scrollIntoView({ block: "start", behavior: "smooth" });
+          }
+        });
+      });
+      // Sürekli izlemede "… önce" yazıları ve düşen yoklamalar için ara sıra yeniden çiz.
+      const ticker = new qx.event.Timer(15000);
+      ticker.addListener("interval", () => watchBox.getValue() && render());
+      ticker.start();
+
+      return {
+        loadFixed,
+        addBoard: board => {
+          if (feeds.has(board.id)) {
+            return;
+          }
+          const feed = { board, name: board.label || board.hostname || board.ip || "#" + board.id, ws: null, busy: false, status: "",
+            notes: [], data: null, probes: new Map(), probeInfo: null, initialKeys: null };
+          feeds.set(board.id, feed);
+          connect(feed);
+        },
+        closeAll: () => {
+          closed = true;
+          ticker.stop();
+          ticker.dispose();
+          feeds.forEach(feed => discard(feed.ws));
+          feeds.clear();
+        }
+      };
     }
   }
 });
