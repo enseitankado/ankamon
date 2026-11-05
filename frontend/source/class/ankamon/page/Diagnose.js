@@ -178,11 +178,14 @@ qx.Class.define("ankamon.page.Diagnose", {
         const names = r.targets <= 3 && r.names ? ": " + esc(r.names) : "";
         const failed = r.failed ? ` · <span style="color:#c5221f">${r.failed} denetlenemedi</span>` : "";
         const state = ["queued", "running"].includes(r.status) ? " · " + ankamon.ui.JobSpinner.label("sürüyor") : "";
+        // Aynı sonuçla art arda tekrarlanan başarısız otomatik taramalar tek seçenek (bkz. DiagnoseApi::collapseRepeats).
+        const repeat = r.repeat > 1
+          ? ` · <span style="opacity:.75">aynı sonuçla ${r.repeat} kez, ${F.dateTime(r.first_at * 1000)}'den beri</span>` : "";
         // rich, etiket oluşmadan verilmeli: qx yazısı konmuş etiketin kipini değiştirmez ("The label mode cannot be
         // modified after initial creation" — sayfa açılışını kırıyordu). Önce boş madde + rich, sonra yazı.
         const item = new qx.ui.form.ListItem("", null, r.id);
         item.setRich(true);
-        item.setLabel(`${F.dateTime(r.created_at * 1000)} · ${who} · ${r.targets} tahta${names}${failed}${state}`);
+        item.setLabel(`${F.dateTime(r.created_at * 1000)} · ${who} · ${r.targets} tahta${names}${failed}${repeat}${state}`);
         this.__runBox.add(item);
       });
       const items = this.__runBox.getChildren();

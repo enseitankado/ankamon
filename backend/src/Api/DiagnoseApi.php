@@ -57,9 +57,41 @@ final class DiagnoseApi
                        FROM (SELECT * FROM job_targets t WHERE t.job_id = j.id LIMIT 4) t
                        JOIN boards b ON b.id = t.board_id) AS names
              FROM jobs j LEFT JOIN users u ON u.id = j.created_by
-             WHERE j.type = 'diagnose' ORDER BY j.id DESC LIMIT 30"
+             WHERE j.type = 'diagnose' ORDER BY j.id DESC LIMIT 400"
         );
-        return ['runs' => $runs, 'schedule' => self::schedule()];
+        return ['runs' => self::collapseRepeats($runs, 30), 'schedule' => self::schedule()];
+    }
+
+    /**
+     * Art arda gelen, aynı tahta(lar)da tümüyle başarısız biten otomatik taramaları tek seçenekte toplar
+     * (repeat: kaç tarama, first_at: ilkinin zamanı; id en yenisinin). Eskiden denetlenemeyen tahta her dakika
+     * yeniden taranıyordu (bkz. worker diagnose_schedule RETRY_SECONDS) — o kayıtlar silinmeden seçici dolmasın.
+     */
+    private static function collapseRepeats(array $runs, int $limit): array
+    {
+        $out = [];
+        foreach ($runs as $r) {
+            $r['repeat'] = 1;
+            $r['first_at'] = $r['created_at'];
+            $failedAll = $r['auto'] && (int) $r['targets'] > 0 && (int) $r['failed'] === (int) $r['targets']
+                && !in_array($r['status'], ['queued', 'running'], true);
+            $last = $out ? count($out) - 1 : -1;
+            if ($failedAll && $last >= 0 && !empty($out[$last]['_failedAll']) && $out[$last]['names'] === $r['names']
+                && $out[$last]['targets'] === $r['targets']) {
+                $out[$last]['repeat']++;
+                $out[$last]['first_at'] = $r['created_at'];
+                continue;
+            }
+            if (count($out) >= $limit) {
+                break;
+            }
+            $r['_failedAll'] = $failedAll;
+            $out[] = $r;
+        }
+        return array_map(function ($r) {
+            unset($r['_failedAll']);
+            return $r;
+        }, $out);
     }
 
     /**
