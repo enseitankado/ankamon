@@ -116,6 +116,10 @@ qx.Class.define("ankamon.page.Boards", {
       new ankamon.ui.table.SessionRenderer());
     // İşaretler Ekranlar kutucuklarına yansır — bkz. __updateActionState.
     this.__table.getTableModel().addListener("dataChanged", this.__updateActionState, this);
+    // Ekranlar kutucukları listenin O ANKİ satır sırasıyla dizilir (sütun başlığıyla sıralama dahil) — bkz. __syncShownOrder.
+    // Başlıkla sıralama dataChanged değil metaDataChanged yayar (qx Simple.sortByColumn).
+    this.__table.getTableModel().addListener("dataChanged", this.__syncShownOrder, this);
+    this.__table.getTableModel().addListener("metaDataChanged", this.__syncShownOrder, this);
     // Satır menüsünün simgeli karşılığı; liste ve ekran görünümünün üstünde (bkz. ui.boards.ActionBar).
     this.__actionBar = new ankamon.ui.boards.ActionBar((board, boards) => this.__rowMenu(board, boards, this.__barSessionOps()),
       () => this._checkedIds(this.__table).map(id => this.__boards && this.__boards.get(id)).filter(Boolean),
@@ -404,8 +408,37 @@ qx.Class.define("ankamon.page.Boards", {
 
       const shown = this.__rows.filter(({ cells }) =>
         colFilters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
-      this.__table.getTableModel().setData(shown.map(r => r.cells));
-      this.__shownBoards = shown.map(r => r.board);
+      this.__table.getTableModel().setData(this.__inScreenOrder(shown).map(r => r.cells));
+      this.__syncShownOrder();
+    },
+
+    /**
+     * Listenin sütunla sıralanmamış (varsayılan) sırası: kutucukların sürükle-bırakla kaydedilen sırası
+     * (bkz. __screenOrder, AuthApi::screenOrder) — o sıradakiler önce, sıralanmamışlar (yeni tahta) doğal
+     * sırayla sona. Sütun başlığıyla sıralanınca o sıra geçerlidir (Base.keepSortOnReload).
+     */
+    __inScreenOrder(rows) {
+      const order = this.__screenOrder || (this._user && this._user.screen_order) || [];
+      const rank = new Map(order.map((id, i) => [id, i]));
+      const ranked = rows.filter(r => rank.has(r.board.id)).sort((a, b) => rank.get(a.board.id) - rank.get(b.board.id));
+      return ranked.concat(rows.filter(r => !rank.has(r.board.id)));
+    },
+
+    /** Gösterilen tahtalar, tablonun o anki satır sırasıyla; Ekranlar kutucukları aynı sırada çizilir. */
+    __syncShownOrder() {
+      if (!this.__rows) {
+        return;
+      }
+      const byId = new Map(this.__rows.map(r => [r.board.id, r.board]));
+      const model = this.__table.getTableModel();
+      const shown = [];
+      for (let i = 0; i < model.getRowCount(); i++) {
+        const board = byId.get(model.getValue(0, i));
+        if (board) {
+          shown.push(board);
+        }
+      }
+      this.__shownBoards = shown;
       this.__pushPreview();
     },
 
@@ -815,6 +848,12 @@ qx.Class.define("ankamon.page.Boards", {
       const shown = new Set(shownOrder);
       const order = shownOrder.concat((this.__screenOrder || []).filter(id => !shown.has(id)));
       this.__screenOrder = order;
+      // Liste ile kutucuklar hep aynı sırada: sütunla sıralı liste sürüklenen sıraya geçer (sıralama kalkar).
+      const model = this.__table.getTableModel();
+      if (model.getSortColumnIndex() >= 0) {
+        model.clearSorting();
+      }
+      this.__apply();
       try {
         await ankamon.io.Api.put("/auth/screen-order", { order });
       } catch (e) {
@@ -865,32 +904,11 @@ qx.Class.define("ankamon.page.Boards", {
     __screensPaused: false,
 
     /**
-     * Grid'in süzgeç/sıralamadan gelen DOĞAL sırasına, kullanıcının sürükle-bırakla değiştirdiği
-     * kalıcı sırayı (bkz. __screenOrder, AuthApi::screenOrder) uygular: __screenOrder'da olan
-     * tahtalar önce o sırayla, OLMAYANLAR (yeni tahta, henüz hiç sıralanmamış) doğal sırayla sona
-     * eklenir — nav_order/__orderedPages ile aynı mantık (bkz. ui/Shell.js).
-     */
-    /**
-     * O an GÖSTERİLEN (süzülmüş) tahtalar, kullanıcının sürükle-bırak sırasıyla (bkz. __screenOrder):
-     * sıradakiler önce o sırayla, sıralanmamışlar (yeni tahta) doğal sırayla sona (bkz. __previewList).
+     * O an GÖSTERİLEN (süzülmüş) tahtalar, listenin satır sırasıyla (bkz. __syncShownOrder): liste
+     * sütunla sıralıysa o sıra, değilse kutucukların sürükle-bırak sırası (__inScreenOrder).
      */
     __orderedShown() {
-      const shown = this.__shownBoards || [];
-      const byId = new Map(shown.map(b => [b.id, b]));
-      const ordered = [];
-      (this.__screenOrder || []).forEach(id => {
-        const b = byId.get(id);
-        if (b) {
-          ordered.push(b);
-          byId.delete(id);
-        }
-      });
-      shown.forEach(b => {
-        if (byId.has(b.id)) {
-          ordered.push(b);
-        }
-      });
-      return ordered;
+      return this.__shownBoards || [];
     },
 
     __previewList() {
