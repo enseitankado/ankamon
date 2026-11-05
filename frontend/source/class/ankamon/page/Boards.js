@@ -118,7 +118,8 @@ qx.Class.define("ankamon.page.Boards", {
     this.__table.getTableModel().addListener("dataChanged", this.__updateActionState, this);
     // Satır menüsünün simgeli karşılığı; liste ve ekran görünümünün üstünde (bkz. ui.boards.ActionBar).
     this.__actionBar = new ankamon.ui.boards.ActionBar((board, boards) => this.__rowMenu(board, boards, this.__barSessionOps()),
-      () => this._checkedIds(this.__table).map(id => this.__boards && this.__boards.get(id)).filter(Boolean));
+      () => this._checkedIds(this.__table).map(id => this.__boards && this.__boards.get(id)).filter(Boolean),
+      { getAll: () => (this.__boards ? [...this.__boards.values()] : []) });
     this.add(this.__actionBar);
     this.__table.addListener("cellDbltap", e => {
       if (this._can("boards.manage")) {

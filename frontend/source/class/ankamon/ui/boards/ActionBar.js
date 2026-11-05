@@ -48,16 +48,18 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
 
     /**
      * Düğmeler, soldan sağa. noSelection: hiç tahta seçili değilken de çalışan maddeler. single: yalnız TEK tahta
-     * seçiliyken kullanılabilir (kullanıcı isteği, 2026-11-05: Ekran düğmesi; çoklu izleme Ekranlar sekmesindedir).
-     * Sağ menüyle eşleşme (2026-11-05): menüdeki "Yönet" grubu → Yönet düğmesi (Bilgisayarı yönet + Web Filtre), Kilit;
-     * menüdeki "Ekran" grubu → Yansıt (yansıt, aktar, aktarımı durdur), Ekran görüntüsü al → Ekran düğmesinin altında;
-     * Uyandır/Uyut → Güç düğmesinin altında.
+     * seçiliyken kullanılabilir; single: "primary" → yalnız birincil madde (ve extra maddeleri) tek tahtada, menünün
+     * geri kalanı çoklu seçimde de (Ekran düğmesi: Ekranı göster tek tahta; çoklu izleme Ekranlar sekmesindedir).
+     * mirror: düğmenin menüsü sağ menüdeki o grubun alt menüsünün AYNISIDIR (alt menüler dahil, sıra korunur) —
+     * KALICI KURAL (kullanıcı, 2026-11-05): sağ menü ↔ araç çubuğu senkron: "Yönet" ↔ Yönet düğmesi, "Ekran" ↔ Ekran
+     * düğmesi (+ Ekranı göster). Menüye eklenen madde düğmede kendiliğinden görünür. extra: aynanın başına eklenen,
+     * menünün başka yerindeki maddeler. Kilit ve Güç düğmeleri Yönet'teki kilit/uyandırma maddelerinin kısayoludur.
      */
     GROUPS: [
-      { id: "watch", label: "Ekran", icon: "deviceDesktop", primary: "Ekranı göster", single: true },
-      { id: "manage", label: "Yönet", icon: "mouse", primary: "Bilgisayarı yönet" },
+      { id: "watch", label: "Ekran", icon: "deviceDesktop", primary: "Ekranı göster", single: "primary", mirror: "Ekran",
+        extra: ["Ekranı göster"] },
+      { id: "manage", label: "Yönet", icon: "mouse", primary: "Bilgisayarı yönet", mirror: "Yönet" },
       { id: "lock", label: "Kilit", icon: "lock", primary: "Kilitle" },
-      { id: "cast", label: "Yansıt", icon: "cast" },
       { id: "command", label: "Komut", icon: "terminal2", primary: "Hazır / Serbest komut çalıştır", sep: true },
       { id: "users", label: "Kullanıcılar", icon: "users" },
       { id: "files", label: "Dosyalar", icon: "folders", primary: "Dosya yöneticisi" },
@@ -68,13 +70,12 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       { id: "power", label: "Güç", icon: "power", sep: true },
       { id: "info", label: "Bilgi", icon: "infoCircle", primary: "Bilgi kartı" },
       { id: "record", label: "Kayıt", icon: "edit", noSelection: ["Tahta ekle…"] },
-      { id: "select", label: "Seçim", icon: "checkbox", primary: "Tümünü işaretle", noSelection: ["Tümünü işaretle", "İşaretleri kaldır"] },
       { id: "other", label: "Diğer", icon: "dots" }
     ],
 
     /** Alt menüsü düğmelere dağıtılan üst maddeler → içindeki bilinmeyen maddenin grubu. */
-    CONTAINERS: { "Komut çalıştır": "command", "Yönet": "manage", "Ekran": "cast", "Kullanıcılar": "users", "Dosyalar": "files",
-      "Web Filtre": "manage", "Web Filtre…": "manage" },
+    CONTAINERS: { "Komut çalıştır": "command", "Yönet": "manage", "Ekran": "watch", "Kullanıcılar": "users", "Dosyalar": "files",
+      "Web filtresi": "manage" },
 
     /** Menü maddesi → grup (menüdeki etiket, tahta sayısı eki olmadan — bkz. BoardOps.menuButton). */
     ITEMS: {
@@ -82,22 +83,26 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       "Uyandır": "power", "Uyut": "power",
       "Kilitle": "lock", "Kilidi aç": "lock", "Klavyeyi kilitle": "lock", "Klavye kilidini aç": "lock", "Fareyi kilitle": "lock",
       "Fare kilidini aç": "lock", "Dokunmatiği kilitle": "lock", "Dokunmatik kilidini aç": "lock",
-      "Ekranımı yansıt": "cast", "Ekranı başka bilgisayara aktar…": "cast", "Ekran aktarımını durdur": "cast",
+      "Ekranımı yansıt": "watch", "Ekranı başka bilgisayara aktar…": "watch", "Ekran aktarımını durdur": "watch",
       "Görev yöneticisi": "taskmgr", "Web sitesi aç…": "web", "Wi-Fi Monitör": "wifi", "Sohbet": "chat",
       "Bilgisayarı aç (WoL)": "power", "Bilgisayarı kapat": "power", "Bilgisayarı yeniden başlat": "power",
       "Bilgi kartı": "info", "Logları göster": "info",
       "Düzenle": "record", "Sil": "record", "Tahta ekle…": "record",
-      "Tümünü işaretle": "select", "İşaretleri kaldır": "select"
+      // Seçim düğmesi kalktı (kullanıcı isteği, 2026-11-05): işaretleme Ctrl+A / satır kutuları; bu maddeler çubukta yok.
+      "Tümünü işaretle": "hidden", "İşaretleri kaldır": "hidden"
     },
 
-    /** Menüde tek tahtaya uygulanan maddeler: çoklu seçimde her tahta için ayrı açılır (pencere başına tahta). */
-    PER_BOARD: ["Bilgisayarı yönet", "Görev yöneticisi", "Sohbet", "Dosya yöneticisi", "Düzenle"],
+    /** Menüde tek tahtaya uygulanan maddeler: çoklu seçimde her tahta için ayrı açılır (pencere başına tahta). Görev
+     * yöneticisi çoklu seçimde tek pencerede bütün tahtaları gösterir (bilgisayar süzgeciyle), burada değil. */
+    PER_BOARD: ["Bilgisayarı yönet", "Sohbet", "Dosya yöneticisi", "Düzenle"],
     PER_BOARD_CONFIRM: 6
   },
 
   /**
    * @param getMenu {Function} (tahta, tahtalar) → qx.ui.menu.Menu|null: sağ menüyü kurar
    * @param getSelected {Function} () → seçili tahtalar
+   * @param config {Map?} groups/items/containers/perBoard (eklenti araç çubuğu); getAll: () → tüm tahtalar (verilirse
+   *   durum yazısı "çevrim içi N (k seçili) · çevrim dışı M (j seçili)" olur)
    */
   construct(getMenu, getSelected, config) {
     super(new qx.ui.layout.Flow(1, 2).set({ alignY: "middle" }));
@@ -112,12 +117,13 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     this.__items = config.items || Bar.ITEMS;
     this.__containers = config.containers || Bar.CONTAINERS;
     this.__perBoard = config.perBoard || Bar.PER_BOARD;
+    this.__getAll = config.getAll || null;
     this.__widgets = new Map();
     this.__tools = [];
     this.set({ padding: [3, 6], margin: [6, 8, 8, 8] });
     this.__applyPanel();
     this.__build();
-    this.__count = new qx.ui.basic.Label("").set({ textColor: "app-muted", alignY: "middle", marginLeft: 6 });
+    this.__count = new qx.ui.basic.Label("").set({ rich: true, textColor: "app-muted", alignY: "middle", marginLeft: 6 });
     this.add(this.__count);
     this.addListener("resize", this.__queueSeparators, this);
     this.refresh();
@@ -136,6 +142,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     __items: null,
     __containers: null,
     __perBoard: null,
+    __getAll: null,
+    __totals: null,
     __widgets: null,
     __count: null,
     __open: null,
@@ -214,6 +222,21 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     /** Durum yazısı. Simge kipinde yer açmak için seçim yoksa gizli, varsa yalnız sayı (ayrıntı ipucunda). */
     __showCount() {
       const n = this.__selectedCount;
+      const t = this.__totals;
+      if (t) {
+        // Seçim düğmesinin yerine (kullanıcı isteği, 2026-11-05): kaç tahta çevrim içi / dışı ve bunlardan kaçı seçili.
+        const sel = k => (k ? ` <span style="font-weight:bold">(${k} seçili)</span>` : "");
+        const on = `<span style="color:#1e8e3e">●</span>`;
+        const off = `<span style="color:#9aa0a6">●</span>`;
+        const value = this.__iconOnly
+          ? `${on} ${t.on}${t.onSel ? ` (${t.onSel})` : ""} ${off} ${t.off}${t.offSel ? ` (${t.offSel})` : ""}`
+          : `${on} ${t.on} çevrim içi${sel(t.onSel)} &nbsp;${off} ${t.off} çevrim dışı${sel(t.offSel)}`;
+        this.__count.set({
+          value, visibility: "visible",
+          toolTipText: `${t.on} çevrim içi (${t.onSel} seçili), ${t.off} çevrim dışı (${t.offSel} seçili)`
+        });
+        return;
+      }
       const text = n ? `${n} seçili` : "Seçim yok";
       this.__count.set({
         value: this.__iconOnly ? String(n) : text,
@@ -328,7 +351,9 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         const probe = { id: 0, online, facts: {}, label: "" };
         const menu = this.__getMenu(probe, [probe, Object.assign({}, probe, { id: -1 })]);
         if (menu) {
-          this.__collect(menu).forEach((leaves, id) => leaves.length && present.add(id));
+          const groups = this.__collect(menu);
+          groups.forEach((leaves, id) => leaves.length && present.add(id));
+          this.__groups.filter(g => g.mirror && groups.containers[g.mirror]).forEach(g => present.add(g.id));
           this.__dropMenu(menu);
         }
       });
@@ -365,6 +390,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     /** Menü → {grup kimliği → yapraklar}. Üst madde alt menüsüyle dağıtılır; alt menülü yaprak (ör. Oturum aç) olduğu gibi kalır. */
     __collect(menu) {
       const groups = new Map();
+      groups.containers = {};   // kapsayıcı adı → alt menüsü (mirror grupları için, bkz. __leaves)
       const push = (id, leaf) => groups.set(id, (groups.get(id) || []).concat([leaf]));
       const key = item => item.getUserData("ankamon.menuKey") || "";
       const walk = (target, fallback) => target.getChildren().forEach(item => {
@@ -373,6 +399,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         }
         const name = key(item);
         if (item.getMenu() && this.__containers[name]) {
+          groups.containers[name] = item.getMenu();
           walk(item.getMenu(), this.__containers[name]);
         } else {
           push(this.__items[name] || fallback || "other", item);
@@ -384,8 +411,17 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     },
 
     /** Seçim boşken yalnız noSelection maddeleri çalışır: sentetik kayıt üzerinde başka madde sunulmaz. */
-    __leaves(group, groups, none) {
-      const leaves = groups.get(group.id) || [];
+    __leaves(group, groups, none, count) {
+      let leaves = groups.get(group.id) || [];
+      if (group.mirror) {
+        const box = groups.containers && groups.containers[group.mirror];
+        const own = box ? box.getChildren().filter(item => item instanceof qx.ui.menu.Button) : [];
+        // extra (ör. Ekranı göster): tek tahta şartlı birincilse çoklu seçimde konmaz.
+        const single = group.single !== "primary" || count === 1;
+        const all = [...groups.values()].flat();
+        const extra = single ? (group.extra || []).map(k => all.find(l => l.getUserData("ankamon.menuKey") === k)).filter(Boolean) : [];
+        leaves = extra.concat(own.filter(l => !extra.includes(l)));
+      }
       return none ? leaves.filter(l => (group.noSelection || []).includes(l.getUserData("ankamon.menuKey"))) : leaves;
     },
 
@@ -398,8 +434,15 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     /** Seçim ya da seçili tahtaların durumu değiştiyse düğmelerin etkinliğini ve sayıyı tazeler. */
     refresh() {
       const boards = this.__getSelected();
-      const key = JSON.stringify(boards.map(b => [b.id, b.online, b.session_username, b.session_locked, b.screen_locked, b.input_locks,
-        b.display_state, b.relay_source, b.relay_is_source]));
+      const all = this.__getAll ? this.__getAll() : null;
+      if (all) {
+        const chosen = new Set(boards.map(b => b.id));
+        const online = all.filter(b => b.online);
+        this.__totals = { on: online.length, off: all.length - online.length,
+          onSel: online.filter(b => chosen.has(b.id)).length, offSel: all.filter(b => !b.online && chosen.has(b.id)).length };
+      }
+      const key = JSON.stringify([this.__totals, boards.map(b => [b.id, b.online, b.session_username, b.session_locked, b.screen_locked, b.input_locks,
+        b.display_state, b.relay_source, b.relay_is_source])]);
       if (key === this.__stateKey) {
         return;
       }
@@ -411,8 +454,9 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         if (!w) {
           return;
         }
-        const leaves = this.__leaves(group, groups, cur.none);
-        const single = !group.single || boards.length === 1;
+        const leaves = this.__leaves(group, groups, cur.none, boards.length);
+        // single: true → düğmenin tamamı tek tahtada; "primary" → menü çoklu seçimde de açılır, birincil yalnız tek tahtada.
+        const single = !group.single || group.single === "primary" || boards.length === 1;
         const on = single && leaves.some(l => l.getEnabled());
         [w.main, w.arrow].forEach(b => {
           b.setEnabled(on);
@@ -424,7 +468,10 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
         // Düz toolTipText tek satırdır, uzun açıklama sığmaz.
         const primary = group.primary && leaves.find(l => l.getUserData("ankamon.menuKey") === group.primary);
         const rich = (primary && primary.getUserData("ankamon.menuHint")) || group.hint;
-        if (!single) {
+        if (group.single === "primary" && boards.length > 1) {
+          w.main.setToolTip(null);
+          w.main.setToolTipText(`${group.label}: seçenekler (${group.primary} yalnız tek tahta seçiliyken)`);
+        } else if (!single) {
           w.main.setToolTip(null);
           w.main.setToolTipText(`${group.label}: yalnız tek tahta seçiliyken`);
         } else if (rich) {
@@ -452,7 +499,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     __pressMain(group, button) {
       const cur = this.__current();
       const groups = cur.menu ? this.__collect(cur.menu) : new Map();
-      const leaves = this.__leaves(group, groups, cur.none);
+      const leaves = this.__leaves(group, groups, cur.none, cur.boards.length);
       const primary = group.primary && leaves.find(l => l.getUserData("ankamon.menuKey") === group.primary && l.getEnabled());
       if (primary && !primary.getMenu()) {
         this.__run(primary, cur.boards);
@@ -465,7 +512,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     __openMenu(group, button) {
       const cur = this.__current();
       const groups = cur.menu ? this.__collect(cur.menu) : new Map();
-      this.__show(this.__leaves(group, groups, cur.none), cur, button);
+      this.__show(this.__leaves(group, groups, cur.none, cur.boards.length), cur, button);
     },
 
     /** Yaprakları kendi menülerinden alıp düğmenin altında açar; PER_BOARD maddeleri çoklu seçimde her tahtaya uygulanır. */

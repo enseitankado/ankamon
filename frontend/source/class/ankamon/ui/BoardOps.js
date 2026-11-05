@@ -985,16 +985,18 @@ qx.Class.define("ankamon.ui.BoardOps", {
               { type: "input_lock", device, lock: false, board_ids: list.map(b => b.id) }, off));
           });
         }
-        // Yönet ▸ Web Filtre (kullanıcı isteği): ETAP Pardus'taki eta-kisit ile kara/beyaz liste ve DNS sayıları (bkz. ui.boards.EtaKisitWebFilter).
+        // Yönet ▸ Web filtresi (kullanıcı isteği): ETAP Pardus'taki eta-kisit ile kara/beyaz liste ve DNS sayıları (bkz.
+        // ui.boards.EtaKisitWebFilter). Maddeler ne yaptıklarını söyler (kullanıcı: "kara liste" tek başına anlaşılmıyordu);
+        // araç çubuğunda da Yönet ▸ Web filtresi alt menüsü olarak görünür (ActionBar mirror).
         if (can("boards.webfilter")) {
           const webFilter = ankamon.ui.boards.EtaKisitWebFilter;
           const filter = sub();
-          subAdd(filter, ICON.webFilter, "Kara liste…" + count, () => webFilter.open(online, boards, "denylist"));
-          subAdd(filter, ICON.webFilter, "Beyaz liste…" + count, () => webFilter.open(online, boards, "allowlist"));
-          subAdd(filter, ICON.webFilter, "Filtreyi kapat" + count, () => webFilter.turnOff(online));
-          subAdd(filter, ICON.info, "Durum ve sayılar…" + count, () => webFilter.open(online, boards));
+          subAdd(filter, ICON.webFilter, "Listedeki siteleri engelle (kara liste)…" + count, () => webFilter.open(online, boards, "denylist"));
+          subAdd(filter, ICON.webFilter, "Yalnız listedeki sitelere izin ver (beyaz liste)…" + count, () => webFilter.open(online, boards, "allowlist"));
+          subAdd(filter, ICON.webFilter, "Web filtresini kapat" + count, () => webFilter.turnOff(online));
+          subAdd(filter, ICON.info, "Web filtresi durumu ve site sayıları…" + count, () => webFilter.open(online, boards));
           if (filter.getChildren().length) {
-            screens.add(this.menuButton(ICON.webFilter, "Web Filtre", null, filter));
+            screens.add(this.menuButton(ICON.webFilter, "Web filtresi", null, filter));
           }
         }
         group(ICON.screenControl, "Yönet" + count, screens);

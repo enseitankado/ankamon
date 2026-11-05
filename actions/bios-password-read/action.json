@@ -1,0 +1,10 @@
+{
+  "title": "BIOS parolasını oku",
+  "description": "eta-112 aracıyla BIOS yönetici ve kullanıcı parolasını okur (flash'tan okur, hiçbir şey yazmaz), yönetici parolasının ne zaman sorulduğunu ve flash'ta kalan önceki parolaları da gösterir. Yalnız desteklenen modellerde çalışır (Vestel 14MB24A, 14MB37C1, 14MB57 — Faz 1/Faz 2). Dikkat: okunan parolalar iş çıktısında ve iş geçmişinde görünür. Araç sunucudan SFTP ile /opt/eta-112'ye kopyalanır; tahtada flashrom/dmidecode yoksa apt ile kurulur.",
+  "category": "BIOS",
+  "feature": "actions",
+  "confirm": false,
+  "timeout": 300,
+  "tools": ["eta-112"],
+  "params": []
+}

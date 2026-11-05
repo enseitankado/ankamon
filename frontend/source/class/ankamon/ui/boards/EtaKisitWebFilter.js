@@ -26,7 +26,7 @@
  */
 
 /**
- * Sağ menü "Web Filtre": ETAP Pardus'taki eta-kisit uygulamasıyla kara/beyaz liste ve adres başına DNS sayıları
+ * Sağ menü Yönet ▸ "Web filtresi": ETAP Pardus'taki eta-kisit uygulamasıyla kara/beyaz liste ve adres başına DNS sayıları
  * (bkz. worker executor/eta_kisit_webfilter.py). Çoklu seçimde liste ilk uygun tahtadan yüklenir, sayılar toplanır, uygulama bütün
  * uygun tahtalara gider. ETAP dışı ya da eta-kisit'siz tahta atlanır, nedeni pencerede yazar.
  */
@@ -81,7 +81,7 @@ qx.Class.define("ankamon.ui.boards.EtaKisitWebFilter", {
       throw new Error("Tahtalardan yanıt alınamadı (zaman aşımı).");
     },
 
-    /** "Filtreyi kapat": pencere açmadan, onayla (listeler tahtada saklı kalır). */
+    /** "Web filtresini kapat": pencere açmadan, onayla (listeler tahtada saklı kalır). */
     async turnOff(boards) {
       const ok = await ankamon.ui.Dialog.confirm(
         `<b>${boards.length} bilgisayarda</b> Web Filtre kapatılsın mı?<br>Sayım kayıtları silinir, adres listeleri eta-kisit profilinde kalır. ` +
