@@ -29,7 +29,8 @@
  * Başlangıç uygulamaları (Windows Görev Yöneticisi gibi): oturum açılınca kendiliğinden başlayan uygulamalar
  * (XDG autostart: /etc/xdg/autostart + ~/.config/autostart) — Ad, Yayımcı (paket), Durum, Başlangıç etkisi.
  * Etkinleştir / Devre dışı bırak, tahtada OTURUM AÇMIŞ kullanıcıya göre uygulanır (kullanıcının autostart
- * geçersiz kılması; sistem dosyası değişmez). Liste yalnız sekme görünürken 10 sn'de bir gelir.
+ * geçersiz kılması; sistem dosyası değişmez). Liste yalnız sekme görünürken 10 sn'de bir gelir. Çok tahtada
+ * bütün tahtaların listeleri tek tabloda ("Bilgisayar" sütunu); değişiklik satırın tahtasına uygulanır.
  */
 qx.Class.define("ankamon.ui.taskmgr.StartupTab", {
   extend: ankamon.ui.taskmgr.Tab,
@@ -53,15 +54,17 @@ qx.Class.define("ankamon.ui.taskmgr.StartupTab", {
       { id: "comment", label: "Açıklama", width: 300 }
     ], "taskmgr.startup");
     this._rowMenu(this.__table, id => {
-      const it = this.__item(id);
-      if (!it) {
+      const found = this.__item(id);
+      if (!found) {
         return null;
       }
+      const it = found.it;
       const menu = new qx.ui.menu.Menu();
-      this._item(menu, it.enabled ? "Devre dışı bırak" : "Etkinleştir", () => this.__set(!it.enabled));
+      this._item(menu, it.enabled ? "Devre dışı bırak" : "Etkinleştir", () => this.__set(!it.enabled), !!found.st.user);
       this._item(menu, "Çevrimiçi ara", () => window.open("https://www.google.com/search?q=" + encodeURIComponent(it.name + " " + it.publisher), "_blank"));
       return menu;
     });
+    this.__table.getSelectionModel().addListener("changeSelection", () => this.__syncButtons());
     this.add(this.__table, { flex: 1 });
   },
 
@@ -71,42 +74,77 @@ qx.Class.define("ankamon.ui.taskmgr.StartupTab", {
     __enable: null,
     __disable: null,
 
+    /** Satır kimliğinden ({link, st, it}) ya da null. */
     __item(id) {
-      const st = this._win.getModel().startup;
-      return st ? st.items.find(x => x.id === id) : null;
+      const parsed = this._parseId(id);
+      const st = parsed && parsed.link.getModel().startup;
+      const it = st && st.items.find(x => x.id === parsed.id);
+      return it ? { link: parsed.link, st, it } : null;
+    },
+
+    /** Düğmeler: tahtada oturum açıksa etkin (çok tahtada seçili satırın tahtasına göre; seçim yoksa etkin). */
+    __syncButtons() {
+      const found = this.__item(this._selectedId(this.__table));
+      let can;
+      if (found) {
+        can = !!found.st.user;
+      } else {
+        const links = this._links("startup");
+        can = this._win.isMulti() ? true : links.some(l => l.getModel().startup.user);
+      }
+      this.__enable.setEnabled(can);
+      this.__disable.setEnabled(can);
     },
 
     async __set(enable) {
-      const it = this.__item(this._selectedId(this.__table));
-      if (!it || it.enabled === enable) {
+      const found = this.__item(this._selectedId(this.__table));
+      if (!found || found.it.enabled === enable) {
+        return;
+      }
+      const { link, st, it } = found;
+      if (!st.user) {
+        ankamon.ui.Dialog.alert("Bu tahtada oturum açık değil: değişiklik oturum açılınca yapılabilir.");
         return;
       }
       try {
-        const res = await this._win.getConn().send("startup", { id: it.id, enable });
+        const res = await link.send("startup", { id: it.id, enable });
         it.enabled = enable;
-        this.update(this._win.getModel());
-        this.__info.setValue(ankamon.ui.taskmgr.Fmt.esc(res.msg || "Tamam."));
+        this.update();
+        this.__info.setValue(ankamon.ui.taskmgr.Fmt.esc((this._win.isMulti() ? link.getDisplay() + ": " : "") + (res.msg || "Tamam.")));
       } catch (e) {
         ankamon.ui.Dialog.error(e);
       }
     },
 
     // overridden
-    update(m) {
-      const st = m.startup;
-      if (!st) {
+    update() {
+      const links = this._links("startup");
+      if (!links.length) {
         return;
       }
       const F = ankamon.ui.taskmgr.Fmt;
       const q = this._win.getFilter();
-      this.__info.setValue(st.user
-        ? `Ayarlar tahtada oturum açmış <b>${F.esc(st.user)}</b> kullanıcısı için geçerlidir. ${st.items.filter(i => i.enabled).length} etkin / ${st.items.length}`
-        : "Tahtada oturum açık değil: liste görüntülenir, değişiklik oturum açılınca yapılabilir.");
-      this.__enable.setEnabled(!!st.user);
-      this.__disable.setEnabled(!!st.user);
-      const rows = st.items.filter(i => !q || i.name.toLowerCase().includes(q) || (i.publisher || "").toLowerCase().includes(q))
-        .map(i => [i.id, i.name, i.publisher || "—", i.enabled ? "Etkin" : "Devre dışı", "Ölçülmedi", i.exec, i.comment]);
+      if (!this._win.isMulti()) {
+        const st = links[0].getModel().startup;
+        this.__info.setValue(st.user
+          ? `Ayarlar tahtada oturum açmış <b>${F.esc(st.user)}</b> kullanıcısı için geçerlidir. ${st.items.filter(i => i.enabled).length} etkin / ${st.items.length}`
+          : "Tahtada oturum açık değil: liste görüntülenir, değişiklik oturum açılınca yapılabilir.");
+      } else {
+        const withUser = links.filter(l => l.getModel().startup.user).length;
+        this.__info.setValue(`${links.length} tahta · ${withUser} tahtada oturum açık. Ayarlar her tahtada oturum açmış kullanıcı ` +
+          "için geçerlidir; oturumu kapalı tahtada değişiklik oturum açılınca yapılabilir.");
+      }
+      const rows = [];
+      links.forEach(link => {
+        const st = link.getModel().startup;
+        const whole = this._win.boardMatches(link, q);
+        const board = link.getDisplay();
+        st.items.filter(i => whole || !q || i.name.toLowerCase().includes(q) || (i.publisher || "").toLowerCase().includes(q))
+          .forEach(i => rows.push([this._rowId(link, i.id), i.name, i.publisher || "—", i.enabled ? "Etkin" : "Devre dışı",
+            "Ölçülmedi", i.exec, i.comment, board]));
+      });
       this._setRows(this.__table, rows);
+      this.__syncButtons();
     }
   }
 });

@@ -28,7 +28,8 @@
 /**
  * Hizmetler (Windows Görev Yöneticisi gibi): systemd hizmetleri — Ad, PID, Açıklama, Durum, Başlangıç türü.
  * Sağ menü: Başlat, Durdur, Yeniden başlat, Ayrıntılara git. Liste yalnız sekme görünürken 5 sn'de bir gelir
- * (ajan "want": services).
+ * (ajan "want": services). Çok tahtada bütün tahtaların hizmetleri tek tabloda ("Bilgisayar" sütunu); işlem
+ * satırın tahtasına gider.
  */
 qx.Class.define("ankamon.ui.taskmgr.ServicesTab", {
   extend: ankamon.ui.taskmgr.Tab,
@@ -55,18 +56,19 @@ qx.Class.define("ankamon.ui.taskmgr.ServicesTab", {
       { id: "start", label: "Başlangıç türü", width: 170 },
       { id: "sub", label: "Alt durum", width: 100 }
     ], "taskmgr.services");
-    this._rowMenu(this.__table, name => {
-      const s = (this._win.getModel().services || []).find(x => x.name === name);
-      if (!s) {
+    this._rowMenu(this.__table, id => {
+      const it = this.__service(id);
+      if (!it) {
         return null;
       }
+      const { link, s } = it;
       const menu = new qx.ui.menu.Menu();
       const on = s.active === "active";
-      this._item(menu, "Başlat", () => this.__act(name, "start"), !on);
-      this._item(menu, "Durdur", () => this.__act(name, "stop"), on);
-      this._item(menu, "Yeniden başlat", () => this.__act(name, "restart"), on);
+      this._item(menu, "Başlat", () => this.__act(id, "start"), !on);
+      this._item(menu, "Durdur", () => this.__act(id, "stop"), on);
+      this._item(menu, "Yeniden başlat", () => this.__act(id, "restart"), on);
       menu.add(new qx.ui.menu.Separator());
-      this._item(menu, "Ayrıntılara git", () => this._win.goToDetails(s.pid), s.pid > 0);
+      this._item(menu, "Ayrıntılara git", () => this._win.goToDetails(link, s.pid), s.pid > 0);
       return menu;
     });
     this.add(this.__table, { flex: 1 });
@@ -75,40 +77,50 @@ qx.Class.define("ankamon.ui.taskmgr.ServicesTab", {
   members: {
     __table: null,
     __info: null,
-    __shown: null,
     __msgAt: 0,
 
-    async __act(name, action) {
-      if (!name) {
+    /** Satır kimliğinden ({link, s}) ya da null. */
+    __service(id) {
+      const parsed = this._parseId(id);
+      const s = parsed && (parsed.link.getModel().services || []).find(x => x.name === parsed.id);
+      return s ? { link: parsed.link, s } : null;
+    },
+
+    async __act(id, action) {
+      const it = this.__service(id);
+      if (!it) {
         return;
       }
+      const { link } = it;
+      const name = it.s.name;
+      const where = this._win.isMulti() ? ` (${link.getDisplay()})` : "";
       const verb = { start: "başlatılsın", stop: "durdurulsun", restart: "yeniden başlatılsın" }[action];
       if (action !== "start" && !(await ankamon.ui.Dialog.confirm(
-        `<b>${ankamon.ui.taskmgr.Fmt.esc(name)}</b> hizmeti ${verb} mı?<br><br>Tahtadaki bağımlı işlevler etkilenebilir.`, "Evet"))) {
+        `<b>${ankamon.ui.taskmgr.Fmt.esc(name)}</b> hizmeti${ankamon.ui.taskmgr.Fmt.esc(where)} ${verb} mı?<br><br>Tahtadaki bağımlı işlevler etkilenebilir.`, "Evet"))) {
         return;
       }
       this.__msgAt = Date.now();
-      this.__info.setValue(`${name}: işlem sürüyor…`);
+      this.__info.setValue(`${name}${where}: işlem sürüyor…`);
       try {
-        await this._win.getConn().send("svc", { name, action });
+        await link.send("svc", { name, action });
         this.__msgAt = Date.now();
-        this.__info.setValue(`${name}: tamam.`);
+        this.__info.setValue(`${name}${where}: tamam.`);
       } catch (e) {
         this.__msgAt = Date.now();
-        this.__info.setValue(`${name}: ${e.message}`);
+        this.__info.setValue(`${name}${where}: ${e.message}`);
         ankamon.ui.Dialog.error(e);
       }
     },
 
-    /** Belirtilen hizmetleri seçer (Ayrıntılar ▸ Hizmetlere git). */
-    reveal(names) {
-      this.__shown = names;
-      this.update(this._win.getModel());
+    /** Belirtilen tahtanın belirtilen hizmetlerini seçer (Ayrıntılar ▸ Hizmetlere git). */
+    reveal(link, names) {
+      this.update();
+      const ids = names.map(n => this._rowId(link, n));
       const tm = this.__table.getTableModel();
       const sel = this.__table.getSelectionModel();
       sel.resetSelection();
       for (let i = 0; i < tm.getRowCount(); i++) {
-        if (names.includes(tm.getValue(0, i))) {
+        if (ids.includes(tm.getValue(0, i))) {
           sel.addSelectionInterval(i, i);
           this.__table.scrollCellVisible(1, i);
         }
@@ -116,19 +128,29 @@ qx.Class.define("ankamon.ui.taskmgr.ServicesTab", {
     },
 
     // overridden
-    update(m) {
-      if (!m.services) {
+    update() {
+      const links = this._links("services");
+      if (!links.length) {
         return;
       }
       const S = ankamon.ui.taskmgr.ServicesTab;
       const q = this._win.getFilter();
-      const rows = m.services.filter(s => !q || s.name.toLowerCase().includes(q) || (s.desc || "").toLowerCase().includes(q) || String(s.pid) === q)
-        .map(s => [s.name, s.name.replace(/\.service$/, ""), s.pid || "", s.desc || "", S.STATE[s.active] || s.active,
-          S.START[s.file_state] ?? s.file_state, s.sub || ""]);
+      const rows = [];
+      let total = 0;
+      let running = 0;
+      links.forEach(link => {
+        const items = link.getModel().services;
+        const whole = this._win.boardMatches(link, q);
+        const board = link.getDisplay();
+        total += items.length;
+        running += items.filter(s => s.active === "active").length;
+        items.filter(s => whole || !q || s.name.toLowerCase().includes(q) || (s.desc || "").toLowerCase().includes(q) || String(s.pid) === q)
+          .forEach(s => rows.push([this._rowId(link, s.name), s.name.replace(/\.service$/, ""), s.pid || "", s.desc || "",
+            S.STATE[s.active] || s.active, S.START[s.file_state] ?? s.file_state, s.sub || "", board]));
+      });
       // İşlem iletisi (__act) 6 sn görünür, sonra özet.
       if (!this.__msgAt || Date.now() - this.__msgAt > 6000) {
-        const running = m.services.filter(s => s.active === "active").length;
-        this.__info.setValue(`${m.services.length} hizmet · ${running} çalışıyor`);
+        this.__info.setValue(`${total} hizmet · ${running} çalışıyor` + (this._win.isMulti() ? ` · ${links.length} tahta` : ""));
       }
       this._setRows(this.__table, rows);
     }

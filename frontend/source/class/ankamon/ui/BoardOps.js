@@ -1055,9 +1055,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         group(ICON.filemanager, "Dosyalar", files);
         // Görev yöneticisi (Windows'taki gibi; canlı SSH, pencere kapanınca biter — bkz. ui.taskmgr.Window):
-        // "Dosyalar"ın hemen altında (kullanıcı isteği). Tek tahta: çoklu seçimde sağ tıklanan tahta için açılır.
+        // "Dosyalar"ın hemen altında (kullanıcı isteği). Çoklu seçimde seçili çevrim içi tahtaların HEPSİ tek pencerede
+        // (tahta başına ayrı pencere değil; Bilgisayar sütunu/süzgeciyle — bkz. ui.taskmgr.Window).
         if (can("taskmgr")) {
-          add(ICON.taskmgr, "Görev yöneticisi", () => ankamon.ui.taskmgr.Window.open(board, user));
+          add(ICON.taskmgr, "Görev yöneticisi" + count, () => ankamon.ui.taskmgr.Window.open(online, user));
         }
         // Web sitesi aç: seçili tahtalardan oturumu açık olanlarda varsayılan tarayıcıyla, tam ekran (bkz. worker executor/open_url.py).
         if (can("screen.web")) {

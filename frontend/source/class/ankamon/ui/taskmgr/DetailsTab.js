@@ -29,7 +29,8 @@
  * Ayrıntılar (Windows Görev Yöneticisi gibi): her süreç bir satır — Ad, PID, Durum, Kullanıcı adı, CPU, Bellek,
  * Açıklama (komut satırı); isteğe bağlı sütunlar (sütun menüsü): Öncelik, İş parçacıkları, Disk, Ağ, Üst PID,
  * CPU süresi, Görüntü yolu. Sağ menü: Görevi sonlandır, İşlem ağacını sonlandır, Önceliği ayarla, Benzeşimi
- * ayarla, Verimlilik modu, Hizmetlere git, Dosya konumunu aç, Çevrimiçi ara, Özellikler.
+ * ayarla, Verimlilik modu, Hizmetlere git, Dosya konumunu aç, Çevrimiçi ara, Özellikler. Çok tahtada bütün
+ * tahtaların süreçleri tek tabloda ("Bilgisayar" sütunu); işlemler satırın tahtasına gider.
  */
 qx.Class.define("ankamon.ui.taskmgr.DetailsTab", {
   extend: ankamon.ui.taskmgr.Tab,
@@ -39,7 +40,7 @@ qx.Class.define("ankamon.ui.taskmgr.DetailsTab", {
     const F = ankamon.ui.taskmgr.Fmt;
     const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
     this.__kthreads = new qx.ui.form.CheckBox("Çekirdek iş parçacıklarını göster");
-    this.__kthreads.addListener("changeValue", () => this.update(this._win.getModel()));
+    this.__kthreads.addListener("changeValue", () => this.update());
     bar.add(this.__kthreads);
     bar.add(new qx.ui.core.Spacer(), { flex: 1 });
     bar.add(this._button("Görevi sonlandır", () => this.endSelected()));
@@ -67,7 +68,7 @@ qx.Class.define("ankamon.ui.taskmgr.DetailsTab", {
         this.endSelected();
       }
     });
-    this._rowMenu(this.__table, pid => this.__menu(pid));
+    this._rowMenu(this.__table, id => this.__menu(id));
     this.add(this.__table, { flex: 1 });
   },
 
@@ -76,86 +77,103 @@ qx.Class.define("ankamon.ui.taskmgr.DetailsTab", {
     __kthreads: null,
     __rows: null,
 
+    /** Satır kimliğinden ({link, pid, p}) ya da null. */
+    __proc(id) {
+      const parsed = this._parseId(id);
+      const pid = parsed ? Number(parsed.id) : NaN;
+      const p = parsed && parsed.link.getModel().procs.get(pid);
+      return p ? { link: parsed.link, pid, p } : null;
+    },
+
     selected() {
-      const pid = this._selectedId(this.__table);
-      const p = pid === null ? null : this._win.getModel().procs.get(pid);
-      return p ? { pid, tree: false, name: p.name } : null;
+      const s = this.__proc(this._selectedId(this.__table));
+      return s ? { link: s.link, pid: s.pid, tree: false, name: s.p.name } : null;
     },
 
     endSelected() {
       const s = this.selected();
       if (s) {
-        this._win.endTask(s.pid, false, s.name);
+        this._win.endTask(s.link, s.pid, false, s.name);
       }
     },
 
-    reveal(pid) {
-      const p = this._win.getModel().procs.get(pid);
+    reveal(link, pid) {
+      const p = link.getModel().procs.get(pid);
       if (p && p.kthread) {
         this.__kthreads.setValue(true);
       }
-      this.update(this._win.getModel());
-      const idx = (this.__rows || []).findIndex(r => r[0] === pid);
+      this.update();
+      const id = this._rowId(link, pid);
+      const idx = (this.__rows || []).findIndex(r => r[0] === id);
       if (idx >= 0) {
         this.__table.getSelectionModel().setSelectionInterval(idx, idx);
         this.__table.scrollCellVisible(1, idx);
       }
     },
 
-    __menu(pid) {
-      const m = this._win.getModel();
-      const p = m.procs.get(pid);
-      if (!p) {
+    __menu(id) {
+      const s = this.__proc(id);
+      if (!s) {
         return null;
       }
+      const { link, pid, p } = s;
+      const m = link.getModel();
       const F = ankamon.ui.taskmgr.Fmt;
       const menu = new qx.ui.menu.Menu();
-      this._item(menu, "Görevi sonlandır", () => this._win.endTask(pid, false, p.name));
-      this._item(menu, "İşlem ağacını sonlandır", () => this._win.endTask(pid, true, p.name));
+      this._item(menu, "Görevi sonlandır", () => this._win.endTask(link, pid, false, p.name));
+      this._item(menu, "İşlem ağacını sonlandır", () => this._win.endTask(link, pid, true, p.name));
       menu.add(new qx.ui.menu.Separator());
       const prio = new qx.ui.menu.Menu();
       const cur = F.priority(p.nice);
       F.PRIORITIES.forEach(([label, nice]) => {
         const b = new qx.ui.menu.RadioButton(label).set({ value: label === cur });
-        b.addListener("execute", () => this._win.setPriority(pid, nice, p.name, label));
+        b.addListener("execute", () => this._win.setPriority(link, pid, nice, p.name, label));
         prio.add(b);
       });
       menu.add(new qx.ui.menu.Button("Önceliği ayarla", null, null, prio));
-      this._item(menu, "Benzeşimi ayarla", () => this._win.setAffinity(pid, p.name));
+      this._item(menu, "Benzeşimi ayarla", () => this._win.setAffinity(link, pid, p.name));
       const eco = new qx.ui.menu.CheckBox("Verimlilik modu").set({ value: !!p.eco });
-      eco.addListener("execute", () => this._win.efficiency(pid, !p.eco, p.name));
+      eco.addListener("execute", () => this._win.efficiency(link, pid, !p.eco, p.name));
       menu.add(eco);
       menu.add(new qx.ui.menu.Separator());
-      const svc = (m.services || []).filter(s => s.pid === pid);
-      this._item(menu, "Hizmetlere git", () => this._win.goToServices(svc.map(s => s.name)), svc.length > 0 || !m.services);
-      this._item(menu, "Dosya konumunu aç", () => this._win.showLocation(pid));
+      const svc = (m.services || []).filter(x => x.pid === pid);
+      this._item(menu, "Hizmetlere git", () => this._win.goToServices(link, svc.map(x => x.name)), svc.length > 0 || !m.services);
+      this._item(menu, "Dosya konumunu aç", () => this._win.showLocation(link, pid));
       this._item(menu, "Çevrimiçi ara", () => window.open("https://www.google.com/search?q=" + encodeURIComponent(p.name + " linux process"), "_blank"));
-      this._item(menu, "Özellikler", () => this._win.showProps(pid));
+      this._item(menu, "Özellikler", () => this._win.showProps(link, pid));
       return menu;
     },
 
     // overridden
-    update(m) {
-      if (!m.snap || !this.isSeeable()) {
+    update() {
+      if (!this.isSeeable()) {
         return;
       }
       const F = ankamon.ui.taskmgr.Fmt;
       const q = this._win.getFilter();
       const all = this.__kthreads.getValue();
       const rows = [];
-      m.procs.forEach(p => {
-        if ((p.kthread && !all) || (q && !p.name.toLowerCase().includes(q) && String(p.pid) !== q &&
-          !(p.cmd || "").toLowerCase().includes(q) && !p.user.toLowerCase().includes(q))) {
-          return;
-        }
-        rows.push([p.pid, p.name, p.pid, F.state(p.state, p.eco), p.user, Math.round(p.cpu), p.mem, p.cmd || `[${p.name}]`,
-          F.priority(p.nice) + ` (nice ${p.nice})`, p.threads, p.disk, p.net, p.ppid,
-          F.cpuTime(p.ticks / (m.hz || 100)), p.exe || ""]);
+      this._links().forEach(link => {
+        const m = link.getModel();
+        const whole = this._win.boardMatches(link, q);
+        const board = link.getDisplay();
+        m.procs.forEach(p => {
+          if ((p.kthread && !all) || (q && !whole && !p.name.toLowerCase().includes(q) && String(p.pid) !== q &&
+            !(p.cmd || "").toLowerCase().includes(q) && !p.user.toLowerCase().includes(q))) {
+            return;
+          }
+          rows.push([this._rowId(link, p.pid), p.name, p.pid, F.state(p.state, p.eco), p.user, Math.round(p.cpu), p.mem, p.cmd || `[${p.name}]`,
+            F.priority(p.nice) + ` (nice ${p.nice})`, p.threads, p.disk, p.net, p.ppid,
+            F.cpuTime(p.ticks / (m.hz || 100)), p.exe || "", board]);
+        });
       });
-      // İlk açılışta ada göre (Windows varsayılanı); sonra kullanıcının seçtiği sütun sıralaması korunur.
+      // Kullanıcı sütun başlığından sıralama seçmediyse ada göre (Windows varsayılanı; çok tahtada aynı ad tahtaya
+      // göre); seçtiyse o sıralama korunur (tablo modeli uygular).
       const tm = this.__table.getTableModel();
-      if (!this.__rows && tm.getSortColumnIndex() < 0) {
-        rows.sort((a, b) => a[1].localeCompare(b[1], "tr"));
+      if (tm.getSortColumnIndex() < 0) {
+        const coll = new Intl.Collator("tr", { numeric: true });
+        const last = rows.length ? rows[0].length - 1 : 0;
+        rows.sort((a, b) => coll.compare(a[1], b[1]) || coll.compare(a[last], b[last]));
       }
       this.__rows = rows;
       this._setRows(this.__table, rows);

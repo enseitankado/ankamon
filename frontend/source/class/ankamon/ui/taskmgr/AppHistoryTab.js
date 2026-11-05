@@ -28,7 +28,8 @@
 /**
  * Uygulama geçmişi (Windows Görev Yöneticisi gibi): uygulamaların (pencereli süreç ağaçları) ve kullanıcı
  * süreçlerinin toplam CPU süresi (süreçlerin başlangıcından beri) ve bu pencere açıldığından beri ağ
- * kullanımı (TCP, ajan ölçümü). "Kullanım geçmişini sil" ağ sayaçlarını sıfırlar.
+ * kullanımı (TCP, ajan ölçümü). "Kullanım geçmişini sil" ağ sayaçlarını sıfırlar. Çok tahtada her tahtanın
+ * uygulamaları ayrı satır ("Bilgisayar" sütunu).
  */
 qx.Class.define("ankamon.ui.taskmgr.AppHistoryTab", {
   extend: ankamon.ui.taskmgr.Tab,
@@ -40,9 +41,12 @@ qx.Class.define("ankamon.ui.taskmgr.AppHistoryTab", {
     this.__info = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
     bar.add(this.__info, { flex: 1 });
     bar.add(this._button("Kullanım geçmişini sil", () => {
-      this._win.getModel().netAcc.clear();
-      this._win.getModel().netSince = Date.now();
-      this.update(this._win.getModel());
+      // Gösterilen (süzgece uyan) tahtaların sayaçları.
+      this._win.getVisibleLinks().forEach(l => {
+        l.getModel().netAcc.clear();
+        l.getModel().netSince = Date.now();
+      });
+      this.update();
     }));
     this.add(bar);
     this.__table = this._table([
@@ -60,40 +64,53 @@ qx.Class.define("ankamon.ui.taskmgr.AppHistoryTab", {
     __info: null,
 
     // overridden
-    update(m) {
-      if (!m.snap || !this.isSeeable()) {
+    update() {
+      if (!this.isSeeable()) {
+        return;
+      }
+      const links = this._links();
+      if (!links.length) {
         return;
       }
       const F = ankamon.ui.taskmgr.Fmt;
-      const hz = m.hz || 100;
-      const sessionUid = m.session && m.session.uid;
-      // Uygulama = pencereli kök + ağacı; ayrıca kullanıcı süreçleri ada göre toplanır.
-      const groups = new Map();
-      const claimed = new Set();
-      const add = (name, pids, user) => {
-        const g = groups.get(name) || { ticks: 0, net: 0, procs: 0, user };
-        pids.forEach(pid => {
-          const p = m.procs.get(pid);
-          if (p) {
-            g.ticks += p.ticks;
-            g.net += m.netAcc.get(pid) || 0;
-            g.procs++;
-            claimed.add(pid);
+      const q = this._win.getFilter();
+      const rows = [];
+      links.forEach(link => {
+        const m = link.getModel();
+        const hz = m.hz || 100;
+        const sessionUid = m.session && m.session.uid;
+        // Uygulama = pencereli kök + ağacı; ayrıca kullanıcı süreçleri ada göre toplanır.
+        const groups = new Map();
+        const claimed = new Set();
+        const add = (name, pids, user) => {
+          const g = groups.get(name) || { ticks: 0, net: 0, procs: 0, user };
+          pids.forEach(pid => {
+            const p = m.procs.get(pid);
+            if (p) {
+              g.ticks += p.ticks;
+              g.net += m.netAcc.get(pid) || 0;
+              g.procs++;
+              claimed.add(pid);
+            }
+          });
+          groups.set(name, g);
+        };
+        m.appRoots.forEach(root => add(m.appName(root), m.descendants(root).filter(pid => !claimed.has(pid)), (m.procs.get(root) || {}).user));
+        m.procs.forEach(p => {
+          if (!claimed.has(p.pid) && !p.kthread && (p.uid >= 1000 || (sessionUid && p.uid === sessionUid))) {
+            add(p.name, [p.pid], p.user);
           }
         });
-        groups.set(name, g);
-      };
-      m.appRoots.forEach(root => add(m.appName(root), m.descendants(root).filter(pid => !claimed.has(pid)), (m.procs.get(root) || {}).user));
-      m.procs.forEach(p => {
-        if (!claimed.has(p.pid) && !p.kthread && (p.uid >= 1000 || (sessionUid && p.uid === sessionUid))) {
-          add(p.name, [p.pid], p.user);
-        }
+        const whole = this._win.boardMatches(link, q);
+        const board = link.getDisplay();
+        [...groups.entries()].filter(([name]) => whole || !q || name.toLowerCase().includes(q))
+          .forEach(([name, g]) => rows.push([this._rowId(link, name), name, F.cpuTime(g.ticks / hz), g.net, g.procs, g.user || "", board, g.ticks]));
       });
-      const q = this._win.getFilter();
-      const rows = [...groups.entries()].filter(([name]) => !q || name.toLowerCase().includes(q))
-        .sort((a, b) => b[1].ticks - a[1].ticks)
-        .map(([name, g]) => [name, name, F.cpuTime(g.ticks / hz), g.net, g.procs, g.user || ""]);
-      this.__info.setValue(`CPU süresi: süreçler başladığından beri · Ağ: ${new Date(m.netSince).toLocaleTimeString("tr-TR")}'den beri (bu pencere)`);
+      // CPU süresine göre azalan (tahtalar arası da); sıralama anahtarı satırın sonundaki gizli tik sayısı, tabloya girmez.
+      rows.sort((a, b) => b[b.length - 1] - a[a.length - 1]);
+      rows.forEach(r => r.pop());
+      const since = Math.min(...links.map(l => l.getModel().netSince));
+      this.__info.setValue(`CPU süresi: süreçler başladığından beri · Ağ: ${new Date(since).toLocaleTimeString("tr-TR")}'den beri (bu pencere)`);
       this._setRows(this.__table, rows);
     }
   }

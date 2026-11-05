@@ -26,14 +26,19 @@
  */
 
 /**
- * Görev yöneticisi penceresi (Tahtalar/Ekranlar sağ menüsü "Görev yöneticisi" — kullanıcı isteği: Windows Görev
- * Yöneticisi'nin özellikleri ve görünümü). Sekmeler (Windows 11 gibi solda): İşlemler, Performans, Uygulama
- * geçmişi, Başlangıç uygulamaları, Kullanıcılar, Ayrıntılar, Hizmetler, Ayarlar. Üstte arama, Yeni görev
+ * Görev yöneticisi penceresi (Tahtalar/Ekranlar sağ menüsü ve araç çubuğu "Görev yöneticisi" — kullanıcı isteği:
+ * Windows Görev Yöneticisi'nin özellikleri ve görünümü). Sekmeler (Windows 11 gibi solda): İşlemler, Performans,
+ * Uygulama geçmişi, Başlangıç uygulamaları, Kullanıcılar, Ayrıntılar, Hizmetler, Ayarlar. Üstte arama, Yeni görev
  * çalıştır, Görevi sonlandır, Verimlilik modu, Görünüm (güncelleme hızı, her zaman üstte).
  *
- * Pencere açık kaldıkça tahtaya TEK canlı SSH bağlantısı (bkz. Connection, worker screen/taskmgr.py) tutulur;
- * pencere kapanınca ya da sayfa yenilenince WebSocket kapanır → SSH ve tahtadaki ajan sonlanır.
- * Model (getModel): ajan çerçevelerinden türetilen süreç haritası, ağaç, uygulamalar, toplamlar ve 60 sn geçmiş.
+ * Çoklu tahta (kullanıcı isteği: seçili her tahta için ayrı pencere değil, tek pencerede süzme ile): pencere seçili
+ * tahtaların HER BİRİ için bir canlı bağ (ui.taskmgr.TaskBoardLink: tahtaya tek SSH + ajan, kendi modeli) tutar.
+ * Tablo sekmelerinde bütün tahtaların satırları tek tabloda, "Bilgisayar" sütunuyla ("takma ad [bilgisayar adı]");
+ * satır kimlikleri tahtayla birleşiktir ("<tahta id>:<kimlik>") ve satır işlemleri satırın tahtasına gider.
+ * Üstteki "Bilgisayar" süzgeci (ui.taskmgr.TaskBoardPicker, çoklu seçim) ve arama kutusu (bilgisayar adını da
+ * arar) birlikte süzer; Performans sekmesinde tahta seçici vardır. Tek tahtada görünüm eskisi gibidir (Bilgisayar
+ * sütunu ve süzgeci yok). Pencere kapanınca ya da sayfa yenilenince BÜTÜN WebSocket'ler kapanır → SSH'ler ve
+ * tahtalardaki ajanlar sonlanır. Çok tahtada tablo tazelemesi birleştirilir (güncelleme aralığında bir kez).
  */
 qx.Class.define("ankamon.ui.taskmgr.Window", {
   extend: qx.ui.window.Window,
@@ -43,49 +48,72 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       ["startup", "Başlangıç uygulamaları"], ["users", "Kullanıcılar"], ["details", "Ayrıntılar"],
       ["services", "Hizmetler"], ["settings", "Ayarlar"]],
     PREF: "taskmgr.settings",
+    /** Çok tahtada bağlantılar arka arkaya bu aralıkla (ms) açılır — 30 SSH'nin aynı anda başlamaması için. */
+    CONNECT_STAGGER: 120,
 
-    /** Sağ menüden: tahta başına tek pencere (açıksa öne getirilir). */
-    open(board, user) {
+    /**
+     * Sağ menüden / araç çubuğundan: verilen tahtaların (çevrim içi olanlar) hepsiyle TEK pencere. Aynı tahta
+     * kümesi için açık pencere varsa öne getirilir.
+     * @param boards {Array|Map} tahta(lar) {id, label, hostname, ip}
+     */
+    open(boards, user) {
       const self = ankamon.ui.taskmgr.Window;
+      const list = (Array.isArray(boards) ? boards : [boards]).filter(Boolean);
+      if (!list.length) {
+        return null;
+      }
+      const key = [...new Set(list.map(b => b.id))].sort((a, b) => a - b).join(",");
       self.__open = self.__open || new Map();
-      const existing = self.__open.get(board.id);
+      const existing = self.__open.get(key);
       if (existing && !existing.isDisposed()) {
         existing.restore();
         existing.open();
         existing.activate();
         return existing;
       }
-      const win = new self(board, user);
-      self.__open.set(board.id, win);
-      win.addListener("close", () => self.__open.delete(board.id));
+      const win = new self(list, user);
+      self.__open.set(key, win);
+      win.addListener("close", () => self.__open.delete(key));
       qx.core.Init.getApplication().getRoot().add(win);
       win.open();
       return win;
     }
   },
 
-  construct(board, user) {
-    const name = board.label || board.hostname || board.ip || "#" + board.id;
-    super("Görev Yöneticisi — " + name);
-    this.__board = board;
-    this.__boardName = name;
+  construct(boards, user) {
+    super("Görev Yöneticisi");
+    const seen = new Set();
+    const list = (Array.isArray(boards) ? boards : [boards]).filter(b => b && !seen.has(b.id) && seen.add(b.id));
     this.__user = user;
     this.__settings = Object.assign({ interval: 1, startTab: "processes", onTop: false, memPct: false },
       (user.ui_prefs || {})[ankamon.ui.taskmgr.Window.PREF] || {});
-    this.__model = this.__emptyModel();
+    this.__chosen = new Set();
+    // Tahta başına bağ; sıra: "Bilgisayar" adına göre (doğal sıralama: A1-2 < A1-10).
+    this.__links = list.map(b => new ankamon.ui.taskmgr.TaskBoardLink(b))
+      .sort((a, b) => a.getDisplay().localeCompare(b.getDisplay(), "tr", { numeric: true }));
+    this.__linkById = new Map(this.__links.map(l => [l.getId(), l]));
+    this.__multi = this.__links.length > 1;
+    this.setCaption("Görev Yöneticisi — " + (this.__multi ? `${this.__links.length} tahta` : this.__links[0].getName()));
     const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
     this.set({
       layout: new qx.ui.layout.VBox(6), contentPadding: 8, showMinimize: true, allowMaximize: true, showMaximize: true,
-      width: Math.min(1180, root.width - 40), height: Math.min(760, root.height - 40),
+      width: Math.min(this.__multi ? 1320 : 1180, root.width - 40), height: Math.min(760, root.height - 40),
       alwaysOnTop: !!this.__settings.onTop, resizable: true
     });
     this.addListenerOnce("appear", () => this.center());
 
     // --- üst çubuk (Windows 11: arama + komutlar) ---------------------------------------------------------
     const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(6).set({ alignY: "middle" }));
-    this.__search = new qx.ui.form.TextField().set({ placeholder: "Ad, PID, kullanıcı ya da komut ara", width: 280, liveUpdate: true });
+    this.__search = new qx.ui.form.TextField().set({
+      placeholder: this.__multi ? "Ad, PID, kullanıcı, komut ya da bilgisayar ara" : "Ad, PID, kullanıcı ya da komut ara",
+      width: 280, liveUpdate: true
+    });
     this.__search.addListener("changeValue", () => this.__refresh());
     bar.add(this.__search);
+    if (this.__multi) {
+      this.__picker = new ankamon.ui.taskmgr.TaskBoardPicker(this);
+      bar.add(this.__picker);
+    }
     bar.add(new qx.ui.core.Spacer(), { flex: 1 });
     const btn = (label, handler, tip) => {
       const b = new qx.ui.form.Button(label).set({ toolTipText: tip || null, padding: [3, 10] });
@@ -109,7 +137,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
     });
     view.add(new qx.ui.menu.Button("Güncelleme hızı", null, null, speed));
     const refreshNow = new qx.ui.menu.Button("Şimdi yenile");
-    refreshNow.addListener("execute", () => this.__conn.send("interval", { sec: this.__settings.interval || 1 }).catch(() => {}));
+    refreshNow.addListener("execute", () => this.__sendAll("interval", { sec: this.__settings.interval || 1 }));
     view.add(refreshNow);
     this.__onTopBox = new qx.ui.menu.CheckBox("Her zaman üstte").set({ value: !!this.__settings.onTop });
     this.__onTopBox.addListener("execute", () => this.setSetting("onTop", this.__onTopBox.getValue()));
@@ -139,27 +167,35 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
 
     // --- durum satırı ----------------------------------------------------------------------------------------
     const foot = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-    this.__status = new qx.ui.basic.Label("Tahtaya bağlanılıyor…").set({ rich: true, textColor: "app-muted" });
+    this.__status = new qx.ui.basic.Label(this.__multi ? "Tahtalara bağlanılıyor…" : "Tahtaya bağlanılıyor…").set({ rich: true, textColor: "app-muted" });
     foot.add(this.__status, { flex: 1 });
-    this.__reconnect = new qx.ui.form.Button("Yeniden bağlan").set({ visibility: "excluded", padding: [2, 10] });
-    this.__reconnect.addListener("execute", () => this.__connect());
+    if (this.__multi) {
+      // Bağlanamayan tahtalar: tek tek ya da hepsi yeniden bağlanır (menü durum değiştikçe yeniden kurulur).
+      this.__reconnect = new qx.ui.form.MenuButton("Bağlanamayanlar").set({ visibility: "excluded", padding: [2, 10] });
+    } else {
+      this.__reconnect = new qx.ui.form.Button("Yeniden bağlan").set({ visibility: "excluded", padding: [2, 10] });
+      this.__reconnect.addListener("execute", () => this.reconnect(this.__links[0]));
+    }
     foot.add(this.__reconnect);
     this.add(foot);
 
-    // --- bağlantı: pencere kapanınca SSH de kapanır ----------------------------------------------------------
-    this.__conn = new ankamon.ui.taskmgr.Connection(board.id);
-    this.__conn.addListener("frame", e => this.__onFrame(e.getData()));
-    this.__conn.addListener("opened", () => {
-      this.__reconnect.exclude();
-      this.__conn.send("interval", { sec: this.__settings.interval }).catch(() => {});
-      this.__onTab();
-    });
-    this.__conn.addListener("closed", e => {
-      this.__status.setValue(`<span style="color:#c42b1c">⚠ ${ankamon.ui.taskmgr.Fmt.esc(e.getData().text)}</span>`);
-      this.__reconnect.show();
+    // --- bağlar: pencere kapanınca bütün SSH'ler de kapanır ----------------------------------------------------
+    this.__links.forEach((link, i) => {
+      link.addListener("updated", e => this.__onUpdated(link, e.getData().kind));
+      link.addListener("changeLinkState", () => this.__onLinkState(link));
+      if (i === 0) {
+        link.connect();
+      } else {
+        qx.event.Timer.once(() => {
+          if (!this.isDisposed() && link.getState() === "connecting" && !link.isOpen()) {
+            link.connect();
+          }
+        }, this, i * ankamon.ui.taskmgr.Window.CONNECT_STAGGER);
+      }
     });
     this.addListener("close", () => {
-      this.__conn.close();
+      this.__closed = true;
+      this.__links.forEach(l => l.close());
       qx.event.Timer.once(() => this.destroy(), null, 0);
     });
     this.addListener("keypress", e => {
@@ -167,45 +203,124 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
         e.preventDefault();
       }
     });
-    this.__connect();
   },
 
   destruct() {
-    if (this.__conn) {
-      this.__conn.dispose();
+    if (this.__refreshTimer) {
+      clearTimeout(this.__refreshTimer);
     }
+    (this.__links || []).forEach(l => l.dispose());
+    this.__links = this.__linkById = null;
   },
 
   members: {
-    __board: null,
-    __boardName: null,
     __user: null,
     __settings: null,
-    __model: null,
-    __conn: null,
+    __links: null,
+    __linkById: null,
+    __multi: false,
+    __chosen: null,
+    __closed: false,
+    __picker: null,
     __search: null,
     __tabs: null,
     __tabMap: null,
     __status: null,
     __reconnect: null,
+    __reconnectSig: null,
     __endBtn: null,
     __ecoBtn: null,
     __speedButtons: null,
     __onTopBox: null,
     __pendingServices: null,
+    __refreshTimer: null,
 
     getUser() {
       return this.__user;
     },
 
-    getConn() {
-      return this.__conn;
+    // ---- tahtalar ---------------------------------------------------------------------------------------------
+    /** Bütün tahta bağları (pencere sırasıyla). */
+    getLinks() {
+      return this.__links;
     },
 
-    getModel() {
-      return this.__model;
+    /** @param id {Number|String} tahta kimliği */
+    getLink(id) {
+      return this.__linkById.get(Number(id)) || null;
     },
 
+    /** Pencere birden çok tahtayla mı açıldı ("Bilgisayar" sütunu ve süzgeci yalnız o zaman). */
+    isMulti() {
+      return this.__multi;
+    },
+
+    /** "Bilgisayar" süzgecine uyan bağlar (süzgeç boşsa hepsi). */
+    getVisibleLinks() {
+      return this.__links.filter(l => !this.__chosen.size || this.__chosen.has(l.getId()));
+    },
+
+    hasBoardFilter() {
+      return this.__chosen.size > 0;
+    },
+
+    isBoardChosen(id) {
+      return this.__chosen.has(Number(id));
+    },
+
+    /** "Bilgisayar" süzgeci: seçili tahta kimlikleri (boş → hepsi). */
+    setBoardFilter(ids) {
+      this.__chosen = new Set((ids || []).map(Number).filter(id => this.__linkById.has(id)));
+      if (this.__picker) {
+        this.__picker.sync();
+      }
+      this.__tabMap.forEach(tab => tab.onBoardFilter());
+      this.__refresh();
+    },
+
+    /** Süzgeçte tek tahta varsa o (yeni görev, Performans varsayılanı), yoksa null. Tek tahtalı pencerede o tahta. */
+    getSingleChosen() {
+      if (!this.__multi) {
+        return this.__links[0];
+      }
+      return this.__chosen.size === 1 ? this.getLink([...this.__chosen][0]) : null;
+    },
+
+    /**
+     * Arama metni tahtanın "Bilgisayar" adıyla eşleşiyor mu (yalnız çok tahtada): eşleşirse o tahtanın bütün
+     * satırları gösterilir (satırın kendi alanları ayrıca aranmaz).
+     */
+    boardMatches(link, q) {
+      return this.__multi && !!q && link.getDisplay().toLowerCase().includes(q);
+    },
+
+    /** Uyumluluk (testler): verilen ya da ilk tahtanın modeli / bağlantısı. */
+    getModel(id) {
+      const link = id === undefined ? this.__links[0] : this.getLink(id);
+      return link ? link.getModel() : null;
+    },
+
+    getConn(id) {
+      const link = id === undefined ? this.__links[0] : this.getLink(id);
+      return link ? link.getConn() : null;
+    },
+
+    reconnect(link) {
+      if (!this.__closed) {
+        link.connect();
+      }
+    },
+
+    /** Bütün açık bağlara komut (görünüm komutları: interval, want); hatalar yutulur. */
+    __sendAll(op, args) {
+      this.__links.forEach(l => {
+        if (l.isOpen()) {
+          l.send(op, args).catch(() => {});
+        }
+      });
+    },
+
+    // ---- ayarlar ------------------------------------------------------------------------------------------------
     getSettings() {
       return this.__settings;
     },
@@ -235,152 +350,74 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       if (settingsTab) {
         settingsTab.syncSpeed(v);
       }
-      this.__conn.send("interval", { sec: v }).catch(() => {});
+      this.__sendAll("interval", { sec: v });
       this.__updateStatus();
     },
 
-    __connect() {
-      this.__model = this.__emptyModel();
-      this.__status.setValue("Tahtaya bağlanılıyor…");
-      this.__conn.open();
-    },
-
-    __emptyModel() {
-      const m = {
-        static: null, snap: null, hz: 100, procs: new Map(), children: new Map(), windows: new Map(),
-        appRoots: [], appOf: new Map(), session: null, users: null, services: null, startup: null,
-        memTotal: 0, totals: { cpu: 0, memUsed: 0, diskBusy: 0, netPct: 0 },
-        hist: { cpu: [], cores: [], mem: [], disks: {}, nets: {}, gpus: [] },
-        netAcc: new Map(), netSince: Date.now()
-      };
-      m.descendants = root => {
-        const out = [];
-        const stack = [root];
-        while (stack.length) {
-          const pid = stack.pop();
-          if (m.procs.has(pid)) {
-            out.push(pid);
-          }
-          (m.children.get(pid) || []).forEach(c => stack.push(c));
-        }
-        return out;
-      };
-      m.appName = root => {
-        const p = m.procs.get(root);
-        if (!p) {
-          return String(root);
-        }
-        const exe = (p.exe || "").split("/").pop() || p.name;
-        return exe.charAt(0).toUpperCase() + exe.slice(1);
-      };
-      return m;
-    },
-
-    __push(arr, v) {
-      arr.push(v);
-      if (arr.length > ankamon.ui.taskmgr.Graph.POINTS) {
-        arr.shift();
+    // ---- bağ olayları -----------------------------------------------------------------------------------------
+    __onLinkState(link) {
+      if (this.__closed) {
+        return;
+      }
+      if (link.getState() === "open") {
+        link.send("interval", { sec: this.__settings.interval }).catch(() => {});
+        link.send("want", { what: this.__want() }).catch(() => {});
+      }
+      if (this.__picker) {
+        this.__picker.sync();
+      }
+      this.__updateReconnect();
+      this.__updateStatus();
+      if (link.getState() !== "open") {
+        // Kopan/yeniden bağlanan tahtanın satırları tablodan düşsün (model boşaldı).
+        this.__scheduleRefresh();
       }
     },
 
-    __onFrame(f) {
-      const m = this.__model;
-      if (f.t === "static") {
-        m.static = f;
-        m.hz = f.hz || 100;
+    __onUpdated(link, kind) {
+      if (this.__closed) {
         return;
       }
-      if (f.t === "services") {
-        m.services = f.items;
-        this.__tabMap.get("services").update(m);
-        if (this.__pendingServices) {
-          this.__tabMap.get("services").reveal(this.__pendingServices);
-          this.__pendingServices = null;
-        }
+      if (kind === "services" && this.__pendingServices && this.__pendingServices.link === link) {
+        const pending = this.__pendingServices;
+        this.__pendingServices = null;
+        this.__tabMap.get("services").reveal(link, pending.names);
         return;
       }
-      if (f.t === "startup") {
-        m.startup = f;
-        this.__tabMap.get("startup").update(m);
+      const key = this.__currentKey();
+      if ((kind === "services" && key !== "services" && key !== "details") || (kind === "startup" && key !== "startup")) {
         return;
       }
-      if (f.t === "error") {
-        this.warn("görev yöneticisi ajanı: " + f.msg);
-        return;
-      }
-      if (f.t !== "snap") {
-        return;
-      }
-      m.snap = f;
-      if (f.users) {
-        m.users = f.users;
-      }
-      m.session = f.session || m.session;
-      // Süreçler: [pid,ppid,ad,durum,kullanıcı,cpu,bellek,disk,ağ,iş parçacığı,nice,başlangıç,tik,çekirdek,komut,yol,verimlilik,uid]
-      m.procs = new Map();
-      m.children = new Map();
-      f.procs.forEach(r => {
-        const p = { pid: r[0], ppid: r[1], name: r[2], state: r[3], user: r[4], cpu: r[5], mem: r[6], disk: r[7], net: r[8],
-          threads: r[9], nice: r[10], start: r[11], ticks: r[12], kthread: !!r[13], cmd: r[14], exe: r[15], eco: !!r[16], uid: r[17] };
-        m.procs.set(p.pid, p);
-        if (!m.children.has(p.ppid)) {
-          m.children.set(p.ppid, []);
-        }
-        m.children.get(p.ppid).push(p.pid);
-        if (p.net) {
-          m.netAcc.set(p.pid, (m.netAcc.get(p.pid) || 0) + p.net * (f.dt || 1));
-        }
-      });
-      // Uygulamalar: penceresi olan süreçler; atası da pencereliyse ona katılır (tek uygulama).
-      m.windows = new Map(Object.entries(f.windows || {}).map(([k, v]) => [Number(k), v]));
-      const winPids = new Set([...m.windows.keys()].filter(pid => m.procs.has(pid)));
-      m.appRoots = [...winPids].filter(pid => {
-        let p = m.procs.get(pid);
-        while (p && p.ppid > 1) {
-          if (winPids.has(p.ppid)) {
-            return false;
-          }
-          p = m.procs.get(p.ppid);
-        }
-        return true;
-      });
-      m.appOf = new Map();
-      m.appRoots.forEach(root => m.descendants(root).forEach(pid => m.appOf.set(pid, root)));
-      // Toplamlar ve 60 sn geçmiş.
-      const mem = f.mem;
-      m.memTotal = mem.total;
-      const used = mem.total - mem.avail;
-      const up = (f.nets || []).filter(n => n.up);
-      const linkBits = up.reduce((a, n) => a + (Number(n.speed) > 0 ? Number(n.speed) * 1e6 : 0), 0);
-      m.totals = {
-        cpu: f.cpu.total, memUsed: used,
-        diskBusy: Math.max(0, ...(f.disks || []).map(d => d.busy)),
-        netPct: linkBits ? (100 * up.reduce((a, n) => a + (n.rx + n.tx) * 8, 0)) / linkBits : 0
-      };
-      const h = m.hist;
-      this.__push(h.cpu, f.cpu.total);
-      f.cpu.cores.forEach((v, i) => this.__push(h.cores[i] = h.cores[i] || [], v));
-      this.__push(h.mem, (100 * used) / (mem.total || 1));
-      (f.disks || []).forEach(d => {
-        const hd = h.disks[d.name] = h.disks[d.name] || { busy: [], r: [], w: [] };
-        this.__push(hd.busy, d.busy);
-        this.__push(hd.r, d.r);
-        this.__push(hd.w, d.w);
-      });
-      (f.nets || []).forEach(n => {
-        const hn = h.nets[n.name] = h.nets[n.name] || { rx: [], tx: [] };
-        this.__push(hn.rx, n.rx);
-        this.__push(hn.tx, n.tx);
-      });
-      (f.gpus || []).forEach((g, i) => this.__push(h.gpus[i] = h.gpus[i] || [], g.busy ?? g.mhz ?? 0));
-      this.__refresh();
+      this.__scheduleRefresh();
     },
 
-    /** Görünen sekme + Performans (sol liste grafikleri hep güncel kalsın) + durum satırı. */
+    /**
+     * Çerçeve geldi: görünen sekme tazelenir. Tek tahtada hemen (eskisi gibi); çok tahtada bütün tahtaların
+     * çerçeveleri birleştirilir — güncelleme aralığında (en az 0,5 sn) bir kez (30 tahtada saniyede 30 kez tabloyu
+     * yeniden kurmak tarayıcıyı boğardı).
+     */
+    __scheduleRefresh() {
+      if (!this.__multi) {
+        this.__refresh();
+        return;
+      }
+      if (this.__refreshTimer) {
+        return;
+      }
+      const delay = Math.max(500, (this.__settings.interval || 1) * 1000);
+      this.__refreshTimer = setTimeout(() => {
+        this.__refreshTimer = null;
+        if (!this.isDisposed()) {
+          this.__refresh();
+        }
+      }, delay);
+    },
+
+    /** Görünen sekme + durum satırı + üst düğmeler. */
     __refresh() {
       const tab = this.__tabs.getSelection()[0];
       if (tab) {
-        tab.update(this.__model);
+        tab.update();
       }
       this.__updateStatus();
       const sel = this.__selection();
@@ -389,22 +426,92 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
     },
 
     __updateStatus() {
-      const m = this.__model;
-      if (!m.snap) {
+      const F = ankamon.ui.taskmgr.Fmt;
+      const paused = !this.__settings.interval ? " · <b>Güncelleme duraklatıldı</b>" : "";
+      if (!this.__multi) {
+        const link = this.__links[0];
+        const m = link.getModel();
+        if (link.getState() === "closed") {
+          this.__status.setValue(`<span style="color:#c42b1c">⚠ ${F.esc(link.getError())}</span>`);
+          return;
+        }
+        if (!m.snap) {
+          this.__status.setValue("Tahtaya bağlanılıyor…");
+          return;
+        }
+        this.__status.setValue(`🟢 ${F.esc(link.getName())} (${F.esc(m.static ? m.static.hostname : "")}) · ` +
+          `İşlemler: ${m.procs.size} · CPU kullanımı: ${F.pct(m.totals.cpu, 0)} · ` +
+          `Fiziksel bellek: ${F.pct((100 * m.totals.memUsed) / (m.memTotal || 1), 0)} · ` +
+          `Çalışma süresi: ${F.uptime(m.snap.uptime)}${paused}`);
+        return;
+      }
+      const all = this.__links;
+      const open = all.filter(l => l.getState() === "open").length;
+      const failed = all.filter(l => l.getState() === "closed").length;
+      const connecting = all.length - open - failed;
+      const shown = this.getVisibleLinks().filter(l => l.getModel().snap);
+      const avg = f => (shown.length ? shown.reduce((a, l) => a + f(l.getModel()), 0) / shown.length : 0);
+      const parts = [`${open ? "🟢" : "⏳"} ${open}/${all.length} tahtaya bağlı`];
+      if (failed) {
+        parts.push(`<span style="color:#c42b1c">⚠ ${failed} tahtaya bağlanılamadı</span>`);
+      }
+      if (connecting) {
+        parts.push(`${connecting} bağlanıyor…`);
+      }
+      if (shown.length) {
+        parts.push(`Gösterilen: ${shown.length} tahta`,
+          `İşlemler: ${shown.reduce((a, l) => a + l.getModel().procs.size, 0)}`,
+          `Ort. CPU: ${F.pct(avg(m => m.totals.cpu), 0)}`,
+          `Ort. bellek: ${F.pct(avg(m => (100 * m.totals.memUsed) / (m.memTotal || 1)), 0)}`);
+      }
+      this.__status.setValue(parts.join(" · ") + paused);
+    },
+
+    /** Yeniden bağlan düğmesi (tek tahta) / "Bağlanamayanlar" menüsü (çok tahta). */
+    __updateReconnect() {
+      const failed = this.__links.filter(l => l.getState() === "closed");
+      if (!this.__multi) {
+        this.__reconnect.setVisibility(failed.length ? "visible" : "excluded");
+        return;
+      }
+      const sig = failed.map(l => l.getId() + ":" + l.getError()).join("|");
+      if (sig === this.__reconnectSig) {
+        return;
+      }
+      this.__reconnectSig = sig;
+      const old = this.__reconnect.getMenu();
+      this.__reconnect.resetMenu();
+      if (old) {
+        old.dispose();
+      }
+      if (!failed.length) {
+        this.__reconnect.exclude();
         return;
       }
       const F = ankamon.ui.taskmgr.Fmt;
-      const paused = !this.__settings.interval ? " · <b>Güncelleme duraklatıldı</b>" : "";
-      this.__status.setValue(`🟢 ${F.esc(this.__boardName)} (${F.esc(m.static ? m.static.hostname : "")}) · ` +
-        `İşlemler: ${m.procs.size} · CPU kullanımı: ${F.pct(m.totals.cpu, 0)} · ` +
-        `Fiziksel bellek: ${F.pct((100 * m.totals.memUsed) / (m.memTotal || 1), 0)} · ` +
-        `Çalışma süresi: ${F.uptime(m.snap.uptime)}${paused}`);
+      const menu = new qx.ui.menu.Menu();
+      const all = new qx.ui.menu.Button(`↻ Tümünü yeniden bağlan (${failed.length})`);
+      all.addListener("execute", () => this.__links.filter(l => l.getState() === "closed").forEach(l => this.reconnect(l)));
+      menu.add(all);
+      menu.add(new qx.ui.menu.Separator());
+      failed.forEach(link => {
+        const b = new qx.ui.menu.Button(`↻ ${F.esc(link.getDisplay())} — <span style="opacity:.7">${F.esc(link.getError() || "")}</span>`);
+        b.getChildControl("label").setRich(true);
+        b.addListener("execute", () => this.reconnect(link));
+        menu.add(b);
+      });
+      this.__reconnect.set({ label: `⚠ Bağlanamayanlar (${failed.length})`, menu });
+      this.__reconnect.show();
     },
 
-    /** Sekme değişti: ajandan yalnız gereken seyrek bölümler istenir (hizmetler, başlangıç), sekme tazelenir. */
-    __onTab() {
+    __currentKey() {
       const tab = this.__tabs.getSelection()[0];
-      const key = tab ? tab.getUserData("key") : "";
+      return tab ? tab.getUserData("key") : "";
+    },
+
+    /** Ajandan istenen seyrek bölümler: yalnız görünen sekmenin gerektirdikleri (bütün tahtalara aynı). */
+    __want() {
+      const key = this.__currentKey();
       const want = [];
       if (key === "services" || key === "details") {
         want.push("services");
@@ -412,7 +519,12 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       if (key === "startup") {
         want.push("startup");
       }
-      this.__conn.send("want", { what: want }).catch(() => {});
+      return want;
+    },
+
+    /** Sekme değişti: ajanlardan yalnız gereken seyrek bölümler istenir (hizmetler, başlangıç), sekme tazelenir. */
+    __onTab() {
+      this.__sendAll("want", { what: this.__want() });
       this.__refresh();
     },
 
@@ -424,15 +536,15 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
     __endSelected() {
       const s = this.__selection();
       if (s) {
-        this.endTask(s.pid, s.tree, s.name);
+        this.endTask(s.link, s.pid, s.tree, s.name);
       }
     },
 
     __ecoSelected() {
       const s = this.__selection();
-      const p = s && this.__model.procs.get(s.pid);
+      const p = s && s.link.getModel().procs.get(s.pid);
       if (p) {
-        this.efficiency(s.pid, !p.eco, p.name);
+        this.efficiency(s.link, s.pid, !p.eco, p.name);
       }
     },
 
@@ -444,26 +556,31 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       return tab;
     },
 
-    // ---- işlemler (sekmeler çağırır) ------------------------------------------------------------------------
-    async endTask(pid, tree, name) {
+    /** Onay/ileti metinlerinde tahta (yalnız çok tahtada): " — <i>A1-5 [etap-…]</i>". */
+    whereHtml(link) {
+      return this.__multi ? ` — <i>${ankamon.ui.taskmgr.Fmt.esc(link.getDisplay())}</i>` : "";
+    },
+
+    // ---- işlemler (sekmeler çağırır; her biri satırın tahtasına gider) ------------------------------------------
+    async endTask(link, pid, tree, name) {
       const F = ankamon.ui.taskmgr.Fmt;
-      const p = this.__model.procs.get(pid);
+      const p = link.getModel().procs.get(pid);
       const system = p && p.uid < 1000;
-      const text = (tree ? `<b>${F.esc(name)}</b> (${pid}) işlem ağacı sonlandırılsın mı?<br><br>Bu işlem ve başlattığı tüm işlemler kapanır.`
-        : `<b>${F.esc(name)}</b> (${pid}) sonlandırılsın mı?`) +
+      const text = (tree ? `<b>${F.esc(name)}</b> (${pid})${this.whereHtml(link)} işlem ağacı sonlandırılsın mı?<br><br>Bu işlem ve başlattığı tüm işlemler kapanır.`
+        : `<b>${F.esc(name)}</b> (${pid})${this.whereHtml(link)} sonlandırılsın mı?`) +
         (system ? "<br><br><b>Bu bir sistem işlemi.</b> Sonlandırmak tahtayı kararsız hale getirebilir ya da oturumu kapatabilir." : "") +
         "<br><br>Kaydedilmemiş veriler kaybolur.";
       if (!(await this.__confirm(text, tree ? "İşlem ağacını sonlandır" : "İşlemi sonlandır"))) {
         return;
       }
       try {
-        await this.__conn.send(tree ? "killtree" : "kill", { pid });
+        await link.send(tree ? "killtree" : "kill", { pid });
         if (!tree) {
           // Windows gibi: 3 sn içinde kapanmazsa zorla sonlandırma önerilir.
           qx.event.Timer.once(async () => {
-            if (this.__model.procs.has(pid) && !this.isDisposed() &&
-              await this.__confirm(`<b>${F.esc(name)}</b> (${pid}) kapanmadı. Zorla sonlandırılsın mı (SIGKILL)?`, "Zorla sonlandır")) {
-              this.__conn.send("kill", { pid, force: true }).catch(e => ankamon.ui.Dialog.error(e));
+            if (!this.isDisposed() && link.getModel().procs.has(pid) &&
+              await this.__confirm(`<b>${F.esc(name)}</b> (${pid})${this.whereHtml(link)} kapanmadı. Zorla sonlandırılsın mı (SIGKILL)?`, "Zorla sonlandır")) {
+              link.send("kill", { pid, force: true }).catch(e => ankamon.ui.Dialog.error(e));
             }
           }, this, 3000);
         }
@@ -472,99 +589,42 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       }
     },
 
-    async efficiency(pid, on, name) {
+    async efficiency(link, pid, on, name) {
       try {
-        await this.__conn.send("efficiency", { pid, on });
+        await link.send("efficiency", { pid, on });
       } catch (e) {
         ankamon.ui.Dialog.error(e);
       }
     },
 
-    async setPriority(pid, nice, name, label) {
-      if (nice < -5 && !(await this.__confirm(`<b>${ankamon.ui.taskmgr.Fmt.esc(name)}</b> önceliği "${label}" yapılsın mı?<br><br>` +
+    async setPriority(link, pid, nice, name, label) {
+      if (nice < -5 && !(await this.__confirm(`<b>${ankamon.ui.taskmgr.Fmt.esc(name)}</b>${this.whereHtml(link)} önceliği "${label}" yapılsın mı?<br><br>` +
         "Çok yüksek öncelik tahtanın diğer işlerini (ses, ekran, giriş) yavaşlatabilir.", "Önceliği değiştir"))) {
         return;
       }
       try {
-        await this.__conn.send("renice", { pid, nice });
+        await link.send("renice", { pid, nice });
       } catch (e) {
         ankamon.ui.Dialog.error(e);
       }
     },
 
-    async setAffinity(pid, name) {
-      let res;
-      try {
-        res = await this.__conn.send("getaffinity", { pid });
-      } catch (e) {
-        ankamon.ui.Dialog.error(e);
-        return;
-      }
-      const win = this.__dialog("İşlemci benzeşimi", 360);
-      win.add(new qx.ui.basic.Label(`<b>${ankamon.ui.taskmgr.Fmt.esc(name)}</b> (${pid}) hangi işlemcilerde çalışabilir?`).set({ rich: true }));
-      const all = new qx.ui.form.CheckBox("<Tüm işlemciler>").set({ value: res.cpus.length === res.ncpu });
-      win.add(all);
-      const boxes = [];
-      for (let i = 0; i < res.ncpu; i++) {
-        const b = new qx.ui.form.CheckBox(`CPU ${i}`).set({ value: res.cpus.includes(i), marginLeft: 20 });
-        boxes.push(b);
-        win.add(b);
-      }
-      all.addListener("execute", () => boxes.forEach(b => b.setValue(all.getValue())));
-      const ok = new qx.ui.form.Button("Tamam");
-      const cancel = new qx.ui.form.Button("İptal");
-      cancel.addListener("execute", () => win.close());
-      ok.addListener("execute", async () => {
-        const cpus = boxes.map((b, i) => (b.getValue() ? i : -1)).filter(i => i >= 0);
-        if (!cpus.length) {
-          ankamon.ui.Dialog.alert("İşlemin en az bir işlemcide çalışması gerekir.");
-          return;
-        }
-        try {
-          await this.__conn.send("affinity", { pid, cpus });
-          win.close();
-        } catch (e) {
-          ankamon.ui.Dialog.error(e);
-        }
-      });
-      ankamon.ui.Dialog.buttons(win, [cancel, ok]);
-      win.open();
+    /** İşlemci benzeşimi penceresi (bkz. TaskDialogs). */
+    setAffinity(link, pid, name) {
+      return ankamon.ui.taskmgr.TaskDialogs.affinity(this, link, pid, name);
     },
 
-    async showProps(pid) {
-      let res;
-      try {
-        res = await this.__conn.send("props", { pid });
-      } catch (e) {
-        ankamon.ui.Dialog.error(e);
-        return;
-      }
-      const F = ankamon.ui.taskmgr.Fmt;
-      const p = res.props;
-      const row = (k, v) => `<tr><td style="opacity:.7;padding:3px 16px 3px 0;vertical-align:top;white-space:nowrap">${F.esc(k)}</td>` +
-        `<td style="word-break:break-all">${F.esc(v ?? "—")}</td></tr>`;
-      const win = this.__dialog(`${p.name} Özellikleri`, 620);
-      win.add(new qx.ui.embed.Html(`<table style="width:100%;border-collapse:collapse">` + [
-        row("Ad", p.name), row("PID / Üst PID", `${p.pid} / ${p.ppid}`), row("Kullanıcı", p.user), row("Durum", p.state),
-        row("Konum (yol)", p.exe), row("Çalışma dizini", p.cwd), row("Komut satırı", p.cmdline),
-        row("Başlangıç", p.started ? new Date(p.started * 1000).toLocaleString("tr-TR") : null),
-        row("CPU süresi", p.cpu_time !== null ? F.cpuTime(p.cpu_time) : null), row("Öncelik", `${F.priority(p.nice)} (nice ${p.nice})`),
-        row("Disk önceliği (ionice)", p.ionice), row("İşlemci benzeşimi", (p.affinity || []).map(c => "CPU " + c).join(", ")),
-        row("İş parçacıkları", p.threads), row("Bellek (RSS / sanal / tepe)", `${p.vm_rss} / ${p.vm_size} / ${p.vm_peak}`),
-        row("Takas", p.vm_swap), row("Açık dosya tanıtıcıları", p.fds), row("Bağlam değişimi (gönüllü / zorunlu)", (p.ctx || []).join(" / ")),
-        row("Bekleme kanalı (wchan)", p.wchan), row("Denetim grubu (cgroup)", (p.cgroup || []).join(" "))
-      ].join("") + "</table>").set({ minHeight: 420, overflowY: "auto", selectable: true }));
-      const close = new qx.ui.form.Button("Kapat");
-      close.addListener("execute", () => win.close());
-      ankamon.ui.Dialog.buttons(win, [close]);
-      win.open();
+    /** Süreç özellikleri penceresi (bkz. TaskDialogs). */
+    showProps(link, pid) {
+      return ankamon.ui.taskmgr.TaskDialogs.props(this, link, pid);
     },
 
-    async showLocation(pid) {
+    async showLocation(link, pid) {
       try {
-        const res = await this.__conn.send("props", { pid });
+        const res = await link.send("props", { pid });
         const F = ankamon.ui.taskmgr.Fmt;
-        ankamon.ui.Dialog.alert(`<b>Konum:</b> ${F.esc(res.props.exe || "(çekirdek iş parçacığı — dosyası yok)")}` +
+        ankamon.ui.Dialog.alert((this.__multi ? `<b>Bilgisayar:</b> ${F.esc(link.getDisplay())}<br>` : "") +
+          `<b>Konum:</b> ${F.esc(res.props.exe || "(çekirdek iş parçacığı — dosyası yok)")}` +
           `<br><b>Çalışma dizini:</b> ${F.esc(res.props.cwd || "—")}<br><br>` +
           `<span style="opacity:.7">Tahtanın dosyalarına sağ menü ▸ Dosyalar ▸ Dosya yöneticisi ile göz atabilirsiniz.</span>`, "Dosya konumu");
       } catch (e) {
@@ -572,62 +632,27 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       }
     },
 
-    goToDetails(pid) {
+    goToDetails(link, pid) {
       const tab = this.selectTab("details");
-      tab.reveal(pid);
+      tab.reveal(link, pid);
     },
 
-    goToServices(names) {
+    goToServices(link, names) {
       const tab = this.selectTab("services");
-      if (this.__model.services) {
-        tab.reveal(names);
+      if (link.getModel().services) {
+        tab.reveal(link, names);
       } else {
-        this.__pendingServices = names;
+        this.__pendingServices = { link, names };
       }
     },
 
+    /** Yeni görev çalıştır (çok tahtada tahta seçilerek — bkz. TaskDialogs.runTask). */
     runTask() {
-      const F = ankamon.ui.taskmgr.Fmt;
-      const win = this.__dialog("Yeni görev oluştur", 520);
-      const s = this.__model.session;
-      win.add(new qx.ui.basic.Label("Tahtada çalıştırmak istediğiniz programın ya da komutun adını yazın " +
-        `(ör. <i>firefox</i>, <i>nemo /home</i>, <i>xdg-open https://eba.gov.tr</i>). Program tahtanın ekranında ` +
-        (s && s.user && s.user !== "lightdm" ? `<b>${F.esc(s.user)}</b> kullanıcısı olarak açılır.` : "açılır (oturum açık değil: root olarak).")).set({ rich: true, wrap: true }));
-      const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-      row.add(new qx.ui.basic.Label("Aç:"));
-      const field = new qx.ui.form.TextField();
-      row.add(field, { flex: 1 });
-      win.add(row);
-      const admin = new qx.ui.form.CheckBox("Bu görevi yönetici (root) ayrıcalıklarıyla oluştur");
-      win.add(admin);
-      const ok = new qx.ui.form.Button("Tamam");
-      const cancel = new qx.ui.form.Button("İptal");
-      cancel.addListener("execute", () => win.close());
-      const go = async () => {
-        const cmd = (field.getValue() || "").trim();
-        if (!cmd) {
-          return;
-        }
-        try {
-          await this.__conn.send("run", { cmd, admin: admin.getValue() });
-          win.close();
-        } catch (e) {
-          ankamon.ui.Dialog.error(e);
-        }
-      };
-      ok.addListener("execute", go);
-      field.addListener("keypress", e => {
-        if (e.getKeyIdentifier() === "Enter") {
-          go();
-        }
-      });
-      ankamon.ui.Dialog.buttons(win, [cancel, ok]);
-      win.open();
-      win.addListenerOnce("appear", () => field.focus());
+      ankamon.ui.taskmgr.TaskDialogs.runTask(this);
     },
 
     /** Diyaloglar: görev yöneticisi "her zaman üstte" iken arkada kalmasınlar. */
-    __dialog(caption, width) {
+    dialog(caption, width) {
       const win = ankamon.ui.Dialog.window(caption, width);
       if (this.getAlwaysOnTop()) {
         win.setAlwaysOnTop(true);

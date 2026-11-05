@@ -29,19 +29,42 @@
  * Performans (Windows Görev Yöneticisi gibi): solda kaynak listesi (CPU, Bellek, Disk N, Ethernet/Wi-Fi, GPU —
  * her biri küçük grafik + özet), sağda seçili kaynağın 60 sn büyük grafiği ve ayrıntıları. CPU grafiği "Genel
  * kullanım" ya da "Mantıksal işlemciler" (çekirdek başına küçük grafikler) olarak değiştirilebilir.
+ *
+ * Çok tahta: üstte tahta seçici (Bilgisayar süzgecine uyan tahtalar); grafikler seçilen tahtanın. Süzgeçte tek
+ * tahta seçilince seçici ona geçer.
  */
 qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
   extend: ankamon.ui.taskmgr.Tab,
 
   construct(win) {
     super(win, "Performans", "performance");
-    this.setLayout(new qx.ui.layout.HBox(10));
     this.__tiles = new Map();
     this.__selected = "cpu";
 
+    // Tahta seçici (yalnız çok tahtada).
+    const boardBar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
+    boardBar.add(new qx.ui.basic.Label("Bilgisayar:"));
+    this.__boardBox = new qx.ui.form.SelectBox().set({ width: 340 });
+    this.__boardBox.addListener("changeSelection", e => {
+      const item = e.getData()[0];
+      if (!this.__syncing && item) {
+        this.__boardId = item.getModel();
+        this.update();
+      }
+    });
+    boardBar.add(this.__boardBox);
+    this.__boardNote = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
+    boardBar.add(this.__boardNote);
+    if (!win.isMulti()) {
+      boardBar.exclude();
+    }
+    this.add(boardBar);
+    const body = new qx.ui.container.Composite(new qx.ui.layout.HBox(10));
+    this.add(body, { flex: 1 });
+
     this.__list = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
     const listScroll = new qx.ui.container.Scroll(this.__list).set({ width: 250 });
-    this.add(listScroll);
+    body.add(listScroll);
 
     const right = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
     const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "bottom" }));
@@ -70,17 +93,22 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
     this.__coreToggle = new qx.ui.form.SelectBox().set({ width: 210 });
     [["overall", "Grafik: Genel kullanım"], ["cores", "Grafik: Mantıksal işlemciler"]].forEach(([v, l]) =>
       this.__coreToggle.add(new qx.ui.form.ListItem(l, null, v)));
-    this.__coreToggle.addListener("changeSelection", () => this.update(this._win.getModel()));
+    this.__coreToggle.addListener("changeSelection", () => this.update());
     foot.add(this.__coreToggle);
     right.add(foot);
     this.__composition = new qx.ui.embed.Html("").set({ height: 34, visibility: "excluded" });
     right.add(this.__composition);
     this.__details = new qx.ui.embed.Html("").set({ minHeight: 150, overflowY: "auto" });
     right.add(this.__details);
-    this.add(right, { flex: 1 });
+    body.add(right, { flex: 1 });
   },
 
   members: {
+    __boardBox: null,
+    __boardNote: null,
+    __boardId: null,
+    __boardSig: null,
+    __syncing: false,
     __list: null,
     __tiles: null,
     __selected: null,
@@ -145,7 +173,7 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
         box.add(text, { flex: 1 });
         box.addListener("tap", () => {
           this.__selected = r.key;
-          this.update(this._win.getModel());
+          this.update();
         });
         this.__list.add(box);
         t = { box, graph, text };
@@ -154,9 +182,54 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
       return t;
     },
 
+    // overridden: süzgeçte tek tahta seçilince seçici ona geçer.
+    onBoardFilter() {
+      const single = this._win.getSingleChosen();
+      if (single) {
+        this.__boardId = single.getId();
+      }
+    },
+
+    /**
+     * Çok tahtada seçicideki tahtalar (süzgece uyanlar) — liste yalnız değişince yeniden kurulur; seçili tahta
+     * süzgeçten çıktıysa ilk bağlı tahtaya geçilir. @return {ankamon.ui.taskmgr.TaskBoardLink?} grafikleri gösterilecek tahta
+     */
+    __currentLink() {
+      const win = this._win;
+      if (!win.isMulti()) {
+        return win.getLinks()[0];
+      }
+      const links = win.getVisibleLinks();
+      let link = links.find(l => l.getId() === this.__boardId);
+      if (!link) {
+        link = links.find(l => l.getModel().snap) || links[0] || null;
+        this.__boardId = link ? link.getId() : null;
+      }
+      const state = l => (l.getModel().snap ? "" : (l.getState() === "closed" ? " — bağlanamadı" : " — bağlanıyor…"));
+      const sig = links.map(l => l.getId() + "|" + l.getDisplay() + state(l)).join("\n");
+      this.__syncing = true;
+      try {
+        if (sig !== this.__boardSig) {
+          this.__boardSig = sig;
+          this.__boardBox.removeAll().forEach(item => item.dispose());
+          links.forEach(l => this.__boardBox.add(new qx.ui.form.ListItem(l.getDisplay() + state(l), null, l.getId())));
+        }
+        const item = this.__boardBox.getSelectables().find(i => i.getModel() === this.__boardId);
+        if (item && this.__boardBox.getSelection()[0] !== item) {
+          this.__boardBox.setSelection([item]);
+        }
+      } finally {
+        this.__syncing = false;
+      }
+      this.__boardNote.setValue(links.length > 1 ? `${links.length} tahtadan biri — grafikler seçilen tahtanın` : "");
+      return link;
+    },
+
     // overridden
-    update(m) {
-      if (!m.snap) {
+    update() {
+      const link = this.__currentLink();
+      const m = link && link.getModel();
+      if (!m || !m.snap) {
         return;
       }
       const F = ankamon.ui.taskmgr.Fmt;
@@ -284,6 +357,11 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
     __drawCores(m) {
       const n = m.hist.cores.length;
       const cols = Math.ceil(Math.sqrt(n));
+      // Çekirdek sayısı farklı tahtaya geçildi (çok tahta): ızgara baştan kurulur.
+      if (this.__coreGraphs.length && this.__coreGraphs.length !== n) {
+        this.__coreGraphs.forEach(g => g.destroy());
+        this.__coreGraphs = [];
+      }
       while (this.__coreGraphs.length < n) {
         const i = this.__coreGraphs.length;
         const g = new ankamon.ui.taskmgr.Graph("cpu", true);

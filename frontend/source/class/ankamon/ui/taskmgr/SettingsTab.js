@@ -80,8 +80,9 @@ qx.Class.define("ankamon.ui.taskmgr.SettingsTab", {
 
     this.add(form);
     this.add(new qx.ui.basic.Label(
-      "Görev yöneticisi açık kaldıkça tahtaya tek bir canlı SSH bağlantısı tutulur ve tahtada küçük bir ölçüm ajanı çalışır " +
-      "(normal hızda tahta işlemcisinin yaklaşık %1–3'ü). Pencere kapanınca ya da sayfa yenilenince bağlantı ve ajan sonlanır. " +
+      "Görev yöneticisi açık kaldıkça her tahtaya tek bir canlı SSH bağlantısı tutulur ve tahtada küçük bir ölçüm ajanı çalışır " +
+      "(normal hızda tahta işlemcisinin yaklaşık %1–3'ü). Pencere kapanınca ya da sayfa yenilenince bütün bağlantılar ve ajanlar sonlanır. " +
+      "Birden çok tahtayla açılan pencerede tablolar güncelleme aralığında bir kez tazelenir; çok tahtada \"Düşük\" hız tarayıcıyı ve ağı daha az yorar. " +
       "Değişiklik yapan her işlem (sonlandırma, öncelik, hizmet, başlangıç, oturum) kim tarafından yapıldığıyla işlem kaydına yazılır."
     ).set({ rich: true, textColor: "app-muted", maxWidth: 640, marginTop: 16 }));
   },
@@ -98,6 +99,6 @@ qx.Class.define("ankamon.ui.taskmgr.SettingsTab", {
     },
 
     // overridden
-    update(m) {}
+    update() {}
   }
 });

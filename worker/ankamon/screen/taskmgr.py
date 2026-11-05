@@ -50,7 +50,9 @@ from .. import db
 
 log = logging.getLogger("ankamon.screen.taskmgr")
 
-MAX_SESSIONS = int(os.environ.get("TASKMGR_MAX_SESSIONS", "16"))
+# Eşzamanlı tahta bağlantısı (bütün kullanıcılar): çoklu seçimle açılan TEK pencere seçili her tahtaya bir
+# bağlantı açar (ör. 30 tahta = 30 SSH); sunucuda bağlantı başına bir ssh süreci (~birkaç MB).
+MAX_SESSIONS = int(os.environ.get("TASKMGR_MAX_SESSIONS", "64"))
 _AGENT = open(os.path.join(os.path.dirname(__file__), "taskmgr_agent.py"), encoding="utf-8").read()
 _REMOTE = ("command -v python3 >/dev/null 2>&1 || { echo NO_PYTHON >&2; exit 44; }; "
            "exec python3 -u -c \"import base64,sys;exec(compile(base64.b64decode(sys.argv[1]),'ankamon-taskmgr','exec'))\" "
