@@ -50,6 +50,10 @@ qx.Class.define("ankamon.page.Maintenance", {
       tab.setUserData("key", key);
       tab.setUserData("page", create(user));
       tab.add(tab.getUserData("page"));
+      // Sayfa kendi sekme kulakçığına ipucu verebilir (ör. Bakım: ne yaptığı + otomatik tarama takvimi).
+      if (tab.getUserData("page").bindTabButton) {
+        tab.getUserData("page").bindTabButton(tab.getButton());
+      }
       this.__tabs.add(tab);
     };
     add("diagnose", "Bakım", "diagnose", u => new ankamon.page.Diagnose(u));

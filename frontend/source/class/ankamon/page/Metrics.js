@@ -45,13 +45,6 @@ qx.Class.define("ankamon.page.Metrics", {
   construct(user) {
     // Başlık yok: Bakım sayfasının "Sensörler" sekmesinde durur, sekme adı yeterli (bkz. page.Maintenance).
     super(user, null);
-    // Düğme satırının başında yardım: verinin nasıl toplandığı/saklandığı, canlı değerlerle (bkz. ui.MetricsHelp).
-    const help = new qx.ui.form.Button("?").set({
-      width: 30, height: 30, minWidth: 30, padding: 0, font: "bold",
-      toolTipText: "Sensör verisi nasıl toplanıyor, saklanıyor ve sunuluyor? (canlı bilgiler)"
-    });
-    help.addListener("execute", () => ankamon.ui.MetricsHelp.open());
-    this._actions.add(help);
     this.__select = new qx.ui.form.SelectBox().set({ width: 280, toolTipText: "Gösterilecek tahtalar" });
     this.__select.add(new qx.ui.form.ListItem("Tüm çevrim içi tahtalar", null, null));
     this.__select.addListener("changeSelection", () => {
@@ -62,18 +55,46 @@ qx.Class.define("ankamon.page.Metrics", {
     this._actions.add(this.__select);
     this.__open = this._addButton("Grafana'yı yeni sekmede aç", () => window.open(this.__url(), "_blank", "noopener"));
     this.__open.setToolTipText("Panoları tam ekran incelemek ve düzenlemek için");
-    // Sensör verisi hiç gelmeyen tahtalar için kurulum yönergesi (bkz. __updateNotice).
-    this.__notice = new qx.ui.basic.Label("").set({ rich: true, wrap: true, selectable: true, visibility: "excluded",
-      padding: [8, 12], backgroundColor: "#fff4ce", textColor: "#3b2f00" });
+    // Verinin nasıl toplandığı/saklandığı, canlı değerlerle (bkz. ui.MetricsHelp) — eski "?" düğmesi (kullanıcı isteği:
+    // Grafana düğmesinin yanında, adıyla).
+    this._addButton("Veri Toplama şeması", () => ankamon.ui.MetricsHelp.open())
+      .setToolTipText("Sensör verisi nasıl toplanıyor, saklanıyor ve sunuluyor? (canlı bilgiler)");
+    // Sensör verisi eksik tahtalar için kurulum yönergesi (bkz. __updateNotice): yeni satır kaplamasın diye düğme
+    // satırında katlı tek satırlık sarı şerit; tıklayınca ayrıntı (bağlantılar dahil) şeridin altında açılır.
+    this.__noticeChip = new qx.ui.basic.Atom("").set({ rich: true, visibility: "excluded", cursor: "pointer",
+      padding: [4, 10], backgroundColor: "#fff4ce", textColor: "#3b2f00", alignY: "middle",
+      decorator: new qx.ui.decoration.Decorator().set({ width: 1, color: "#e8c95a", radius: 4 }) });
+    this.__notice = new qx.ui.basic.Label("").set({ rich: true, wrap: true, selectable: true,
+      padding: [8, 12], backgroundColor: "#fff4ce", textColor: "#3b2f00", maxWidth: 760 });
     this.__notice.addListener("tap", e => this.__noticeTap(e));
-    this.add(this.__notice);
+    this.__noticePopup = new qx.ui.popup.Popup(new qx.ui.layout.Grow()).set({ autoHide: true, position: "bottom-left" });
+    this.__noticePopup.add(this.__notice);
+    this.__noticePopup.addListener("changeVisibility", () => this.__updateChip());
+    this.__noticeChip.addListener("tap", () => {
+      if (this.__noticePopup.isVisible()) {
+        this.__noticePopup.hide();
+      } else {
+        this.__noticePopup.placeToWidget(this.__noticeChip, true);
+        this.__noticePopup.show();
+      }
+    });
+    this._actions.add(this.__noticeChip);
+    // Sekme/sayfa değişince açık ayrıntı kalmasın (menüden programla geçişte autoHide tetiklenmez).
+    this.addListener("disappear", () => this.__noticePopup.hide());
     this.__frame = new qx.ui.embed.Iframe("about:blank");
     this.add(this.__frame, { flex: 1 });
+  },
+
+  destruct() {
+    this._disposeObjects("__noticePopup");
   },
 
   members: {
     __frame: null,
     __notice: null,
+    __noticeChip: null,
+    __noticePopup: null,
+    __noticeSummary: "",
     __noticeTargets: null,
     __coverage: null,
     __select: null,
@@ -161,7 +182,21 @@ qx.Class.define("ankamon.page.Metrics", {
       }
       const html = lines.join("<br>");
       this.__notice.setValue(html);
-      this.__notice.setVisibility(html ? "visible" : "excluded");
+      // Katlı şerit: kaç tahtada eksik olduğu (ayrıntı açılır pencerede).
+      const n = new Set(missing.concat(noBoard).map(b => b.id)).size;
+      this.__noticeSummary = !html ? ""
+        : id !== null ? "⚠ Bu tahtada sensör verisi eksik"
+        : `⚠ ${n} tahtada sensör verisi eksik`;
+      this.__noticeChip.setVisibility(html ? "visible" : "excluded");
+      if (!html) {
+        this.__noticePopup.hide();
+      }
+      this.__updateChip();
+    },
+
+    __updateChip() {
+      const open = this.__noticePopup.isVisible();
+      this.__noticeChip.setLabel(`${qx.bom.String.escape(this.__noticeSummary)} <span style="opacity:.7">${open ? "▴ gizle" : "▾ ayrıntı"}</span>`);
     },
 
     /** Uyarıdaki bağlantılar (bkz. __updateNotice): hazır komut penceresi ya da WoL ile açma. */

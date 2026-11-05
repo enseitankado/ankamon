@@ -36,8 +36,8 @@
  * Açılışta "Son durum" görünür: her tahtanın EN SON denetimi tek tabloda (GET /api/diagnose/latest). Otomatik
  * zamanlayıcı yalnız vadesi gelen tahtaları taradığından tek bir otomatik tarama çoğu kez 1-2 tahtalıktır; açılışta
  * en son taramayı göstermek "yalnız bu tahta mı taranıyor?" karışıklığı yaratıyordu (kullanıcı geri bildirimi).
- * Tek tek taramalar seçicide kalır. Sayfanın ne yaptığı en üstte kısaca, ayrıntısı Bakım ▸ Yardım sekmesinde
- * (bkz. ui.MaintenanceHelp).
+ * Tek tek taramalar seçicide kalır. Sayfanın ne yaptığı ve otomatik tarama takvimi "Bakım" sekme kulakçığının
+ * ipucunda (bindTabButton), ayrıntısı Bakım ▸ Yardım sekmesinde (bkz. page.MaintenanceHelp).
  *
  * Rapor tek tablodur: her tahta bir özet satırı, bulguları satıra tıklayınca hemen altında açılır
  * (varsayılan kapalı; başlıktaki ok tümünü açar/kapatır). Süzgeç (düzey + tahta) ikisine de uygulanır;
@@ -50,13 +50,6 @@ qx.Class.define("ankamon.page.Diagnose", {
     // Başlık yok; düğmeler, rapor seçici, başlatılma bilgisi ve ilerleme tek satırda (kullanıcı isteği).
     super(user, null);
     this._actions.exclude();
-    // Ne işe yaradığı — sayfaya ilk gelen kullanıcı için (kullanıcı isteği: "hiçbir şey anlaşılmıyor").
-    this.add(new qx.ui.basic.Label(
-      "<b>Bakım</b>, tahtaların donanım ve sistem sağlığını SSH ile denetler: disk (SMART) ve boş alan, işlemci ve kasa " +
-      "sıcaklığı, fan, CMOS pili, RAM, güncellemeler, başarısız servisler, saat… Her tahta bir satırdır; " +
-      "satıra tıklayınca bulguları ve önerileri açılır. Tarama haftada bir kendiliğinden yapılır, " +
-      "<b>Şimdi tara</b> ile hemen yapılabilir. Ayrıntılar: <b>Yardım</b> sekmesi."
-    ).set({ rich: true, wrap: true, marginBottom: 6 }));
     const top = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" }));
     const button = (label, handler) => {
       const b = new qx.ui.form.Button(label);
@@ -89,8 +82,6 @@ qx.Class.define("ankamon.page.Diagnose", {
     top.add(this.__status, { flex: 1 });
     this.add(top);
 
-    this.__info = new qx.ui.basic.Label("").set({ rich: true, wrap: true });
-    this.add(this.__info);
     this.add(this.__createReportFilter());
 
     this.__html = new qx.ui.embed.Html("").set({
@@ -137,7 +128,7 @@ qx.Class.define("ankamon.page.Diagnose", {
     __runBox: null,
     __progress: null,
     __status: null,
-    __info: null,
+    __tabButton: null,
     __started: null,
     __html: null,
     __levelBoxes: null,
@@ -258,30 +249,35 @@ qx.Class.define("ankamon.page.Diagnose", {
         : `Elle başlatan: <b>${qx.bom.String.escape(String(j.created_by || "—"))}</b>`;
     },
 
-    /** Otomatik tarama takvimi. */
-    __infoHtml() {
+    /**
+     * Bakım sekme kulakçığı (bkz. page.Maintenance) bu sayfanın ne yaptığını ve otomatik tarama takvimini
+     * ipucunda gösterir — sayfada yer kaplamasın (kullanıcı isteği). Takvim /api/diagnose'dan geldikçe tazelenir.
+     */
+    bindTabButton(button) {
+      this.__tabButton = button;
+      this.__updateTabHint();
+    },
+
+    __updateTabHint() {
+      if (!this.__tabButton || this.__tabButton.isDisposed()) {
+        return;
+      }
       const F = ankamon.util.Format;
       const esc = s => qx.bom.String.escape(String(s ?? ""));
-      let s = "";
       const sc = this.__schedule;
-      if (sc) {
-        s += `<span style="opacity:.75">Otomatik tarama: her tahta en az ${sc.interval_days} günde bir, sunucu yükü ve ağ ` +
-          "trafiği düşükken; tahta yalnız açıkken taranabilir. Her tahtanın zamanı ayrı işlediğinden otomatik taramalar " +
-          "çoğu kez yalnız birkaç tahtayı kapsar.";
-        if (sc.never_scanned) {
-          s += ` Hiç taranmamış ${sc.never_scanned} tahta ilk uygun anda taranacak.`;
-        } else if (sc.next_from) {
-          s += ` Sıradaki: ${esc(F.dateTime(sc.next_from * 1000))} sonrasında uygun ilk an, en geç ${esc(F.dateTime(sc.next_by * 1000))}.`;
-        }
-        s += "</span>";
-        if (sc.failing && sc.failing.length) {
-          s += `<br><span style="color:#c5221f">Denetlenemeyen: ${esc(sc.failing.join(", "))}</span>` +
-            `<span style="opacity:.75"> — ${sc.retry_hours} saatte bir yeniden denenir. Nedeni satırda yazar; ` +
-            "\"SSH parolası reddedildi\" ise tahtanın root parolası genel paroladan farklıdır: Tahtalar ▸ sağ menü ▸ Kullanıcılar ▸ " +
-            "Parola ayarla… ▸ Yönetici hesapları ile tahtaya özel parolayı kaydedin.</span>";
-        }
+      let s = "<b>Bakım</b>, tahtaların donanım ve sistem sağlığını SSH ile denetler: disk (SMART) ve boş alan, " +
+        "işlemci ve kasa sıcaklığı, fan, CMOS pili, RAM, güncellemeler, başarısız servisler, saat… Her tahta bir " +
+        "satırdır; satıra tıklayınca bulguları ve önerileri açılır. <b>Şimdi tara</b> açık tüm tahtaları hemen denetler.";
+      s += `<br><br><b>Otomatik tarama:</b> her tahta en az ${esc(sc ? sc.interval_days : 7)} günde bir, sunucu yükü ve ` +
+        "ağ trafiği düşükken; tahta yalnız açıkken taranabilir. Her tahtanın zamanı ayrı işlediğinden otomatik " +
+        "taramalar çoğu kez yalnız birkaç tahtayı kapsar.";
+      if (sc && sc.never_scanned) {
+        s += ` Hiç taranmamış ${sc.never_scanned} tahta ilk uygun anda taranacak.`;
+      } else if (sc && sc.next_from) {
+        s += ` Sıradaki: ${esc(F.dateTime(sc.next_from * 1000))} sonrasında uygun ilk an, en geç ${esc(F.dateTime(sc.next_by * 1000))}.`;
       }
-      return s;
+      s += "<br><br>Ayrıntılar: <b>Yardım</b> sekmesi.";
+      this.__tabButton.setToolTipText(`<div style="max-width:520px;white-space:normal">${s}</div>`);
     },
 
     /** Süzgeç satırı: düzey (çoklu) + tahta. Değişince yalnız yeniden çizilir (sunucuya gidilmez). */
@@ -338,7 +334,7 @@ qx.Class.define("ankamon.page.Diagnose", {
 
     __render() {
       this.__started.setValue(this.__startedHtml());
-      this.__info.setValue(this.__infoHtml());
+      this.__updateTabHint();
       const targets = this.__job ? this.__job.targets : [];
       const F = ankamon.util.Format;
       const esc = s => qx.bom.String.escape(String(s ?? ""));
