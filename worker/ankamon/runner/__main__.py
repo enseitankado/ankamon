@@ -32,6 +32,7 @@ import logging
 import os
 import select
 import subprocess
+import threading
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -74,6 +75,28 @@ def _load_job_done_hooks() -> dict:
 _JOB_DONE_HOOKS = _load_job_done_hooks()
 
 JOB_THREADS = int(os.environ.get("RUNNER_JOB_THREADS", "8"))  # aynı anda çalışan görev
+# Tahta iş parçacıklarının (her biri kendi bağlantısı, SSH süresince tutar) TÜM görevler toplamında aynı anda
+# tutabileceği veritabanı bağlantısı. Paralellik görev başına yüke göre 20'ye çıkar, görevler de 8'e kadar eşzamanlı:
+# kotasız, açık tahtalarla 5 toplu işte tepe 89/100 ölçüldü (2026-11-05). Kota dolunca sıradaki tahta bekler.
+# Bütçe: 40 + görevlerin kendi bağlantıları (~16) + diğer servisler (~14) + PHP-FPM (12) < max_connections 100.
+BOARD_DB_SLOTS = int(os.environ.get("RUNNER_BOARD_DB_SLOTS", "40"))
+_board_db_slots = threading.BoundedSemaphore(BOARD_DB_SLOTS)
+
+
+def _board_conn():
+    _board_db_slots.acquire()
+    try:
+        return db.connect()
+    except BaseException:
+        _board_db_slots.release()
+        raise
+
+
+def _board_conn_close(conn) -> None:
+    try:
+        conn.close()
+    finally:
+        _board_db_slots.release()
 POLL_SECONDS = 3
 
 
@@ -164,7 +187,7 @@ def _run_job(job) -> None:
             action = (job["params"] or {}).get("action") if job["type"] == "action" else None
 
             def work(t):
-                wconn = db.connect()
+                wconn = _board_conn()
                 try:
                     wconn.execute("UPDATE job_targets SET status = 'running', started_at = now() WHERE job_id = %s AND board_id = %s",
                                   (job["id"], t["board_id"]))
@@ -213,7 +236,7 @@ def _run_job(job) -> None:
                             board_password.remember_root(wconn, t, str(values.get("PAROLA", "")), password)
                     return result
                 finally:
-                    wconn.close()
+                    _board_conn_close(wconn)
 
             n = max(1, min(whoami.dynamic_concurrency(), len(targets)))
             if len(targets) > 1:
@@ -266,14 +289,14 @@ def _run_job(job) -> None:
                 "SELECT id, hostname FROM boards WHERE id = ANY(%s)", ([t["board_id"] for t in targets],)).fetchall()}
 
             def anomaly_scan(t):
-                wconn = db.connect()
+                wconn = _board_conn()
                 try:
                     return anomaly_scan_mod.run(wconn, dict(t, hostname=hostnames.get(t["board_id"])), kinds, user, password)
                 except Exception as e:  # noqa: BLE001 — bir tahtanın hatası diğerlerini düşürmesin
                     log.exception("anomali taraması: tahta %s", t["board_id"])
                     return {"status": "failed", "rc": None, "output": f"Hata: {e}"}
                 finally:
-                    wconn.close()
+                    _board_conn_close(wconn)
 
             n = whoami.dynamic_concurrency()
             with ThreadPoolExecutor(max_workers=max(1, min(n, len(targets)))) as pool:
@@ -495,7 +518,7 @@ def _run_job(job) -> None:
             conn.execute("UPDATE job_targets SET status = 'queued' WHERE job_id = %s", (job["id"],))
 
             def scan(t):
-                wconn = db.connect()
+                wconn = _board_conn()
                 try:
                     wconn.execute("UPDATE job_targets SET status = 'running' WHERE job_id = %s AND board_id = %s",
                                   (job["id"], t["board_id"]))
@@ -520,7 +543,7 @@ def _run_job(job) -> None:
                     _write_one(wconn, job, t["board_id"], result, names.get(t["board_id"], ""))
                     return result
                 finally:
-                    wconn.close()
+                    _board_conn_close(wconn)
 
             n = max(1, min(whoami.dynamic_concurrency(), len(targets)))
             if len(targets) > 1:
