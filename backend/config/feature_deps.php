@@ -40,5 +40,6 @@ return [
     'logs.exclude' => 'logs',
     'sessions.manage' => 'logs',
     'sessions.hosts' => 'logs',
+    'leagues.exclude' => 'logs',
     'network.manage' => 'network',
 ];

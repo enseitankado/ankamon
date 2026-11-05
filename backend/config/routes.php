@@ -88,6 +88,9 @@ return [
     ['GET',    '/api/session-league',    [Api\SessionLeagueApi::class, 'index'], 'logs'],
     // Oturumlar ▸ Teneffüs Ligi: ders aralarında açık kalan tahtalar (bkz. BreakLeagueApi).
     ['GET',    '/api/break-league',      [Api\BreakLeagueApi::class, 'index'], 'logs'],
+    // Liglerin dışında bırakılan kullanıcı/tahtalar (bkz. LeagueExclusionsApi).
+    ['GET',    '/api/league-exclusions', [Api\LeagueExclusionsApi::class, 'index'], 'logs'],
+    ['PUT',    '/api/league-exclusions', [Api\LeagueExclusionsApi::class, 'update'], 'leagues.exclude'],
     // Tahtalar ▸ Anomaliler (bkz. AnomaliesApi, worker/ankamon/anomaly).
     ['GET',    '/api/anomalies',         [Api\AnomaliesApi::class, 'index'],   'anomalies'],
     // Tahta sağlığı ▸ Durum: sürekli izleme + SSH denetimi bulguları tek biçimde (yetki içeride: anomalies / diagnose).

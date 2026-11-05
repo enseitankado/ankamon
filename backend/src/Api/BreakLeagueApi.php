@@ -40,7 +40,9 @@ use DateTimeImmutable;
  * arası) en çok açık kalan tahtalar; günün, haftanın, ayın, dönemin ve eğitim-öğretim yılının sıralaması (dönem sınırları
  * Şampiyonlar Ligi ile aynı, bkz. SessionLeagueApi::leaguePeriods). Açık kalınan süre oturum AÇIKKEN ve oturum KAPALIYKEN
  * (giriş ekranında) diye ikiye ayrılır; sıralama ölçütü seçilebilir. Veri worker'ın doldurduğu break_league_days'ten
- * (bkz. worker/ankamon/tasks/break_league.py, db/migrations/041_break_league.sql).
+ * (bkz. worker/ankamon/tasks/break_league.py, db/migrations/041_break_league.sql). Lig dışı bırakılan tahtalar
+ * (league_exclusions, league 'break' — bkz. LeagueExclusionsApi) varsayılan olarak sayılmaz; with_excluded=1 ile
+ * işaretli (excluded: true) katılır.
  */
 final class BreakLeagueApi
 {
@@ -58,16 +60,20 @@ final class BreakLeagueApi
         $column = self::BREAK_LEAGUE_SORTS[$sort] ?? self::BREAK_LEAGUE_SORTS['total'];
         $today = new DateTimeImmutable((string) Db::value('SELECT current_date::text'));
         $lessons = Settings::get('lesson_times');
+        $withOut = $request->query('with_excluded') === '1';
+        $leagueOut = LeagueExclusionsApi::leagueExcludedValues('break', 'board');
         $periods = [];
         foreach (SessionLeagueApi::leaguePeriods($today, Settings::get('school_calendar')) as $period) {
             $period['title'] = str_replace('şampiyonu', 'teneffüs şampiyonu', $period['title']);
-            $periods[] = $period + self::breakStandings($period['from'], $period['to'], $column, $limit);
+            $periods[] = $period + self::breakStandings($period['from'], $period['to'], $column, $limit, $leagueOut, $withOut);
         }
         return [
             'today' => $today->format('Y-m-d'),
             'sort' => isset(self::BREAK_LEAGUE_SORTS[$sort]) ? $sort : 'total',
             'breaks' => self::breakWindows($lessons),
             'boards' => (int) Db::value('SELECT count(*) FROM boards'),
+            'with_excluded' => $withOut,
+            'excluded' => $leagueOut,
             'periods' => $periods,
         ];
     }
@@ -88,36 +94,46 @@ final class BreakLeagueApi
 
     /**
      * [from, to) aralığında tahta başına teneffüste açık kalınan süre (oturum açık/kapalı ayrımıyla), seçilen ölçüte göre
-     * çoktan aza ilk $limit; teneffüs süresine oranı, gün sayısı. Ayrıca katılan tahta sayısı ve toplamlar.
+     * çoktan aza ilk $limit; teneffüs süresine oranı, gün sayısı. Ayrıca katılan tahta sayısı, toplamlar ve dönemde
+     * süresi olan lig dışı tahta sayısı (excluded_count). Lig dışılar $withOut değilse ne sıralamaya ne toplamlara girer.
      */
-    private static function breakStandings(string $from, string $to, string $column, int $limit): array
+    private static function breakStandings(string $from, string $to, string $column, int $limit, array $leagueOut, bool $withOut): array
     {
+        $out = Db::textArray($leagueOut);
+        $shown = $withOut ? 'true' : 'false';
         $rows = Db::all(
             "WITH days AS (
                  SELECT host, max(board_id) AS board_id, sum(on_seconds)::bigint AS on_seconds,
                         sum(session_seconds)::bigint AS session_seconds,
                         sum(on_seconds - session_seconds)::bigint AS idle_seconds,
                         sum(break_seconds)::bigint AS break_seconds, count(*) AS days
-                 FROM break_league_days WHERE day >= ?::date AND day < ?::date
+                 FROM break_league_days WHERE day >= ?::date AND day < ?::date AND (?::boolean OR host <> ALL(?::text[]))
                  GROUP BY host HAVING sum(on_seconds) > 0
              ), ranked AS (
                  SELECT * FROM days WHERE $column > 0 ORDER BY $column DESC, on_seconds DESC, host LIMIT ?
              )
-             SELECT r.*, COALESCE(NULLIF(b.label, ''), r.host) AS board
+             SELECT r.*, COALESCE(NULLIF(b.label, ''), r.host) AS board, r.host = ANY(?::text[]) AS excluded
              FROM ranked r LEFT JOIN boards b ON b.id = r.board_id
              ORDER BY r.$column DESC, r.on_seconds DESC, r.host",
-            [$from, $to, $limit]
+            [$from, $to, $shown, $out, $limit, $out]
         );
         $all = Db::one(
             'SELECT count(DISTINCT host) AS boards, COALESCE(sum(on_seconds), 0)::bigint AS on_seconds,
                     COALESCE(sum(session_seconds), 0)::bigint AS session_seconds
-             FROM break_league_days WHERE day >= ?::date AND day < ?::date AND on_seconds > 0',
-            [$from, $to]
+             FROM break_league_days WHERE day >= ?::date AND day < ?::date AND on_seconds > 0
+               AND (?::boolean OR host <> ALL(?::text[]))',
+            [$from, $to, $shown, $out]
         ) ?: [];
+        $hidden = $leagueOut ? (int) Db::value(
+            'SELECT count(DISTINCT host) FROM break_league_days
+             WHERE day >= ?::date AND day < ?::date AND on_seconds > 0 AND host = ANY(?::text[])',
+            [$from, $to, $out]
+        ) : 0;
         return [
             'participants' => (int) ($all['boards'] ?? 0),
             'total_seconds' => (int) ($all['on_seconds'] ?? 0),
             'total_session_seconds' => (int) ($all['session_seconds'] ?? 0),
+            'excluded_count' => $hidden,
             'leaders' => array_map(fn(array $r) => [
                 'host' => $r['host'],
                 'board' => $r['board'],
@@ -126,6 +142,7 @@ final class BreakLeagueApi
                 'idle_seconds' => (int) $r['idle_seconds'],
                 'break_seconds' => (int) $r['break_seconds'],
                 'days' => (int) $r['days'],
+                'excluded' => (bool) $r['excluded'],
             ], $rows),
         ];
     }

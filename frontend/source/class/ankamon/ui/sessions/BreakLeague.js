@@ -31,12 +31,14 @@
  * (Şampiyonlar Ligi'nin tahta karşılığı — bkz. ui.sessions.ChampionsLeague, görünümü ortak). Açık kalınan süre ikiye
  * ayrılır: oturum AÇIKKEN (turuncu) ve oturum KAPALIYKEN, giriş ekranında (mavi); çubuk ikisinin toplamı. Sıralama ölçütü
  * seçilebilir (toplam / oturum açık / oturum kapalı). Veri /break-league'den (bkz. backend BreakLeagueApi). Sekme
- * göründükçe ve görünürken dakikada bir tazelenir.
+ * göründükçe ve görünürken dakikada bir tazelenir. Görev gereği sürekli açık kalan tahtalar lig dışı bırakılabilir
+ * (ui.sessions.LeagueExclusions): varsayılan görünümde sayılmazlar, "Lig dışındakileri de göster" ile katılırlar.
  */
 qx.Class.define("ankamon.ui.sessions.BreakLeague", {
   extend: qx.ui.tabview.Page,
 
-  construct() {
+  /** @param page {ankamon.page.Sessions} yetki denetimi (_can) için */
+  construct(page) {
     super("Teneffüs Ligi");
     this.setUserData("key", "breakLeague"); // sekme kimliği (sol menü yaprağı — bkz. ui.Shell.PAGES)
     this.setLayout(new qx.ui.layout.VBox(8));
@@ -55,14 +57,17 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
     });
     this.__sort.addListener("changeSelection", () => this.load());
     bar.add(this.__sort);
+    this.__out = ankamon.ui.sessions.LeagueExclusions.toolbar(bar, {
+      league: "break", page, kind: () => "board", onChange: () => this.load()
+    });
     const C = ankamon.ui.sessions.BreakLeague.BREAK_COLORS;
     bar.add(new qx.ui.basic.Label(
       `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${C.session};vertical-align:middle"></span> oturum açık &nbsp; ` +
       `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${C.idle};vertical-align:middle"></span> oturum kapalı (giriş ekranı)`
     ).set({ rich: true, alignY: "middle", marginLeft: 8 }));
-    this.__status = new qx.ui.basic.Label("").set({ textColor: "app-muted", alignY: "middle", rich: true });
-    bar.add(this.__status, { flex: 1 });
+    this.__status = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true });
     this.add(bar);
+    this.add(this.__status); // teneffüs listesi uzun: düğme satırına sığmayınca satırı uzatıyordu
 
     this.__html = new qx.ui.embed.Html("").set({ overflowY: "auto" });
     this.add(this.__html, { flex: 1 });
@@ -90,10 +95,12 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
 
   members: {
     __sort: null,
+    __out: null,
     __status: null,
     __html: null,
     __timer: null,
     __loading: false,
+    __reloadAfter: false,
 
     __sortKey() {
       const item = this.__sort.getSelection()[0];
@@ -102,12 +109,16 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
 
     async load() {
       if (this.__loading) {
+        this.__reloadAfter = true; // süren yükleme bitince seçimlerin son haliyle bir kez daha
         return;
       }
       this.__loading = true;
+      this.__reloadAfter = false;
       try {
         const sort = this.__sortKey();
-        const data = await ankamon.io.Api.get("/break-league?sort=" + encodeURIComponent(sort));
+        const data = await ankamon.io.Api.get("/break-league?sort=" + encodeURIComponent(sort) +
+          (this.__out.withExcluded() ? "&with_excluded=1" : ""));
+        this.__out.setInfo(data.excluded);
         const breaks = data.breaks || [];
         if (!breaks.length) {
           this.__html.setHtml('<div style="padding:24px;opacity:.75">Ders saatleri tanımlı olmadığından teneffüsler ' +
@@ -122,6 +133,9 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
         this.__status.setValue("Yüklenemedi: " + qx.bom.String.escape(String(e.message || e)));
       } finally {
         this.__loading = false;
+        if (this.__reloadAfter) {
+          this.load();
+        }
       }
     },
 
@@ -136,7 +150,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
       return `${rank}. ${r.board}` + (r.board !== r.host ? ` (${r.host})` : "") +
         `\nTeneffüste açık: ${F.duration(r.seconds)} (teneffüs payı %${share})` +
         `\n  oturum açıkken: ${F.duration(r.session_seconds)}\n  oturum kapalıyken: ${F.duration(r.idle_seconds)}` +
-        `\n${r.days} gün`;
+        `\n${r.days} gün` + (r.excluded ? "\n(lig dışı)" : "");
     },
 
     __renderBreakLeague(periods, sort, boardCount) {
@@ -145,6 +159,8 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
       const League = ankamon.ui.sessions.ChampionsLeague;
       const medals = League.LEAGUE_MEDALS;
       const C = ankamon.ui.sessions.BreakLeague.BREAK_COLORS;
+      const outTag = r => r.excluded ? `<span class="lg-outtag">lig dışı</span>` : "";
+      const out = r => r.excluded ? " lg-out" : "";
       // Tarih biçimleri Şampiyonlar Ligi ile aynı (ortak yardımcı yok: o sınıfın üyeleri; küçük kopya).
       const date = ymd => {
         const [y, m, d] = ymd.split("-").map(Number);
@@ -162,21 +178,22 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
         const head = `<div class="lg-head"><div class="lg-title">${esc(p.title)}</div>` +
           `<div class="lg-sub">${esc(p.label)} · ${esc(range(p))}</div></div>`;
         if (!rows.length) {
-          return `<div class="lg-card">${head}<div class="lg-empty">Bu dönemde teneffüste açık kalan tahta yok.</div></div>`;
+          return `<div class="lg-card">${head}<div class="lg-empty">Bu dönemde teneffüste açık kalan tahta yok.` +
+            (p.excluded_count ? ` (${p.excluded_count} lig dışı sayılmadı)` : "") + `</div></div>`;
         }
         const scale = Math.max(...rows.map(r => r.seconds), 1);
         const podium = [1, 0, 2].filter(i => rows[i]).map(i => {
           const r = rows[i];
-          return `<div class="lg-step lg-step${i + 1}" title="${esc(this.__breakTip(r, i + 1))}">` +
+          return `<div class="lg-step lg-step${i + 1}${out(r)}" title="${esc(this.__breakTip(r, i + 1))}">` +
             (i === 0 ? `<div class="lg-crown">🏆</div>` : "") +
             `<div class="lg-pname">${esc(r.board)}</div><div class="lg-ptime">${esc(F.duration(this.__metric(r, sort)))}</div>` +
             `<div class="lg-block" style="background:${medals[i]}">${i + 1}</div></div>`;
         }).join("");
         const bars = rows.map((r, i) =>
-          `<div class="lg-row${i === 0 ? " lg-lead" : ""}" title="${esc(this.__breakTip(r, i + 1))}">` +
+          `<div class="lg-row${i === 0 ? " lg-lead" : ""}${out(r)}" title="${esc(this.__breakTip(r, i + 1))}">` +
           `<span class="lg-rank" ${i < 3 ? `style="background:${medals[i]};color:#fff"` : ""}>${i + 1}</span>` +
           // "%24'ü/%51'i" ekleri sayıya göre değişir (ses uyumu): eksiz yazılır.
-          `<span class="lg-name">${esc(r.board)}<small>${r.days} gün · teneffüs payı %${r.break_seconds ? Math.round(r.seconds / r.break_seconds * 100) : 0}</small></span>` +
+          `<span class="lg-name">${esc(r.board)}<small>${outTag(r)}${r.days} gün · teneffüs payı %${r.break_seconds ? Math.round(r.seconds / r.break_seconds * 100) : 0}</small></span>` +
           `<span class="lg-track bl-track">` +
           `<span class="bl-seg" style="width:${(r.session_seconds / scale * 100).toFixed(1)}%;background:${C.session}"></span>` +
           `<span class="bl-seg" style="width:${(r.idle_seconds / scale * 100).toFixed(1)}%;background:${C.idle}"></span></span>` +
@@ -186,7 +203,8 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
           `toplam ${esc(F.duration(p.total_seconds))} (oturum açık ${esc(F.duration(p.total_session_seconds))}, ` +
           `kapalı ${esc(F.duration(idle))})` +
           // Liste yalnız sınırda (API limit 10) kesilmiştir; daha kısaysa ölçütte süresi olan tahtaların hepsidir.
-          (rows.length >= ankamon.ui.sessions.BreakLeague.BREAK_LIST_LIMIT ? ` · ilk ${rows.length} gösteriliyor` : "") + `</div>`;
+          (rows.length >= ankamon.ui.sessions.BreakLeague.BREAK_LIST_LIMIT ? ` · ilk ${rows.length} gösteriliyor` : "") +
+          (p.excluded_count ? ` · ${p.excluded_count} lig dışı ${this.__out.withExcluded() ? "dahil" : "sayılmadı"}` : "") + `</div>`;
         return `<div class="lg-card">${head}<div class="lg-podium">${podium}</div><div class="lg-bars">${bars}</div>${foot}</div>`;
       };
 

@@ -60,8 +60,8 @@ qx.Class.define("ankamon.page.Sessions", {
     this.__movements = new ankamon.ui.sessions.Movements(this);
     this.__tabs.add(this.__movements);
     this.__tabs.add(new ankamon.ui.sessions.Chats(this));
-    this.__tabs.add(new ankamon.ui.sessions.ChampionsLeague()); // kendi verisini kendisi çeker (bkz. o sınıf)
-    this.__tabs.add(new ankamon.ui.sessions.BreakLeague()); // teneffüste açık kalan tahtalar (/break-league)
+    this.__tabs.add(new ankamon.ui.sessions.ChampionsLeague(this)); // kendi verisini kendisi çeker (bkz. o sınıf)
+    this.__tabs.add(new ankamon.ui.sessions.BreakLeague(this)); // teneffüste açık kalan tahtalar (/break-league)
     this._rememberTab(this.__tabs, "sessions"); // son seçili sekme (bkz. Base._rememberTab)
     this.add(this.__tabs, { flex: 1 });
 

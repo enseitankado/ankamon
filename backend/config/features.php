@@ -45,5 +45,6 @@ return [
     'network.manage' => 'Ağ envanterinde cihaz ekleme, düzenleme, silme; ağ adı/tarama ayarı; taramayı hemen başlatma',
     'logins' => 'Ankamon oturumlarını görme (Kullanıcılar ▸ Oturumlar): kim, ne zaman, hangi IP\'den giriş/çıkış yaptı, hangi işlemleri yaptı; alt çubukta oturum açmış kullanıcıların ayrıntısı',
     'sessions.manage' => 'Kullanıcı oturum kayıtlarını silme (Kullanıcı oturumları sayfasında, süzgece göre)',
+    'leagues.exclude' => 'Oturumlar ▸ Şampiyonlar Ligi / Teneffüs Ligi: görev gereği sürekli açık kalan tahtaları ve kullanıcıları lig dışı bırakma, listeyi düzenleme (herkesin lig görünümünü değiştirir, veri silinmez)',
     'sessions.hosts' => 'Oturumlar ▸ Kullanıcılar zaman çizelgesinde Tahtalar\'a kayıtlı olmayan bilgisayarın kayıtlarını silme (satırın sağ menüsü: oturumlar, açık/kapalı aralıkları, isteğe bağlı ham logları)',
 ];

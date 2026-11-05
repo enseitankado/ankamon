@@ -65,7 +65,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       { id: "manage", label: "Yönet", icon: "mouse", primary: "Bilgisayarı yönet", mirror: "Yönet" },
       { id: "lock", label: "Kilit", icon: "lock", primary: "Kilitle" },
       { id: "command", label: "Komut", icon: "terminal2", primary: "Hazır / Serbest komut çalıştır", sep: true },
-      { id: "users", label: "Kullanıcılar", icon: "users" },
+      // Etiket "Kullanıcılar" → "Oturum" (kullanıcı isteği, 2026-11-05); menüdeki grup adı (CONTAINERS) değişmedi.
+      { id: "users", label: "Oturum", icon: "users" },
       { id: "files", label: "Dosyalar", icon: "folders", primary: "Dosya yöneticisi" },
       { id: "taskmgr", label: "Görevler", icon: "activity", primary: "Görev yöneticisi" },
       { id: "web", label: "Web sitesi", icon: "worldWww", primary: "Web sitesi aç…", sep: true },

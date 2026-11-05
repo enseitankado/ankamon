@@ -31,12 +31,15 @@
  * (altın/gümüş/bronz), altta ilk on yatay çubukla (çubuk boyu liderin süresine göre; lider vurgulu). Tahtanın yönetici
  * ve sistem hesabı (etapadmin, root) sıralamaya girmez. Veri /session-league'den (bkz. backend SessionLeagueApi):
  * oturum kayıtları ya da loglar silinse de korunan ayrı tablodan (session_league_parts) gelir. Sekme göründükçe ve
- * görünürken dakikada bir tazelenir.
+ * görünürken dakikada bir tazelenir. "Sırala" ile kullanıcılar ya da tahtalar (en uzun süre oturumlu kalan tahtalar)
+ * sıralanır. Görev gereği sürekli oturumlu kalan kullanıcı/tahtalar lig dışı bırakılabilir (ui.sessions.LeagueExclusions):
+ * varsayılan görünümde sayılmazlar, "Lig dışındakileri de göster" ile soluk ve etiketli katılırlar.
  */
 qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
   extend: qx.ui.tabview.Page,
 
-  construct() {
+  /** @param page {ankamon.page.Sessions} yetki denetimi (_can) için */
+  construct(page) {
     super("Şampiyonlar Ligi");
     this.setUserData("key", "league"); // sekme kimliği (sol menü yaprağı, hatırlanan sekme — bkz. ui.Shell.PAGES)
     this.setLayout(new qx.ui.layout.VBox(8));
@@ -46,6 +49,18 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
     const refresh = new qx.ui.form.Button("Yenile");
     refresh.addListener("execute", () => this.load());
     bar.add(refresh);
+    bar.add(new qx.ui.basic.Label("Sırala:").set({ alignY: "middle", marginLeft: 8 }));
+    this.__by = new qx.ui.form.SelectBox().set({ width: 130 });
+    [["users", "Kullanıcılar"], ["boards", "Tahtalar"]].forEach(([key, label]) => {
+      const item = new qx.ui.form.ListItem(label);
+      item.setUserData("key", key);
+      this.__by.add(item);
+    });
+    this.__by.addListener("changeSelection", () => this.load());
+    bar.add(this.__by);
+    this.__out = ankamon.ui.sessions.LeagueExclusions.toolbar(bar, {
+      league: "session", page, kind: () => this.__byKey() === "boards" ? "board" : "user", onChange: () => this.load()
+    });
     this.__status = new qx.ui.basic.Label("").set({ textColor: "app-muted", alignY: "middle" });
     bar.add(this.__status, { flex: 1 });
     this.add(bar);
@@ -93,6 +108,8 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
 .tm-league .lg-bar{display:block;height:100%;border-radius:5px;background:#3b82c4}
 .tm-league .lg-lead .lg-bar{background:${medals[0]}}
 .tm-league .lg-time{white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;min-width:74px}
+.tm-league .lg-out{opacity:.5}
+.tm-league .lg-outtag{display:inline-block;margin-right:5px;padding:0 5px;border-radius:4px;font-size:10px;font-weight:600;vertical-align:middle;border:1px solid rgba(127,127,127,.5)}
 .tm-league .lg-foot{opacity:.6;font-size:12px;margin-top:8px;border-top:1px solid rgba(127,127,127,.25);padding-top:6px}
 `;
     }
@@ -106,24 +123,39 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
   members: {
     __status: null,
     __html: null,
+    __by: null,
+    __out: null,
     __timer: null,
     __loading: false,
+    __reloadAfter: false,
 
     async load() {
       if (this.__loading) {
+        this.__reloadAfter = true; // süren yükleme bitince seçimlerin son haliyle bir kez daha
         return;
       }
       this.__loading = true;
+      this.__reloadAfter = false;
       try {
-        const data = await ankamon.io.Api.get("/session-league");
-        this.__renderLeague(data.periods || []);
+        const by = this.__byKey();
+        const data = await ankamon.io.Api.get(`/session-league?by=${by}` + (this.__out.withExcluded() ? "&with_excluded=1" : ""));
+        this.__out.setInfo(data.excluded);
+        this.__renderLeague(data.periods || [], by === "boards");
         this.__status.setValue("Tahtalarda açık kalınan toplam oturum süresine göre · etapadmin ve root sayılmaz · " +
           "güncelleme: " + new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
       } catch (e) {
         this.__status.setValue("Yüklenemedi: " + (e.message || e));
       } finally {
         this.__loading = false;
+        if (this.__reloadAfter) {
+          this.load();
+        }
       }
+    },
+
+    __byKey() {
+      const item = this.__by.getSelection()[0];
+      return item ? item.getUserData("key") : "users";
     },
 
     /** "2026-11-02" → "2 Kas 2026" */
@@ -141,43 +173,58 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
         ? this.__leagueDate(p.from) : `${this.__leagueDate(p.from)} – ${this.__leagueDate(lastYmd)}`;
     },
 
-    __leaderTip(r, rank) {
+    __leaderTip(r, rank, boards) {
       const F = ankamon.util.Format;
+      const out = r.excluded ? "\n(lig dışı)" : "";
+      if (boards) {
+        return `${rank}. ${r.board}` + (r.board !== r.host ? ` (${r.host})` : "") +
+          `\nToplam: ${F.duration(r.seconds)}\n${r.days} gün · ${r.sessions} oturum · ${r.users} kullanıcı` +
+          (r.top_user ? `\nEn çok kullanan: ${r.top_user}` : "") + out;
+      }
       return `${rank}. ${r.full_name || r.username}` + (r.full_name ? ` (${r.username})` : "") +
         `\nToplam: ${F.duration(r.seconds)}\n${r.days} gün · ${r.sessions} oturum · ${r.boards} tahta` +
-        (r.board ? `\nEn çok kullandığı tahta: ${r.board}` : "");
+        (r.board ? `\nEn çok kullandığı tahta: ${r.board}` : "") + out;
     },
 
-    __renderLeague(periods) {
+    /** Kart altı: dönemde süresi olan lig dışı sayısı (gizliyse "sayılmadı", gösteriliyorsa "dahil"). */
+    leagueOutNote(p, shown) {
+      return p.excluded_count ? ` · ${p.excluded_count} lig dışı ${shown ? "dahil" : "sayılmadı"}` : "";
+    },
+
+    __renderLeague(periods, boards) {
       const F = ankamon.util.Format;
       const esc = qx.bom.String.escape;
       const medals = ankamon.ui.sessions.ChampionsLeague.LEAGUE_MEDALS;
-      const name = r => esc(r.full_name || r.username);
+      const outTag = r => r.excluded ? `<span class="lg-outtag">lig dışı</span>` : "";
+      const name = r => esc(boards ? r.board : (r.full_name || r.username));
+      const sub = r => boards ? r.top_user : r.board;
+      const shown = this.__out.withExcluded();
 
       const card = p => {
         const rows = p.leaders || [];
         const head = `<div class="lg-head"><div class="lg-title">${esc(p.title)}</div>` +
           `<div class="lg-sub">${esc(p.label)} · ${esc(this.__leagueRange(p))}</div></div>`;
         if (!rows.length) {
-          return `<div class="lg-card">${head}<div class="lg-empty">Bu dönemde henüz oturum yok.</div></div>`;
+          return `<div class="lg-card">${head}<div class="lg-empty">Bu dönemde henüz oturum yok.` +
+            (p.excluded_count ? ` (${p.excluded_count} lig dışı sayılmadı)` : "") + `</div></div>`;
         }
         const top = rows[0].seconds || 1;
         // Kürsü: 2. solda, 1. ortada (en yüksek), 3. sağda.
         const podium = [1, 0, 2].filter(i => rows[i]).map(i => {
           const r = rows[i];
-          return `<div class="lg-step lg-step${i + 1}" title="${esc(this.__leaderTip(r, i + 1))}">` +
+          return `<div class="lg-step lg-step${i + 1}${r.excluded ? " lg-out" : ""}" title="${esc(this.__leaderTip(r, i + 1, boards))}">` +
             (i === 0 ? `<div class="lg-crown">🏆</div>` : "") +
             `<div class="lg-pname">${name(r)}</div><div class="lg-ptime">${esc(F.duration(r.seconds))}</div>` +
             `<div class="lg-block" style="background:${medals[i]}">${i + 1}</div></div>`;
         }).join("");
         const bars = rows.map((r, i) =>
-          `<div class="lg-row${i === 0 ? " lg-lead" : ""}" title="${esc(this.__leaderTip(r, i + 1))}">` +
+          `<div class="lg-row${i === 0 ? " lg-lead" : ""}${r.excluded ? " lg-out" : ""}" title="${esc(this.__leaderTip(r, i + 1, boards))}">` +
           `<span class="lg-rank" ${i < 3 ? `style="background:${medals[i]};color:#fff"` : ""}>${i + 1}</span>` +
-          `<span class="lg-name">${name(r)}${r.board ? `<small>${esc(r.board)}</small>` : ""}</span>` +
+          `<span class="lg-name">${name(r)}${sub(r) || r.excluded ? `<small>${outTag(r)}${esc(sub(r) || "")}</small>` : ""}</span>` +
           `<span class="lg-track"><span class="lg-bar" style="width:${Math.max(2, r.seconds / top * 100).toFixed(1)}%"></span></span>` +
           `<span class="lg-time">${esc(F.duration(r.seconds))}</span></div>`).join("");
-        const foot = `<div class="lg-foot">${p.participants} kullanıcı · toplam ${esc(F.duration(p.total_seconds))}` +
-          (p.participants > rows.length ? ` · ilk ${rows.length} gösteriliyor` : "") + `</div>`;
+        const foot = `<div class="lg-foot">${p.participants} ${boards ? "tahta" : "kullanıcı"} · toplam ${esc(F.duration(p.total_seconds))}` +
+          (p.participants > rows.length ? ` · ilk ${rows.length} gösteriliyor` : "") + this.leagueOutNote(p, shown) + `</div>`;
         return `<div class="lg-card">${head}<div class="lg-podium">${podium}</div><div class="lg-bars">${bars}</div>${foot}</div>`;
       };
 

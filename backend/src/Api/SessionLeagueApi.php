@@ -36,26 +36,36 @@ use Ankamon\Core\Settings;
 use DateTimeImmutable;
 
 /**
- * Oturumlar ▸ Şampiyonlar Ligi: tahtalarda en uzun süre oturum açık tutan kullanıcılar — bugün, bu hafta, bu ay,
- * bu dönem ve bu eğitim-öğretim yılı için ayrı sıralama. Kaynak board_sessions DEĞİL, worker'ın ondan türettiği
- * session_league_parts (oturumun gün parçaları; bkz. db/migrations/039_session_league.sql, worker
- * tasks/session_league.py): oturum kayıtları ya da loglar silinse de sıralama korunur. Günler veritabanının saat
- * diliminde (TZ) yerel gündür; dönem/yıl sınırları Settings 'school_calendar'dan.
+ * Oturumlar ▸ Şampiyonlar Ligi: tahtalarda en uzun süre oturum açık tutan kullanıcılar (by=users) ya da en uzun süre
+ * oturumlu kalan tahtalar (by=boards) — bugün, bu hafta, bu ay, bu dönem ve bu eğitim-öğretim yılı için ayrı sıralama.
+ * Kaynak board_sessions DEĞİL, worker'ın ondan türettiği session_league_parts (oturumun gün parçaları; bkz.
+ * db/migrations/039_session_league.sql, worker tasks/session_league.py): oturum kayıtları ya da loglar silinse de
+ * sıralama korunur. Günler veritabanının saat diliminde (TZ) yerel gündür; dönem/yıl sınırları Settings
+ * 'school_calendar'dan. Lig dışı bırakılan kullanıcı/tahtalar (league_exclusions, league 'session' — bkz.
+ * LeagueExclusionsApi) varsayılan olarak sayılmaz; with_excluded=1 ile işaretli (excluded: true) katılır.
  */
 final class SessionLeagueApi
 {
-    /** Sıralamaya girmeyen hesaplar: tahtanın yönetici ve sistem hesabı (öğretmen kullanımı değil). */
-    private const LEAGUE_EXCLUDED_USERS = ['etapadmin', 'root'];
+    /** Sıralamaya girmeyen hesaplar: tahtanın yönetici ve sistem hesabı (öğretmen kullanımı değil). Tahta
+     * sıralamasında da bu hesapların oturumları sayılmaz. */
+    public const LEAGUE_EXCLUDED_USERS = ['etapadmin', 'root'];
 
     public function index(Request $request): array
     {
         $limit = $request->queryInt('limit', 10, 1, 50);
+        $by = $request->query('by') === 'boards' ? 'boards' : 'users';
+        $withOut = $request->query('with_excluded') === '1';
+        $leagueOut = LeagueExclusionsApi::leagueExcludedValues('session', $by === 'boards' ? 'board' : 'user');
         $today = new DateTimeImmutable((string) Db::value('SELECT current_date::text'));
         $periods = [];
         foreach (self::leaguePeriods($today, Settings::get('school_calendar')) as $period) {
-            $periods[] = $period + self::leagueStandings($period['from'], $period['to'], $limit);
+            if ($by === 'boards') {
+                $period['title'] = str_replace('şampiyonu', 'şampiyon tahtası', $period['title']);
+            }
+            $periods[] = $period + self::leagueStandings($by, $period['from'], $period['to'], $limit, $leagueOut, $withOut);
         }
-        return ['today' => $today->format('Y-m-d'), 'periods' => $periods];
+        return ['today' => $today->format('Y-m-d'), 'by' => $by, 'with_excluded' => $withOut,
+            'excluded' => $leagueOut, 'periods' => $periods];
     }
 
     /**
@@ -99,42 +109,62 @@ final class SessionLeagueApi
     }
 
     /**
-     * [from, to) aralığında kullanıcı başına toplam açık oturum süresi (çoktan aza, ilk $limit), etkin gün, oturum ve
-     * tahta sayısı, en çok kullandığı tahta (takma adıyla); ayrıca katılımcı sayısı ve toplam süre.
+     * [from, to) aralığında kullanıcı (by=users) ya da tahta (by=boards) başına toplam açık oturum süresi (çoktan aza,
+     * ilk $limit), etkin gün, oturum sayısı; kullanıcıda tahta sayısı ve en çok kullandığı tahta (takma adıyla),
+     * tahtada kullanıcı sayısı ve en çok kullanan kullanıcı. Ayrıca katılımcı sayısı, toplam süre ve dönemde süresi
+     * olan lig dışı sayısı (excluded_count). Lig dışılar $withOut değilse ne sıralamaya ne toplamlara girer.
      */
-    private static function leagueStandings(string $from, string $to, int $limit): array
+    private static function leagueStandings(string $by, string $from, string $to, int $limit, array $leagueOut, bool $withOut): array
     {
-        $excluded = Db::textArray(self::LEAGUE_EXCLUDED_USERS);
+        $users = $by === 'users';
+        // Gruplama anahtarı ve "en çok" eşi: kullanıcının en çok kullandığı tahta / tahtayı en çok kullanan kullanıcı.
+        $key = $users ? 'username' : 'host';
+        $outMatch = $users ? 'lower(username)' : 'host';
+        $count = $users ? 'count(DISTINCT host) AS boards' : 'count(DISTINCT username) AS users, max(board_id) AS board_id';
+        $top = $users
+            ? "SELECT DISTINCT ON (p.username) p.username AS k, COALESCE(NULLIF(b.label, ''), p.host) AS top
+               FROM parts p LEFT JOIN boards b ON b.id = p.board_id
+               WHERE p.username IN (SELECT username FROM ranked)
+               GROUP BY p.username, p.host, b.label ORDER BY p.username, sum(p.seconds) DESC"
+            : "SELECT DISTINCT ON (p.host) p.host AS k, COALESCE(NULLIF(n.full_name, ''), p.username) AS top
+               FROM parts p LEFT JOIN session_league_names n ON n.username = p.username
+               WHERE p.host IN (SELECT host FROM ranked)
+               GROUP BY p.host, p.username, n.full_name ORDER BY p.host, sum(p.seconds) DESC";
+        $select = $users
+            ? 'SELECT r.*, n.full_name, t.top AS board FROM ranked r
+               LEFT JOIN session_league_names n ON n.username = r.username LEFT JOIN top t ON t.k = r.username'
+            : "SELECT r.*, COALESCE(NULLIF(b.label, ''), r.host) AS board, t.top AS top_user FROM ranked r
+               LEFT JOIN boards b ON b.id = r.board_id LEFT JOIN top t ON t.k = r.host";
         $rows = Db::all(
             "WITH parts AS (
                  SELECT p.* FROM session_league_parts p
                  WHERE p.day >= ?::date AND p.day < ?::date AND lower(p.username) <> ALL(?::text[])
              ), totals AS (
-                 SELECT username, sum(seconds)::bigint AS seconds, count(DISTINCT day) AS days,
-                        count(DISTINCT session_id) AS sessions, count(DISTINCT host) AS boards
-                 FROM parts GROUP BY username HAVING sum(seconds) > 0
+                 SELECT $key, sum(seconds)::bigint AS seconds, count(DISTINCT day) AS days,
+                        count(DISTINCT session_id) AS sessions, $count, $outMatch = ANY(?::text[]) AS excluded
+                 FROM parts GROUP BY $key HAVING sum(seconds) > 0
+             ), shown AS (
+                 SELECT * FROM totals WHERE ?::boolean OR NOT excluded
              ), ranked AS (
                  SELECT *, count(*) OVER () AS participants, sum(seconds) OVER ()::bigint AS total_seconds
-                 FROM totals ORDER BY seconds DESC, username LIMIT ?
-             ), top_board AS (
-                 SELECT DISTINCT ON (p.username) p.username, COALESCE(NULLIF(b.label, ''), p.host) AS board
-                 FROM parts p LEFT JOIN boards b ON b.id = p.board_id
-                 WHERE p.username IN (SELECT username FROM ranked)
-                 GROUP BY p.username, p.host, b.label ORDER BY p.username, sum(p.seconds) DESC
-             )
-             SELECT r.username, n.full_name, r.seconds, r.days, r.sessions, r.boards, t.board,
-                    r.participants, r.total_seconds
-             FROM ranked r
-             LEFT JOIN session_league_names n ON n.username = r.username
-             LEFT JOIN top_board t ON t.username = r.username
-             ORDER BY r.seconds DESC, r.username",
-            [$from, $to, $excluded, $limit]
+                 FROM shown ORDER BY seconds DESC, $key LIMIT ?
+             ), top AS ($top)
+             $select
+             ORDER BY r.seconds DESC, r.$key",
+            [$from, $to, Db::textArray(self::LEAGUE_EXCLUDED_USERS), Db::textArray($leagueOut), $withOut ? 'true' : 'false', $limit]
         );
+        $hidden = $leagueOut ? (int) Db::value(
+            "SELECT count(DISTINCT $outMatch) FROM session_league_parts
+             WHERE day >= ?::date AND day < ?::date AND lower(username) <> ALL(?::text[]) AND $outMatch = ANY(?::text[])
+               AND seconds > 0",
+            [$from, $to, Db::textArray(self::LEAGUE_EXCLUDED_USERS), Db::textArray($leagueOut)]
+        ) : 0;
         $first = $rows[0] ?? null;
         return [
             'participants' => $first ? (int) $first['participants'] : 0,
             'total_seconds' => $first ? (int) $first['total_seconds'] : 0,
-            'leaders' => array_map(fn(array $r) => [
+            'excluded_count' => $hidden,
+            'leaders' => array_map(fn(array $r) => $users ? [
                 'username' => $r['username'],
                 'full_name' => $r['full_name'],
                 'seconds' => (int) $r['seconds'],
@@ -142,6 +172,16 @@ final class SessionLeagueApi
                 'sessions' => (int) $r['sessions'],
                 'boards' => (int) $r['boards'],
                 'board' => $r['board'],
+                'excluded' => (bool) $r['excluded'],
+            ] : [
+                'host' => $r['host'],
+                'board' => $r['board'],
+                'seconds' => (int) $r['seconds'],
+                'days' => (int) $r['days'],
+                'sessions' => (int) $r['sessions'],
+                'users' => (int) $r['users'],
+                'top_user' => $r['top_user'],
+                'excluded' => (bool) $r['excluded'],
             ], $rows),
         ];
     }
