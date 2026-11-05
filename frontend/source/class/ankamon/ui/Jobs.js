@@ -59,6 +59,7 @@ qx.Class.define("ankamon.ui.Jobs", {
      *   istek sürerken açılır — "kuyruğa alınıyor" görünür)
      * @param caption {String?} pencere başlığı
      * @param opts {Map?} {progress: true} — toplam ilerleme çubuğu (worker'ın "progress" olayları, bkz.
+     *   onDone: Function(res) — görev bitince BİR KEZ çağrılır (res: /api/jobs/{id} yanıtı; ör. ardışık görev zinciri).
      *   worker/ankamon/executor/backup.py); {downloads: url(jobId, name)} — "file" olaylarındaki dosyalar
      *   indirme listesine eklenir ve DOWNLOAD_GAP_MS aralıklarla sırayla otomatik indirilir;
      *   {intro: "metin"} — çıktı kutusunun EN BAŞINDA (her görünümde, tahta seçiminden bağımsız) duran
@@ -132,6 +133,7 @@ qx.Class.define("ankamon.ui.Jobs", {
       let after = 0;
       let names = new Map();
       let lastAllBoard; // "Tümü" görünümünde en son eklenen tahta — aralara boş satır koymak için
+      let doneNotified = false; // opts.onDone yalnız bir kez
       const finished = new Set();  // bitiş satırı ("ok"/"fail" olayı) gelmiş tahtalar — ayraç kararı için
       const percent = new Map();   // board_id → son "progress" yüzdesi
       const files = [];            // [{board, name, size, note, url, auto, started}]
@@ -336,6 +338,10 @@ qx.Class.define("ankamon.ui.Jobs", {
         status.setValue(running
           ? `<b>${title}</b> — ${F.jobStatus(res.job.status)}: ${done}/${res.targets.length} tahta bitti${counts}`
           : `<b>${title}</b> — ${F.jobStatus(res.job.status)}. ${qx.bom.String.escape(res.job.summary || "")}${counts}`);
+        if (!running && opts.onDone && !doneNotified) {
+          doneNotified = true;
+          opts.onDone(res);
+        }
         // Görev bittikten sonra da son olaylar gelsin diye bir tur daha okunur.
         if (running || res.events.length) {
           qx.event.Timer.once(tick, this, ankamon.ui.Jobs.POLL_MS);

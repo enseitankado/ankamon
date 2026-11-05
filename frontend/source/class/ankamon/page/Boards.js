@@ -1287,55 +1287,9 @@ qx.Class.define("ankamon.page.Boards", {
       }
     },
 
+    /** Tahta ekle / Düzenle penceresi — ortak (bkz. ui.BoardOps.editBoard; Bakım ▸ Ahenk sağ menüsü de kullanır). */
     __edit(board) {
-      const win = ankamon.ui.Dialog.window(board ? "Tahtayı düzenle" : "Tahta ekle", 460);
-      const form = new ankamon.ui.Form();
-      const adding = !board;
-      board = board || { monitor_enabled: true, exporter_port: 9100 };
-      // Yeni tahtada takma ad ve MAC zorunlu (bkz. BoardsApi::create): MAC tahtayı ağ taramasında bulur (IP
-      // girilmezse oradan dolar), uzaktan uyandırmayı sağlar. Bilgisayar adı elle girilmez — tahtanın
-      // loglarından ve donanım bilgisinden öğrenilir.
-      const mark = adding ? " *" : "";
-      form.text("label", "Takma ad" + mark, board.label, "ör. A Blok 2. Derslik");
-      form.text("location", "Konum", board.location, "ör. B blok, 2. kat");
-      form.text("ip", "IP adresi", board.ip);
-      form.text("mac", "MAC adresi" + mark, board.mac, "de:ad:de:ad:de:ad").setToolTipText(
-        "İki nokta üst üste ile ayrılmış altı onaltılık çift (ör. de:ad:de:ad:de:ad). Uzaktan uyandırma ve ağ " +
-        "taramasında tahtayı bulmak için kullanılır.");
-      form.text("exporter_port", "Sensör portu", String(board.exporter_port));
-      form.check("monitor_enabled", "Sensör verisi toplansın", board.monitor_enabled)
-        .setToolTipText("Sensör verisi bilgisayar ağda ulaşılabilir olduğunda toplanır.");
-      form.addField("notes", "Not", new qx.ui.form.TextArea(board.notes || "").set({ wrap: true, autoSize: true, minimalLineHeight: 3 }));
-      win.add(form);
-
-      const cancel = new qx.ui.form.Button("Vazgeç");
-      const save = new qx.ui.form.Button("Kaydet");
-      cancel.addListener("execute", () => win.close());
-      save.addListener("execute", async () => {
-        const values = form.values();
-        values.exporter_port = parseInt(values.exporter_port, 10) || 0;
-        if (adding && (!values.label || !values.mac)) {
-          ankamon.ui.Dialog.error("Takma ad ve MAC adresi zorunlu.");
-          return;
-        }
-        if (values.mac && !ankamon.page.Boards.MAC_RE.test(values.mac)) {
-          ankamon.ui.Dialog.error("MAC adresi de:ad:de:ad:de:ad biçiminde olmalı.");
-          return;
-        }
-        try {
-          if (board.id) {
-            await ankamon.io.Api.patch("/boards/" + board.id, values);
-          } else {
-            await ankamon.io.Api.post("/boards", values);
-          }
-          win.close();
-          this.refresh();
-        } catch (e) {
-          ankamon.ui.Dialog.error(e);
-        }
-      });
-      ankamon.ui.Dialog.buttons(win, [cancel, save]);
-      win.open();
+      ankamon.ui.BoardOps.editBoard(board, () => this.refresh());
     },
 
     /**
