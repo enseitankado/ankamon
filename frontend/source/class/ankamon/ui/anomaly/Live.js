@@ -69,6 +69,7 @@ qx.Class.define("ankamon.ui.anomaly.Live", {
     __kinds: null,
     __help: null,
     __helpLabel: null,
+    __helpScroll: null,
 
     /** @param rows {Array} süren kayıtlar (page.Anomalies._refresh) @param kinds {Map} tür → {label, description, source, every} */
     setData(rows, kinds) {
@@ -100,10 +101,17 @@ qx.Class.define("ankamon.ui.anomaly.Live", {
         "toplanmış bilgi. Tahtaya SSH ile o an bakmak için Tarama sekmesi.</div>" +
         `<table style="border-collapse:collapse">${rows}</table>`;
       if (!this.__help) {
-        this.__help = new qx.ui.popup.Popup(new qx.ui.layout.Grow()).set({ padding: 10, maxWidth: 820 });
+        this.__help = new qx.ui.popup.Popup(new qx.ui.layout.Grow()).set({ padding: 10 });
         this.__helpLabel = new qx.ui.basic.Label("").set({ rich: true, wrap: true, selectable: true });
-        this.__help.add(new qx.ui.container.Scroll(this.__helpLabel).set({ maxHeight: 520 }));
+        this.__helpScroll = new qx.ui.container.Scroll(this.__helpLabel);
+        this.__help.add(this.__helpScroll);
       }
+      // Kaydırma kabının kendi boyut ipucu küçük (100 px): boyut açıkça verilir, pencereye sığdırılır.
+      const view = qx.bom.Viewport;
+      this.__helpScroll.set({
+        width: Math.max(320, Math.min(820, view.getWidth() - 60)),
+        height: Math.max(200, Math.min(560, view.getHeight() - 160))
+      });
       this.__helpLabel.setValue(html);
       this.__help.placeToWidget(button, true);
       this.__help.show();
