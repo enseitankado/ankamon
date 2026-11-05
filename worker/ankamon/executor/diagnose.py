@@ -332,10 +332,16 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
         worn = [f"{realloc} yeniden atanmış sektör" if realloc else None,
                 f"{uncorr} düzeltilemeyen hata" if uncorr else None]
         worn = [w for w in worn if w]
+        # SMART hata sayaçları ve eşiği aşan öznitelikler acildir (kullanıcı kararı, 2026-11-05):
+        # sıfırdan büyük sayaç diskin kendi kaydettiği hatadır, beklemeden ele alınır.
         if worn:
-            add(g, "Yıpranma işaretleri", "warn", ", ".join(worn) + ".",
-                "Diskte yıpranma başlamış. Önemli verileri yedekleyin ve sorun tespitini haftalık tekrarlayın; "
-                "sayılar artıyorsa diski değiştirin.")
+            add(g, "Yıpranma işaretleri", "bad", ", ".join(worn) + ".",
+                "Disk SMART hatası kaydetmiş: önemli verileri hemen yedekleyin ve diskin değişimini planlayın; "
+                "sayılar artıyorsa diski beklemeden değiştirin.")
+        failing = facts.get("smart_failing")
+        if failing:
+            add(g, "Eşiği aşan SMART öznitelikleri", "bad", f"{failing}.",
+                "Disk, üreticinin arıza eşiğini aşan değer bildirdi: verileri yedekleyin ve diski değiştirin.")
         if life is not None and life < 30:
             add(g, "SSD kalan ömrü", "bad" if life < 10 else "warn", f"%{life}.",
                 "SSD yazma ömrünün sonuna yaklaşıyor; değişimini planlayın.")

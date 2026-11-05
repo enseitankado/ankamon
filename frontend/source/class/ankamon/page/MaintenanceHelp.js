@@ -161,7 +161,7 @@ ${now}
 <table>
   <tr><th>Başlık</th><th>Denetimler</th></tr>
   <tr><td>Donanım kapasitesi</td><td>RAM ve disk boyutu (tahtaların ortalamasıyla kıyas)</td></tr>
-  <tr><td>Disk sağlığı (SMART)</td><td>diskin kendi sağlık testi, okunamayan sektörler, yıpranma işaretleri, SSD kalan ömrü,
+  <tr><td>Disk sağlığı (SMART)</td><td>diskin kendi sağlık testi, okunamayan sektörler, yıpranma işaretleri, eşiği aşan öznitelikler (bu SMART hataları <b>Acil</b> sayılır), SSD kalan ömrü,
       disk sıcaklığı, son 7 günde çekirdeğin bildirdiği disk (G/Ç) hataları</td></tr>
   <tr><td>İşlemci sıcaklığı</td><td>son 24 saatin sıcaklık ölçümleri, ısı yüzünden işlemcinin yavaşlatılması</td></tr>
   <tr><td>Soğutma ve kasa</td><td>işlemci fanı dönüyor mu, kasa içi sıcaklık</td></tr>
