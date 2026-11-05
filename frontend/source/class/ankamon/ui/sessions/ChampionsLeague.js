@@ -62,7 +62,40 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
   statics: {
     LEAGUE_REFRESH_MS: 60000,
     // Kürsü renkleri (1., 2., 3.): açık ve koyu temada okunur.
-    LEAGUE_MEDALS: ["#e0a800", "#9aa4ae", "#c0793a"]
+    LEAGUE_MEDALS: ["#e0a800", "#9aa4ae", "#c0793a"],
+
+    /** Lig kartlarının ortak görünümü (kürsü, çubuklar) — Teneffüs Ligi de kullanır (bkz. ui.sessions.BreakLeague). */
+    leagueCss(medals) {
+      return `
+.tm-league{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;padding:6px;font-size:13px}
+.tm-league .lg-card{border:1px solid rgba(127,127,127,.3);border-radius:10px;padding:12px 14px;background:rgba(127,127,127,.06)}
+.tm-league .lg-head{margin-bottom:8px}
+.tm-league .lg-title{font-size:16px;font-weight:600}
+.tm-league .lg-sub{opacity:.65;font-size:12px;margin-top:2px}
+.tm-league .lg-empty{opacity:.6;padding:24px 0;text-align:center}
+.tm-league .lg-podium{display:flex;justify-content:center;align-items:flex-end;gap:8px;margin:6px 0 12px}
+.tm-league .lg-step{flex:0 1 32%;text-align:center;min-width:0}
+.tm-league .lg-crown{font-size:22px;line-height:1}
+.tm-league .lg-pname{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-league .lg-step1 .lg-pname{font-size:14px}
+.tm-league .lg-ptime{opacity:.75;font-size:12px;margin-bottom:3px}
+.tm-league .lg-block{border-radius:6px 6px 0 0;color:#fff;font-weight:700;font-size:18px;display:flex;align-items:flex-start;justify-content:center;padding-top:4px;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.tm-league .lg-step1 .lg-block{height:64px}
+.tm-league .lg-step2 .lg-block{height:44px}
+.tm-league .lg-step3 .lg-block{height:30px}
+.tm-league .lg-row{display:grid;grid-template-columns:24px minmax(0,40%) 1fr auto;align-items:center;gap:8px;padding:3px 4px;border-radius:6px}
+.tm-league .lg-row:hover{background:rgba(127,127,127,.14)}
+.tm-league .lg-lead{background:rgba(224,168,0,.16);font-weight:600}
+.tm-league .lg-rank{display:inline-flex;width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:rgba(127,127,127,.18)}
+.tm-league .lg-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-league .lg-name small{display:block;opacity:.6;font-weight:400;font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.tm-league .lg-track{height:10px;border-radius:5px;background:rgba(127,127,127,.15);overflow:hidden}
+.tm-league .lg-bar{display:block;height:100%;border-radius:5px;background:#3b82c4}
+.tm-league .lg-lead .lg-bar{background:${medals[0]}}
+.tm-league .lg-time{white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;min-width:74px}
+.tm-league .lg-foot{opacity:.6;font-size:12px;margin-top:8px;border-top:1px solid rgba(127,127,127,.25);padding-top:6px}
+`;
+    }
   },
 
   destruct() {
@@ -149,35 +182,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
       };
 
       this.__html.setHtml(
-        `<style>
-.tm-league{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;padding:6px;font-size:13px}
-.tm-league .lg-card{border:1px solid rgba(127,127,127,.3);border-radius:10px;padding:12px 14px;background:rgba(127,127,127,.06)}
-.tm-league .lg-head{margin-bottom:8px}
-.tm-league .lg-title{font-size:16px;font-weight:600}
-.tm-league .lg-sub{opacity:.65;font-size:12px;margin-top:2px}
-.tm-league .lg-empty{opacity:.6;padding:24px 0;text-align:center}
-.tm-league .lg-podium{display:flex;justify-content:center;align-items:flex-end;gap:8px;margin:6px 0 12px}
-.tm-league .lg-step{flex:0 1 32%;text-align:center;min-width:0}
-.tm-league .lg-crown{font-size:22px;line-height:1}
-.tm-league .lg-pname{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tm-league .lg-step1 .lg-pname{font-size:14px}
-.tm-league .lg-ptime{opacity:.75;font-size:12px;margin-bottom:3px}
-.tm-league .lg-block{border-radius:6px 6px 0 0;color:#fff;font-weight:700;font-size:18px;display:flex;align-items:flex-start;justify-content:center;padding-top:4px;text-shadow:0 1px 2px rgba(0,0,0,.35)}
-.tm-league .lg-step1 .lg-block{height:64px}
-.tm-league .lg-step2 .lg-block{height:44px}
-.tm-league .lg-step3 .lg-block{height:30px}
-.tm-league .lg-row{display:grid;grid-template-columns:24px minmax(0,40%) 1fr auto;align-items:center;gap:8px;padding:3px 4px;border-radius:6px}
-.tm-league .lg-row:hover{background:rgba(127,127,127,.14)}
-.tm-league .lg-lead{background:rgba(224,168,0,.16);font-weight:600}
-.tm-league .lg-rank{display:inline-flex;width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:rgba(127,127,127,.18)}
-.tm-league .lg-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tm-league .lg-name small{display:block;opacity:.6;font-weight:400;font-size:11px;overflow:hidden;text-overflow:ellipsis}
-.tm-league .lg-track{height:10px;border-radius:5px;background:rgba(127,127,127,.15);overflow:hidden}
-.tm-league .lg-bar{display:block;height:100%;border-radius:5px;background:#3b82c4}
-.tm-league .lg-lead .lg-bar{background:${medals[0]}}
-.tm-league .lg-time{white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;min-width:74px}
-.tm-league .lg-foot{opacity:.6;font-size:12px;margin-top:8px;border-top:1px solid rgba(127,127,127,.25);padding-top:6px}
-</style><div class="tm-league">${periods.map(card).join("")}</div>`);
+        `<style>${ankamon.ui.sessions.ChampionsLeague.leagueCss(medals)}</style><div class="tm-league">${periods.map(card).join("")}</div>`);
     }
   }
 });

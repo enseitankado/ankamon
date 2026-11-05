@@ -86,6 +86,8 @@ return [
     ['GET',    '/api/board-uptime',      [Api\UptimeApi::class, 'index'],      'logs'],
     // Oturumlar ▸ Şampiyonlar Ligi: en uzun oturum süresi sıralamaları (bkz. SessionLeagueApi).
     ['GET',    '/api/session-league',    [Api\SessionLeagueApi::class, 'index'], 'logs'],
+    // Oturumlar ▸ Teneffüs Ligi: ders aralarında açık kalan tahtalar (bkz. BreakLeagueApi).
+    ['GET',    '/api/break-league',      [Api\BreakLeagueApi::class, 'index'], 'logs'],
     // Tahtalar ▸ Anomaliler (bkz. AnomaliesApi, worker/ankamon/anomaly).
     ['GET',    '/api/anomalies',         [Api\AnomaliesApi::class, 'index'],   'anomalies'],
     ['DELETE', '/api/board-sessions',    [Api\SessionsApi::class, 'delete'],   'sessions.manage'],

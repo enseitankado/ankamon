@@ -37,7 +37,8 @@
  *  - "Oturumlar" (ui.sessions.List): tüm kayıtların süzülebilir grid'i.
  *  - "Zaman çizelgesi" (ui.sessions.Users): kullanıcı/tahta bazında zaman çizelgesi ve özet. Grid'de
  *    sağ tık → "Oturum geçmişi" buraya, o kullanıcı seçili olarak geçer (showUserHistory).
- * "Şampiyonlar Ligi" (ui.sessions.ChampionsLeague) kendi verisini (/session-league) ayrıca çeker.
+ * "Şampiyonlar Ligi" (ui.sessions.ChampionsLeague) kendi verisini (/session-league), "Teneffüs Ligi"
+ * (ui.sessions.BreakLeague) kendi verisini (/break-league) ayrıca çeker.
  *
  * Oturum kapanışı her zaman güvenilir biçimde loglanmaz (elektrik kesintisi, fiziksel güç
  * düğmesiyle zorla kapatma, çok hızlı "Kapat"); bkz. util.Format.SESSION_END_REASON ve worker
@@ -60,6 +61,7 @@ qx.Class.define("ankamon.page.Sessions", {
     this.__tabs.add(this.__movements);
     this.__tabs.add(new ankamon.ui.sessions.Chats(this));
     this.__tabs.add(new ankamon.ui.sessions.ChampionsLeague()); // kendi verisini kendisi çeker (bkz. o sınıf)
+    this.__tabs.add(new ankamon.ui.sessions.BreakLeague()); // teneffüste açık kalan tahtalar (/break-league)
     this._rememberTab(this.__tabs, "sessions"); // son seçili sekme (bkz. Base._rememberTab)
     this.add(this.__tabs, { flex: 1 });
 

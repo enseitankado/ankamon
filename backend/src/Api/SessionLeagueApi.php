@@ -63,7 +63,7 @@ final class SessionLeagueApi
      * term1_start'ta başlar; bugün term2_start'tan önceyse 1. dönem, sonraysa 2. dönem (term2_end'den sonraki yaz
      * tatilinde de biten 2. dönem gösterilir, "bitti" işaretiyle).
      */
-    private static function leaguePeriods(DateTimeImmutable $today, array $calendar): array
+    public static function leaguePeriods(DateTimeImmutable $today, array $calendar): array
     {
         $md = fn(string $key, string $fallback) => preg_match('/^\d{2}-\d{2}$/', (string) ($calendar[$key] ?? ''))
             ? $calendar[$key] : $fallback;
