@@ -56,7 +56,9 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
      * menünün başka yerindeki maddeler. Kilit ve Güç düğmeleri Yönet'teki kilit/uyandırma maddelerinin kısayoludur.
      */
     GROUPS: [
-      { id: "watch", label: "Ekran", icon: "deviceDesktop", primary: "Ekranı göster", single: "primary", mirror: "Ekran",
+      // single: true — kullanıcı isteği (2026-11-05): "Ekran düğmesi yalnızca tek tahta seçili olduğunda kullanılabilir olsun";
+      // Yansıt maddeleri bu düğmede birleşti, çoklu tahtada yansıtma/aktarma sağ menü "Ekran" grubundan yapılır.
+      { id: "watch", label: "Ekran", icon: "deviceDesktop", primary: "Ekranı göster", single: true, mirror: "Ekran",
         extra: ["Ekranı göster"] },
       { id: "manage", label: "Yönet", icon: "mouse", primary: "Bilgisayarı yönet", mirror: "Yönet" },
       { id: "lock", label: "Kilit", icon: "lock", primary: "Kilitle" },
