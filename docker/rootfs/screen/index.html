@@ -757,7 +757,9 @@ class Tile {
       return;
     }
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${proto}//${location.host}/screen/ws/${this.board.id}?q=${this.q}${this.control ? "&control=1" : ""}${embed ? "&nolog=1" : ""}`);
+    // fresh=1: ekran değişti (bkz. refreshStream) — salt izleme paylaşılan yayındır (bkz. worker screen/shared_feed.py),
+    // var olana katılmak yerine yenisi kurulur.
+    const ws = new WebSocket(`${proto}//${location.host}/screen/ws/${this.board.id}?q=${this.q}${this.control ? "&control=1" : ""}${embed ? "&nolog=1" : ""}${this.refreshPending ? "&fresh=1" : ""}`);
     const token = this.token = {};                  // eski bağlantının geç gelen "close"u yenisini bozmasın
     // Her bağlantı kendi katmanında: yeni katman en alta eklenir, böylece geçişte eski görüntü
     // üstte kalır (.msg/.whoami katmanları da hep üstte).
@@ -922,7 +924,7 @@ class Tile {
     if (this.wrap) { this.wrap.remove(); this.wrap = null; }   // ölü akışın katmanı birikmesin
     if (code === 4030) this.setControl(false, true);   // yetki yok: salt izlemeye dön (yeniden bağlanmadan)
     if (!this.wanted) return;                       // bilerek kapatıldı (görünmüyor / sekme gizli)
-    if (code === 4010) { this.connect(); return; }  // tahtada oturum değişti: yeni ekrana hemen bağlan
+    if (code === 4010) { this.connect(); return; }  // paylaşılan yayın bitti/tazelendi: yenisine hemen bağlan
     if (code === 4006) {
       // x11vnc arka planda kuruluyor: hata değil — kısa aralıkla yeniden bağlanılır, kurulum bitince açılır.
       this.setState("connecting", MESSAGES[4006]);

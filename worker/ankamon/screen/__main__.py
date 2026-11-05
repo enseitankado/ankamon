@@ -25,9 +25,11 @@
 
 """Ekran köprüsü: ws://127.0.0.1:8890/screen/ws/<tahta id>?q=view|thumb (nginx /screen/ws/ vekiller).
 
-Her WebSocket bağlantısı için önce tahtada x11vnc başlatılır (remote.start_command), sonra
-`ssh -W 127.0.0.1:<port>` tüneli açılır; tünelin stdout'u WebSocket'e, tarayıcıdan gelen baytlar
-tünelin stdin'ine yazılır. Yetki nginx auth_request'te (oturum + "screen") denetlenir; köprü yalnız
+Salt izleme (q=thumb|view|chat) paylaşılır: (tahta, profil) başına tek yayın — tahtada tek x11vnc, tek
+`ssh -W` tüneli, Ankamon'da x11vnc -reflect çoğaltıcısı; her WebSocket çoğaltıcıya bir TCP bağlantısıdır
+(bkz. shared_feed.py; `fresh=1` yeni yayın kurdurur). Müdahale (control=1) paylaşılmaz: bağlantı başına
+tahtada girdi kabul eden ayrı bir x11vnc (remote.start_command) ve `ssh -W 127.0.0.1:<port>` tüneli;
+tünelin stdout'u WebSocket'e, tarayıcıdan gelen baytlar tünelin stdin'ine yazılır. Yetki nginx auth_request'te (oturum + "screen") denetlenir; köprü yalnız
 127.0.0.1'i dinler. `control=1` (fare/klavye ile müdahale) yalnız nginx'in oturumdan doldurduğu
 X-Auth-Control: 1 başlığı varsa ("screen.control" yetkisi) kabul edilir; yoksa 4030 ile kapanır.
 Tek tahta izleme ve müdahale oturumları komut loglarına (source=screen) ve etkinlik günlüğüne yazılır.
@@ -36,7 +38,8 @@ Kapanış kodları (tarayıcıdaki /screen/ sayfası bunları Türkçe iletiye �
   4001 tahta yok/IP'si yok · 4002 SSH ile ulaşılamadı · 4003 SSH girişi reddedildi
   4004 tahtada x11vnc kurulu değil (otomatik kurulum kapalı) · 4005 x11vnc hatası
   4006 x11vnc otomatik kuruluyor ("job <id>") · 4007 otomatik kurulum yakın zamanda başarısız oldu
-  4029 eşzamanlı izleme sınırı aşıldı · 4030 müdahale yetkisi yok
+  4010 paylaşılan yayın bitti/tazelendi (tarayıcı hemen yeniden bağlanır)
+  4029 eşzamanlı izleme sınırı aşıldı (paylaşılan yayın + müdahale bağlantısı sayısı) · 4030 müdahale yetkisi yok
 """
 
 from __future__ import annotations
@@ -51,7 +54,7 @@ from psycopg.types.json import Jsonb
 
 from .. import activity, db
 from ..executor.jobs import _board_access
-from . import audio, chat, perf, remote, taskmgr, wifi
+from . import audio, chat, perf, remote, shared_feed, taskmgr, wifi
 
 log = logging.getLogger("ankamon.screen")
 
@@ -140,18 +143,17 @@ def _autoinstall(board_id: int, name: str, username: str) -> tuple[int, str]:
 
 
 class ScreenSocket(tornado.websocket.WebSocketHandler):
+    """Salt izleme (önizleme, tek tahta izleme, sohbet) paylaşılan yayına katılır — tahta başına tek VNC
+    bağlantısı, bütün izleyicilere Ankamon'da çoğaltılır (bkz. shared_feed.py). Müdahale (control=1)
+    kullanıcının kendi özel bağlantısıdır: tahtada girdi kabul eden ayrı bir x11vnc + kendi SSH tüneli."""
+
     proc: asyncio.subprocess.Process | None = None
     counted = False
+    feed: shared_feed.ScreenFeed | None = None
+    writer: asyncio.StreamWriter | None = None
 
     async def open(self, board_id: str):
-        global _streams
         self.set_nodelay(True)
-        if _streams >= MAX_STREAMS:
-            self.close(4029, "limit")
-            return
-        _streams += 1
-        self.counted = True
-
         profile = self.get_argument("q", "view")
         if profile not in remote.PROFILES:
             profile = "view"
@@ -169,8 +171,47 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
         board, ssh_user, password = found
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
         target = f"{ssh_user}@{board['ip']}"
+        # Önizleme kutucukları (onlarca tahta) günlüğü doldurmasın; yalnız tek tahta izlemesi ve
+        # müdahale yazılır — ve yalnız ekran paylaşımı gerçekten başladıysa (başarısız denemeler değil).
+        # nolog=1: Tahtalar sayfasının "Ekranlar" önizleme sekmesi (kullanıcı isteği: önizleme komut
+        # loguna yansımaz — oradan tam ekrana büyütülen kutucuk da). Müdahale her durumda yazılır.
+        nolog = self.get_argument("nolog", "0") == "1"
+        if control:
+            await self._open_private(int(board_id), board, user, env, target)
+            return
 
-        # 1) x11vnc'yi tahtanın 127.0.0.1'inde başlat, portunu öğren.
+        async def opener(feed):
+            # Yeni yayın eşzamanlı akış sınırına sayılır (kendisi zaten listede).
+            if _streams + shared_feed.active_count() - 1 >= MAX_STREAMS:
+                raise shared_feed.FeedRefused(4029, "limit")
+            port, dim = await self._start_remote(int(board_id), board, user, env, target, profile, False)
+            await feed.start(port, remote.PROFILES[profile]["wait"], dim,
+                             ["sshpass", "-e", "ssh", *_SSH_OPTS, "-W", f"127.0.0.1:{port}", target], env)
+
+        try:
+            feed = await shared_feed.join(int(board_id), profile, self.get_argument("fresh", "0") == "1",
+                                          board["name"], opener)
+        except shared_feed.FeedRefused as e:
+            self.close(e.code, e.reason)
+            return
+        self.feed = feed
+        if self.ws_connection is None:   # tarayıcı bu arada kapattı
+            self._leave()
+            return
+        try:
+            reader, self.writer = await asyncio.open_connection("127.0.0.1", feed.port)
+        except OSError:
+            self._leave()
+            self.close(shared_feed.CLOSE_FEED_ENDED, "feed")
+            return
+        feed.track(self.writer)
+        if profile == "view" and not nolog:
+            await asyncio.to_thread(_record, int(board_id), board["name"], user, False)
+        asyncio.ensure_future(self._pump_shared(reader, board["name"]))
+
+    async def _start_remote(self, board_id: int, board: dict, user: str, env: dict, target: str,
+                            profile: str, control: bool) -> tuple[int, str | None]:
+        """Tahtada x11vnc'yi 127.0.0.1'inde başlatır; (port, gerçek çözünürlük) döner. Hata: FeedRefused."""
         start = await asyncio.create_subprocess_exec(
             "sshpass", "-e", "ssh", *_SSH_OPTS, target, remote.start_command(profile, control),
             stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
@@ -180,36 +221,57 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
             out, err = await asyncio.wait_for(start.communicate(), timeout=30)
         except asyncio.TimeoutError:
             start.kill()
-            self.close(4002, "timeout")
-            return
-        port = remote.parse_port(out.decode(errors="replace"))
+            raise shared_feed.FeedRefused(4002, "timeout")
+        text = out.decode(errors="replace")
+        port = remote.parse_port(text)
         if start.returncode != 0 or port is None:
             err_text = err.decode(errors="replace").strip()
             code, reason = self._close_reason(start.returncode or 4, err_text)
             if code == 4004:
                 # Tahta ağda ve SSH çalışıyor ama x11vnc yok: ayara göre arka planda kur (bkz. _autoinstall).
-                code, reason = await asyncio.to_thread(_autoinstall, int(board_id), board["name"], user)
+                code, reason = await asyncio.to_thread(_autoinstall, board_id, board["name"], user)
             else:
                 log.info("%s: ekran paylaşımı başlatılamadı (çıkış %s): %s", board["name"], start.returncode, err_text[-200:])
-            self.close(code, reason)
+            raise shared_feed.FeedRefused(code, reason)
+        return port, remote.parse_dim(text)
+
+    async def _open_private(self, board_id: int, board: dict, user: str, env: dict, target: str):
+        """Müdahale: yalnız bu kullanıcının bağlantısı (girdi kabul eden x11vnc + kendi SSH tüneli)."""
+        global _streams
+        if _streams + shared_feed.active_count() >= MAX_STREAMS:
+            self.close(4029, "limit")
+            return
+        _streams += 1
+        self.counted = True
+        try:
+            port, _dim = await self._start_remote(board_id, board, user, env, target, "view", True)
+        except shared_feed.FeedRefused as e:
+            self.close(e.code, e.reason)
             return
         if self.ws_connection is None:  # tarayıcı bu arada kapattı; x11vnc -timeout ile kendisi biter
             return
-        # Önizleme kutucukları (onlarca tahta) günlüğü doldurmasın; yalnız tek tahta izlemesi ve
-        # müdahale yazılır — ve yalnız ekran paylaşımı gerçekten başladıysa (başarısız denemeler değil).
-        # nolog=1: Tahtalar sayfasının "Ekranlar" önizleme sekmesi (kullanıcı isteği: önizleme komut
-        # loguna yansımaz — oradan tam ekrana büyütülen kutucuk da). Müdahale her durumda yazılır.
-        nolog = self.get_argument("nolog", "0") == "1"
-        if control or (profile == "view" and not nolog):
-            await asyncio.to_thread(_record, int(board_id), board["name"], user, control)
-
-        # 2) Standart SSH tüneli: stdin/stdout doğrudan x11vnc'nin TCP bağlantısıdır.
+        await asyncio.to_thread(_record, board_id, board["name"], user, True)
+        # Standart SSH tüneli: stdin/stdout doğrudan x11vnc'nin TCP bağlantısıdır.
         self.proc = await asyncio.create_subprocess_exec(
             "sshpass", "-e", "ssh", *_SSH_OPTS, "-W", f"127.0.0.1:{port}", target,
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             env=env,
         )
         asyncio.ensure_future(self._pump(board["name"]))
+
+    async def _pump_shared(self, reader: asyncio.StreamReader, name: str):
+        """Çoğaltıcı → WebSocket. Yayın biterse tarayıcı 4010 ile hemen yeniden bağlanır (yeni yayın kurulur);
+        yayın hemen bittiyse (tahtada sorun) 4005 — olağan aralıkla yeniden denenir, döngüye girmez."""
+        feed = self.feed
+        try:
+            while data := await reader.read(65536):
+                await self.write_message(data, binary=True)
+        except (tornado.websocket.WebSocketClosedError, ConnectionError, OSError):
+            pass
+        if self.ws_connection is None:
+            return
+        short = asyncio.get_running_loop().time() - feed.started < 5
+        self.close(4005 if short else shared_feed.CLOSE_FEED_ENDED, "feed")
 
     async def _pump(self, name: str):
         """SSH stdout → WebSocket. write_message beklenir: yavaş istemci akışı doğal olarak frenler."""
@@ -252,12 +314,26 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
         return 4005, hint.encode("ascii", "replace").decode()[:100]
 
     def on_message(self, message):
+        data = message if isinstance(message, bytes) else message.encode()
+        if self.writer is not None:
+            if not self.writer.is_closing():
+                self.writer.write(data)   # izleyicinin RFB istekleri (çoğaltıcı salt izlemedir)
+            return
         proc = self.proc
         if proc and proc.returncode is None and proc.stdin and not proc.stdin.is_closing():
-            proc.stdin.write(message if isinstance(message, bytes) else message.encode())
+            proc.stdin.write(data)
+
+    def _leave(self):
+        feed, self.feed = self.feed, None
+        if feed is not None:
+            if self.writer is not None:
+                feed.untrack(self.writer)
+                self.writer.close()
+            shared_feed.leave(feed)
 
     def on_close(self):
         global _streams
+        self._leave()
         if self.counted:
             self.counted = False
             _streams -= 1

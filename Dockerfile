@@ -86,6 +86,11 @@ RUN sed -i 's|https://|http://|' /etc/apk/repositories \
  && cp /usr/share/zoneinfo/Europe/Istanbul /etc/localtime \
  && rm -f /etc/nginx/http.d/default.conf
 
+# Ekran önizlemesinin paylaşımı: salt izlemede tahta başına tek VNC bağlantısı, Ankamon'da x11vnc -reflect
+# ile bütün izleyicilere çoğaltılır (bkz. worker/ankamon/screen/shared_feed.py). Ayrı katman: üstteki büyük
+# katmanın önbelleği bozulmasın.
+RUN apk add --no-cache x11vnc
+
 # webssh'in kendi eşzamanlılık hatasını düzeltir (bkz. dosyanın başındaki açıklama) — /multishell/'in
 # aynı anda birden çok terminal açması bu olmadan arada bir "Websocket authentication failed" veriyordu.
 COPY docker/rootfs/webssh-race-fix.py /tmp/webssh-race-fix.py

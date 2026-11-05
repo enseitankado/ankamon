@@ -83,6 +83,7 @@ out=$(x11vnc -q -bg -localhost -once -timeout 15 -display "$disp" ${auth:+-auth 
   -nopw -norc -nosel -nobell -nolookup -noxrecord -wait WAIT -defer WAIT $sc ${dim:+-desktop "ankamon-$dim"} 2>&1 </dev/null)
 case "$out" in
   *PORT=*) printf '%s\n' "$out" | grep '^PORT=' | head -n 1
+    [ -n "$dim" ] && echo "DIM=$dim"
     CONTROL_POST;;
   *) printf '%s\n' "$out" | grep -v '^$' | tail -n 2 >&2; exit 4 ;;
 esac
@@ -102,6 +103,7 @@ _CONTROL_POST = """
     """
 
 _PORT = re.compile(r"^PORT=(\d+)\s*$", re.M)
+_DIM = re.compile(r"^DIM=(\d+x\d+)\s*$", re.M)
 
 
 def start_command(profile: str, control: bool = False) -> str:
@@ -119,3 +121,9 @@ def start_command(profile: str, control: bool = False) -> str:
 def parse_port(output: str) -> int | None:
     m = _PORT.search(output)
     return int(m.group(1)) if m else None
+
+
+def parse_dim(output: str) -> str | None:
+    """Tahta ekranının gerçek çözünürlüğü ("1920x1080") — paylaşılan yayının masaüstü adı için."""
+    m = _DIM.search(output)
+    return m.group(1) if m else None
