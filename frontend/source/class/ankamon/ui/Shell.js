@@ -162,7 +162,7 @@ qx.Class.define("ankamon.ui.Shell", {
       // etiket, Zaman çizelgesinde userData "key" (eski adı "Kullanıcılar" — bkz. ui.sessions.Users).
       { id: "sessions", label: "Oturumlar", feature: "logs", collapsed: true, create: u => new ankamon.page.Sessions(u),
         tabs: [{ key: "Oturumlar", label: "Oturumlar" }, { key: "timeline", label: "Zaman çizelgesi" }, { key: "movements", label: "Hareketler" },
-          { key: "chat", label: "Sohbet geçmişi" }] },
+          { key: "chat", label: "Sohbet geçmişi" }, { key: "league", label: "Şampiyonlar Ligi" }] },
       // Bakım: "Bakım" (sorun tespiti) + "Sensörler" (Grafana) sekmeleri — bkz. page.Maintenance. features:
       // herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı
       // isteği); eski {page: "metrics"} bağlantıları __openPage'de buraya yönlenir. id "diagnose" kalır

@@ -42,6 +42,10 @@ final class Settings
         // Okulun ders saatleri (bkz. Api\LessonTimesApi): hangi günler ders var (1=Pzt … 7=Paz) ve
         // [{name, start: "HH:MM", end: "HH:MM"}] — Oturumlar çizelgesi oturumu derslere eşler.
         'lesson_times' => ['days' => [1, 2, 3, 4, 5], 'lessons' => []],
+        // Okul takvimi (Oturumlar ▸ Şampiyonlar Ligi'nin dönem/yıl sıralaması; bkz. Api\SessionLeagueApi): "AA-GG".
+        // Eğitim-öğretim yılı term1_start'ta başlar, 1. dönem term2_start'a dek sürer, 2. dönem term2_end'de biter
+        // (yaz tatilinde "dönem" biten 2. dönemdir). Arayüzü yok; MEB takvimi farklıysa settings tablosuna yazılır.
+        'school_calendar' => ['term1_start' => '09-01', 'term2_start' => '02-01', 'term2_end' => '06-30'],
         // Ekranlar: tahtada x11vnc yoksa "Ekran istemcisini kur" (actions/vnc-install) arka planda
         // kendiliğinden çalıştırılsın mı (bkz. worker/ankamon/screen/__main__.py). Varsayılan: evet.
         'screen_vnc_autoinstall' => true,
