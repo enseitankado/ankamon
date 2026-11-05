@@ -27,7 +27,8 @@
 
 /**
  * Anomaliler ▸ Anlık: şu an süren anomaliler (bkz. page.Anomalies — veriyi sayfa 30 sn'de bir çeker).
- * Üstte özet satırı (kaç tahtada sürüyor) ve türlerin açıklaması.
+ * Üstte özet satırı (kaç tahtada sürüyor) ve yardım simgesi: türlerin açıklaması, kaynağı ve sıklığı (eskiden tablonun
+ * altında sürekli duruyordu — kullanıcı isteğiyle simgeye alındı). Tabloda her kaydın Kaynak ve Sıklık sütunu.
  */
 qx.Class.define("ankamon.ui.anomaly.Live", {
   extend: qx.ui.tabview.Page,
@@ -38,19 +39,27 @@ qx.Class.define("ankamon.ui.anomaly.Live", {
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
 
+    const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
     this.__status = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
-    this.add(this.__status);
+    head.add(this.__status, { flex: 1 });
+    const help = new qx.ui.form.Button().set({
+      label: ankamon.ui.boards.ActionIcons.svg("helpCircle", 20), rich: true, show: "label",
+      padding: [2, 4], toolTipText: "Anomali türleri: açıklama, kaynak ve sıklık"
+    });
+    help.addListener("execute", () => this.__showHelp(help));
+    head.add(help);
+    this.add(head);
     this.__columns = [
       { id: "board", label: "Tahta", width: 200 },
       { id: "kind", label: "Anomali", width: 140 },
       { id: "started", label: "Başlangıç", width: 150 },
       { id: "duration", label: "Süre", width: 110 },
+      { id: "source", label: "Kaynak", width: 90 },
+      { id: "every", label: "Sıklık", width: 70 },
       { id: "detail", label: "Ayrıntı" }
     ];
     this.__table = page._createTable(this.__columns, { prefsKey: "anomalies.live.columns" });
     this.add(this.__table, { flex: 1 });
-    this.__kinds = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true, textColor: "app-muted" });
-    this.add(this.__kinds);
   },
 
   members: {
@@ -58,20 +67,46 @@ qx.Class.define("ankamon.ui.anomaly.Live", {
     __columns: null,
     __table: null,
     __kinds: null,
+    __help: null,
+    __helpLabel: null,
 
-    /** @param rows {Array} süren kayıtlar (page.Anomalies._refresh) @param kinds {Map} tür → {label, description} */
+    /** @param rows {Array} süren kayıtlar (page.Anomalies._refresh) @param kinds {Map} tür → {label, description, source, every} */
     setData(rows, kinds) {
       const F = ankamon.util.Format;
       const now = Date.now() / 1000;
-      this.__table.getTableModel().setData(rows.map(a => [
-        a.id, a.board, a.kindLabel, F.dateTime(a.started_at * 1000), F.duration(now - a.started_at), a.text
-      ]));
+      this.__kinds = kinds;
+      this.__table.getTableModel().setData(rows.map(a => {
+        const k = kinds[a.kind] || {};
+        return [a.id, a.board, a.kindLabel, F.dateTime(a.started_at * 1000), F.duration(now - a.started_at),
+          k.source || "—", k.every || "—", a.text];
+      }));
       const boards = new Set(rows.map(a => a.host)).size;
       const color = rows.length ? "#d93025" : "#1e8e3e";
       this.__status.setValue(`<span style="font-size:14px;font-weight:bold;color:${color}">` +
         (rows.length ? `Şu an ${boards} tahtada ${rows.length} anomali sürüyor` : "Şu an süren anomali yok") + "</span>");
+    },
+
+    /** Tür listesi (açıklama, kaynak, sıklık) — yardım simgesinin altında açılır, dışına tıklayınca kapanır. */
+    __showHelp(button) {
       const esc = qx.bom.String.escape;
-      this.__kinds.setValue(Object.values(kinds).map(k => `<b>${esc(k.label)}</b>: ${esc(k.description)}`).join("<br>"));
+      const rows = Object.values(this.__kinds || {}).map(k =>
+        `<tr><td style="padding:3px 10px 3px 0;vertical-align:top;white-space:nowrap"><b>${esc(k.label)}</b></td>` +
+        `<td style="padding:3px 10px 3px 0;vertical-align:top;white-space:nowrap">${esc(k.source || "—")}, ${esc(k.every || "—")}</td>` +
+        `<td style="padding:3px 0;vertical-align:top">${esc(k.description || "")}` +
+        (k.source_detail ? `<br><span style="opacity:.7">Kaynak: ${esc(k.source_detail)}</span>` : "") + "</td></tr>").join("");
+      const html = "<div style=\"margin-bottom:6px\">Otomatik tespit tahtaya bağlanıp komut çalıştırmaz: Ankamon 60 sn'de bir " +
+        "kendi verisinden hesaplar, log tarayan kurallar en çok 5 dk'da bir. <b>Log</b>: tahtanın gönderdiği loglar; " +
+        "<b>Ölçüm</b>: Ankamon'un tahtanın 9100 portundan okuduğu ölçümler; <b>SSH verisi</b>: daha önce SSH ile " +
+        "toplanmış bilgi. Tahtaya SSH ile o an bakmak için Tarama sekmesi.</div>" +
+        `<table style="border-collapse:collapse">${rows}</table>`;
+      if (!this.__help) {
+        this.__help = new qx.ui.popup.Popup(new qx.ui.layout.Grow()).set({ padding: 10, maxWidth: 820 });
+        this.__helpLabel = new qx.ui.basic.Label("").set({ rich: true, wrap: true, selectable: true });
+        this.__help.add(new qx.ui.container.Scroll(this.__helpLabel).set({ maxHeight: 520 }));
+      }
+      this.__helpLabel.setValue(html);
+      this.__help.placeToWidget(button, true);
+      this.__help.show();
     }
   }
 });

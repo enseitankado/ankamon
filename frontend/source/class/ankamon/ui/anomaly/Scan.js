@@ -54,6 +54,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     // (pencere daralınca yalnız yerleşim küçülür, özellik değişmez: kaydedilmez — bkz. ui.Shell nav.width).
     const saved = prefs["anomalies.scan.split"] || {};
     const split = new qx.ui.splitpane.Pane("horizontal");
+    this.__mainSplit = split;
     this.add(split);
     const boards = this.__createBoardsPane().set({ width: saved.left || null });
     if (!saved.left) {
@@ -78,6 +79,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
 
   members: {
     __page: null,
+    __mainSplit: null,
     __checked: null,
     __hasBoardPref: false,
     __kindPref: null,
@@ -143,6 +145,21 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     __splitTimer: null,
     __splitDefaulting: false,
 
+    /**
+     * Kaydırma çubuğu 1/2 ayırıcısıyla aynı görünür (kalınlık ve zemin rengi o ayırıcıdan okunur — her temada eşleşir).
+     * @param scroll {qx.ui.container.Scroll}
+     */
+    __matchScrollbar(scroll) {
+      const splitter = this.__mainSplit.getChildControl("splitter");
+      const width = (splitter.getBounds() || {}).width || splitter.getSizeHint().width;
+      const bar = scroll.getChildControl("scrollbar-y");
+      bar.set({ width, minWidth: width, maxWidth: width });
+      const color = splitter.getBackgroundColor();
+      if (color) {
+        bar.setBackgroundColor(color);
+      }
+    },
+
     /** @param top {Integer?} 2. bölmenin kayıtlı yüksekliği (yoksa içeriğin doğal yüksekliği) */
     __createRightPane(top) {
       // 2 ile 3 arasında yatay ayırıcı (1 ile 2/3 arasındaki gibi).
@@ -153,7 +170,11 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       pane.add(box, 0);
       box.addListener("changeHeight", e => this.__saveSplit("top", e.getData()));
       this.__kindBox = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
-      box.add(this.__kindBox);
+      // Tür listesi kaydırmalı: 2. bölgenin en küçük yüksekliği artık listeye bağlı değil, 2/3 ayırıcısı serbestçe
+      // yukarı çekilebilir (eskiden ~670 px'in altına inmiyordu); liste sığmazsa dikey kaydırma çubuğu çıkar.
+      const kindScroll = new qx.ui.container.Scroll(this.__kindBox).set({ minHeight: 40 });
+      kindScroll.addListenerOnce("appear", () => this.__matchScrollbar(kindScroll));
+      box.add(kindScroll, { flex: 1 });
 
       const run = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ marginTop: 4 });
       this.__scanButton = new qx.ui.form.Button("Tara").set({ minWidth: 90 });

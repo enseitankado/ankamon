@@ -186,6 +186,8 @@ def _write_results(conn, job, results: dict[int, dict], targets: list[dict]) -> 
     ok = sum(1 for r in results.values() if r["status"] == "ok")
     status = "done" if ok == total else "failed"
     summary = f"{ok}/{total} tahtada başarılı" if total else "Hedef tahta yok."
+    if job["type"] == "ntfy_test" and not total:
+        summary = "Deneme bildirimi gönderildi (ntfy sunucusu kabul etti)."   # tahtasız görev: hata olsaydı failed olurdu
     conn.execute(
         "UPDATE jobs SET status = %s, finished_at = now(), summary = %s WHERE id = %s",
         (status, summary, job["id"]))
