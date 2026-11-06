@@ -138,7 +138,7 @@ qx.Class.define("ankamon.ui.ShellNavPath", {
         }
         const sub = this.__menuOf(kids, current);
         // Sekmesi olmayan dalın kendi sayfası (ör. Sistem, Ağ) alt menünün başında: sekmeli dalda ilk sekme zaten onu açar.
-        if (item.getUserData("page") && !kids.some(kid => kid.getUserData("tab"))) {
+        if (item.getUserData("page") && !item.getUserData("selfLeaf") && !kids.some(kid => kid.getUserData("tab"))) {
           sub.addAt(new qx.ui.menu.Separator(), 0);
           sub.addAt(entry(item), 0);
         }

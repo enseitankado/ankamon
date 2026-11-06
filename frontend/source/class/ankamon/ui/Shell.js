@@ -154,8 +154,10 @@ qx.Class.define("ankamon.ui.Shell", {
     PAGES: [
       // retap: ağaçta zaten seçili düğüme yeniden tıklamak sayfayı yeniler (sayfada "Yenile" düğmesi yok).
       { id: "dashboard", label: "Genel bakış", feature: "dashboard", retap: true, create: u => new ankamon.page.Dashboard(u) },
-      // Tahtalar alt menüsüz ana menü öğesi (kullanıcı isteği): liste/ekran seçimi sayfanın içinde (bkz. page.Boards).
-      { id: "boards", label: "Tahtalar", feature: "boards", create: u => new ankamon.page.Boards(u) },
+      // Tahtalar (kullanıcı isteği 2026-11-06): altında "Liste" (bu sayfa — liste/ekran seçimi sayfanın içinde, bkz.
+      // page.Boards), Sensörler ve eklenti sekmeleri (Ahenk; "diagnose" sayfasının sekmeleri, inline). selfLeaf: sayfanın
+      // kendisi ağaçta ilk alt seçenek olarak da durur; Tahtalar'a tıklamak onu seçer (varsayılan seçenek).
+      { id: "boards", label: "Tahtalar", feature: "boards", selfLeaf: "Liste", create: u => new ankamon.page.Boards(u) },
       // parent: ağaçta o sayfanın düğümünün ALTINDA. Üst sayfa kullanıcıya kapalıysa kökte gösterilir — bkz. __createTree.
       // collapsed: kökte olsa da katlı başlar (uzun sekme listesi menüyü doldurmasın — bkz. __rememberOpen).
       // Sekmeleri ağaçta da (kullanıcı isteği: zaman çizelgesi sol menüden açılsın). key: Oturumlar sekmesinde
@@ -182,7 +184,10 @@ qx.Class.define("ankamon.ui.Shell", {
       // admin: o sekmenin yetkisi (sayfanın kendi sekme yetkisiyle aynı). Fonksiyon da olabilir (dinamik liste).
       // features: Sensörler "metrics", eklenti sekmeleri (ör. Ahenk) "diagnose" ister (PAGES sınıf yüklenirken kurulur,
       // eklentiler sonra: liste sabit kalır).
-      { id: "diagnose", label: "Bakım", features: ["metrics", "diagnose"], collapsed: true, create: u => new ankamon.page.Maintenance(u),
+      // Bakım ana menüsü kalktı (kullanıcı isteği 2026-11-06): sekmeleri (Sensörler, Ahenk…) inline — kendi düğümü olmadan
+      // doğrudan Tahtalar'ın altında. Tahtalar kullanıcıya kapalıysa kökte kendi düğümüyle ("Sensörler") durur.
+      { id: "diagnose", label: "Sensörler", parent: "boards", inline: true, features: ["metrics", "diagnose"], collapsed: true,
+        create: u => new ankamon.page.Maintenance(u),
         tabs: () => [{ key: "metrics", label: "Sensörler", feature: "metrics" }]
           .concat(ankamon.ext.Extensions.maintenanceTabs().map(t => ({ key: t.key, label: t.label, feature: t.feature }))) },
       { id: "logs", label: "Loglar", feature: "logs", collapsed: true, create: u => new ankamon.page.Logs(u),
@@ -344,7 +349,16 @@ qx.Class.define("ankamon.ui.Shell", {
           this.__widget(item.getUserData("page")).selectTab(tab);
         }
         const widget = this.__open(item.getUserData("page"));
-        if (!tab && this.__tabsOf(item.getUserData("page")).length) {
+        const self = item.getUserData("selfLeaf");
+        if (self) {
+          // Üst düğüm (ör. Tahtalar) = varsayılan alt seçeneği (Liste): vurgu ona geçer, sayfa zaten açıldı.
+          qx.event.Timer.once(() => {
+            this.__reveal(self);
+            this.__silentTree = true;
+            this.__tree.setSelection([self]);
+            this.__silentTree = false;
+          }, this, 0);
+        } else if (!tab && this.__tabsOf(item.getUserData("page")).length) {
           // Seçim olayının içinde ağaç seçimi değiştirilemiyor (geri alınıyor): bir sonraki turda.
           qx.event.Timer.once(() => this.__selectTabLeaf(item.getUserData("page"), widget.currentTab()), this, 0);
         }
@@ -450,23 +464,37 @@ qx.Class.define("ankamon.ui.Shell", {
      * @param childrenOf {Function} sayfa id → ağaçta altında duracak sayfalar
      */
     __buildNode(page, childrenOf) {
-      const children = childrenOf(page.id);
+      const all = childrenOf(page.id);
       if (page.id === "network") {
         return this.__buildNetworkNode(page);
       }
+      // inline alt sayfa: kendi düğümü yok, sekmeleri doğrudan bu düğümün altında (ör. Tahtalar ▸ Sensörler/Ahenk).
+      const children = all.filter(child => !child.inline);
+      const inlineTabs = all.filter(child => child.inline).flatMap(child => this.__tabsOf(child).map(tab => ({ page: child, tab })));
       const label = `${ankamon.ui.Shell.ICON[page.id] || ""} ${page.label}`.trim();
-      const tabs = this.__tabsOf(page);
-      const node = children.length || tabs.length ? new qx.ui.tree.TreeFolder(label) : new qx.ui.tree.TreeFile(label);
+      const tabs = this.__tabsOf(page).map(tab => ({ page, tab }));
+      const branch = children.length || tabs.length || inlineTabs.length || page.selfLeaf;
+      const node = branch ? new qx.ui.tree.TreeFolder(label) : new qx.ui.tree.TreeFile(label);
       this.__hideThemeIcon(node);
       node.setUserData("page", page);
       if (page.retap) {
         this.__addRetap(node);
       }
+      if (page.selfLeaf) {
+        // Sayfanın kendisi ilk alt seçenek (ör. Tahtalar ▸ Liste): üst düğüme tıklamak bunu seçer (bkz. changeSelection).
+        const self = new qx.ui.tree.TreeFile(page.selfLeaf);
+        this.__hideThemeIcon(self);
+        self.setUserData("page", page);
+        self.setUserData("self", true);
+        this.__addRetap(self);
+        node.add(self);
+        node.setUserData("selfLeaf", self);
+      }
       // Sekmeler alt seçenek: seçilince sayfa o sekmede açılır; seçiliyken yeniden tıklamak sayfayı yeniler.
-      tabs.forEach(tab => {
+      tabs.concat(inlineTabs).forEach(({ page: owner, tab }) => {
         const leaf = new qx.ui.tree.TreeFile(tab.label);
         this.__hideThemeIcon(leaf);
-        leaf.setUserData("page", page);
+        leaf.setUserData("page", owner);
         leaf.setUserData("tab", tab.key);
         this.__addRetap(leaf);
         node.add(leaf);
@@ -474,7 +502,7 @@ qx.Class.define("ankamon.ui.Shell", {
       if (children.length) {
         children.forEach(child => node.add(this.__buildNode(child, childrenOf)));
       }
-      if (children.length || tabs.length) {
+      if (branch) {
         this.__rememberOpen(node, page.id);
       }
       return node;
@@ -617,7 +645,7 @@ qx.Class.define("ankamon.ui.Shell", {
         data = { page: "diskusage", tab: data.diskUsage }; // Disk kullanımı sayfası, o sekmede
       }
       if (data.page === "metrics") {
-        data = { ...data, page: "diagnose", tab: "metrics" }; // Sensörler artık Bakım'ın sekmesi
+        data = { ...data, page: "diagnose", tab: "metrics" }; // Sensörler: "diagnose" sayfasının sekmesi (Tahtalar altında)
       }
       if (data.page === "diagnose" && (!data.tab || data.tab === "diagnose" || data.tab === "help")) {
         data = { ...data, page: "anomalies", tab: data.tab === "help" ? "help" : "reports" }; // sorun tespiti Tahta sağlığı'nda
@@ -630,6 +658,7 @@ qx.Class.define("ankamon.ui.Shell", {
       // sekmenin yaprağı varsa o (ör. Genel bakış ▸ Sensörler → Bakım ▸ Sensörler), yoksa sayfanın düğümü.
       const items = this.__tree.getRoot().getItems(true);
       const leaf = (data.tab && items.find(n => n.getUserData("page") === page && n.getUserData("tab") === data.tab)) ||
+        items.find(n => n.getUserData("page") === page && n.getUserData("self")) ||
         items.find(n => n.getUserData("page") === page && !n.getUserData("tab"));
       if (leaf) {
         this.__reveal(leaf);

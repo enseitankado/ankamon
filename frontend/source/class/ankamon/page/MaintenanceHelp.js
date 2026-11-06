@@ -128,7 +128,7 @@ bakılır. Her denetimin listesi: <b>Denetimler</b> sekmesi.</p>
   <li><b>Denetimler</b> — bütün denetimler: yolu, kaynağı, nasıl ve ne sıklıkla bakıldığı, bulgu düzeyi.</li>
   <li><b>Bildirimler</b> — sürekli izleme bulgularının telefona ntfy bildirimi.</li>
 </ul>
-<p>Zaman içindeki değişimin grafikleri (sıcaklık, işlemci, bellek, disk, ağ) <b>Bakım ▸ Sensörler</b>'de.</p>
+<p>Zaman içindeki değişimin grafikleri (sıcaklık, işlemci, bellek, disk, ağ) <b>Tahtalar ▸ Sensörler</b>'de.</p>
 ${now}
 
 <h3>Denetim raporları nasıl okunur?</h3>
