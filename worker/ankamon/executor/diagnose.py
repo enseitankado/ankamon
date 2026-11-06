@@ -101,18 +101,10 @@ LEVELS = ["ok", "info", "warn", "bad"]
 # yalnız bunlardan gelir (bkz. backend Core/BoardSensors.php).
 _SUPERIO = ("it87", "it86", "nct6", "f71", "w836")
 
-# CMOS (RTC) pili: CR2032, anma 3,0 V. RTC yongası (Intel PCH / AMD FCH) VccRTC için en az 2,0 V ister;
-# pil ile yonga arasındaki yalıtım diyotu ~0,2 V düşürdüğünden pil 2,2 V'un altına inince saat/BIOS
-# ayarları, tahta prizden çekildiğinde kaybolabilir (acil). 2,5 V'un altı zayıflama işaretidir (dikkat).
-CMOS_BAD_V = 2.2
-CMOS_WARN_V = 2.5
 # Kasa içi (anakart/ortam) sıcaklığı — Super I/O temp1, yoksa ACPI termal bölge.
 CASE_WARN_C = 50
 # Paket listesi (apt update) bu kadar gün yenilenmemişse "bekleyen güncelleme" sayısı eksik olabilir.
 APT_LISTS_STALE_DAYS = 7
-# "Saat eşitlenmemiş" yalnız tahta açılalı bu kadar saniye geçtiyse: açılışta NTP sunucusuna bağlanıp
-# eşitlenmek zaman alır (kullanıcı isteği: en az 3 dk).
-NTP_GRACE_S = 180
 # Son 15 dakikanın ortalama işlemci kullanımı bu yüzdeyi aşarsa bilgi verilir.
 CPU_INFO_PCT = 80
 GIB = 1024 ** 3
@@ -136,20 +128,6 @@ def _ssh(board: dict, user: str, password: str, timeout: int = 60) -> dict:
     # Sunucunun saati SSH döner dönmez (tahtanın DG_EPOCH'u betiğin son satırı): fark = saat sapması.
     return {"status": "ok", "rc": 0,
             "output": proc.stdout.decode("utf-8", "replace") + f"\nDG_SERVER_EPOCH={int(time.time())}\n"}
-
-
-def _drift_text(seconds: int) -> str:
-    """Saat sapması: "4 dk 12 sn ileri", "3 sa 5 dk geri", "12 gün ileri"."""
-    a = abs(seconds)
-    if a < 90:
-        amount = f"{a} sn"
-    elif a < 90 * 60:
-        amount = f"{a // 60} dk {a % 60} sn"
-    elif a < 48 * 3600:
-        amount = f"{a // 3600} sa {a % 3600 // 60} dk"
-    else:
-        amount = f"{a // 86400} gün {a % 86400 // 3600} sa"
-    return amount + (" ileri" if seconds > 0 else " geri")
 
 
 def _extra(output: str) -> dict:
@@ -430,23 +408,8 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
     else:
         add(g, "Kasa içi sıcaklık", "info", "Kasa içi sıcaklık sensörü okunamadı.")
 
-    g = "CMOS pili"
-    v = sens["vbat"]
-    if not sens["superio"]:
-        add(g, "Pil gerilimi", "info", *no_sio)
-    elif v is None:
-        add(g, "Pil gerilimi", "info", "Donanım izleme yongası pil gerilimini (Vbat) vermiyor.")
-    else:
-        vt = f"{v:.2f} V".replace(".", ",")
-        advice = ("CMOS pilini (CR2032) değiştirin. Pil bitince tahta prizden/sigortadan çekildiğinde saat ve BIOS "
-                  "ayarları (ör. Wake-on-LAN, açılış sırası) sıfırlanır; saat yanlış olunca HTTPS ve güncellemeler de bozulur.")
-        if v < CMOS_BAD_V:
-            add(g, "Pil gerilimi düşük", "bad",
-                f"{vt} — {CMOS_BAD_V:.1f} V'un altında; RTC yongası en az 2,0 V ister.".replace(".", ",", 1), advice)
-        elif v < CMOS_WARN_V:
-            add(g, "Pil zayıflıyor", "warn", f"{vt} (yeni pil ~3,0 V).", advice)
-        else:
-            add(g, "Pil gerilimi", "ok", f"{vt}.")
+    # BIOS (CMOS) pili burada denetlenmez: sürekli izlemede (anomali "BIOS pili zayıf", Ankamon'un 60 sn'de bir okuduğu
+    # ölçümden) — aynı soruya iki ayrı cevap verilmesin (Tahta sağlığı ▸ Denetimler).
 
     # 4) Boş disk alanı — toplamın %15'inin altı
     g = "Boş disk alanı"
@@ -511,17 +474,7 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
     if extra.get("dpkg_broken"):
         add(g, "Yarım kalmış paket kurulumu", "warn", f"{extra['dpkg_broken']} paket yarım kalmış — güncellemeler çalışmaz.",
             "Tahtada \"dpkg --configure -a\" çalıştırın.")
-    # Açılıştan hemen sonra NTP henüz eşitlememiş olabilir: en az NTP_GRACE_S geçmeden anomali sayılmaz.
-    uptime = extra.get("uptime")
-    if extra.get("ntp_sync") == "no" and (uptime is None or uptime >= NTP_GRACE_S):
-        detail = "Sistem saati internetten eşitlenmiyor."
-        if extra.get("epoch") and extra.get("server_epoch"):
-            drift = extra["epoch"] - extra["server_epoch"]
-            board_time = time.strftime("%d.%m.%Y %H:%M:%S", time.localtime(extra["epoch"]))
-            detail += (f" Tahtanın saati {board_time}; Ankamon sunucusuna göre "
-                       + (f"{_drift_text(drift)}." if abs(drift) >= 2 else "şimdilik doğru (sapma 2 sn'den az)."))
-        add(g, "Saat eşitlenmemiş", "warn", detail,
-            "Yanlış saat HTTPS/sertifika hatalarına ve yanlış log zamanlarına yol açar; NTP erişimini (UDP 123) kontrol edin.")
+    # Saat eşitlemesi burada denetlenmez: sürekli izlemede ("NTP eşitlenmemiş" ölçümden, "Tahta saati yanlış" loglardan).
     cores = facts.get("cpu_cores")
     if extra.get("load15") is not None and cores and extra["load15"] > cores:
         add(g, "Sürekli yüksek yük", "warn", f"Son 15 dk yük ortalaması {extra['load15']:.2f} ({cores} iş parçacığı).",

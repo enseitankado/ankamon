@@ -26,7 +26,8 @@
  */
 
 /**
- * Anomaliler ▸ Geçmiş: seçili dönemle örtüşen tüm anomali kayıtları (sürenler dahil), Excel tarzı
+ * Tahta sağlığı ▸ Geçmiş: sürekli izlemenin seçili dönemle örtüşen tüm kayıtları (sürenler dahil); Kaynak sütunu bulgunun
+ * nereden çıkarıldığını yazar (Log / Ölçüm / SSH verisi — bkz. backend AnomaliesApi KINDS source). Excel tarzı
  * sütun süzgeçli (bkz. page.Base _addColumnFilters). Özet'te çift tık bu sekmeyi o tahtaya süzer.
  */
 qx.Class.define("ankamon.ui.anomaly.History", {
@@ -40,7 +41,8 @@ qx.Class.define("ankamon.ui.anomaly.History", {
 
     this.__columns = [
       { id: "board", label: "Tahta", width: 200 },
-      { id: "kind", label: "Anomali", width: 140 },
+      { id: "kind", label: "Bulgu", width: 160 },
+      { id: "source", label: "Kaynak", width: 90 },
       { id: "started", label: "Başlangıç", width: 150 },
       { id: "ended", label: "Bitiş", width: 150 },
       { id: "duration", label: "Süre", width: 130 },
@@ -70,7 +72,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
         return {
           seconds,
           cells: [
-            a.id, a.board, a.kindLabel, F.dateTime(a.started_at * 1000),
+            a.id, a.board, a.kindLabel, a.source || "", F.dateTime(a.started_at * 1000),
             a.ended_at ? F.dateTime(a.ended_at * 1000) : "—",
             F.span(seconds) + (a.ended_at ? "" : " (sürüyor)"),
             a.text

@@ -139,7 +139,7 @@ qx.Class.define("ankamon.ui.Shell", {
       dashboard: "◈", boards: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
       info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", bulk: "⇄", wakeScreen: "☀", sleepScreen: "☾", screenLock: "🔐", screenUnlock: "🔓", cast: "⇪", logout: "⏏", lock: "🔒", password: "🔑", diagnose: "⚕", system: "⚒", diskusage: "⛁", software: "⬢",
-      network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "⚠",
+      network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "♥",
       screenshot: "📷", keyboard: "⌨", mouse: "🖱", touch: "☝", unlockInput: "🔓", relay: "⇶", relayStop: "⏹", chat: "💬", web: "🌐", webFilter: "🛡", wifi: "📶", movements: "☰"
     },
 
@@ -164,24 +164,27 @@ qx.Class.define("ankamon.ui.Shell", {
         tabs: [{ key: "Oturumlar", label: "Oturumlar" }, { key: "timeline", label: "Zaman çizelgesi" }, { key: "movements", label: "Hareketler" },
           { key: "chat", label: "Sohbet geçmişi" }, { key: "league", label: "Şampiyonlar Ligi" },
           { key: "breakLeague", label: "Teneffüs Ligi" }] },
-      // Bakım: "Bakım" (sorun tespiti) + "Sensörler" (Grafana) sekmeleri — bkz. page.Maintenance. features:
-      // herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı
+      // Tahta sağlığı: sorun tespiti (SSH denetimi) ile anomaliler (sürekli izleme) tek bölümde — bkz. page.Anomalies,
+      // ui.health.Status. Kimlik "anomalies" kalır (nav_order, hatırlanan sekme); features: ikisinden biri yeterli, sekme
+      // başına yetki sayfanın içinde. Eski "Bakım ▸ Bakım/Yardım" bağlantıları __openPage'de buraya yönlenir.
+      { id: "anomalies", label: "Tahta sağlığı", features: ["anomalies", "diagnose"], collapsed: true, create: u => new ankamon.page.Anomalies(u),
+        tabs: [{ key: "status", label: "Durum" }, { key: "Geçmiş", label: "Geçmiş", feature: "anomalies" },
+          { key: "summary", label: "Özet", feature: "anomalies" }, { key: "reports", label: "Denetim raporları", feature: "diagnose" },
+          { key: "Tarama", label: "Tara" }, { key: "catalog", label: "Denetimler" },
+          { key: "notifications", label: "Bildirimler", feature: "anomalies" }, { key: "help", label: "Yardım" }] },
+      // Bakım: "Sensörler" (Grafana) ve eklenti sekmeleri (ör. Ahenk) — bkz. page.Maintenance. Sorun tespiti raporu
+      // "Tahta sağlığı"na taşındı. features: herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı
       // isteği); eski {page: "metrics"} bağlantıları __openPage'de buraya yönlenir. id "diagnose" kalır
       // (nav_order / nav.open kayıtları). Oturumlar'ın altında (kullanıcı isteği).
       // tabs: sayfanın sekmeleri ağaçta düğümün ALT seçenekleri de (kullanıcı isteği); sayfadaki sekme çubuğu
       // görünür kalır ve ikisi eşzamanlıdır (yaprak → Base.selectTab, sekme → TAB_CHANGED ile ağaç vurgusu).
       // key = sekmenin kimliği — sayfadaki sekmenin userData "key"i ya da etiketiyle AYNI olmalı; feature /
       // admin: o sekmenin yetkisi (sayfanın kendi sekme yetkisiyle aynı). Fonksiyon da olabilir (dinamik liste).
-      { id: "diagnose", label: "Bakım", features: ["diagnose", "metrics"], collapsed: true, create: u => new ankamon.page.Maintenance(u),
-        tabs: () => [{ key: "diagnose", label: "Bakım", feature: "diagnose" }, { key: "metrics", label: "Sensörler", feature: "metrics" }]
-          .concat(ankamon.ext.Extensions.maintenanceTabs().map(t => ({ key: t.key, label: t.label, feature: t.feature })))
-          .concat([{ key: "help", label: "Yardım" }]) },
-      // Anomaliler: sıra dışı durumlar (ör. açık ama oturumsuz tahta, NTP eşitlenmemiş saat) — anlık + geçmiş
-      // rapor + seçilen tahtalarda tarama (bkz. page.Anomalies). Bakım'ın altında (kullanıcı isteği); Bakım
-      // kapalı kullanıcıda kökte (bkz. __createTree).
-      { id: "anomalies", label: "Anomaliler", feature: "anomalies", parent: "diagnose", create: u => new ankamon.page.Anomalies(u),
-        tabs: [{ key: "Anlık", label: "Anlık" }, { key: "Tarama", label: "Tarama" }, { key: "Geçmiş", label: "Geçmiş" },
-          { key: "summary", label: "Özet" }, { key: "notifications", label: "Bildirimler" }] },
+      // features: Sensörler "metrics", eklenti sekmeleri (ör. Ahenk) "diagnose" ister (PAGES sınıf yüklenirken kurulur,
+      // eklentiler sonra: liste sabit kalır).
+      { id: "diagnose", label: "Bakım", features: ["metrics", "diagnose"], collapsed: true, create: u => new ankamon.page.Maintenance(u),
+        tabs: () => [{ key: "metrics", label: "Sensörler", feature: "metrics" }]
+          .concat(ankamon.ext.Extensions.maintenanceTabs().map(t => ({ key: t.key, label: t.label, feature: t.feature }))) },
       { id: "logs", label: "Loglar", feature: "logs", collapsed: true, create: u => new ankamon.page.Logs(u),
         tabs: () => ankamon.ui.Shell.LOG_KINDS.map(kind => ({ key: kind.mode, label: kind.label })) },
       // Ağ envanteri: altında sunucunun bağlı olduğu fiziksel ağlar (dinamik, bkz. __fillNetworks).
@@ -615,6 +618,9 @@ qx.Class.define("ankamon.ui.Shell", {
       }
       if (data.page === "metrics") {
         data = { ...data, page: "diagnose", tab: "metrics" }; // Sensörler artık Bakım'ın sekmesi
+      }
+      if (data.page === "diagnose" && (!data.tab || data.tab === "diagnose" || data.tab === "help")) {
+        data = { ...data, page: "anomalies", tab: data.tab === "help" ? "help" : "reports" }; // sorun tespiti Tahta sağlığı'nda
       }
       const page = ankamon.ui.Shell.PAGES.find(p => p.id === data.page);
       if (!page || !this.__allowed(page)) {

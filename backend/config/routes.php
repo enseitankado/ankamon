@@ -90,6 +90,8 @@ return [
     ['GET',    '/api/break-league',      [Api\BreakLeagueApi::class, 'index'], 'logs'],
     // Tahtalar ▸ Anomaliler (bkz. AnomaliesApi, worker/ankamon/anomaly).
     ['GET',    '/api/anomalies',         [Api\AnomaliesApi::class, 'index'],   'anomalies'],
+    // Tahta sağlığı ▸ Durum: sürekli izleme + SSH denetimi bulguları tek biçimde (yetki içeride: anomalies / diagnose).
+    ['GET',    '/api/board-health',      [Api\BoardHealthApi::class, 'index'], 'user'],
     ['DELETE', '/api/board-sessions',    [Api\SessionsApi::class, 'delete'],   'sessions.manage'],
     ['DELETE', '/api/board-hosts',       [Api\SessionsApi::class, 'deleteHost'], 'sessions.hosts'],
     ['GET',    '/api/logs/stats',        [Api\LogStatsApi::class, 'stats'],    'logs'],

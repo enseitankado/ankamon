@@ -86,7 +86,7 @@ qx.Class.define("ankamon.page.Settings", {
       org.text("name", "Kuruluş adı", (settings.organization || {}).name || "");
       org.text("code", "Kuruluş kodu", (settings.organization || {}).code || "");
       this.__section(orgPage, "Kuruluş",
-        "Okul ya da kurumun adı ve kodu (ör. MEB kurum kodu). Bildirim başlıklarında görünür; Anomaliler ▸ Bildirimler'deki ntfy konu önerisi bunlardan türetilir.", org);
+        "Okul ya da kurumun adı ve kodu (ör. MEB kurum kodu). Bildirim başlıklarında görünür; Tahta sağlığı ▸ Bildirimler'deki ntfy konu önerisi bunlardan türetilir.", org);
       tabs.add(orgPage);
 
       const access = this.__page("Tahta erişimi");

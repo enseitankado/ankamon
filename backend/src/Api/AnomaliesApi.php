@@ -44,6 +44,7 @@ use Ankamon\Core\Request;
 final class AnomaliesApi
 {
     /**
+     * level: bulgunun düzeyi (bad = Acil, warn = Dikkat — Bakım raporuyla aynı adlar; Tahta sağlığı ▸ Durum en kötüsünü gösterir).
      * Tür adları ve açıklamaları — arayüz metni tek yerde (worker yalnız kind yazar). scan: Anomaliler ▸
      * Tarama'da seçilen tahtalarda anlık taranabilir (kuralın PROBE'u var — bkz. worker anomaly/scan.py).
      * source/source_detail/every: otomatik tespitin veri kaynağı ve sıklığı (Anlık sekmesi). Otomatik tespit tahtaya
@@ -54,6 +55,7 @@ final class AnomaliesApi
         'no_login' => [
             'label' => 'Oturumsuz açık',
             'description' => 'Tahta en az 15 dakikadır açık ve kimse oturum açmamış (açılıştan beri ya da son oturum kapandıktan sonra).',
+            'level' => 'warn',
             'scan' => true,
             'source' => 'Log',
             'source_detail' => 'Tahtanın gönderdiği loglardan çıkarılan açık kalma ve oturum aralıkları (Ankamon bağlanmaz).',
@@ -62,6 +64,7 @@ final class AnomaliesApi
         'ntp_unsynced' => [
             'label' => 'NTP eşitlenmemiş',
             'description' => 'Tahtanın saati en az 15 dakikadır NTP sunucusuyla eşitlenmiyor (eşitleme kapalı, sunucuya ulaşılamıyor) ya da saati Ankamon sunucusundan 30 sn\'den fazla sapıyor.',
+            'level' => 'warn',
             'scan' => true,
             'source' => 'Ölçüm',
             'source_detail' => 'Ankamon\'un tahtanın 9100 portundan 60 sn\'de bir okuduğu saat ölçümleri (komut çalışmaz).',
@@ -70,6 +73,7 @@ final class AnomaliesApi
         'cpu_temp_high' => [
             'label' => 'İşlemci sıcaklığı yüksek',
             'description' => 'İşlemci sıcaklığı en az 15 dakikadır tahtanın kendi ortalamasının %30 üzerinde (ortalama: son 30 günün saatlik ortalamaları; en az 24 saatlik geçmiş gerekir).',
+            'level' => 'warn',
             'scan' => true,
             'source' => 'Ölçüm',
             'source_detail' => 'Ankamon\'un tahtanın 9100 portundan 60 sn\'de bir okuduğu sıcaklık ölçümleri (komut çalışmaz).',
@@ -78,6 +82,7 @@ final class AnomaliesApi
         'disk_temp_high' => [
             'label' => 'Disk sıcaklığı yüksek',
             'description' => 'Disk sıcaklığı en az 15 dakikadır tahtanın kendi ortalamasının %30 üzerinde (ortalama: son 30 günün saatlik ortalamaları; en az 24 saatlik geçmiş gerekir).',
+            'level' => 'warn',
             'scan' => true,
             'source' => 'Ölçüm',
             'source_detail' => 'Ankamon\'un tahtanın 9100 portundan 60 sn\'de bir okuduğu disk sıcaklığı ölçümleri (komut çalışmaz).',
@@ -86,6 +91,7 @@ final class AnomaliesApi
         'net_link_lost' => [
             'label' => 'Ağ bağlantısı koptu',
             'description' => 'Tahta açıkken ağa ulaşamadı: ağ kablosu çıkarıldı ya da ağ anahtarı/port kesildi. Bağlantı gelince tahtanın kuyrukta bekletip geç gönderdiği loglardan geriye dönük saptanır (o sürede sensör verisi de alınamamış, başka tahtalar ise ulaşıyor olmalı). Tahta kabloyu kaybettiğini logla bildirdiyse "Ağ kablosu çıkarıldı" yazar. Tarama: kablonun şu anki durumu ve son 7 gündeki kopmalar.',
+            'level' => 'bad',
             'scan' => true,
             'source' => 'Log',
             'source_detail' => 'Tahtanın loglarının geç ve toplu gelmesi (Ankamon bağlanmaz).',
@@ -94,6 +100,7 @@ final class AnomaliesApi
         'log_delayed' => [
             'label' => 'Log iletimi gecikti',
             'description' => 'Tahtaya ulaşılabildiği halde (sensör verisi geliyordu) logları en az 10 dakika geç geldi: sorun log iletim yolunda — tahta log sunucusunun adını (istiklal.local) çözemedi, sunucunun log portu ya da tahtanın rsyslog\'u. Ağ bağlantısı kopukluğu ayrı türdür.',
+            'level' => 'warn',
             'scan' => false,
             'source' => 'Log',
             'source_detail' => 'Tahtanın loglarının geç gelmesi (Ankamon bağlanmaz).',
@@ -102,6 +109,7 @@ final class AnomaliesApi
         'ssh_bruteforce' => [
             'label' => 'SSH kaba kuvvet',
             'description' => 'Aynı kaynaktan en az 10 başarısız SSH girişi (aralarında 10 dakikadan uzun ara yok). Kaynak adres ve denenen hesaplar ayrıntıda; kaynak Ankamon\'un kendisi de olabilir (ayarlardaki parola tahtanınkinden farklıysa).',
+            'level' => 'bad',
             'scan' => false,
             'source' => 'Log',
             'source_detail' => 'Tahtanın sshd logları: başarısız giriş satırları (Ankamon bağlanmaz).',
@@ -110,6 +118,7 @@ final class AnomaliesApi
         'dhcp_issue' => [
             'label' => 'DHCP adres alamadı',
             'description' => 'Tahta bir ağ arabiriminde (kablolu ya da Wi-Fi) DHCP ile adres alamadı (15 dakika içinde en az 3 kez). Yalnız NetworkManager satırlarını gönderen tahtalarda görülür.',
+            'level' => 'warn',
             'scan' => false,
             'source' => 'Log',
             'source_detail' => 'Tahtanın NetworkManager logları: DHCP hataları (Ankamon bağlanmaz).',
@@ -118,6 +127,7 @@ final class AnomaliesApi
         'nic_error' => [
             'label' => 'Ağ kartı hatası',
             'description' => 'Ağ kartı sürücüsü takılma/zaman aşımı bildirdi (NETDEV WATCHDOG, tx timeout, Hardware Unit Hang). Kart, kablo ya da sürücü sorunu.',
+            'level' => 'bad',
             'scan' => false,
             'source' => 'Log',
             'source_detail' => 'Tahtanın çekirdek logları: ağ kartı hataları (Ankamon bağlanmaz).',
@@ -126,6 +136,7 @@ final class AnomaliesApi
         'identity_conflict' => [
             'label' => 'Ad / IP çakışması',
             'description' => 'Aynı bilgisayar adı aynı anda birden çok IP\'den log gönderdi (aynı kalıptan kurulmuş tahtalar adı değiştirilmeden) ya da iki tahta kaydı aynı IP\'yi taşıyor. Aynı IP durumu düzelene dek açık kalır.',
+            'level' => 'warn',
             'scan' => false,
             'source' => 'Log',
             'source_detail' => 'Loglardaki bilgisayar adı ve gönderen IP (Ankamon bağlanmaz).',
@@ -134,6 +145,7 @@ final class AnomaliesApi
         'subnet_changed' => [
             'label' => 'Tahta başka ağda',
             'description' => 'Tahtanın logları başka bir IP ağından gelmeye başladı: tahta taşındı, başka VLAN\'a bağlandı ya da Wi-Fi\'ye geçti.',
+            'level' => 'warn',
             'scan' => false,
             'source' => 'Log',
             'source_detail' => 'Loglardaki gönderen IP (Ankamon bağlanmaz).',
@@ -142,6 +154,7 @@ final class AnomaliesApi
         'clock_skew' => [
             'label' => 'Tahta saati yanlış',
             'description' => 'Tahtanın saati sunucununkinden en az 10 dakika sapıyor (logların tahta zamanına göre). NTP eşitlenmemiş kuralı sensör verisi olan tahtaları görür, bu kural log gönderen her tahtayı.',
+            'level' => 'warn',
             'scan' => false,
             'source' => 'Log',
             'source_detail' => 'Log satırının tahtadaki zamanı ile Ankamon\'a varış zamanı farkı (Ankamon bağlanmaz).',
@@ -150,6 +163,7 @@ final class AnomaliesApi
         'cmos_battery_low' => [
             'label' => 'BIOS pili zayıf',
             'description' => 'BIOS (CMOS) pilinin gerilimi 2,4 V\'un altında. Sağlam bir okuma gelene (pil değişene) dek sürer. Yalnız pil sensörü etkinleştirilmiş tahtalarda ölçülür.',
+            'level' => 'warn',
             'scan' => true,
             'source' => 'Ölçüm',
             'source_detail' => 'Ankamon\'un tahtanın 9100 portundan 60 sn\'de bir okuduğu pil gerilimi ölçümü (komut çalışmaz).',
@@ -158,6 +172,7 @@ final class AnomaliesApi
         'uefi_nvram_high' => [
             'label' => 'UEFI NVRAM dolu',
             'description' => 'UEFI değişken deposunun (NVRAM) doluluk oranı filodaki tahtaların ortalamasından en az 10 puan yüksek ya da boş alanı %10\'un altında. Depo dolarsa firmware yeni açılış girdisi/değişken yazamaz: güncellemede önyükleyici kaydı başarısız olabilir, tahta açılmayabilir. Değer Bilgi kartı, ilk tanıma ve haftalık otomatik sorun taramasında toplanır; ortalama için en az 3 tahtanın verisi gerekir.',
+            'level' => 'warn',
             'scan' => true,
             'source' => 'SSH verisi',
             'source_detail' => 'Daha önce SSH ile toplanan donanım bilgisi: tahta ilk tanındığında ve Bilgi kartı açıldığında (1 sa önbellek) tazelenir. Kural 60 sn\'de bir bakar ama veri bu kadar güncel değildir.',
@@ -177,7 +192,7 @@ final class AnomaliesApi
             $dir = defined('EXT_DIR') ? EXT_DIR : '/opt/ankamon/ext';
             foreach (glob($dir . '/*/anomaly_kinds.json') ?: [] as $file) {
                 $extra = json_decode((string) file_get_contents($file), true);
-                // origin: kaydı üreten eklenti (Anomaliler ▸ Anlık "Tetikleyen") — extension.json başlığı, yoksa dizin adı.
+                // origin: kaydı üreten eklenti (Tahta sağlığı ▸ Denetimler, Durum) — extension.json başlığı, yoksa dizin adı.
                 $meta = json_decode((string) @file_get_contents(dirname($file) . '/extension.json'), true);
                 $origin = is_array($meta) && !empty($meta['title']) ? (string) $meta['title'] : basename(dirname($file));
                 foreach (is_array($extra) ? $extra : [] as $kind => $def) {

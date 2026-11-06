@@ -26,10 +26,9 @@
  */
 
 /**
- * Bakım (sol menüde Tahtalar > Bakım): sekmeler — "Bakım" (sorun tespiti raporu, page.Diagnose),
- * "Sensörler" (Grafana panosu, page.Metrics), eklenti sekmeleri (ör. "Ahenk") ve en sonda "Yardım" (page.MaintenanceHelp). Kullanıcı isteğiyle Sensörler ayrı menü öğesi olmaktan
- * çıkıp buraya taşındı. Her sekme yalnız kendi yetkisiyle görünür ("diagnose" / "metrics"); sayfa
- * ikisinden biri olan kullanıcıya açılır (bkz. ui.Shell PAGES features).
+ * Bakım (sol menüde): sekmeler — "Sensörler" (Grafana panosu, page.Metrics) ve eklenti sekmeleri (ör. "Ahenk"). Sorun
+ * tespiti raporu (page.Diagnose) ve yardımı (page.MaintenanceHelp) "Tahta sağlığı"na taşındı (bkz. page.Anomalies);
+ * eski {tab: "diagnose"|"help"} istekleri oraya yönlenir. Her sekme yalnız kendi yetkisiyle görünür (bkz. ui.Shell PAGES).
  *
  * İçteki sayfalar olduğu gibi kullanılır: sayfa açılınca ya da sekme değişince görünen sekmenin sayfası
  * activate() edilir (kendi yenilemesi). openWith({tab: "metrics"|"diagnose"}) o sekmeyi seçer —
@@ -56,14 +55,10 @@ qx.Class.define("ankamon.page.Maintenance", {
       }
       this.__tabs.add(tab);
     };
-    add("diagnose", "Bakım", "diagnose", u => new ankamon.page.Diagnose(u));
     add("metrics", "Sensörler", "metrics", u => new ankamon.page.Metrics(u));
     // Eklentiler Bakım'a sekme ekleyebilir (bkz. ankamon.ext.Extensions.addMaintenanceTab). Ahenk artık bir
     // eklenti (ext/ankamon-ahenk) ve kendi init'inde etkinse bu sekmeyi kaydeder; burada yalnız yetki bakılır.
     ankamon.ext.Extensions.maintenanceTabs().forEach(t => add(t.key, t.label, t.feature, t.create));
-    // Yardım en sonda: Bakım raporunun ne olduğu, nasıl okunduğu, taramaların ne zaman yapıldığı (bkz. page.MaintenanceHelp).
-    // Yetki: sayfayı açabilen herkes (Bakım ya da Sensörler) — feature null.
-    add("help", "Yardım", null, u => new ankamon.page.MaintenanceHelp(u));
     this._rememberTab(this.__tabs, "maintenance"); // son seçili sekme (dinleyiciden önce: activate tetiklenmesin)
     this.__tabs.addListener("changeSelection", () => {
       const page = this.__current();
@@ -92,6 +87,10 @@ qx.Class.define("ankamon.page.Maintenance", {
 
     /** Bkz. ui.Shell OPEN_PAGE: {tab: "metrics"|"diagnose"|"ahenk"} o sekmeyi seçer (ve sayfasını yeniler). */
     openWith(opts) {
+      if (opts && (opts.tab === "diagnose" || opts.tab === "help")) {
+        qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "anomalies", tab: opts.tab === "help" ? "help" : "reports" });
+        return;
+      }
       const tab = this.__tabs.getChildren().find(t => t.getUserData("key") === (opts && opts.tab));
       if (tab && this.__tabs.getSelection()[0] !== tab) {
         this.__tabs.setSelection([tab]);

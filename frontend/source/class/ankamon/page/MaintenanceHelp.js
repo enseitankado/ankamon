@@ -26,8 +26,8 @@
  */
 
 /**
- * Bakım ▸ Yardım sekmesi (bkz. page.Maintenance): Bakım raporunun ne olduğu, nasıl okunduğu, taramaların ne
- * zaman/nasıl yapıldığı ve sık karşılaşılan durumlar (kullanıcı isteği: "buranın ne işe yaradığı, nasıl çalıştığı
+ * Tahta sağlığı ▸ Yardım sekmesi (bkz. page.Anomalies): bulguların iki yolu (sürekli izleme / SSH denetimi) ve sekmeler;
+ * SSH denetim raporunun ne olduğu, nasıl okunduğu, denetimlerin ne zaman/nasıl yapıldığı ve sık karşılaşılan durumlar (kullanıcı isteği: "buranın ne işe yaradığı, nasıl çalıştığı
  * anlaşılmıyor"). Takvim değerleri sabit yazılmaz — /api/diagnose'un schedule alanından (sunucunun .env'i:
  * DIAGNOSE_INTERVAL_DAYS, DIAGNOSE_RETRY_HOURS) ve şu an denetlenemeyen tahtalardan okunur. Kodda karşılığı
  * olmayan iddia yazılmaz: kurallar worker/ankamon/tasks/diagnose_schedule.py ve executor/diagnose.py'dendir.
@@ -71,6 +71,8 @@ qx.Class.define("ankamon.page.MaintenanceHelp", {
       const badge = (color, text) => `<span class="b" style="background:${color}">${text}</span>`;
       const L = ankamon.page.Diagnose.LEVEL;
       const lv = k => badge(L[k].color, L[k].text);
+      const P = ankamon.ui.health.Status.PATH;
+      const path = k => badge(P[k].color, P[k].text);
       let now = "";
       if (sc) {
         now = `<div class="v note"><span class="t">Şu an</span>${sc.boards} kayıtlı tahta; ` +
@@ -94,20 +96,42 @@ qx.Class.define("ankamon.page.MaintenanceHelp", {
 .mh .q{font-weight:700;margin-top:10px}
 </style>
 
-<h3>Bu sayfa ne işe yarar?</h3>
-<p><b>Bakım</b>, tahtalarda arızaya dönüşmeden önce fark edilmesi gereken donanım ve sistem sorunlarını bulur:
-diski bozulmak üzere olan, ısınan, fanı durmuş, CMOS pili bitmek üzere olan, diski dolmuş, güncellemesi yarım kalmış
-tahtalar… Her tahta için bir <b>rapor satırı</b> üretir; satırda tahtanın genel durumu ve en önemli bulgusu yazar.</p>
+<h3>Tahta sağlığı ne işe yarar?</h3>
+<p>Tahtalarda arızaya dönüşmeden önce fark edilmesi gereken donanım, yazılım ve ağ sorunlarını bulur. Bulgular
+<b>iki yoldan</b> gelir; her bulgunun yanında hangisinden geldiği, kaynağı ve nasıl bakıldığı yazar.</p>
+<table>
+  <tr><th></th><th>${path("watch")}</th><th>${path("ssh")}</th></tr>
+  <tr><th>Nasıl bakılır</th><td>Ankamon tahtaya <b>bağlanmaz</b>: tahtanın gönderdiği loglardan, tahtanın 9100 portundan
+    okuduğu ölçümlerden ya da daha önce toplanmış bilgiden çıkarır.</td>
+    <td>Ankamon tahtaya root olarak <b>SSH ile girer</b>, yalnız okuma yapan komutlarla ölçer (tahtada hiçbir şey değişmez).</td></tr>
+  <tr><th>Ne zaman</th><td>Sürekli: kurala göre dakikada bir ya da 5 dakikada bir.</td>
+    <td>Her tahta haftada bir kendiliğinden (sunucu boştayken); istenince <b>Tara</b> sekmesinden ya da
+    <b>Denetim raporları ▸ Şimdi tara</b> ile.</td></tr>
+  <tr><th>Ne üretir</th><td>Zaman aralığı olan olay: ne zaman başladı, sürüyor mu, ne zaman bitti.</td>
+    <td>Denetim anının fotoğrafı: o an diskin, servislerin, güncellemelerin durumu.</td></tr>
+  <tr><th>Neyi iyi görür</th><td>Gelip geçen olaylar: ağ kopması, kaba kuvvet girişimi, sıcaklık yükselmesi, saat sapması,
+    oturumsuz açık kalma.</td><td>Ancak tahtaya girince görülenler: disk sağlığı (SMART), bekleyen güncellemeler, başarısız
+    servisler, boş alan.</td></tr>
+  <tr><th>Tahta kapalıyken</th><td>Kayıtlar kalır; bazı olaylar (ör. ağ kopması) bağlantı gelince geriye dönük yazılır.</td>
+    <td>Denetlenemez; ilk açıldığı uygun anda denetlenir.</td></tr>
+</table>
+<p>Aynı soruya iki ayrı cevap verilmesin diye sürekli ölçülebilenler (BIOS pili, saat eşitlemesi) yalnız sürekli izlemede
+bakılır. Her denetimin listesi: <b>Denetimler</b> sekmesi.</p>
+<h3>Sekmeler</h3>
 <ul>
-  <li><b>Bakım</b> sekmesi — bu denetimlerin raporu (aşağıda anlatılıyor).</li>
-  <li><b>Sensörler</b> sekmesi — tahtalardan sürekli toplanan sıcaklık, işlemci, bellek, disk ve ağ ölçümlerinin
-      grafikleri (Grafana). Bakım raporu bir anlık denetimdir; Sensörler ise zaman içindeki değişimi gösterir.</li>
-  <li>Sol menüde Bakım'ın altındaki <b>Anomaliler</b> — loglardan ve ölçümlerden dakikalar içinde yakalanan sıra dışı
-      durumlar (kendi sayfasında <b>?</b> yardımı vardır).</li>
+  <li><b>Durum</b> — her tahtanın şu anki sağlığı: en kötü bulgusu, sürekli izlemede şu an sürenler, son SSH denetiminin
+      sonucu. Bir tahta seçince altta bulguları; her bulguda <i>Yol, Kaynak, Nasıl bakıldı, Sıklık, Zaman</i>.
+      "Aksiyon gereken ne?" sorusunun cevabı burası. Bulguya çift tık: kaydına (Geçmiş ya da Denetim raporları) gider.</li>
+  <li><b>Geçmiş / Özet</b> — sürekli izleme kayıtları, sayfanın üstündeki rapor döneminde.</li>
+  <li><b>Denetim raporları</b> — SSH denetimlerinin raporları (aşağıda anlatılıyor).</li>
+  <li><b>Tara</b> — seçilen tahtalara o an bakmak: tam SSH denetimi ve/veya sürekli izleme denetimlerinin anlık yoklaması.</li>
+  <li><b>Denetimler</b> — bütün denetimler: yolu, kaynağı, nasıl ve ne sıklıkla bakıldığı, bulgu düzeyi.</li>
+  <li><b>Bildirimler</b> — sürekli izleme bulgularının telefona ntfy bildirimi.</li>
 </ul>
+<p>Zaman içindeki değişimin grafikleri (sıcaklık, işlemci, bellek, disk, ağ) <b>Bakım ▸ Sensörler</b>'de.</p>
 ${now}
 
-<h3>Rapor nasıl okunur?</h3>
+<h3>Denetim raporları nasıl okunur?</h3>
 <ol>
   <li>Sayfa açılınca <b>"Son durum — tüm tahtalar"</b> görünür: denetlenmiş <b>her tahtanın en son denetimi</b>, hangi
       taramada yapılmış olursa olsun, tek tabloda. Her satırın sağında denetim zamanı ve kimin başlattığı
@@ -128,9 +152,10 @@ ${now}
 <p>Tahtanın genel durumu en kötü bulgusudur. <b>Acil / Dikkat / Bilgi</b> sütunları o düzeydeki bulgu sayısıdır.
 <i>Yarıda kaldı</i>: tarama o tahtada bitmeden kesildi (ör. Ankamon yeniden başlatıldı) — yeniden taranır.</p>
 
-<h3>Tarama ne zaman yapılır?</h3>
+<h3>SSH denetimi ne zaman yapılır?</h3>
 <table>
-  <tr><th>Elle</th><td><b>Şimdi tara</b> düğmesi o an <b>açık olan tüm tahtaları</b> denetler (aynı anda kaç tahta: sunucunun
+  <tr><th>Elle</th><td><b>Tara</b> sekmesinde <i>Tam SSH denetimi</i> seçili tahtaları, Denetim raporları'ndaki
+    <b>Şimdi tara</b> düğmesi o an <b>açık olan tüm tahtaları</b> denetler (aynı anda kaç tahta: sunucunun
     boş işlemci/belleğine göre). İlerleme düğmelerin yanında görünür.</td></tr>
   <tr><th>Otomatik</th><td>Her tahta <b>en az ${esc(days)} günde bir</b> kendiliğinden denetlenir. Saat <b>tahta başına</b>
     işler: bir tahtanın son başarılı denetiminden ~${esc(early)} gün geçince, sunucu boştayken (düşük işlemci yükü, yeterli
@@ -157,7 +182,7 @@ ${now}
       <b>Sistem ▸ Disk kullanımı ▸ Bakım raporları</b> sekmesinden silinebilir.</li>
 </ul>
 
-<h3>Neler denetlenir?</h3>
+<h3>SSH denetiminde neler denetlenir?</h3>
 <table>
   <tr><th>Başlık</th><th>Denetimler</th></tr>
   <tr><td>Donanım kapasitesi</td><td>RAM ve disk boyutu (tahtaların ortalamasıyla kıyas)</td></tr>
@@ -165,13 +190,15 @@ ${now}
       disk sıcaklığı, son 7 günde çekirdeğin bildirdiği disk (G/Ç) hataları</td></tr>
   <tr><td>İşlemci sıcaklığı</td><td>son 24 saatin sıcaklık ölçümleri, ısı yüzünden işlemcinin yavaşlatılması</td></tr>
   <tr><td>Soğutma ve kasa</td><td>işlemci fanı dönüyor mu, kasa içi sıcaklık</td></tr>
-  <tr><td>CMOS pili</td><td>pil gerilimi (zayıfsa tahta prizden çekilince saat ve BIOS ayarları kaybolabilir)</td></tr>
   <tr><td>Boş disk alanı</td><td>kök dosya sistemi doluluğu, dosya sayısı sınırı (inode)</td></tr>
   <tr><td>Yazılım güncellemeleri</td><td>bekleyen (güvenlik dahil) güncellemeler, paket listesinin yaşı</td></tr>
   <tr><td>Sistem çalışma koşulları</td><td>düşük RAM, takas alanı yok, mekanik disk (HDD), salt-okunur dosya sistemi,
-      bellek yetersizliği nedeniyle kapatılan uygulamalar, başarısız servisler, yarım kalmış paket kurulumu, saat eşitlenmemiş,
+      bellek yetersizliği nedeniyle kapatılan uygulamalar, başarısız servisler, yarım kalmış paket kurulumu,
       sürekli yüksek yük / işlemci kullanımı, yeniden başlatma bekliyor, uzun süredir açık</td></tr>
 </table>
+
+<p>BIOS (CMOS) pili ve saat eşitlemesi sürekli izlemede bakılır: <i>BIOS pili zayıf</i>, <i>NTP eşitlenmemiş</i>,
+<i>Tahta saati yanlış</i> (Denetimler sekmesi).</p>
 
 <h3>Sık karşılaşılan durumlar</h3>
 <div class="q">Bir tahta hep ${lv("bad")} "bağlanılamadı — SSH parolası reddedildi" görünüyor.</div>

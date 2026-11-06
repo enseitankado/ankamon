@@ -26,7 +26,8 @@
  */
 
 /**
- * Bakım (menüdeki adı; eski adı "Sorun tespiti"): YALNIZ tespit raporu (kullanıcı isteği — Tahtalar grid'i, Ekranlar vb. yok).
+ * Tahta sağlığı ▸ Denetim raporları (eski "Bakım ▸ Bakım", daha önce "Sorun tespiti"; bkz. page.Anomalies): SSH denetimi
+ * raporları. YALNIZ tespit raporu (kullanıcı isteği — Tahtalar grid'i, Ekranlar vb. yok).
  *
  * Taramalar "diagnose" görevleridir (bkz. worker/ankamon/executor/diagnose.py): "Şimdi tara" o an
  * çevrimiçi TÜM tahtaları paralel denetler (aynı anda kaç tahta: konteynerin CPU/RAM boşluğuna göre); ayrıca worker kaynaklar müsaitken her tahtayı haftada en az
@@ -37,7 +38,7 @@
  * zamanlayıcı yalnız vadesi gelen tahtaları taradığından tek bir otomatik tarama çoğu kez 1-2 tahtalıktır; açılışta
  * en son taramayı göstermek "yalnız bu tahta mı taranıyor?" karışıklığı yaratıyordu (kullanıcı geri bildirimi).
  * Tek tek taramalar seçicide kalır. Sayfanın ne yaptığı ve otomatik tarama takvimi "Bakım" sekme kulakçığının
- * ipucunda (bindTabButton), ayrıntısı Bakım ▸ Yardım sekmesinde (bkz. page.MaintenanceHelp).
+ * ipucunda (bindTabButton), ayrıntısı Tahta sağlığı ▸ Yardım sekmesinde (bkz. page.MaintenanceHelp).
  *
  * Rapor tek tablodur: her tahta bir özet satırı, bulguları satıra tıklayınca hemen altında açılır
  * (varsayılan kapalı; başlıktaki ok tümünü açar/kapatır). Süzgeç (düzey + tahta) ikisine de uygulanır;
@@ -250,7 +251,7 @@ qx.Class.define("ankamon.page.Diagnose", {
     },
 
     /**
-     * Bakım sekme kulakçığı (bkz. page.Maintenance) bu sayfanın ne yaptığını ve otomatik tarama takvimini
+     * Denetim raporları sekme kulakçığı (bkz. page.Anomalies) bu sayfanın ne yaptığını ve otomatik tarama takvimini
      * ipucunda gösterir — sayfada yer kaplamasın (kullanıcı isteği). Takvim /api/diagnose'dan geldikçe tazelenir.
      */
     bindTabButton(button) {
@@ -265,9 +266,10 @@ qx.Class.define("ankamon.page.Diagnose", {
       const F = ankamon.util.Format;
       const esc = s => qx.bom.String.escape(String(s ?? ""));
       const sc = this.__schedule;
-      let s = "<b>Bakım</b>, tahtaların donanım ve sistem sağlığını SSH ile denetler: disk (SMART) ve boş alan, " +
-        "işlemci ve kasa sıcaklığı, fan, CMOS pili, RAM, güncellemeler, başarısız servisler, saat… Her tahta bir " +
-        "satırdır; satıra tıklayınca bulguları ve önerileri açılır. <b>Şimdi tara</b> açık tüm tahtaları hemen denetler.";
+      let s = "<b>SSH denetimi</b>: Ankamon tahtaya SSH ile girip donanım ve sistem sağlığını ölçer: disk (SMART) ve boş alan, " +
+        "işlemci ve kasa sıcaklığı, fan, RAM, güncellemeler, başarısız servisler… Her tahta bir " +
+        "satırdır; satıra tıklayınca bulguları ve önerileri açılır. <b>Şimdi tara</b> açık tüm tahtaları hemen denetler " +
+        "(seçili tahtalar: <b>Tara</b> sekmesi). BIOS pili ve saat sürekli izlemededir.";
       s += `<br><br><b>Otomatik tarama:</b> her tahta en az ${esc(sc ? sc.interval_days : 7)} günde bir, sunucu yükü ve ` +
         "ağ trafiği düşükken; tahta yalnız açıkken taranabilir. Her tahtanın zamanı ayrı işlediğinden otomatik " +
         "taramalar çoğu kez yalnız birkaç tahtayı kapsar.";
