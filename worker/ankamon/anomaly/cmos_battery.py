@@ -26,7 +26,7 @@
 """Anomali: BIOS (CMOS) pili 2,4 V'un altında.
 
 Kaynak: metrics_5m özetindeki Super I/O in8 = Vbat (bkz. docker/telegraf/reshape.star). Yalnız Super I/O sürücüsü
-yüklü tahtalarda ölçülür ("Fan/pil/anakart sensörlerini etkinleştir" işlemi, bkz. actions/sensors-superio).
+yüklü tahtalarda ölçülür ("Metrik izlemeyi kur (fan/pil/anakart sensörleri dahil)" hazır komutu, bkz. actions/node-exporter).
 
 Düşük okuma en az MIN_BUCKETS kez (15 dk) görülmelidir (tek okuma parazit olabilir). Pil kendiliğinden düzelmez:
 tahta kapanınca anomali bitmez, sağlam bir okuma (pil değişti) gelene dek sürer. ~0 V okuma yonga girişinin bağlı
@@ -133,7 +133,7 @@ echo "superio=$superio"
 
 def evaluate(values: dict, ctx: dict) -> dict:
     if values.get("superio") != "1":
-        return {"anomaly": None, "summary": "Pil ölçülemiyor: \"Fan/pil/anakart sensörlerini etkinleştir\" işlemini "
+        return {"anomaly": None, "summary": "Pil ölçülemiyor: \"Metrik izlemeyi kur (fan/pil/anakart sensörleri dahil)\" hazır komutunu "
                                             "çalıştırın", "detail": {}}
     try:
         volts = float(values.get("mv", "")) / 1000

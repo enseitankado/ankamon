@@ -98,7 +98,7 @@ qx.Class.define("ankamon.page.Boards", {
       { id: "net_rx", label: "D:Mbit/sn", hint: "D (download / indirme): tahtanın ağdan ALDIĞI trafik, Mbit/sn — son ölçüm aralığının ortalaması", width: 95 },
       { id: "net_tx", label: "U:Mbit/sn", hint: "U (upload / yükleme): tahtanın ağa GÖNDERDİĞİ trafik, Mbit/sn — son ölçüm aralığının ortalaması", width: 95 },
       // Sensörler (bkz. backend Core/BoardSensors.php). Fan/pil/anakart, tahtada Super I/O sürücüsü
-      // yüklüyse gelir ("Fan/pil/anakart sensörlerini etkinleştir" işlemi); Kasa yoksa ACPI bölgesidir.
+      // yüklüyse gelir ("Metrik izlemeyi kur" işlemi); Kasa yoksa ACPI bölgesidir.
       { id: "temp", label: "CPU sıcaklığı", width: 100 },
       { id: "case_temp", label: "Kasa", hint: "Kasa sıcaklığı", width: 100 },
       { id: "disk_temp", label: "Disk", hint: "Disk sıcaklığı", width: 100 },

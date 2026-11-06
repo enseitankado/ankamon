@@ -76,7 +76,7 @@ echo "DG_UPG_SAMPLE=$(printf '%s\n' "$u" | cut -d/ -f1 | head -n 8 | paste -sd, 
 echo "DG_APT_LISTS_AT=$(find /var/lib/apt/lists -maxdepth 1 -name '*Packages*' -printf '%T@\n' 2>/dev/null | sort -n | tail -n 1 | cut -d. -f1)"
 # Donanım sensörleri (hwmon): her satır "DGS <yonga> <dosya> <ham değer> <etiket>" — fan devri, gerilimler
 # (CMOS pili), Super I/O ve ACPI sıcaklıkları. Super I/O sürücüsü yüklü değilse fan/pil satırı çıkmaz
-# (bkz. actions/sensors-superio).
+# (bkz. actions/node-exporter, Super I/O adımı).
 for h in /sys/class/hwmon/hwmon*; do
   n=$(cat "$h/name" 2>/dev/null)
   for f in "$h"/fan*_input "$h"/in*_input "$h"/temp*_input; do
@@ -388,7 +388,7 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
     sens = extra.get("sensors") or {"superio": False, "fans": {}, "vbat": None, "case": []}
     g = "Soğutma ve kasa"
     no_sio = ("Anakartın donanım izleme yongası (Super I/O) sürücüsü yüklü değil; fan devri ve CMOS pili okunamıyor.",
-              "Komut çalıştır → hazır işlemlerden \"Fan/pil/anakart sensörlerini etkinleştir\"i bu tahtaya uygulayın.")
+              "Komut çalıştır → hazır işlemlerden \"Metrik izlemeyi kur (fan/pil/anakart sensörleri dahil)\" komutunu bu tahtaya uygulayın.")
     if not sens["superio"]:
         add(g, "İşlemci fanı", "info", *no_sio)
     else:

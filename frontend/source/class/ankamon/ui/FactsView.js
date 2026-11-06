@@ -154,7 +154,7 @@ qx.Class.define("ankamon.ui.FactsView", {
         row(label, { html: now + range });
       });
       if (!sensors.fan_rpm && !sensors.battery_v) {
-        row("Not", "Fan devri, CMOS pili ve anakart sıcaklığı için \"Fan/pil/anakart sensörlerini etkinleştir\" işlemini çalıştırın");
+        row("Not", "Fan devri, CMOS pili ve anakart sıcaklığı için \"Metrik izlemeyi kur (fan/pil/anakart sensörleri dahil)\" hazır komutunu çalıştırın");
       }
     },
 

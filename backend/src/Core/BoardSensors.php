@@ -35,7 +35,7 @@ namespace Ankamon\Core;
  *   cpu_temp   işlemci (coretemp/k10temp)       board_temp  anakart (Super I/O temp1)
  *   acpi_temp  kasa içi (ACPI termal bölge)     disk_temp   disk (SMART 194/190, NVMe)
  *   fan_rpm    işlemci fanı (Super I/O)         battery_v   CMOS pili (Super I/O in8 = Vbat)
- * Super I/O değerleri tahtada sürücü yüklüyse gelir (bkz. actions/sensors-superio). Bir göstergeye
+ * Super I/O değerleri tahtada sürücü yüklüyse gelir (bkz. actions/node-exporter, Super I/O adımı). Bir göstergeye
  * birden çok seri düşerse (ör. çekirdek başına sıcaklık, bağlı olmayan fan3 = 0) son değeri en yüksek
  * olan seçilir; en düşük/en yüksek değerler de o serinin kendisinden verilir.
  */

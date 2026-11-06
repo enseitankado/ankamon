@@ -114,11 +114,12 @@ qx.Class.define("ankamon.page.Metrics", {
 
     /**
      * Sensör verisi eksik tahtalar için bilgilendirme: tüm tahtalar görünümünde o tahtaların listesi, tek
-     * tahtada yalnız o tahta. İki kurulum adımı tahta başına AYRI denetlenir ve yalnız gereken adım yazılır:
-     *   1. Metrik izlemeyi kur (actions/node-exporter) — son 7 günde hiç veri gelmeyen tahtalar (has_data);
-     *   2. Fan/pil/anakart sensörlerini etkinleştir (actions/sensors-superio) — fan/anakart sensörü olmayan
-     *      ve bu işlemin henüz başarıyla çalışmadığı tahtalar (has_board_sensors, superio_done).
-     * Adımların yolu tıklanır: Komut çalıştır penceresi o adımın tahtaları için o hazır komut seçili açılır
+     * tahtada yalnız o tahta. Eksiklik iki türlüdür ama kurulum TEK hazır komuttur — "Metrik izlemeyi kur"
+     * (actions/node-exporter; fan/pil/anakart sensörlerini de etkinleştirir):
+     *   • son 7 günde hiç veri gelmeyen tahtalar (has_data);
+     *   • fan/anakart sensörü olmayan ve anakart sensörü adımı henüz denenmemiş tahtalar (has_board_sensors,
+     *     superio_done — yonga desteklenmiyorsa komut yeniden önerilmez).
+     * Komutun yolu tıklanır: Komut çalıştır penceresi bu tahtalar için o hazır komut seçili açılır
      * (bkz. ui.BoardOps.run). Listede kapalı tahta varsa sonuna "WoL ile aç" bağlantısı eklenir.
      */
     __updateNotice() {
@@ -129,11 +130,10 @@ qx.Class.define("ankamon.page.Metrics", {
       const missing = shown.filter(b => !b.has_data);
       const noBoard = shown.filter(b => b.has_data && !b.has_board_sensors && !b.superio_done);
       const steps = [
-        { key: "node-exporter", boards: missing, title: "Metrik izlemeyi kur",
-          what: "işlemci, bellek, disk, ağ, sıcaklık" },
-        { key: "sensors-superio", boards: shown.filter(b => !b.has_board_sensors && !b.superio_done),
-          title: "Fan/pil/anakart sensörlerini etkinleştir",
-          what: "fan devri, CMOS pili, anakart sıcaklığı; anakartın donanım izleme yongası destekleniyorsa" }
+        { key: "node-exporter", boards: shown.filter(b => !b.has_data || (!b.has_board_sensors && !b.superio_done)),
+          title: "Metrik izlemeyi kur (fan/pil/anakart sensörleri dahil)",
+          what: "işlemci, bellek, disk, ağ, sıcaklık; anakartın donanım izleme yongası destekleniyorsa fan devri, " +
+            "CMOS pili ve anakart sıcaklığı da" }
       ].filter(st => st.boards.length);
       const canRun = this._can("actions");
       const link = (attr, text) => `<span ${attr} style="color:#0b57d0;text-decoration:underline;cursor:pointer">${text}</span>`;
