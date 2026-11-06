@@ -144,7 +144,7 @@ ${now}
   <li>Bir tahtayı seçince bulguları, önerileriyle birlikte alttaki bölmede görünür (seçim yokken
       bölme boştur). İki bölmenin arasındaki çubuk sürüklenerek boyları ayarlanır.</li>
   <li>Sütun başlığına tıklamak sıralar; başlıktaki kutu süzer: elle yazın ya da ▾ ile hazır listeden seçin
-      (<b>Tahta, Genel durum, Acil, Dikkat, Bilgi</b>). <b>Göster</b> kutuları düzeye göre süzer (sunucuya gidilmez).</li>
+      (<b>Tahta, Genel durum, Acil, Dikkat, Bilgi</b>); düzeye göre süzmek için Genel durum sütunu (sunucuya gidilmez).</li>
   <li><b>Rapor</b> seçicisinde, "Son durum"un altında tek tek taramalar listelenir (en yeni 30). Bir taramayı seçince
       yalnız o taramada denetlenen tahtalar görünür.</li>
 </ol>

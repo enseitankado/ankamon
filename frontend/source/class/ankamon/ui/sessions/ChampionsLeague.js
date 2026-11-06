@@ -41,7 +41,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
 
   /** @param page {ankamon.page.Sessions} yetki denetimi (_can) için */
   construct(page) {
-    super("Şampiyonlar Ligi");
+    super("Kullanım sıralaması"); // eski adı "Şampiyonlar Ligi" (Ligler sayfası — bkz. page.Leagues)
     this.setUserData("key", "league"); // sekme kimliği (sol menü yaprağı, hatırlanan sekme — bkz. ui.Shell.PAGES)
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
@@ -178,7 +178,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
 
     __leaderTip(r, rank, boards) {
       const F = ankamon.util.Format;
-      const out = r.excluded ? "\n(lig dışı)" : "";
+      const out = r.excluded ? "\n(sıralama dışı)" : "";
       if (boards) {
         return `${rank}. ${r.board}` + (r.board !== r.host ? ` (${r.host})` : "") +
           `\nToplam: ${F.duration(r.seconds)}\n${r.days} gün · ${r.sessions} oturum · ${r.users} kullanıcı` +
@@ -191,14 +191,14 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
 
     /** Kart altı: dönemde süresi olan lig dışı sayısı (gizliyse "sayılmadı", gösteriliyorsa "dahil"). */
     leagueOutNote(p, shown) {
-      return p.excluded_count ? ` · ${p.excluded_count} lig dışı ${shown ? "dahil" : "sayılmadı"}` : "";
+      return p.excluded_count ? ` · ${p.excluded_count} sıralama dışı ${shown ? "dahil" : "sayılmadı"}` : "";
     },
 
     __renderLeague(periods, boards) {
       const F = ankamon.util.Format;
       const esc = qx.bom.String.escape;
       const medals = ankamon.ui.sessions.ChampionsLeague.LEAGUE_MEDALS;
-      const outTag = r => r.excluded ? `<span class="lg-outtag">lig dışı</span>` : "";
+      const outTag = r => r.excluded ? `<span class="lg-outtag">sıralama dışı</span>` : "";
       const name = r => esc(boards ? r.board : (r.full_name || r.username));
       const sub = r => boards ? r.top_user : r.board;
       const shown = this.__out.withExcluded();
@@ -212,7 +212,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
           `<div class="lg-sub">${esc(p.label)} · ${esc(this.__leagueRange(p))}</div></div>`;
         if (!rows.length) {
           return `<div class="lg-card">${head}<div class="lg-empty">Bu dönemde henüz oturum yok.` +
-            (p.excluded_count ? ` (${p.excluded_count} lig dışı sayılmadı)` : "") + `</div></div>`;
+            (p.excluded_count ? ` (${p.excluded_count} sıralama dışı sayılmadı)` : "") + `</div></div>`;
         }
         const top = rows[0].seconds || 1;
         // Kürsü: 2. solda, 1. ortada (en yüksek), 3. sağda.

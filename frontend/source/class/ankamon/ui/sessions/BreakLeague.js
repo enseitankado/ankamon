@@ -45,7 +45,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
 
   /** @param page {ankamon.page.Sessions} yetki denetimi (_can) için */
   construct(page) {
-    super("Teneffüs Ligi");
+    super("Ders arası sıralaması"); // eski adı "Teneffüs Ligi" (Ligler sayfası — bkz. page.Leagues)
     this.setUserData("key", "breakLeague"); // sekme kimliği (sol menü yaprağı — bkz. ui.Shell.PAGES)
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
@@ -198,13 +198,13 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
           `\nTeneffüste: ${F.duration(r.seconds)}` +
           `\n  oturumu açıkken: ${F.duration(r.session_seconds)}` +
           `\n  oturumu kapattıktan sonra tahtayı açık bıraktığı: ${F.duration(r.idle_seconds)}` +
-          `\n${r.days} gün · ${r.boards} tahta` + (r.board ? `\nEn çok: ${r.board}` : "") + (r.excluded ? "\n(lig dışı)" : "");
+          `\n${r.days} gün · ${r.boards} tahta` + (r.board ? `\nEn çok: ${r.board}` : "") + (r.excluded ? "\n(sıralama dışı)" : "");
       }
       const share = r.break_seconds ? Math.round(r.seconds / r.break_seconds * 100) : 0;
       return `${rank}. ${r.board}` + (r.board !== r.host ? ` (${r.host})` : "") +
         `\nTeneffüste açık: ${F.duration(r.seconds)} (teneffüs payı %${share})` +
         `\n  oturum açıkken: ${F.duration(r.session_seconds)}\n  oturum kapalıyken: ${F.duration(r.idle_seconds)}` +
-        `\n${r.days} gün` + (r.excluded ? "\n(lig dışı)" : "");
+        `\n${r.days} gün` + (r.excluded ? "\n(sıralama dışı)" : "");
     },
 
     /**
@@ -217,7 +217,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
       const League = ankamon.ui.sessions.ChampionsLeague;
       const medals = League.LEAGUE_MEDALS;
       const C = ankamon.ui.sessions.BreakLeague.BREAK_COLORS;
-      const outTag = r => r.excluded ? `<span class="lg-outtag">lig dışı</span>` : "";
+      const outTag = r => r.excluded ? `<span class="lg-outtag">sıralama dışı</span>` : "";
       const out = r => r.excluded ? " lg-out" : "";
       const name = r => users ? (r.full_name || r.username) : r.board;
       const menuAttrs = r => users
@@ -247,7 +247,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
         if (!rows.length) {
           return `<div class="lg-card">${head}<div class="lg-empty">` +
             (users ? "Bu dönemde teneffüste süresi olan kullanıcı yok." : "Bu dönemde teneffüste açık kalan tahta yok.") +
-            (p.excluded_count ? ` (${p.excluded_count} lig dışı sayılmadı)` : "") + `</div></div>`;
+            (p.excluded_count ? ` (${p.excluded_count} sıralama dışı sayılmadı)` : "") + `</div></div>`;
         }
         const scale = Math.max(...rows.map(r => r.seconds), 1);
         const podium = [1, 0, 2].filter(i => rows[i]).map(i => {
@@ -276,7 +276,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
             : "") +
           // Liste yalnız sınırda (API limit 10) kesilmiştir; daha kısaysa ölçütte süresi olanların hepsidir.
           (rows.length >= ankamon.ui.sessions.BreakLeague.BREAK_LIST_LIMIT ? ` · ilk ${rows.length} gösteriliyor` : "") +
-          (p.excluded_count ? ` · ${p.excluded_count} lig dışı ${this.__out.withExcluded() ? "dahil" : "sayılmadı"}` : "") + `</div>`;
+          (p.excluded_count ? ` · ${p.excluded_count} sıralama dışı ${this.__out.withExcluded() ? "dahil" : "sayılmadı"}` : "") + `</div>`;
         return `<div class="lg-card">${head}<div class="lg-podium">${podium}</div><div class="lg-bars">${bars}</div>${foot}</div>`;
       };
 

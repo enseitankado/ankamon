@@ -28,6 +28,13 @@
 /**
  * Genel bakış: tahta sayıları, son 24 saatin log yoğunluğu, son hatalar ve görevler. Her bilgi
  * kartının ipucu yalnız kendi konusunu, güncel değerlerle anlatır (bkz. __tip).
+ *
+ * Kartların altında yan yana (kullanıcı isteği 2026-11-06), her biri yalnız yetkisi olana:
+ *  - "Toplam disk kullanımı" (yetki "logs.manage"): Disk kullanımı ▸ Özet'in daire grafiği, küçük. Hesabı yavaş
+ *    olduğundan tampondan çizilir; tampon CACHE_MS'ten eskiyse arkada yeniden hesaplanır (bkz. ui.DiskUsageSummary).
+ *    Dilime/satıra tıklama o veri türünün sekmesini açar.
+ *  - "Tahta sağlığı — acil bulgular" (yetki "anomalies" ya da "diagnose"): Tahta sağlığı ▸ Durum'daki Acil bulgular
+ *    (GET /api/board-health). Çift tık: Tahta sağlığı ▸ Durum.
  */
 qx.Class.define("ankamon.page.Dashboard", {
   extend: ankamon.page.Base,
@@ -48,6 +55,8 @@ qx.Class.define("ankamon.page.Dashboard", {
         this.__stats.setWidth(width);
       }
     });
+
+    this.__createHealthRow();
 
     this.add(new qx.ui.basic.Label("Son 24 saatte hata düzeyindeki kayıtlar").set({ font: "bold" }));
     this.__errors = this._createTable([
@@ -78,15 +87,125 @@ qx.Class.define("ankamon.page.Dashboard", {
     });
   },
 
+  statics: {
+    /** Disk ve acil bulgular satırının yüksekliği (px). */
+    HEALTH_ROW_HEIGHT: 300
+  },
+
   members: {
+    __diskHtml: null,
+    __diskNote: null,
+    __urgent: null,
+    __urgentRows: null,
+    __urgentTitle: null,
     __stats: null,
     __errors: null,
     __jobs: null,
     __errorRows: null,
     __jobRows: null,
 
+    /** Kartların altındaki satır: toplam disk kullanımı + Tahta sağlığı acil bulguları (yetkiye göre). */
+    __createHealthRow() {
+      const disk = this._can("logs.manage");
+      const health = this._can("anomalies") || this._can("diagnose");
+      if (!disk && !health) {
+        return;
+      }
+      const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(16)).set({ height: ankamon.page.Dashboard.HEALTH_ROW_HEIGHT });
+      if (disk) {
+        const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
+        const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "bottom" }));
+        head.add(new qx.ui.basic.Label("Toplam disk kullanımı").set({ font: "bold" }));
+        this.__diskNote = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true });
+        head.add(this.__diskNote);
+        box.add(head);
+        this.__diskHtml = new qx.ui.embed.Html("").set({ overflowY: "auto", minWidth: 470 });
+        this.__diskHtml.addListenerOnce("appear", () => {
+          this.__diskHtml.getContentElement().getDomElement().addEventListener("click", e => {
+            const hit = e.target.closest && e.target.closest("[data-mode]");
+            if (hit) {
+              qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { diskUsage: hit.getAttribute("data-mode") });
+            }
+          });
+        });
+        box.add(this.__diskHtml, { flex: 1 });
+        row.add(box);
+      }
+      if (health) {
+        const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
+        this.__urgentTitle = new qx.ui.basic.Label("Tahta sağlığı — acil bulgular").set({ font: "bold" });
+        box.add(this.__urgentTitle);
+        this.__urgent = this._createTable([
+          { id: "board", label: "Tahta", width: 150 },
+          { id: "check", label: "Bulgu", width: 220 },
+          { id: "path", label: "Yol", width: 110 },
+          { id: "at", label: "Zaman", width: 140 },
+          { id: "text", label: "Ayrıntı" }
+        ], { prefsKey: "dashboard.urgent.columns" });
+        this.__urgent.setToolTipText("Çift tıklayın: Tahta sağlığı ▸ Durum");
+        this.__urgent.addListener("cellDbltap", () =>
+          qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "anomalies", tab: "status" }));
+        box.add(this.__urgent, { flex: 1 });
+        row.add(box, { flex: 1 });
+      }
+      this.add(row);
+    },
+
+    /** Toplam disk kullanımı: tampondan hemen; tampon yok ya da eskiyse arkada yeniden hesaplanıp çizilir. */
+    __refreshDisk() {
+      if (!this.__diskHtml) {
+        return;
+      }
+      const S = ankamon.ui.DiskUsageSummary;
+      const draw = res => {
+        if (this.isDisposed() || !res) {
+          return;
+        }
+        this.__diskHtml.setHtml(S.html(res.items, res.disk, { radius: 75, font: 12 }));
+        this.__diskNote.setValue(`hesaplandı: ${ankamon.util.Format.ago(Math.floor(res.at / 1000))}`);
+      };
+      const cached = S.cached();
+      draw(cached);
+      if (!cached) {
+        this.__diskHtml.setHtml(`<div style="padding:12px;opacity:.7">Hesaplanıyor… (veri türlerinin boyutları toplanıyor)</div>`);
+      }
+      if (!cached || Date.now() - cached.at > S.CACHE_MS) {
+        S.compute(ankamon.ui.DiskUsage.specs()).then(draw).catch(() => {
+          if (!cached && !this.isDisposed()) {
+            this.__diskHtml.setHtml(`<div style="padding:12px;opacity:.7">Disk kullanımı alınamadı.</div>`);
+          }
+        });
+      }
+    },
+
+    /** Tahta sağlığı ▸ Durum'daki Acil bulgular. */
+    async __refreshUrgent() {
+      if (!this.__urgent) {
+        return;
+      }
+      const F = ankamon.util.Format;
+      const P = ankamon.ui.health.Status.PATH;
+      let data;
+      try {
+        data = await ankamon.io.Api.get("/board-health");
+      } catch (e) {
+        return;
+      }
+      if (this.isDisposed()) {
+        return;
+      }
+      const bad = (data.findings || []).filter(f => f.level === "bad");
+      const boards = new Set(bad.map(f => f.board_id ?? f.board));
+      this.__urgentTitle.setValue(bad.length ? `Tahta sağlığı — acil bulgular (${boards.size} tahtada ${bad.length})`
+        : "Tahta sağlığı — acil bulgu yok");
+      this.__urgent.getTableModel().setData(bad.map((f, i) => [i, f.board || "?", f.check, P[f.path] ? P[f.path].text : f.path,
+        f.since ? ankamon.ui.health.Status.when(f.since) : "", (f.text || "") + (f.advice ? ` — Öneri: ${f.advice}` : "")]));
+    },
+
     async _refresh() {
       const F = ankamon.util.Format;
+      this.__refreshDisk();
+      this.__refreshUrgent();
       const data = await ankamon.io.Api.get("/dashboard");
       const logs = data.log_histogram.reduce((sum, bucket) => sum + bucket.total, 0);
       const errors = data.log_histogram.reduce((sum, bucket) => sum + bucket.errors, 0);

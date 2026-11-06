@@ -308,8 +308,11 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
         stack: true,
         orientation: { axis: "top", item: "top" },
         groupOrder: "content",
+        // Tekerlek dikey kaydırır, Ctrl+tekerlek yakınlaştırır/uzaklaştırır (kullanıcı isteği; vis: zoomKey basılı değilken
+        // tekerlek verticalScroll'a gider).
         verticalScroll: true,
         horizontalScroll: false,
+        zoomKey: "ctrlKey",
         showCurrentTime: true,
         zoomMin: 5 * 60 * 1000,
         hiddenDates: this.__hiddenDates(),

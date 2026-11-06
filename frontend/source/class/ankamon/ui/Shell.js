@@ -139,7 +139,7 @@ qx.Class.define("ankamon.ui.Shell", {
       dashboard: "◈", boards: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
       info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", bulk: "⇄", wakeScreen: "☀", sleepScreen: "☾", screenLock: "🔐", screenUnlock: "🔓", cast: "⇪", logout: "⏏", lock: "🔒", password: "🔑", diagnose: "⚕", system: "⚒", diskusage: "⛁", software: "⬢",
-      network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "♥",
+      network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "♥", leagues: "🏆",
       screenshot: "📷", keyboard: "⌨", mouse: "🖱", touch: "☝", unlockInput: "🔓", relay: "⇶", relayStop: "⏹", chat: "💬", web: "🌐", webFilter: "🛡", wifi: "📶", movements: "☰"
     },
 
@@ -164,8 +164,11 @@ qx.Class.define("ankamon.ui.Shell", {
       // etiket, Zaman çizelgesinde userData "key" (eski adı "Kullanıcılar" — bkz. ui.sessions.Users).
       { id: "sessions", label: "Oturumlar", feature: "logs", collapsed: true, create: u => new ankamon.page.Sessions(u),
         tabs: [{ key: "Oturumlar", label: "Oturumlar" }, { key: "timeline", label: "Zaman çizelgesi" }, { key: "movements", label: "Hareketler" },
-          { key: "chat", label: "Sohbet geçmişi" }, { key: "league", label: "Şampiyonlar Ligi" },
-          { key: "breakLeague", label: "Teneffüs Ligi" }] },
+          { key: "chat", label: "Sohbet geçmişi" }] },
+      // Ligler (kullanıcı isteği 2026-11-06): eskiden Oturumlar'ın "Şampiyonlar Ligi" / "Teneffüs Ligi" sekmeleri; adları
+      // "Kullanım sıralaması" / "Ders arası sıralaması" oldu (bkz. page.Leagues). Eski bağlantılar __openPage'de yönlenir.
+      { id: "leagues", label: "Ligler", feature: "logs", collapsed: true, create: u => new ankamon.page.Leagues(u),
+        tabs: [{ key: "league", label: "Kullanım sıralaması" }, { key: "breakLeague", label: "Ders arası sıralaması" }] },
       // Tahta sağlığı: sorun tespiti (SSH denetimi) ile anomaliler (sürekli izleme) tek bölümde — bkz. page.Anomalies,
       // ui.health.Status. Kimlik "anomalies" kalır (nav_order, hatırlanan sekme); features: ikisinden biri yeterli, sekme
       // başına yetki sayfanın içinde. Eski "Bakım ▸ Bakım/Yardım" bağlantıları __openPage'de buraya yönlenir.
@@ -190,7 +193,8 @@ qx.Class.define("ankamon.ui.Shell", {
         create: u => new ankamon.page.Maintenance(u),
         tabs: () => [{ key: "metrics", label: "Sensörler", feature: "metrics" }]
           .concat(ankamon.ext.Extensions.maintenanceTabs().map(t => ({ key: t.key, label: t.label, feature: t.feature }))) },
-      { id: "logs", label: "Loglar", feature: "logs", collapsed: true, create: u => new ankamon.page.Logs(u),
+      // Loglar Sistem'in altında (kullanıcı isteği 2026-11-06); Sistem'e yetkisi olmayanlarda kökte (bkz. __createTree).
+      { id: "logs", label: "Loglar", feature: "logs", parent: "system", collapsed: true, create: u => new ankamon.page.Logs(u),
         tabs: () => ankamon.ui.Shell.LOG_KINDS.map(kind => ({ key: kind.mode, label: kind.label })) },
       // Ağ envanteri: altında sunucunun bağlı olduğu fiziksel ağlar (dinamik, bkz. __fillNetworks).
       { id: "network", label: "Ağ", feature: "network", create: u => new ankamon.page.Network(u) },
@@ -646,6 +650,9 @@ qx.Class.define("ankamon.ui.Shell", {
       }
       if (data.page === "metrics") {
         data = { ...data, page: "diagnose", tab: "metrics" }; // Sensörler: "diagnose" sayfasının sekmesi (Tahtalar altında)
+      }
+      if (data.page === "sessions" && ["league", "breakLeague"].includes(data.tab)) {
+        data = { ...data, page: "leagues" }; // sıralamalar Ligler sayfasında
       }
       if (data.page === "diagnose" && (!data.tab || data.tab === "diagnose" || data.tab === "help")) {
         data = { ...data, page: "anomalies", tab: data.tab === "help" ? "help" : "reports" }; // sorun tespiti Tahta sağlığı'nda

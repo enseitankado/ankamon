@@ -43,8 +43,8 @@
  * Rapor bir grid'dir: her tahta bir satır (Tahta, IP, Genel durum, Acil, Dikkat, Bilgi, Başlıca bulgu, Denetim zamanı,
  * Başlatan). Sütunlar sıralanabilir ve başlıktaki kutuyla süzülür (serbest yazım + hazır değer listesi; Tahta, Genel durum,
  * Acil, Dikkat, Bilgi'de liste her zaman — kullanıcı isteği, eski "Tahta" seçicisinin yerine). Altta seçili tahtanın
- * bulguları ve önerileri (tahta seçilmeden boş, başlık satırı yok); ayırıcı Durum'daki gibi kalın. "Göster" kutuları düzeye
- * göre süzer. Hepsi sunucuya gitmeden son rapor verisinden yeniden çizilir (bkz. __render / __apply).
+ * bulguları ve önerileri (tahta seçilmeden boş, başlık satırı yok); ayırıcı Durum'daki gibi kalın. Düzeye göre süzme
+ * grid'in Genel durum / Acil / Dikkat / Bilgi sütunlarında (üstteki eski "Göster" kutuları kalktı — kullanıcı isteği). Hepsi sunucuya gitmeden son rapor verisinden yeniden çizilir (bkz. __render / __apply).
  * Durum'daki SSH bulgusuna çift tık → showBoard(): "Son durum" + grid o tahtaya süzülür.
  */
 qx.Class.define("ankamon.page.Diagnose", {
@@ -86,7 +86,6 @@ qx.Class.define("ankamon.page.Diagnose", {
     top.add(this.__status, { flex: 1 });
     this.add(top);
 
-    this.add(this.__createReportFilter());
 
     const split = new qx.ui.splitpane.Pane("vertical");
     const thick = ankamon.ui.health.Status.SPLITTER;
@@ -164,7 +163,6 @@ qx.Class.define("ankamon.page.Diagnose", {
     __tabButton: null,
     __started: null,
     __html: null,
-    __levelBoxes: null,
     __jobId: null,
     __job: null,
     __schedule: null,
@@ -328,21 +326,6 @@ qx.Class.define("ankamon.page.Diagnose", {
       this.__apply();
     },
 
-    /** Süzgeç satırı: düzey (çoklu). Tahta süzgeci grid'in kendi sütun süzgecindedir. */
-    __createReportFilter() {
-      const L = ankamon.page.Diagnose.LEVEL;
-      const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(12).set({ alignY: "middle" }));
-      row.add(new qx.ui.basic.Label("Göster:"));
-      this.__levelBoxes = {};
-      ankamon.page.Diagnose.ORDER.forEach(level => {
-        const box = new qx.ui.form.CheckBox(L[level].text).set({ value: true });
-        box.addListener("changeValue", this.__render, this);
-        this.__levelBoxes[level] = box;
-        row.add(box);
-      });
-      return row;
-    },
-
     __parse(t) {
       if (t.status !== "ok") {
         return null;
@@ -358,14 +341,13 @@ qx.Class.define("ankamon.page.Diagnose", {
       return !!this.__job && ["queued", "running"].includes(this.__job.status);
     },
 
-    /** Seçili düzeylerdeki bulgular. */
+    /** Tahtanın bütün bulguları (düzey süzgeci grid sütunlarında). */
     __visibleChecks(t) {
-      const levels = new Set(ankamon.page.Diagnose.ORDER.filter(l => this.__levelBoxes[l].getValue()));
       const r = this.__parse(t);
-      return r ? r.checks.filter(c => levels.has(c.level)) : [];
+      return r ? r.checks : [];
     },
 
-    /** Rapor verisinden grid satırları (Göster kutularına göre) → __apply. */
+    /** Rapor verisinden grid satırları → __apply. */
     __render() {
       this.__started.setValue(this.__startedHtml());
       this.__updateTabHint();
@@ -377,7 +359,6 @@ qx.Class.define("ankamon.page.Diagnose", {
       // Yalnız görev SÜRERKEN "Denetleniyor/Sırada": görev bittiyse (ör. yürütücü yeniden başladı) hâlâ
       // queued/running duran satır yarıda kalmıştır — sonsuza dek "Denetleniyor…" görünmesin.
       const jobRunning = this.__jobRunning();
-      const levels = new Set(ORDER.filter(l => this.__levelBoxes[l].getValue()));
       this.__targets = new Map();
       const rows = [];
       targets.forEach(t => {
@@ -385,10 +366,6 @@ qx.Class.define("ankamon.page.Diagnose", {
         const r = this.__parse(t);
         const pending = jobRunning && ["queued", "running"].includes(t.status);
         const halted = !jobRunning && ["queued", "running"].includes(t.status);
-        // Göster süzgeci: bağlanılamayan = "Acil"; sürmekte/sırada olan her zaman görünür.
-        if (!pending && (r ? !(levels.has(r.level) || this.__visibleChecks(t).length) : !levels.has("bad"))) {
-          return;
-        }
         let state, rank, counts = [null, null, null], top = "";
         if (pending) {
           state = t.status === "running" ? S.RUNNING : S.QUEUED;
@@ -531,7 +508,7 @@ qx.Class.define("ankamon.page.Diagnose", {
         });
       });
       if (!any) {
-        h += `<tr><td colspan="5" style="${td};opacity:.7">Seçili düzeylerde bulgu yok.</td></tr>`;
+        h += `<tr><td colspan="5" style="${td};opacity:.7">Bulgu yok.</td></tr>`;
       }
       this.__html.setHtml(h + "</table></div>");
     }

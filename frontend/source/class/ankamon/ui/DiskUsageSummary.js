@@ -30,6 +30,10 @@
  * kapladığı alan bir daire grafikte (dilim = sekme) ve yanındaki listede. Dilime ya da liste
  * satırına tıklamak o sekmeyi açar. Boyutlar her sekmenin kendi uç noktasının toplamıdır
  * (spec.size(), bkz. ui.DiskUsage); sekme her göründüğünde tazelenir.
+ *
+ * Toplamları hesaplamak yavaş (her veri türünün uç noktası ayrı sorgu): sonuç tamponlanır (CACHE_MS; tarayıcıda
+ * localStorage'da da — sayfa yeniden yüklenince Genel bakış hemen gösterir, eskiyse arkada yeniler). Genel bakış'taki
+ * küçük grafik aynı tamponu ve çizimi kullanır (bkz. statics cached/html, page.Dashboard).
  */
 qx.Class.define("ankamon.ui.DiskUsageSummary", {
   extend: qx.ui.tabview.Page,
@@ -68,48 +72,66 @@ qx.Class.define("ankamon.ui.DiskUsageSummary", {
 
   statics: {
     // Sekme sırasıyla dilim renkleri (açık ve koyu temada okunur, birbirinden ayrışan tonlar).
-    COLORS: ["#1f77b4", "#ff7f0e", "#9467bd", "#2ca02c", "#8c564b", "#d62728", "#17becf", "#bcbd22"]
-  },
+    COLORS: ["#1f77b4", "#ff7f0e", "#9467bd", "#2ca02c", "#8c564b", "#d62728", "#17becf", "#bcbd22"],
+    /** Tampon ömrü: bundan eskiyse Genel bakış arkada yeniden hesaplatır. */
+    CACHE_MS: 15 * 60 * 1000,
+    __STORE: "ankamon.diskusage.summary",
+    __cache: null,
+    __pending: null,
 
-  members: {
-    __specs: null,
-    __status: null,
-    __html: null,
-    __loading: false,
-
-    async load() {
-      if (this.__loading) {
-        return;
+    /** Bütün veri türlerinin boyutları (yavaş). Sonuç tampona yazılır. @return {Promise<Map>} {items, disk, at} */
+    compute(specs) {
+      const S = ankamon.ui.DiskUsageSummary;
+      if (S.__pending) {
+        return S.__pending;
       }
-      this.__loading = true;
-      this.__status.setValue("Yükleniyor…");
-      try {
-        // Biri hata verirse diğerleri yine gösterilir (dilimi olmaz, listede "—").
-        const results = await Promise.all(this.__specs.map(spec => spec.size().catch(e => ({ error: e }))));
-        const items = this.__specs.map((spec, i) => ({
-          mode: spec.mode, label: spec.label, color: ankamon.ui.DiskUsageSummary.COLORS[i % 8],
-          bytes: results[i].error ? null : results[i].bytes, error: results[i].error
-        }));
-        const disk = (results.find(r => r.disk) || {}).disk;
-        this.__render(items, disk);
-        const F = ankamon.util.Format;
-        const total = items.reduce((sum, it) => sum + (it.bytes || 0), 0);
-        this.__status.setValue(`Toplam ${F.bytes(total)}` + (disk && disk.total != null && disk.free != null
-          ? ` · Disk (/data): toplam ${F.bytes(disk.total)}, boş ${F.bytes(disk.free)}` : "") +
-          " · bir dilime ya da satıra tıklayınca o sekme açılır");
-      } catch (e) {
-        this.__status.setValue("");
-        ankamon.ui.Dialog.error(e);
-      } finally {
-        this.__loading = false;
-      }
+      S.__pending = (async () => {
+        try {
+          // Biri hata verirse diğerleri yine gösterilir (dilimi olmaz, listede "—").
+          const results = await Promise.all(specs.map(spec => spec.size().catch(e => ({ error: e }))));
+          const items = specs.map((spec, i) => ({
+            mode: spec.mode, label: spec.label, color: S.COLORS[i % 8],
+            bytes: results[i].error ? null : results[i].bytes, error: results[i].error ? String(results[i].error.message || results[i].error) : null
+          }));
+          const disk = (results.find(r => r.disk) || {}).disk || null;
+          S.__cache = { items, disk, at: Date.now() };
+          try {
+            localStorage.setItem(S.__STORE, JSON.stringify(S.__cache));
+          } catch (e) {
+            // depolama dolu/kapalı: yalnız bellekte tampon
+          }
+          return S.__cache;
+        } finally {
+          S.__pending = null;
+        }
+      })();
+      return S.__pending;
     },
 
-    __render(items, disk) {
+    /** Tampondaki son sonuç (bellek, yoksa localStorage) — eski olabilir (at'e bakın); yoksa null. */
+    cached() {
+      const S = ankamon.ui.DiskUsageSummary;
+      if (!S.__cache) {
+        try {
+          S.__cache = JSON.parse(localStorage.getItem(S.__STORE) || "null");
+        } catch (e) {
+          S.__cache = null;
+        }
+      }
+      return S.__cache;
+    },
+
+    /**
+     * Daire grafik + liste HTML'i. @param opts {Map?} {radius: 120, font: 14, hint: true}
+     * Dilim ve satırlarda data-mode var (tıklama kapsayıcıda ele alınır).
+     */
+    html(items, disk, opts = {}) {
       const F = ankamon.util.Format;
       const esc = qx.bom.String.escape;
       const total = items.reduce((sum, it) => sum + (it.bytes || 0), 0);
-      const R = 120, C = 130;
+      const R = opts.radius || 120, C = R + 10;
+      const font = opts.font || 14;
+      const pad = opts.radius && opts.radius < 100 ? "2px 6px" : "5px 8px";
       let svg;
       const shown = items.filter(it => it.bytes > 0);
       if (!total) {
@@ -134,20 +156,51 @@ qx.Class.define("ankamon.ui.DiskUsageSummary", {
       }
       const pct = it => it.bytes == null || !total ? "" : "%" + (it.bytes / total * 100).toFixed(1);
       const rows = items.map(it =>
-        `<tr data-mode="${it.mode}" style="cursor:pointer">` +
-        `<td style="padding:5px 8px"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;` +
+        `<tr data-mode="${it.mode}" style="cursor:pointer" title="${esc(it.label)}: ${it.error ? "okunamadı" : F.bytes(it.bytes)} — tıklayınca o sekme açılır">` +
+        `<td style="padding:${pad}"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;` +
         `background:${it.color};vertical-align:middle;margin-right:8px"></span>${esc(it.label)}</td>` +
-        `<td style="padding:5px 8px;text-align:right;white-space:nowrap">${it.error ? "—" : F.bytes(it.bytes)}</td>` +
-        `<td style="padding:5px 8px;text-align:right;opacity:.7">${pct(it)}</td></tr>`).join("");
-      this.__html.setHtml(
-        `<style>.tm-du .slice:hover{opacity:.8}.tm-du tr[data-mode]:hover{background:rgba(127,127,127,.15)}</style>` +
-        `<div class="tm-du" style="display:flex;flex-wrap:wrap;gap:32px;align-items:center;padding:12px">` +
+        `<td style="padding:${pad};text-align:right;white-space:nowrap">${it.error ? "—" : F.bytes(it.bytes)}</td>` +
+        `<td style="padding:${pad};text-align:right;opacity:.7">${pct(it)}</td></tr>`).join("");
+      const diskRow = disk && disk.total != null && disk.free != null
+        ? `<tr style="opacity:.75"><td style="padding:${pad}" colspan="3">Disk (/data): toplam ${F.bytes(disk.total)}, boş ${F.bytes(disk.free)}</td></tr>` : "";
+      return `<style>.tm-du .slice:hover{opacity:.8}.tm-du tr[data-mode]:hover{background:rgba(127,127,127,.15)}</style>` +
+        `<div class="tm-du" style="display:flex;flex-wrap:wrap;gap:${R < 100 ? 16 : 32}px;align-items:center;padding:${R < 100 ? 4 : 12}px">` +
         `<svg width="${2 * C}" height="${2 * C}" viewBox="0 0 ${2 * C} ${2 * C}" role="img" aria-label="Disk kullanımı dağılımı">${svg}</svg>` +
-        `<table style="border-collapse:collapse;font-size:14px;min-width:300px">` +
-        `<tr style="opacity:.7"><th style="text-align:left;padding:5px 8px">Veri</th><th style="text-align:right;padding:5px 8px">Boyut</th>` +
-        `<th style="text-align:right;padding:5px 8px">Pay</th></tr>${rows}` +
-        `<tr style="border-top:1px solid rgba(127,127,127,.4);font-weight:600"><td style="padding:5px 8px">Toplam</td>` +
-        `<td style="padding:5px 8px;text-align:right">${F.bytes(total)}</td><td></td></tr></table></div>`);
+        `<table style="border-collapse:collapse;font-size:${font}px;min-width:${R < 100 ? 220 : 300}px">` +
+        `<tr style="opacity:.7"><th style="text-align:left;padding:${pad}">Veri</th><th style="text-align:right;padding:${pad}">Boyut</th>` +
+        `<th style="text-align:right;padding:${pad}">Pay</th></tr>${rows}` +
+        `<tr style="border-top:1px solid rgba(127,127,127,.4);font-weight:600"><td style="padding:${pad}">Toplam</td>` +
+        `<td style="padding:${pad};text-align:right">${F.bytes(total)}</td><td></td></tr>${diskRow}</table></div>`;
+    }
+  },
+
+  members: {
+    __specs: null,
+    __status: null,
+    __html: null,
+    __loading: false,
+
+    async load() {
+      if (this.__loading) {
+        return;
+      }
+      this.__loading = true;
+      this.__status.setValue("Yükleniyor…");
+      try {
+        const res = await ankamon.ui.DiskUsageSummary.compute(this.__specs);
+        this.__html.setHtml(ankamon.ui.DiskUsageSummary.html(res.items, res.disk));
+        const F = ankamon.util.Format;
+        const total = res.items.reduce((sum, it) => sum + (it.bytes || 0), 0);
+        const disk = res.disk;
+        this.__status.setValue(`Toplam ${F.bytes(total)}` + (disk && disk.total != null && disk.free != null
+          ? ` · Disk (/data): toplam ${F.bytes(disk.total)}, boş ${F.bytes(disk.free)}` : "") +
+          " · bir dilime ya da satıra tıklayınca o sekme açılır");
+      } catch (e) {
+        this.__status.setValue("");
+        ankamon.ui.Dialog.error(e);
+      } finally {
+        this.__loading = false;
+      }
     }
   }
 });
