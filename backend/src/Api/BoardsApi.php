@@ -50,7 +50,14 @@ final class BoardsApi
         (SELECT r.source_board_id FROM screen_relays r WHERE r.target_board_id = b.id) AS relay_source,
         EXISTS (SELECT 1 FROM screen_relays r WHERE r.source_board_id = b.id) AS relay_is_source,
         extract(epoch FROM b.last_seen_at)::bigint AS last_seen_at,
-        extract(epoch FROM GREATEST(b.last_log_at, rl.at))::bigint AS last_log_at";
+        extract(epoch FROM GREATEST(b.last_log_at, rl.at))::bigint AS last_log_at,
+        -- Kablo için logdan kanıt (Tahtalar ▸ Kablo, oturum yoklaması yokken/eskiyken): son 2 dk'da tahtanın IP'sinden
+        -- log geldi VE ağ taramasının o IP için gördüğü MAC tahtanın kablolu kartının MAC'i (bkz. netifs) → loglar
+        -- kablolu karttan, yerel kablolu ağdan geliyor.
+        (rl.ip_log AND EXISTS (
+            SELECT 1 FROM net_devices d, jsonb_array_elements(b.netifs->'ifaces') i
+            WHERE i->>'kind' = 'ethernet' AND d.ip = b.ip AND lower(d.mac::text) = lower(i->>'mac')
+        )) AS cable_log";
 
     /**
      * boards + "şu anda log mu geliyor" (rl) — yalnız last_log_at'i hemen göstermek için (bir tahta
@@ -61,7 +68,7 @@ final class BoardsApi
      * gösterebilirdi). logs_host_time_idx (host, received_at DESC) bu sorguyu indeksli tutar.
      */
     private const FROM = "FROM boards b LEFT JOIN LATERAL (
-        SELECT max(received_at) AS at FROM logs
+        SELECT max(received_at) AS at, bool_or(from_ip = host(b.ip)) AS ip_log FROM logs
         WHERE received_at > now() - interval '2 minutes'
           AND (lower(host) = lower(b.hostname) OR from_ip = host(b.ip))
     ) rl ON true";

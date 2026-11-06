@@ -75,6 +75,8 @@ qx.Class.define("ankamon.page.Boards", {
       // Wi-Fi kartı etkin mi (bkz. ui.FactsView.wifiStatus — Bilgi kartıyla aynı kural). Donanım
       // bilgisiyle birlikte toplanır; Wi-Fi aç/kapat işlemi sonrası runner hemen günceller.
       { id: "wifi", label: "Wi-Fi", width: 110 },
+      // Tahta yerel ağa kablolu kartıyla bağlı mı (internet değil) — bkz. Boards.cableText.
+      { id: "cable", label: "Kablo", hint: "Yerel ağa kablolu ağ kartıyla bağlı mı", width: 100 },
       // Donanım bilgisi (bkz. worker/ankamon/executor/hwfacts.py): tahta ilk kez tanınırken (MAC
       // öğrenilirken) bir kez SSH ile toplanır; satır sağ menüsündeki "Bilgi kartı" bunu canlı
       // tazeler (60dk önbellekli). Değer yoksa (henüz toplanmadıysa) hücre boş kalır.
@@ -222,6 +224,36 @@ qx.Class.define("ankamon.page.Boards", {
       ["disk_temp", "Disk sıcaklığı (HDD)"], ["fan", "Fan hızı"], ["battery", "CMOS pili"]
     ],
 
+    /** Oturum yoklamasının ağ kartı bilgisi (netifs) bu kadar saniyeden eskiyse "Kablo" logdan kanıta bakar. */
+    CABLE_FRESH_S: 300,
+
+    /**
+     * "Kablo" sütununun metni: tahta yerel ağa KABLOLU kartıyla bağlı mı (internet değil; Wi-Fi ile de bağlı
+     * olabilir). Asıl kaynak oturum yoklaması (30 sn, aynı SSH turu — bkz. worker executor/netif.py): kablolu
+     * kartta kablo sinyali (carrier) + NetworkManager "bağlı" (100) + IPv4 → "Bağlı"; sinyal var ama bağlantı
+     * yoksa "Bağlantı yok"; sinyal yoksa "Takılı değil"; kablolu kart yoksa "Kart yok". Yoklama eskiyse
+     * (CABLE_FRESH_S) logdan kanıt: son 2 dk'da tahtanın IP'sinden log geldi ve o IP'nin MAC'i kablolu kartınki
+     * (BoardsApi cable_log) → "Bağlı (log)". Kapalı tahtada boş (bilinmiyor).
+     */
+    cableText(board) {
+      const wired = ((board.netifs && board.netifs.ifaces) || []).filter(i => i.kind === "ethernet");
+      if (!board.online) {
+        return "";
+      }
+      const fresh = board.netifs && board.session_checked_at &&
+        Date.now() / 1000 - board.session_checked_at < ankamon.page.Boards.CABLE_FRESH_S;
+      if (fresh) {
+        if (!wired.length) {
+          return "Kart yok";
+        }
+        if (wired.some(i => i.carrier && i.state === 100 && (i.ipv4 || []).length)) {
+          return "Bağlı";
+        }
+        return wired.some(i => i.carrier) ? "Bağlantı yok" : "Takılı değil";
+      }
+      return board.cable_log ? "Bağlı (log)" : "";
+    },
+
     /**
      * "Oturum" sütununun metni: çevrimdışı ya da henüz yoklanmamış tahtada boş (bilinmiyor), oturum
      * yoksa "Oturum kapalı", varsa kullanıcı adı — oturum kilitliyse (dm-tool lock) "(kilitli)" ekiyle.
@@ -368,6 +400,7 @@ qx.Class.define("ankamon.page.Boards", {
             board.hostname, board.ip, board.mac, F.etap(board.etap),
             ankamon.page.Boards.sessionText(board),
             (ankamon.ui.FactsView.wifiStatus(board.facts) || { text: "" }).text,
+            ankamon.page.Boards.cableText(board),
             board.facts.disk_total_bytes ? F.bytes(board.facts.disk_total_bytes) : "",
             board.facts.mem_installed_bytes || board.facts.mem_total_bytes ? ankamon.ui.FactsView.ramText(board.facts, false) : "",
             board.facts.bios_version || "", board.facts.kernel_version || "", board.facts.motherboard_model || "",
