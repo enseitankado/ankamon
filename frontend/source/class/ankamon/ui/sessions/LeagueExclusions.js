@@ -45,7 +45,8 @@ qx.Class.define("ankamon.ui.sessions.LeagueExclusions", {
     LEAGUE_EXCLUSION_TEXTS: {
       "session/user": { title: "Şampiyonlar Ligi — lig dışı kullanıcılar", noun: "kullanıcı" },
       "session/board": { title: "Şampiyonlar Ligi — lig dışı tahtalar", noun: "tahta" },
-      "break/board": { title: "Teneffüs Ligi — lig dışı tahtalar", noun: "tahta" }
+      "break/board": { title: "Teneffüs Ligi — lig dışı tahtalar", noun: "tahta" },
+      "break/user": { title: "Teneffüs Ligi — lig dışı kullanıcılar", noun: "kullanıcı" }
     },
 
     /**

@@ -23,7 +23,8 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Teneffüs Ligi verisi: ders aralarında açık kalan tahtalar → break_league_days. Bkz. db/migrations/041_break_league.sql.
+"""Teneffüs Ligi verisi: ders aralarında açık kalan tahtalar → break_league_days, kullanıcı bazında →
+break_league_user_days. Bkz. db/migrations/041_break_league.sql, 044_break_league_users.sql.
 
 Teneffüs pencereleri Ayarlar ▸ Ders saatleri'nden (settings.lesson_times): tanımlı okul günlerinde ardışık iki dersin
 arası (teneffüsler ve öğle arası; ilk dersten önce ve son dersten sonra sayılmaz). Tahta başına gün başına:
@@ -47,9 +48,11 @@ log = logging.getLogger(__name__)
 
 _FINAL_CURSOR = "break_league.final_day"
 _SCHEDULE_CURSOR = "break_league.schedule"
+_USERS_CURSOR = "break_league.users"  # kullanıcı tablosu (göç 044) dolduruldu mu — yoksa oturum kaydı olan günler baştan
 _FINAL_LAG = 2  # bu kadar günden eski günler kesinleşmiş sayılır
 
-_COMPUTE = r"""
+# Ortak kısım: teneffüs pencereleri (win) ve tahtanın gün başına teneffüste açık kaldığı aralıklar (up.on_mr).
+_BREAK_UP_CTE = r"""
 WITH brk AS (SELECT * FROM unnest(%(starts)s::time[], %(ends)s::time[]) AS b(s, e)),
 days AS (SELECT d::date AS day FROM generate_series(%(d1)s::date, %(d2)s::date, interval '1 day') d
          WHERE extract(isodow FROM d)::int = ANY(%(dows)s::int[])),
@@ -59,7 +62,10 @@ win AS (SELECT d.day, range_agg(tstzrange((d.day + b.s)::timestamptz, (d.day + b
         FROM days d CROSS JOIN brk b GROUP BY d.day),
 up AS (SELECT w.day, w.break_seconds, u.host, range_agg(tstzrange(u.started_at, u.last_at)) * w.w AS on_mr
        FROM win w JOIN board_uptime u ON u.started_at < (w.day + 1)::timestamptz AND u.last_at > w.day::timestamptz
-       GROUP BY w.day, w.break_seconds, w.w, u.host),
+       GROUP BY w.day, w.break_seconds, w.w, u.host)
+"""
+
+_COMPUTE = _BREAK_UP_CTE + r""",
 sess AS (SELECT up.day, up.break_seconds, up.host, up.on_mr,
                 up.on_mr * COALESCE((SELECT range_agg(tstzrange(s.started_at, COALESCE(s.ended_at, now())))
                                      FROM board_sessions s
@@ -75,6 +81,48 @@ SELECT day, host,
        (SELECT COALESCE(sum(extract(epoch FROM upper(r) - lower(r))), 0)::int FROM unnest(s_mr) r),
        break_seconds
 FROM sess
+"""
+
+# Kullanıcı bazında (break_league_user_days, göç 044): tahtanın teneffüste açık aralıkları (up.on_mr)
+#   session_seconds = ∩ kullanıcının o tahtadaki oturumları (aynı anda iki kullanıcı oturumluysa ikisine de yazılır)
+#   idle_seconds    = oturumsuz parçalar (on_mr - bütün oturumlar); her parça, tahtanın O AÇILIŞINDA (parçayı içeren
+#                     board_uptime aralığı) parçadan önce oturumu son kapanan kullanıcıya yazılır — tahtayı giriş
+#                     ekranında açık bırakan. Açılıştan beri kimse oturum açmadıysa parça kimseye yazılmaz.
+# etapadmin/root ve lig dışılar burada elenmez (API eler): son oturum etapadmin'inse parça etapadmin'e yazılır, sayılmaz.
+_COMPUTE_BREAK_USERS = _BREAK_UP_CTE + r""",
+upl AS (SELECT up.day, up.host, up.on_mr FROM up WHERE NOT isempty(up.on_mr)),
+sess_all AS (SELECT upl.*, COALESCE((SELECT range_agg(tstzrange(s.started_at, COALESCE(s.ended_at, now())))
+                                     FROM board_sessions s
+                                     WHERE lower(s.host) = lower(upl.host)
+                                       AND s.started_at < (upl.day + 1)::timestamptz
+                                       AND COALESCE(s.ended_at, now()) > upl.day::timestamptz),
+                                    '{}'::tstzmultirange) AS s_mr
+             FROM upl),
+user_on AS (SELECT upl.day, upl.host, s.username,
+                   range_agg(tstzrange(s.started_at, COALESCE(s.ended_at, now()))) AS u_mr
+            FROM upl JOIN board_sessions s ON lower(s.host) = lower(upl.host)
+                 AND s.started_at < (upl.day + 1)::timestamptz AND COALESCE(s.ended_at, now()) > upl.day::timestamptz
+            GROUP BY upl.day, upl.host, s.username),
+user_sess AS (SELECT o.day, o.host, o.username,
+                     (SELECT COALESCE(sum(extract(epoch FROM upper(r) - lower(r))), 0)
+                      FROM unnest(o.u_mr * upl.on_mr) r) AS session_seconds, 0::numeric AS idle_seconds
+              FROM user_on o JOIN upl ON upl.day = o.day AND upl.host = o.host),
+idle_seg AS (SELECT a.day, a.host, seg FROM sess_all a, unnest(a.on_mr - a.s_mr) seg),
+idle_own AS (SELECT i.day, i.host, own.username, 0::numeric AS session_seconds,
+                    extract(epoch FROM upper(i.seg) - lower(i.seg)) AS idle_seconds
+             FROM idle_seg i
+             JOIN LATERAL (SELECT s.username FROM board_sessions s
+                           WHERE lower(s.host) = lower(i.host) AND s.ended_at <= lower(i.seg)
+                             AND s.ended_at > (SELECT max(u.started_at) FROM board_uptime u
+                                               WHERE u.host = i.host AND u.started_at <= lower(i.seg))
+                           ORDER BY s.ended_at DESC LIMIT 1) own ON true)
+INSERT INTO break_league_user_days (day, username, host, board_id, session_seconds, idle_seconds)
+SELECT day, username, host,
+       (SELECT b.id FROM boards b WHERE lower(b.hostname) = lower(t.host) ORDER BY b.id LIMIT 1),
+       round(sum(session_seconds))::int, round(sum(idle_seconds))::int
+FROM (SELECT * FROM user_sess UNION ALL SELECT * FROM idle_own) t
+GROUP BY day, username, host
+HAVING round(sum(session_seconds)) + round(sum(idle_seconds)) > 0
 """
 
 
@@ -113,9 +161,10 @@ def run(conn) -> None:
     if first is None:
         return
     final = _cursor(conn, _FINAL_CURSOR)
-    if _cursor(conn, _SCHEDULE_CURSOR) != digest:
-        # İlk çalışma: bütün geçmiş. Ders saatleri değişti: oturum kaydı hâlâ olan günler yeni pencerelerle yeniden
-        # hesaplanır (oturumu silinmiş eski günler yeniden hesaplanırsa "oturum açık" süresi yanlışlıkla sıfırlanırdı).
+    if _cursor(conn, _SCHEDULE_CURSOR) != digest or _cursor(conn, _USERS_CURSOR) is None:
+        # İlk çalışma: bütün geçmiş. Ders saatleri değişti (ya da kullanıcı tablosu yeni eklendi): oturum kaydı hâlâ
+        # olan günler yeni pencerelerle yeniden hesaplanır (oturumu silinmiş eski günler yeniden hesaplanırsa "oturum
+        # açık" süresi yanlışlıkla sıfırlanırdı).
         sess_first = conn.execute("SELECT min(started_at)::date AS d FROM board_sessions").fetchone()["d"]
         start = max(first, sess_first) if (final is not None and sess_first) else first
     else:
@@ -123,7 +172,11 @@ def run(conn) -> None:
     start = min(start, today - datetime.timedelta(days=_FINAL_LAG))
     start = max(start, first)
     with conn.transaction():
+        params = {"d1": start, "d2": today, "dows": days, "starts": starts, "ends": ends}
         conn.execute("DELETE FROM break_league_days WHERE day >= %s AND day <= %s", (start, today))
-        conn.execute(_COMPUTE, {"d1": start, "d2": today, "dows": days, "starts": starts, "ends": ends})
+        conn.execute(_COMPUTE, params)
+        conn.execute("DELETE FROM break_league_user_days WHERE day >= %s AND day <= %s", (start, today))
+        conn.execute(_COMPUTE_BREAK_USERS, params)
         _set_cursor(conn, _FINAL_CURSOR, (today - datetime.timedelta(days=_FINAL_LAG + 1)).isoformat())
         _set_cursor(conn, _SCHEDULE_CURSOR, digest)
+        _set_cursor(conn, _USERS_CURSOR, "1")

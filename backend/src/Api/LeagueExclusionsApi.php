@@ -40,13 +40,13 @@ use DateTimeImmutable;
 /**
  * Lig dışı bırakılanlar (league_exclusions — bkz. göç 042): görev gereği sürekli açık/oturumlu kalan tahtalar ve
  * kullanıcılar Şampiyonlar Ligi (league 'session': kullanıcı ve tahta sıralaması) ile Teneffüs Ligi'nden (league
- * 'break': tahta sıralaması) çıkarılır. Veri silinmez; lig API'leri listeyi leagueExcludedValues() ile okur, varsayılan
- * olarak saymaz. Listeleme 'logs', düzenleme 'leagues.exclude' yetkisi ister (bkz. routes.php).
+ * 'break': tahta ve kullanıcı sıralaması) çıkarılır. Veri silinmez; lig API'leri listeyi leagueExcludedValues() ile
+ * okur, varsayılan olarak saymaz. Listeleme 'logs', düzenleme 'leagues.exclude' yetkisi ister (bkz. routes.php).
  */
 final class LeagueExclusionsApi
 {
     /** Lig → dışlanabilen türler. */
-    private const LEAGUE_EXCLUSION_KINDS = ['session' => ['user', 'board'], 'break' => ['board']];
+    private const LEAGUE_EXCLUSION_KINDS = ['session' => ['user', 'board'], 'break' => ['user', 'board']];
 
     /** Ligin o türden dışlanan değerleri (kullanıcı adı küçük harf / tahta host adı). */
     public static function leagueExcludedValues(string $league, string $kind): array
@@ -70,9 +70,12 @@ final class LeagueExclusionsApi
             fn(array $p) => $p['key'] === 'year'
         ))[0];
         if ($kind === 'user') {
+            $source = $league === 'break'
+                ? '(SELECT day, username, session_seconds + idle_seconds AS seconds FROM break_league_user_days)'
+                : 'session_league_parts';
             $rows = Db::all(
                 "SELECT p.username AS value, n.full_name AS label, sum(p.seconds)::bigint AS seconds
-                 FROM session_league_parts p LEFT JOIN session_league_names n ON n.username = p.username
+                 FROM $source p LEFT JOIN session_league_names n ON n.username = p.username
                  WHERE p.day >= ?::date AND p.day < ?::date AND lower(p.username) <> ALL(?::text[])
                  GROUP BY p.username, n.full_name ORDER BY seconds DESC, p.username",
                 [$year['from'], $year['to'], Db::textArray(SessionLeagueApi::LEAGUE_EXCLUDED_USERS)]
