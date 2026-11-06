@@ -113,6 +113,8 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     // çizelgesi (aralık düğmeleri çizelgeyi yönettiği için onunla aynı bölümde). Grid ile alt bölüm
     // arasındaki ayraç sürüklenebilir.
     const split = new qx.ui.splitpane.Pane("vertical");
+    // Ayraç ince olunca fareyle tutmak zordu (kullanıcı bildirimi): temanın görünümü korunur, yalnız kalınlaşır.
+    split.getChildControl("splitter").setHeight(ankamon.ui.sessions.Users.SPLITTER_HEIGHT);
     this.__timeline = new ankamon.ui.sessions.Timeline();
     this.__timeline.addListener("changeRange", e => this.__summarize(e.getData()));
     this.__timeline.addListener("itemContextmenu", e => this.__itemMenu(e.getData()));
@@ -123,7 +125,23 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     });
     const lower = new qx.ui.container.Composite(new qx.ui.layout.VBox(6)).set({ paddingTop: 6 });
     lower.add(ranges);
-    lower.add(this.__summary);
+    // "Gece saatlerini gizle" (kullanıcı isteği): özet satırının sonunda, varsayılan işaretli; seçim
+    // kullanıcı başına sunucuda (users.ui_prefs["timeline.nights.show"] — yalnız işaret kaldırılınca yazılır).
+    const T = ankamon.ui.sessions.Timeline;
+    const prefs = page._user.ui_prefs || {};
+    const nights = new qx.ui.form.CheckBox(`Gece saatlerini gizle (${T.nightHoursText()})`).set({
+      value: prefs[ankamon.ui.sessions.Users.PREF_SHOW_NIGHTS] !== true, alignY: "middle", marginLeft: 12,
+      toolTipText: "Her günün bu saatleri çizelgede gösterilmez; gündüzler yan yana gelir, böylece görünen alan daha verimli kullanılır."
+    });
+    this.__timeline.setNightsHidden(nights.getValue());
+    nights.addListener("changeValue", e => {
+      this.__timeline.setNightsHidden(e.getData());
+      ankamon.page.Base.savePref(page._user, ankamon.ui.sessions.Users.PREF_SHOW_NIGHTS, e.getData() ? null : true);
+    });
+    const summaryRow = new qx.ui.container.Composite(new qx.ui.layout.HBox().set({ alignY: "middle" }));
+    summaryRow.add(this.__summary, { flex: 0 });
+    summaryRow.add(nights);
+    lower.add(summaryRow);
     lower.add(this.__timeline, { flex: 1 });
 
     this.__columns = [
@@ -153,6 +171,12 @@ qx.Class.define("ankamon.ui.sessions.Users", {
   },
 
   statics: {
+    /** Tablo ile çizelge arasındaki sürüklenebilir ayracın kalınlığı (px). */
+    SPLITTER_HEIGHT: 8,
+
+    /** ui_prefs anahtarı: true = gece saatleri de gösterilsin (varsayılan: gizli). */
+    PREF_SHOW_NIGHTS: "timeline.nights.show",
+
     /** Çubuk renkleri (CSS: ui.sessions.Timeline.CSS, sınıf "tm-s-<anahtar>") ve açıklamaları. */
     STATES: {
       ok: "Düzgün kapandı",

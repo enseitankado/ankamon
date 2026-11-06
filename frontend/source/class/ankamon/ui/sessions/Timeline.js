@@ -33,6 +33,10 @@
  * Kütüphane derlemede node_modules'tan resource/ankamon/vis/'e kopyalanır (bkz. Dockerfile) ve
  * yalnız bu bileşen ilk kez ekrana geldiğinde yüklenir — diğer sayfaların açılışını ağırlaştırmaz.
  *
+ * Gece saatlerini gizleme (setNightsHidden): her günün NIGHT_HOURS aralığı eksenden çıkarılır (vis
+ * "hiddenDates", günlük tekrar) — gündüz blokları yan yana gelir, gün başları (07:00) koyu çizgiyle
+ * ayrılır; geceye taşan çubuklar o kısmı görünmeden çizilir.
+ *
  * Olaylar: "changeRange" {start, end: Date} (kullanıcı kaydırma/yakınlaştırmayı bitirince ya da
  * setWindow/fit ile), "itemContextmenu" {item: öğe kimliği, event: DOM olayı}, "groupContextmenu"
  * {group: satır kimliği, event: DOM olayı} (soldaki satır adına sağ tıklama).
@@ -60,6 +64,19 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
 
   statics: {
     __loading: null,
+
+    /**
+     * "Gece saatlerini gizle" açıkken çizelgede gösterilmeyen saat aralığı: her gün `from`:00'dan
+     * ertesi gün `to`:00'a (yerel saat).
+     */
+    NIGHT_HOURS: { from: 18, to: 7 },
+
+    /** NIGHT_HOURS'u kısa metin olarak verir: "18:00–07:00". */
+    nightHoursText() {
+      const H = ankamon.ui.sessions.Timeline.NIGHT_HOURS;
+      const hh = h => String(h).padStart(2, "0") + ":00";
+      return hh(H.from) + "–" + hh(H.to);
+    },
 
     /** Kütüphaneyi (bir kez) yükler. @return {Promise} */
     load() {
@@ -104,6 +121,7 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
       .vis-item.vis-box.tm-shot .vis-item-content { box-sizing: border-box; min-width: 22px; height: 18px; padding: 0; line-height: 16px;
         text-align: center; font-size: 12px; }
       .vis-item.vis-dot.tm-shot, .vis-item.vis-line.tm-shot { display: none; }
+      .tm-nights-hidden .vis-grid.vis-vertical.vis-major { border-left: 2px solid #80868b; }
       .tm-legend { display: inline-block; width: 12px; height: 12px; border-radius: 2px;
         border: 1px solid; vertical-align: -2px; margin: 0 4px 0 10px; }
     `,
@@ -153,6 +171,35 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
     __pendingFit: false,
     __header: "",
     __headerEl: null,
+    __nightsHidden: false,
+
+    /**
+     * Gece saatlerini (NIGHT_HOURS) çizelgeden çıkarır ya da geri getirir. Kütüphane yüklenmeden
+     * çağrılırsa ilk çizimde uygulanır.
+     * @param on {Boolean}
+     */
+    setNightsHidden(on) {
+      this.__nightsHidden = !!on;
+      if (!this.__timeline) {
+        return;
+      }
+      this.__timeline.setOptions({ hiddenDates: this.__hiddenDates() });
+      this.__timeline.dom.root.classList.toggle("tm-nights-hidden", this.__nightsHidden);
+      if (this.__ready) {
+        // Görünen aralığın ucu gizli saate düştüyse kütüphane onu kaydırır: özet yeni aralıkla.
+        this.__fireRange();
+      }
+    },
+
+    /** vis "hiddenDates" seçeneği: günlük tekrarlanan tek gece aralığı (kapalıyken boş). */
+    __hiddenDates() {
+      if (!this.__nightsHidden) {
+        return [];
+      }
+      const H = ankamon.ui.sessions.Timeline.NIGHT_HOURS;
+      // Herhangi bir günün aralığı örnek verilir; kütüphane her güne yayar (repeat: "daily").
+      return [{ start: new Date(2000, 0, 1, H.from), end: new Date(2000, 0, H.from > H.to ? 2 : 1, H.to), repeat: "daily" }];
+    },
 
     /**
      * Satır adları sütununun başlığı (ör. "Bilgisayar", "Kullanıcı"): eksen satırının solundaki boş köşeye
@@ -265,6 +312,7 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
         horizontalScroll: false,
         showCurrentTime: true,
         zoomMin: 5 * 60 * 1000,
+        hiddenDates: this.__hiddenDates(),
         zoomMax: 3 * 365 * 24 * 3600 * 1000,
         margin: { item: { horizontal: 0, vertical: 4 }, axis: 4 },
         tooltip: { followMouse: true, overflowMethod: "cap", delay: 150 },
@@ -275,6 +323,7 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
           majorLabels: (date, scale) => label(date, scale, true)
         }
       });
+      this.__timeline.dom.root.classList.toggle("tm-nights-hidden", this.__nightsHidden);
       this.__timeline.on("rangechanged", props => {
         if (props.byUser) {
           this.__fireRange();
