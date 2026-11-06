@@ -57,6 +57,10 @@ qx.Class.define("ankamon.ui.health.Status", {
     this.__info = new qx.ui.basic.Label("ⓘ Bulgular nereden gelir?").set({ textColor: "app-muted", cursor: "help" });
     head.add(this.__info);
     this.add(head);
+    // Açıklama sayfada da soluk, küçük bir ipucu satırı (kullanıcı isteği: "Durum sekmesinde hint olarak"); rozetli
+    // biçimi sekme adının ve ⓘ'nin ipucu balonunda.
+    this.__hint = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true, textColor: "app-muted", font: "small" });
+    this.add(this.__hint);
     this.getButton().setToolTipText(this.__legendHtml(["watch", "ssh"]));
     this.__info.setToolTipText(this.__legendHtml(["watch", "ssh"]));
 
@@ -156,6 +160,7 @@ qx.Class.define("ankamon.ui.health.Status", {
   members: {
     __page: null,
     __info: null,
+    __hint: null,
     __summary: null,
     __boardColumns: null,
     __boardTable: null,
@@ -175,6 +180,16 @@ qx.Class.define("ankamon.ui.health.Status", {
       const r = new qx.ui.table.cellrenderer.Conditional();
       Object.values(ankamon.page.Diagnose.LEVEL).forEach(L => r.addRegex(`^${L.text}$`, null, L.color, null, "bold"));
       table.getTableColumnModel().setDataCellRenderer(column, r);
+    },
+
+    /** İpucu satırının düz metni (kullanıcının verdiği metin; yalnız kullanıcının gördüğü yollar). */
+    __hintText(paths) {
+      return "Bulgular iki yoldan gelir; her satırda hangisinden geldiği yazar. " +
+        (paths.includes("watch") ? "Sürekli izleme Ankamon tahtaya bağlanmadan, tahtanın gönderdiği loglardan ve kendi okuduğu " +
+          "ölçümlerden birkaç dakikada bir çıkarır; burada yalnız şu an sürenler. " : "") +
+        (paths.includes("ssh") ? "SSH denetimi Ankamon tahtaya SSH ile girip ölçer (haftada bir kendiliğinden ya da Tara sekmesinden " +
+          "elle); her tahtanın en son denetimi. " : "") +
+        "Her denetimin ne olduğu, nasıl ve ne sıklıkla bakıldığı: Denetimler sekmesi.";
     },
 
     /** İki yolun açıklaması (ipucu): yalnız kullanıcının gördüğü yollar. */
@@ -201,6 +216,7 @@ qx.Class.define("ankamon.ui.health.Status", {
       const legend = this.__legendHtml(paths);
       this.getButton().setToolTipText(legend);
       this.__info.setToolTipText(legend);
+      this.__hint.setValue(qx.bom.String.escape(this.__hintText(paths)));
       const when = ankamon.ui.health.Status.when;
 
       const order = { bad: 3, warn: 2, info: 1, ok: 0 };
