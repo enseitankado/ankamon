@@ -77,7 +77,9 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         this.__win.focus();
         return;
       }
-      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör", 1040, { maximizable: true });
+      // Tek tablo bütün sütunlarıyla sığsın: ekran izin verdiğince geniş (satırlar kırılmasın).
+      const bounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280 };
+      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör", Math.max(900, Math.min(1400, bounds.width - 40)), { maximizable: true });
       win.setHeight(640);
       this.__win = win;
       win.ctx = this.__createWifimonContext(win);
@@ -121,7 +123,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       const summary = new qx.ui.embed.Html("").set({ height: 30, overflowY: "auto" });
       let only = null; // şeritte tıklanan tahta: tablo yalnız onu gösterir
       win.add(summary);
-      const html = new qx.ui.embed.Html("").set({ overflowY: "auto" });
+      const html = new qx.ui.embed.Html("").set({ overflowY: "auto", overflowX: "auto" });
       win.add(html, { flex: 1 });
 
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -153,7 +155,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           html.setHtml(Render.grid(only === null ? entries : entries.filter(e => e.feed.board.id === only), opts));
           summary.setHtml(`<div style="font-size:13px;line-height:22px">${Render.boards(entries, only)}</div>`);
           // Şerit tahta sayısı kadar uzar (satır başı ~1–2 satır), çok tahtada kaydırılır.
-          summary.setHeight(Math.min(200, 6 + list.length * (list.some(f => (f.notes || []).some(Boolean)) ? 46 : 28)));
+          summary.setHeight(Math.min(160, 4 + list.length * 29));
           win.setCaption(`Wi-Fi Monitör — ${list.length === 1 ? list[0].name : list.length + " tahta"}`);
         }, null, 120);
       };
