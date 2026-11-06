@@ -51,6 +51,13 @@ for pair in it87:it87 nct6775:nct67 f71882fg:f71; do
         modprobe -r "$mod" 2>/dev/null || true
     fi
 done
+# Eski ad (tiha-mon) döneminin dosyası: kalıptan gelen tahtalarda başka anakartın modülünü (ör. AMD
+# tahtadan nct6775) taşıyabilir; açılışta "Failed to insert module ... No such device" bırakır. Bu tahtada
+# çalışan sürücü zaten yukarıda bulunup yeni dosyaya yazıldığından eski dosya silinir.
+if [ -e /etc/modules-load.d/tiha-mon-sensors.conf ]; then
+    rm -f /etc/modules-load.d/tiha-mon-sensors.conf
+    echo "Eski /etc/modules-load.d/tiha-mon-sensors.conf kaldırıldı."
+fi
 if [ -n "$superio_found" ]; then
     {
         echo "# Ankamon \"Metrik izlemeyi kur\": anakart donanım izleme yongası (fan/pil/anakart sensörleri) sürücüsü."
@@ -60,6 +67,7 @@ if [ -n "$superio_found" ]; then
     mv "$SUPERIO_CONF.tmp" "$SUPERIO_CONF"
     echo "[Super I/O] fan/pil/anakart sensörleri etkin:$superio_found (açılışta yüklenir: $SUPERIO_CONF)."
 else
+    rm -f "$SUPERIO_CONF"  # bu tahtada yüklenemeyen modül açılışa kalmasın
     echo "[Super I/O] desteklenen anakart sensör yongası bulunamadı; fan devri, CMOS pili ve anakart sıcaklığı bu tahtada okunamaz."
 fi
 
