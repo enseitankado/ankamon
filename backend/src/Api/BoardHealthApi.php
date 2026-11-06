@@ -96,7 +96,7 @@ final class BoardHealthApi
                 $lastRuns[$bid] = ['at' => $t['finished_at'] === null ? null : (int) $t['finished_at'],
                     'status' => $t['status'], 'run_id' => (int) $t['run_id'], 'how' => $how];
                 $base = ['board_id' => $bid, 'board' => $t['board'], 'path' => 'ssh', 'source' => 'SSH denetimi',
-                    'every' => 'Haftada bir + elle', 'kind' => null, 'since' => $lastRuns[$bid]['at'],
+                    'every' => self::sshEvery(), 'kind' => null, 'since' => $lastRuns[$bid]['at'],
                     'run_id' => (int) $t['run_id'], 'origin' => null];
                 if ($t['status'] !== 'ok') {
                     $findings[] = $base + ['how' => $how, 'check' => 'Denetlenemedi', 'level' => 'info',
@@ -120,8 +120,12 @@ final class BoardHealthApi
             'boards' => array_map(static fn(array $b) => ['id' => (int) $b['id'], 'name' => $b['name'],
                 'online' => (bool) $b['online'], 'ip' => $b['ip'], 'ssh' => $lastRuns[(int) $b['id']] ?? null], $boards),
             'findings' => $findings,
-            // Denetimler sekmesi: sürekli izleme kurallarının adı, düzeyi, kaynağı ve sıklığı (bkz. AnomaliesApi::KINDS).
+            // Yardım ▸ Denetim türleri: sürekli izleme kurallarının adı, düzeyi, kaynağı ve sıklığı (bkz. AnomaliesApi::kinds)
+            // ve SSH denetiminin otomatik aralığı (gün; ssh_interval_default = ayarsız değer).
             'kinds' => $watch ? $kinds : (object) [],
+            'ssh_every' => $ssh ? self::sshEvery() : null,
+            'ssh_interval_days' => $ssh ? DiagnoseApi::intervalDays() : null,
+            'ssh_interval_default' => $ssh ? (float) (getenv('DIAGNOSE_INTERVAL_DAYS') ?: 7) : null,
             'generated_at' => time(),
         ];
     }
@@ -148,5 +152,13 @@ final class BoardHealthApi
             return $parts ? implode('; ', $parts) : 'Saat eşitlenmemiş';
         }
         return '';
+    }
+
+    /** SSH denetiminin sıklık metni (otomatik aralık + elle). */
+    public static function sshEvery(): string
+    {
+        $days = DiagnoseApi::intervalDays();
+        $text = $days == 7.0 ? 'Haftada bir' : (($days == (int) $days ? (int) $days : $days) . ' günde bir');
+        return $text . ' + elle';
     }
 }

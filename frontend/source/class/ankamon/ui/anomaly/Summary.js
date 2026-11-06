@@ -29,7 +29,8 @@
  * Anomaliler ▸ Özet: seçili dönemde tahta (ve tür) başına anomali sayısı, toplam/en uzun süre,
  * son başlangıç, şu an sürüyor mu. Süreler döneme kırpılır (dönem başından önce başlayan kaydın yalnız
  * dönem içindeki kısmı sayılır). Sütun süzgeçli (bkz. page.Base _addColumnFilters). Çift tık → Geçmiş
- * sekmesi o tahtaya süzülür.
+ * sekmesi o tahtaya süzülür. Her sütun başlığının ve hücrenin açıklayıcı ipucu var (kullanıcı isteği; bkz. HINTS ve
+ * ui.table.HintRenderer).
  */
 qx.Class.define("ankamon.ui.anomaly.Summary", {
   extend: qx.ui.tabview.Page,
@@ -44,15 +45,32 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
     // Tahta ve Anomali her zaman hazır listeli (kullanıcı isteği): satır azken (her tahtanın birkaç türü)
     // otomatik karar "değer sayısı satır sayısına yakın" diye listeyi gizliyordu (bkz. Base.choicesSuitable).
     this.__columns = [
-      { id: "board", label: "Tahta", width: 200, choices: true },
-      { id: "kind", label: "Anomali", width: 140, choices: true },
-      { id: "count", label: "Sayı", width: 70 },
-      { id: "total", label: "Toplam süre", width: 130 },
-      { id: "longest", label: "En uzun", width: 120 },
-      { id: "last", label: "Son başlangıç", width: 150 },
-      { id: "now", label: "Şu an" }
+      { id: "board", label: "Tahta", width: 200, choices: true, hint: "Bulgunun görüldüğü tahta. Çift tık: o tahtanın kayıtları (Geçmiş)" },
+      { id: "kind", label: "Anomali", width: 140, choices: true, hint: "Bulgu türü (sürekli izleme denetimi); ayrıntısı Yardım ▸ Denetim türleri'nde" },
+      { id: "count", label: "Sayı", width: 70, hint: "Seçili rapor döneminde bu bulgunun kaç kez başladığı" },
+      { id: "total", label: "Toplam süre", width: 130, hint: "Dönem içinde toplam sürdüğü zaman (dönem başından önce başlayan kaydın yalnız dönem içindeki kısmı sayılır)" },
+      { id: "longest", label: "En uzun", width: 120, hint: "En uzun süren tek kaydın süresi (dönem dışına taşan kısmı dahil)" },
+      { id: "last", label: "Son başlangıç", width: 150, hint: "Bu bulgunun bu tahtada en son başladığı an" },
+      { id: "now", label: "Şu an", hint: "Bulgu şu an sürüyor mu (Sürüyor = henüz bitmedi)" }
     ];
     this.__table = page._createTable(this.__columns, { prefsKey: "anomalies.summary.columns" });
+    // Hücre ipuçları: değerin ne anlama geldiği, satırın kendi sayılarıyla.
+    const F = ankamon.util.Format;
+    const hints = {
+      board: g => `${g.board}: bu dönemde ${g.count} kez "${g.kind}". Çift tık: bu tahtanın kayıtları (Geçmiş)`,
+      kind: g => `${g.kind}${g.desc ? ": " + g.desc : ""}`,
+      count: g => `Seçili dönemde ${g.count} kez başladı`,
+      total: g => `Dönem içinde toplam ${F.span(g.total)} sürdü (dönem başından önce başlayan kaydın yalnız dönem içi kısmı sayılır)`,
+      longest: g => `En uzun tek kayıt ${F.span(g.longest)} sürdü`,
+      last: g => `En son ${F.dateTime(g.lastAt * 1000)} tarihinde başladı (${F.ago(g.lastAt)})`,
+      now: g => (g.open ? "Bu bulgu şu an sürüyor (henüz bitmedi)" : "Şu an sürmüyor: dönemdeki bütün kayıtları bitti")
+    };
+    this.__columns.forEach((column, index) => {
+      this.__table.getTableColumnModel().setDataCellRenderer(index + 1, new ankamon.ui.table.HintRenderer(info => {
+        const g = this.__raw && info.rowData ? this.__raw[info.rowData[0]] : null;
+        return g ? hints[column.id](g) : null;
+      }));
+    });
     // Sayı ve süre sütunları metin değil değere göre sıralansın (hücre metni "1 sa 5 dk" gibi).
     const model = this.__table.getTableModel();
     [[3, "count"], [4, "total"], [5, "longest"], [6, "lastAt"]].forEach(([col, key]) => {
@@ -92,7 +110,7 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
       const groups = {};
       anomalies.forEach(a => {
         const key = a.host + "\u0000" + a.kind;
-        const g = groups[key] || (groups[key] = { board: a.board, kind: a.kindLabel, count: 0, total: 0, longest: 0, lastAt: 0, open: false });
+        const g = groups[key] || (groups[key] = { board: a.board, kind: a.kindLabel, desc: a.kindDesc || "", count: 0, total: 0, longest: 0, lastAt: 0, open: false });
         const seconds = Math.max(0, (a.ended_at || now) - Math.max(a.started_at, from));
         g.count++;
         g.total += seconds;

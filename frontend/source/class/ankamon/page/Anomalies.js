@@ -39,10 +39,12 @@
  *  - "Durum" (ui.health.Status): her tahtanın şu anki sağlığı, iki yolun bulguları tek tabloda (GET /api/board-health).
  *  - "Denetle" (page.Diagnose; kimlik "reports", eski adı "Denetim raporları"): SSH denetimlerinin raporları (eski Bakım
  *    sekmesi). Durum'un hemen sağında (kullanıcı isteği).
- *  - "Geçmiş" / "Özet" (ui.anomaly.History / Summary): sürekli izleme kayıtları, seçili dönem.
+ *  - "Geçmiş" / "Özet" (ui.anomaly.History / Summary): sürekli izleme kayıtları, seçili dönem. "Rapor dönemi" seçicisi
+ *    sayfanın tepesinde değil bu iki sekmenin içinde (kullanıcı isteği); ikisi aynı dönemi gösterir (seçiciler eşzamanlı).
  *  - "Tara" (ui.anomaly.Scan): seçilen tahtalarda o an yoklama — sürekli izleme denetimleri ve tam SSH denetimi.
- *  - "Denetimler" (ui.health.Catalog): bütün denetimler; yol, kaynak, nasıl/ne sıklıkla bakıldığı.
- *  - "Bildirimler" (ui.anomaly.Notifications), "Yardım" (page.MaintenanceHelp).
+ *  - "Bildirimler" (ui.anomaly.Notifications).
+ *  - "Yardım": iç sekmeler "Kılavuz" (page.MaintenanceHelp) ve "Denetim türleri" (ui.health.Catalog — eski ayrı
+ *    "Denetimler" sekmesi; satıra çift tık: ayrıntı ve yöneticiye ayarlar penceresi, bkz. ui.health.CheckTypeWindow).
  * Kayıtlar tahta silinse ya da logları silinse de kalır (bkz. 033_anomalies.sql).
  */
 qx.Class.define("ankamon.page.Anomalies", {
@@ -53,20 +55,6 @@ qx.Class.define("ankamon.page.Anomalies", {
     const watch = this._can("anomalies");
     const ssh = this._can("diagnose");
 
-    if (watch) {
-      this._actions.add(new qx.ui.basic.Label("Rapor dönemi:").set({ alignY: "middle" }));
-      this.__period = new qx.ui.form.SelectBox().set({ width: 140 });
-      ankamon.page.Anomalies.PERIODS.forEach(([days, label]) => {
-        const item = new qx.ui.form.ListItem(label, null, days);
-        this.__period.add(item);
-        if (days === 30) {
-          this.__period.setSelection([item]);
-        }
-      });
-      this.__period.setToolTipText("Geçmiş ve Özet bu dönemi gösterir; Durum her zaman şu anı.");
-      this.__period.addListener("changeSelection", () => this.refresh());
-      this._actions.add(this.__period);
-    }
     this._addButton("Yenile", () => this.refresh());
 
     this.__tabs = new qx.ui.tabview.TabView();
@@ -79,6 +67,8 @@ qx.Class.define("ankamon.page.Anomalies", {
     if (watch) {
       this.__history = new ankamon.ui.anomaly.History(this);
       this.__summary = new ankamon.ui.anomaly.Summary(this);
+      this.__history.addAt(this.__periodRow(), 0);
+      this.__summary.addAt(this.__periodRow(), 0);
       this.__tabs.add(this.__history);
       this.__tabs.add(this.__summary);
     }
@@ -86,13 +76,23 @@ qx.Class.define("ankamon.page.Anomalies", {
       this.__scan = new ankamon.ui.anomaly.Scan(this);
       this.__tabs.add(this.__scan);
     }
-    this.__catalog = new ankamon.ui.health.Catalog(this);
-    this.__tabs.add(this.__catalog);
     if (watch) {
       this.__notifications = new ankamon.ui.anomaly.Notifications(this);
       this.__tabs.add(this.__notifications);
     }
-    this.__help = this.__hosted("help", "Yardım", new ankamon.page.MaintenanceHelp(user));
+    // Yardım: kılavuz + Denetim türleri (iç sekmeler). Sekme seçilince kılavuz sayfası activate() edilir (userData page).
+    this.__help = new qx.ui.tabview.Page("Yardım").set({ layout: new qx.ui.layout.Grow(), padding: 8 });
+    this.__help.setUserData("key", "help");
+    this.__helpTabs = new qx.ui.tabview.TabView();
+    const guidePage = new ankamon.page.MaintenanceHelp(user);
+    const guide = new qx.ui.tabview.Page("Kılavuz").set({ layout: new qx.ui.layout.Grow(), padding: 4 });
+    guide.add(guidePage);
+    this.__helpTabs.add(guide);
+    this.__catalog = new ankamon.ui.health.Catalog(this);
+    this.__helpTabs.add(this.__catalog);
+    this.__help.setUserData("page", guidePage);
+    this.__help.add(this.__helpTabs);
+    this.__tabs.add(this.__help);
     this._rememberTab(this.__tabs, "anomalies");
     // Gömülü sayfalar (Denetle, Yardım) kendi verilerini sekmeye geçilince tazeler.
     this.__tabs.addListener("changeSelection", e => {
@@ -113,7 +113,7 @@ qx.Class.define("ankamon.page.Anomalies", {
     /** [gün (0 = tümü), etiket] */
     PERIODS: [[1, "Son 24 saat"], [7, "Son 7 gün"], [30, "Son 30 gün"], [90, "Son 90 gün"], [365, "Son 1 yıl"], [0, "Tümü"]],
     /** Eski sekme kimlikleri (sol menü, hatırlanan sekme, bağlantılar) → yenisi. */
-    OLD_TABS: { "Anlık": "status", "diagnose": "reports" },
+    OLD_TABS: { "Anlık": "status", "diagnose": "reports", "catalog": "help" },
 
     /** Kaydın ayrıntı metni (türe göre). */
     describe(a) {
@@ -149,7 +149,6 @@ qx.Class.define("ankamon.page.Anomalies", {
   members: {
     __timer: null,
     __tabs: null,
-    __period: null,
     __status: null,
     __history: null,
     __summary: null,
@@ -157,6 +156,9 @@ qx.Class.define("ankamon.page.Anomalies", {
     __reportsPage: null,
     __scan: null,
     __catalog: null,
+    __helpTabs: null,
+    __days: 30,
+    __periodBoxes: null,
     __notifications: null,
     __help: null,
 
@@ -173,10 +175,42 @@ qx.Class.define("ankamon.page.Anomalies", {
       return tab;
     },
 
+    /** "Rapor dönemi" satırı (Geçmiş ve Özet'in tepesinde); bütün seçiciler aynı değeri gösterir. */
+    __periodRow() {
+      const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
+      row.add(new qx.ui.basic.Label("Rapor dönemi:"));
+      const box = new qx.ui.form.SelectBox().set({ width: 140, toolTipText: "Geçmiş ve Özet bu dönemi gösterir; Durum her zaman şu anı." });
+      ankamon.page.Anomalies.PERIODS.forEach(([days, label]) => {
+        const item = new qx.ui.form.ListItem(label, null, days);
+        box.add(item);
+        if (days === this.__days) {
+          box.setSelection([item]);
+        }
+      });
+      box.addListener("changeSelection", e => {
+        const item = e.getData()[0];
+        if (!item || item.getModel() === this.__days) {
+          return;
+        }
+        this.__days = item.getModel();
+        // Öteki sekmenin seçicisi de aynı döneme geçsin.
+        (this.__periodBoxes || []).forEach(other => {
+          const same = other.getChildren().find(it => it.getModel() === this.__days);
+          if (other !== box && same) {
+            other.setSelection([same]);
+          }
+        });
+        this.refresh();
+      });
+      (this.__periodBoxes = this.__periodBoxes || []).push(box);
+      row.add(box);
+      return row;
+    },
+
     async _refresh() {
       const tasks = [ankamon.io.Api.get("/board-health")];
-      if (this.__period) {
-        const days = this.__period.getSelection()[0].getModel();
+      if (this.__history) {
+        const days = this.__days;
         const to = Math.floor(Date.now() / 1000);
         const from = days ? to - days * 86400 : 0;
         tasks.push(ankamon.io.Api.get("/anomalies", { from, to }).then(data => ({ data, from })));
@@ -186,12 +220,13 @@ qx.Class.define("ankamon.page.Anomalies", {
         return;
       }
       this.__status.setData(health);
-      this.__catalog.setData(health.kinds, health.paths);
+      this.__catalog.setData(health);
       if (anomalies) {
         const { data, from } = anomalies;
         const rows = data.anomalies.map(a => Object.assign(a, {
           kindLabel: (data.kinds[a.kind] || {}).label || a.kind,
           source: (data.kinds[a.kind] || {}).source || "",
+          kindDesc: (data.kinds[a.kind] || {}).description || "",
           text: ankamon.page.Anomalies.describe(a)
         }));
         this.__history.setData(rows);
@@ -212,6 +247,9 @@ qx.Class.define("ankamon.page.Anomalies", {
       const key = opts && (ankamon.page.Anomalies.OLD_TABS[opts.tab] || opts.tab);
       if (key) {
         this.selectTab(key);
+      }
+      if (opts && opts.tab === "catalog") {
+        this.__helpTabs.setSelection([this.__catalog]);
       }
     },
 

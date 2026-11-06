@@ -42,8 +42,8 @@
  *
  * Rapor bir grid'dir: her tahta bir satır (Tahta, IP, Genel durum, Acil, Dikkat, Bilgi, Başlıca bulgu, Denetim zamanı,
  * Başlatan). Sütunlar sıralanabilir ve başlıktaki kutuyla süzülür (serbest yazım + hazır değer listesi; Tahta, Genel durum,
- * Acil, Dikkat, Bilgi'de liste her zaman — kullanıcı isteği, eski "Tahta" seçicisinin yerine). Altta seçili tahtanın (seçim
- * yoksa grid'de görünen bütün tahtaların) bulguları ve önerileri; ayırıcı Durum'daki gibi kalın. "Göster" kutuları düzeye
+ * Acil, Dikkat, Bilgi'de liste her zaman — kullanıcı isteği, eski "Tahta" seçicisinin yerine). Altta seçili tahtanın
+ * bulguları ve önerileri (tahta seçilmeden boş, başlık satırı yok); ayırıcı Durum'daki gibi kalın. "Göster" kutuları düzeye
  * göre süzer. Hepsi sunucuya gitmeden son rapor verisinden yeniden çizilir (bkz. __render / __apply).
  * Durum'daki SSH bulgusuna çift tık → showBoard(): "Son durum" + grid o tahtaya süzülür.
  */
@@ -124,13 +124,11 @@ qx.Class.define("ankamon.page.Diagnose", {
     // Sütuna göre sıralanınca qx seçimi satır NUMARASIYLA tutar (vurgu başka tahtaya kayardı): seçili tahta yeniden bulunur.
     model.addListener("metaDataChanged", () => this.__reselect());
     this.__table.setToolTipText("Bir tahtayı seçin: aşağıda yalnız onun bulguları ve önerileri görünür");
-    const top2 = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ marginBottom: 5 });
+    const top2 = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ paddingBottom: ankamon.ui.health.Status.PANE_GAP });
     top2.add(this.__table, { flex: 1 });
     split.add(top2, 1);
 
-    const bottom = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ marginTop: 5 });
-    this.__detailTitle = new qx.ui.basic.Label("").set({ rich: true, font: "bold" });
-    bottom.add(this.__detailTitle);
+    const bottom = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ paddingTop: ankamon.ui.health.Status.PANE_GAP });
     this.__html = new qx.ui.embed.Html("").set({
       overflowX: "auto", overflowY: "auto", textColor: "text-primary-on-surface", backgroundColor: "surface",
       // "text" Tangible/Modern renk temalarında tanımlı değil (yazı siyah kalıyordu); bu ad tüm temalarda var.
@@ -157,7 +155,6 @@ qx.Class.define("ankamon.page.Diagnose", {
     __table: null,
     __filters: null,
     __allRows: null,
-    __detailTitle: null,
     __pendingBoard: null,
     __selKey: null,
     __restoring: false,
@@ -490,7 +487,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       return row ? row[0] : null;
     },
 
-    /** Alt bölme: seçili tahtanın (seçim yoksa grid'de görünen bütün tahtaların) bulguları ve önerileri. */
+    /** Alt bölme: seçili tahtanın bulguları ve önerileri; tahta seçilmeden boş (başlık satırı yok — kullanıcı isteği). */
     __renderDetail() {
       const esc = s => qx.bom.String.escape(String(s ?? ""));
       const L = ankamon.page.Diagnose.LEVEL;
@@ -499,27 +496,13 @@ qx.Class.define("ankamon.page.Diagnose", {
       const css = "font:13px/1.45 sans-serif;padding:8px 10px 16px";
       const th = "text-align:left;padding:4px 8px;border-bottom:2px solid rgba(128,128,128,.4);white-space:nowrap";
       const td = "padding:4px 8px;border-bottom:1px solid rgba(128,128,128,.25);vertical-align:top";
-      const tm = this.__table.getTableModel();
       const selected = this.__selectedKey();
-      const keys = [];
-      for (let row = 0; row < tm.getRowCount(); row++) {
-        const key = tm.getValue(0, row);
-        if (selected === null || key === selected) {
-          keys.push(key);
-        }
-      }
-      const many = selected === null;
-      const name = many ? null : (this.__targets.get(selected) || {}).board;
-      this.__detailTitle.setValue(many ? `Bulgular ve öneriler — grid'deki tahtalar (${keys.length})`
-        : `Bulgular ve öneriler — ${esc(name)}`);
-      if (!this.__job || !this.__job.targets.length) {
-        this.__html.setHtml(`<div style="${css}"><p style="opacity:.7">Rapor boş.</p></div>`);
+      if (selected === null || !this.__targets || !this.__targets.has(selected)) {
+        this.__html.setHtml("");
         return;
       }
-      if (!keys.length) {
-        this.__html.setHtml(`<div style="${css}"><p style="opacity:.7">Süzgeçlere uyan tahta yok.</p></div>`);
-        return;
-      }
+      const keys = [selected];
+      const many = false;
       let h = `<div style="${css}"><table style="border-collapse:collapse;width:100%"><tr>` +
         (many ? `<th style="${th}">Tahta</th>` : "") +
         `<th style="${th}">Düzey</th><th style="${th}">Denetim</th><th style="${th}">Bulgu</th><th style="${th}">Öneri</th></tr>`;

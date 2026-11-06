@@ -30,8 +30,11 @@ declare(strict_types=1);
 
 namespace Ankamon\Api;
 
+use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
 use Ankamon\Core\Db;
 use Ankamon\Core\Request;
+use Ankamon\Core\Settings;
 
 /**
  * Anomaliler (Tahtalar ▸ Anomaliler): worker'ın kurallarla ön hesapladığı sıra dışı durum aralıkları
@@ -183,8 +186,103 @@ final class AnomaliesApi
     /**
      * Bütün türler: çekirdeğinkiler + eklentilerin (ext/<ad>/anomaly_kinds.json — {tür: {label, description,
      * scan?}}; kuralları worker'da ext/<ad>/worker/anomaly_rules.py). Çekirdek eklentiyi adıyla bilmez.
+     * Yöneticinin ayarları (settings.anomaly_kind_overrides — Yardım ▸ Denetim türleri) uygulanmış olarak döner:
+     * every/every_s (sıklık), level, scan; defaults = ayarsız değerler, scan_supported = kuralın anlık yoklaması var mı.
      */
     public static function kinds(): array
+    {
+        $kinds = self::baseKinds();
+        $over = Settings::get('anomaly_kind_overrides');
+        $over = is_array($over) ? $over : [];
+        foreach ($kinds as $kind => &$k) {
+            $everyS = self::everySeconds((string) ($k['every'] ?? ''));
+            $k['scan_supported'] = !empty($k['scan']);
+            $k['defaults'] = ['every_s' => $everyS, 'level' => $k['level'] ?? 'warn', 'scan' => $k['scan_supported']];
+            $k['every_s'] = $everyS;
+            $k['every'] = self::everyText($everyS);
+            $o = is_array($over[$kind] ?? null) ? $over[$kind] : [];
+            if (isset($o['every_s'])) {
+                $k['every_s'] = (int) $o['every_s'];
+                $k['every'] = self::everyText($k['every_s']);
+            }
+            if (isset($o['level'])) {
+                $k['level'] = (string) $o['level'];
+            }
+            if (isset($o['scan'])) {
+                $k['scan'] = $k['scan_supported'] && $o['scan'];
+            }
+            $k['overridden'] = array_keys($o);
+        }
+        unset($k);
+        return $kinds;
+    }
+
+    /** "60 sn" / "5 dk" / "1 saat" → saniye (worker kuralının EVERY'si; bilinmiyorsa her tur = 60 sn). */
+    private static function everySeconds(string $text): int
+    {
+        if (preg_match('/(\d+)\s*(sn|dk|saat)/u', $text, $m)) {
+            return (int) $m[1] * ['sn' => 1, 'dk' => 60, 'saat' => 3600][$m[2]];
+        }
+        return 60;
+    }
+
+    public static function everyText(int $seconds): string
+    {
+        if ($seconds < 120) {
+            return $seconds . ' sn';
+        }
+        if ($seconds % 3600 === 0) {
+            return ($seconds / 3600) . ' saat';
+        }
+        return (int) round($seconds / 60) . ' dk';
+    }
+
+    /**
+     * Yönetici: bir sürekli izleme türünün sıklığı, bulgu düzeyi ve anlık taranıp taranmayacağı (Yardım ▸ Denetim
+     * türleri penceresi). Gövde {kind, every_s|null, level|null, scan|null}; null = varsayılan. Sıklık worker'ın 60 sn'lik
+     * turuna bağlı: en az 60 sn, en çok 1 gün.
+     */
+    public function updateKind(Request $request, array $user): array
+    {
+        $kind = (string) $request->input('kind', '');
+        $base = self::baseKinds();
+        if (!isset($base[$kind])) {
+            throw ApiError::badRequest('Bilinmeyen denetim türü.');
+        }
+        $o = [];
+        $every = $request->input('every_s');
+        if ($every !== null && $every !== '') {
+            $every = (int) $every;
+            if ($every < 60 || $every > 86400) {
+                throw ApiError::badRequest('Sıklık 60 sn ile 1 gün arasında olmalı.');
+            }
+            $o['every_s'] = $every;
+        }
+        $level = $request->input('level');
+        if ($level !== null && $level !== '') {
+            if (!in_array($level, ['bad', 'warn', 'info'], true)) {
+                throw ApiError::badRequest('Geçersiz bulgu düzeyi.');
+            }
+            $o['level'] = $level;
+        }
+        $scan = $request->input('scan');
+        if ($scan !== null && !empty($base[$kind]['scan'])) {
+            $o['scan'] = (bool) $scan;
+        }
+        $all = Settings::get('anomaly_kind_overrides');
+        $all = is_array($all) ? $all : [];
+        if ($o) {
+            $all[$kind] = $o;
+        } else {
+            unset($all[$kind]);
+        }
+        Settings::set('anomaly_kind_overrides', (object) $all);
+        Audit::log($user, $request, 'anomaly.kind.update', $kind . ' ' . json_encode($o, JSON_UNESCAPED_UNICODE));
+        return ['ok' => true, 'kind' => self::kinds()[$kind]];
+    }
+
+    /** Ayarsız türler (çekirdek + eklentiler). */
+    private static function baseKinds(): array
     {
         static $kinds = null;
         if ($kinds === null) {

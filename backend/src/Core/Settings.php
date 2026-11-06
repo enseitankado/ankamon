@@ -57,6 +57,12 @@ final class Settings
         'organization' => ['name' => '', 'code' => ''],
         // ntfy bildirimleri (Anomaliler ▸ Bildirimler; bkz. worker executor/ntfy.py).
         'ntfy' => ['server' => 'https://ntfy.sh', 'topic' => ''],
+        // Tahta sağlığı ▸ Yardım ▸ Denetim türleri (bkz. Api\AnomaliesApi::kinds/updateKind): sürekli izleme kurallarının
+        // yönetici ayarları {tür: {every_s?, level?, scan?}} — verilmeyen alan varsayılandır. worker anomaly._due okur.
+        'anomaly_kind_overrides' => [],
+        // SSH denetiminin otomatik aralığı (gün); null = DIAGNOSE_INTERVAL_DAYS ortam değişkeni (vars. 7). worker
+        // tasks/diagnose_schedule ve Api\DiagnoseApi okur.
+        'diagnose_interval_days' => null,
     ];
 
     public static function get(string $key): mixed

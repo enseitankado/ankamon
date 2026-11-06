@@ -55,9 +55,10 @@ from .. import activity
 
 log = logging.getLogger(__name__)
 
+# Varsayılan aralık; yönetici Tahta sağlığı ▸ Yardım ▸ Denetim türleri'nden değiştirebilir (settings.diagnose_interval_days,
+# her turda okunur — bkz. _interval).
 INTERVAL_SECONDS = float(os.environ.get("DIAGNOSE_INTERVAL_DAYS", "7")) * 86400
 EARLY_FRACTION = 0.85
-FORCE_AFTER_SECONDS = INTERVAL_SECONDS + 86400
 RETRY_SECONDS = float(os.environ.get("DIAGNOSE_RETRY_HOURS", "6")) * 3600
 
 # (1 dk yük / çekirdek, boş bellek oranı, ağ trafiği bayt/sn) üst/alt sınırları
@@ -98,8 +99,19 @@ def _resources() -> dict | None:
     }
 
 
+def _interval(conn) -> float:
+    """Otomatik denetim aralığı (sn): yöneticinin ayarı, yoksa DIAGNOSE_INTERVAL_DAYS."""
+    try:
+        row = conn.execute("SELECT value FROM settings WHERE key = 'diagnose_interval_days'").fetchone()
+        days = float(row["value"]) if row and row["value"] is not None else 0
+    except Exception:  # noqa: BLE001 — okunamazsa varsayılan
+        days = 0
+    return days * 86400 if days > 0 else INTERVAL_SECONDS
+
+
 def run(conn) -> None:
     global _last_skip_log
+    interval = _interval(conn)
     res = _resources()  # her turda ölçülsün (ağ hızı için önceki örnek gerekir)
     if res is None:
         return
@@ -117,7 +129,7 @@ def run(conn) -> None:
     ).fetchall()
     now = time.time()
     due = [(r["id"], now - (r["last"] or 0)) for r in rows
-           if now - (r["last"] or 0) >= INTERVAL_SECONDS * EARLY_FRACTION
+           if now - (r["last"] or 0) >= interval * EARLY_FRACTION
            and (r["tried"] is None or r["tried"] == r["last"] or now - r["tried"] >= RETRY_SECONDS)]
     if not due:
         return
@@ -126,9 +138,9 @@ def run(conn) -> None:
         return
 
     oldest = max(age for _, age in due)
-    if oldest >= FORCE_AFTER_SECONDS:
+    if oldest >= interval + 86400:
         limits, mode = _FORCE, "gecikmiş"
-    elif oldest >= INTERVAL_SECONDS:
+    elif oldest >= interval:
         limits, mode = _RELAXED, "süresi dolmuş"
     else:
         limits, mode = _STRICT, "uygun an"

@@ -26,35 +26,38 @@
  */
 
 /**
- * Tahta sağlığı ▸ Denetimler: Ankamon'un tahtalara baktığı BÜTÜN denetimler tek tabloda — hangi yoldan (sürekli izleme /
- * SSH denetimi), hangi kaynaktan, nasıl ve ne sıklıkla bakıldığı, bulgu düzeyi ve anlık taranıp taranamadığı.
+ * Tahta sağlığı ▸ Yardım ▸ Denetim türleri (eski ayrı "Denetimler" sekmesi; kullanıcı isteğiyle Yardım'ın içinde): Ankamon'un
+ * tahtalara baktığı BÜTÜN denetimler tek tabloda — hangi yoldan (sürekli izleme / SSH denetimi), hangi kaynaktan, nasıl ve
+ * ne sıklıkla bakıldığı, bulgu düzeyi ve anlık taranıp taranamadığı. Metinler uzun: satıra çift tıklayınca hepsi bir
+ * pencerede okunur ve yönetici sıklık / bulgu düzeyi / anlık taranır ayarlarını değiştirir (bkz. ui.health.CheckTypeWindow).
  *
- * Sürekli izleme denetimleri anomali kurallarıdır (tür bilgileri backend AnomaliesApi::KINDS + eklentilerin
- * anomaly_kinds.json'u, /api/board-health "kinds"). SSH denetiminin başlıkları worker/ankamon/executor/diagnose.py'deki gruplardır
- * (aşağıda SSH_GROUPS — oradaki gruplar değişirse burası da güncellenir). Pil gerilimi ve saat eşitlemesi SSH denetiminde
- * değil, sürekli izlemededir (aynı soruya iki ayrı cevap verilmesin).
+ * Sürekli izleme denetimleri anomali kurallarıdır (tür bilgileri backend AnomaliesApi::kinds + eklentilerin
+ * anomaly_kinds.json'u, yönetici ayarları uygulanmış; /api/board-health "kinds"). SSH denetiminin başlıkları
+ * worker/ankamon/executor/diagnose.py'deki gruplardır (aşağıda SSH_GROUPS — oradaki gruplar değişirse burası da güncellenir).
+ * Pil gerilimi ve saat eşitlemesi SSH denetiminde değil, sürekli izlemededir (aynı soruya iki ayrı cevap verilmesin).
  */
 qx.Class.define("ankamon.ui.health.Catalog", {
   extend: qx.ui.tabview.Page,
 
   /** @param page {ankamon.page.Anomalies} */
   construct(page) {
-    super("Denetimler");
+    super("Denetim türleri");
     this.setUserData("key", "catalog");
+    this.__page = page;
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
     this.add(new qx.ui.basic.Label(
       "Ankamon'un tahtalara baktığı bütün denetimler. <b>Sürekli izleme</b> tahtaya bağlanmaz: tahtanın gönderdiği " +
       "loglardan, Ankamon'un tahtadan okuduğu ölçümlerden ya da daha önce toplanmış verilerden kendiliğinden çıkarılır. " +
       "<b>SSH denetimi</b> tahtaya SSH ile girip yalnız okuma yapan komutlarla ölçer (tahtada hiçbir şey değiştirilmez). " +
-      "<i>Anlık taranır</i> denetimler <b>Tara</b> sekmesinden seçilen tahtalarda o an da yoklanabilir."
+      "<b>Satıra çift tıklayın</b>: bütün ayrıntı" + (page._user.is_admin ? " ve ayarlar (sıklık, bulgu düzeyi, anlık taranır)." : ".")
     ).set({ rich: true, wrap: true, allowGrowX: true }));
     this.__columns = [
       { id: "check", label: "Denetim", width: 200 },
       { id: "path", label: "Yol", width: 120 },
       { id: "source", label: "Kaynak", width: 110 },
-      { id: "every", label: "Sıklık", width: 140 },
-      { id: "level", label: "Bulgu düzeyi", width: 100 },
+      { id: "every", label: "Sıklık", width: 150 },
+      { id: "level", label: "Bulgu düzeyi", width: 110 },
       { id: "scan", label: "Anlık taranır", width: 100 },
       { id: "how", label: "Nasıl bakılır", width: 360 },
       { id: "what", label: "Ne arar" }
@@ -62,6 +65,14 @@ qx.Class.define("ankamon.ui.health.Catalog", {
     this.__table = page._createTable(this.__columns, { prefsKey: "health.catalog.columns" });
     this.__filters = page._addColumnFilters(this.__table, this.__columns, () => this.__apply(),
       { rows: () => (this.__rows || []).map(r => r.cells) });
+    this.__table.setToolTipText("Çift tıklayın: bütün ayrıntı" + (page._user.is_admin ? " ve ayarlar" : ""));
+    this.__table.addListener("cellDbltap", e => {
+      const id = this.__table.getTableModel().getValue(0, e.getRow());
+      const row = (this.__rows || []).find(x => x.cells[0] === id);
+      if (row) {
+        ankamon.ui.health.CheckTypeWindow.open(row.meta, !!page._user.is_admin, () => page.refresh());
+      }
+    });
     this.add(this.__table, { flex: 1 });
     this.__count = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
     this.add(this.__count);
@@ -77,35 +88,45 @@ qx.Class.define("ankamon.ui.health.Catalog", {
       ["Boş disk alanı", "Acil / Dikkat", "Kök dosya sistemi doluluğu, dosya sayısı sınırı (inode)."],
       ["Yazılım güncellemeleri", "Dikkat", "Bekleyen (güvenlik dahil) güncellemeler, paket listesinin yaşı."],
       ["Sistem çalışma koşulları", "Acil / Dikkat", "Düşük RAM, takas alanı yok, mekanik disk, salt-okunur dosya sistemi, bellek yetersizliğinden kapatılan uygulamalar, başarısız servisler, yarım kalmış paket kurulumu, sürekli yüksek yük, yeniden başlatma bekliyor, uzun süredir açık."]
-    ]
+    ],
+    SSH_HOW: "Ankamon tahtaya root olarak tek SSH bağlantısı açar, yalnız okuma yapan komutlar çalıştırır (tahta başına 1-2 sn)."
   },
 
   members: {
+    __page: null,
     __columns: null,
     __table: null,
     __filters: null,
     __rows: null,
     __count: null,
 
-    /** @param kinds {Map} sürekli izleme türleri (boşsa kullanıcının o yola yetkisi yok) @param paths {Array} yetkili yollar */
-    setData(kinds, paths) {
+    /** @param health {Map} GET /api/board-health yanıtı (kinds, paths, ssh_every, ssh_interval_days, ssh_interval_default) */
+    setData(health) {
       const P = ankamon.ui.health.Status.PATH;
       const text = ankamon.ui.health.Status.levelText;
+      const paths = health.paths || [];
       const rows = [];
+      // Yöneticinin değiştirdiği değerlerin yanında "(ayarlı)".
+      const mark = (k, field, value) => value + ((k.overridden || []).includes(field) ? " (ayarlı)" : "");
       if (paths.includes("watch")) {
-        Object.entries(kinds || {}).forEach(([kind, k]) => {
+        Object.entries(health.kinds || {}).forEach(([kind, k]) => {
           const origin = k.origin ? ` (${k.origin} eklentisi)` : "";
-          rows.push([kind, k.label + origin, P.watch.text, k.source || "Log", k.every || "", text(k.level || "warn"),
-            k.scan ? "Evet" : "Hayır", k.source_detail || "", k.description || ""]);
+          const cells = [kind, k.label + origin, P.watch.text, k.source || "Log", mark(k, "every_s", k.every || ""),
+            mark(k, "level", text(k.level || "warn")), mark(k, "scan", k.scan ? "Evet" : "Hayır"), k.source_detail || "", k.description || ""];
+          rows.push({ cells, meta: { type: "watch", kind, k, check: cells[1], path: cells[2], source: cells[3], how: cells[7], what: cells[8] } });
         });
       }
       if (paths.includes("ssh")) {
+        const days = health.ssh_interval_days;
+        const def = health.ssh_interval_default;
+        const every = (health.ssh_every || "Haftada bir + elle") + (days !== def ? " (ayarlı)" : "");
         ankamon.ui.health.Catalog.SSH_GROUPS.forEach(([group, level, what]) => {
-          rows.push(["ssh:" + group, group, P.ssh.text, "SSH denetimi", "Haftada bir kendiliğinden + elle", level, "Evet",
-            "Ankamon tahtaya root olarak tek SSH bağlantısı açar, yalnız okuma yapan komutlar çalıştırır (tahta başına 1-2 sn).", what]);
+          const cells = ["ssh:" + group, group, P.ssh.text, "SSH denetimi", every, level, "Evet", ankamon.ui.health.Catalog.SSH_HOW, what];
+          rows.push({ cells, meta: { type: "ssh", group, level, check: group, path: cells[2], source: cells[3], how: cells[7],
+            what, days, daysDefault: def } });
         });
       }
-      this.__rows = rows.map(cells => ({ cells }));
+      this.__rows = rows;
       this.__apply();
     },
 
@@ -118,7 +139,7 @@ qx.Class.define("ankamon.ui.health.Catalog", {
         .filter(f => f.text);
       const shown = this.__rows.filter(({ cells }) => filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
       this.__table.getTableModel().setData(shown.map(r => r.cells));
-      this.__count.setValue(`${shown.length} / ${this.__rows.length} denetim`);
+      this.__count.setValue(`${shown.length} / ${this.__rows.length} denetim türü`);
     }
   }
 });

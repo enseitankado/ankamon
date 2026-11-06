@@ -37,8 +37,10 @@
  * Üst tablo tahta başına bir satır (en kötü düzey, iki yolun özeti); alttaki tablo seçili tahtanın (seçim yoksa hepsinin)
  * bulguları: Yol, Kaynak, Nasıl bakıldı, Sıklık, Zaman. Çift tık: sürekli izleme bulgusu → o tahtanın Geçmiş'i; SSH denetimi
  * bulgusu → Denetle (o tahtaya süzülmüş). İki tablo da sütun süzgeçli (az çeşitli sütunlarda hazır değer listesi).
- * İki yolun açıklaması sayfada yer kaplamaz: sekme kulakçığının ve özet satırındaki ⓘ işaretinin ipucunda (kullanıcı isteği).
- * İki tablo arasındaki ayırıcı kalın (SPLITTER px; kullanıcı isteği: ince çubuk zor tutuluyordu).
+ * İki yolun açıklaması yalnız ipucunda: sekme kulakçığı ve özet satırının solundaki "ⓘ Bulgular nereden gelir?" (kullanıcı
+ * isteği: sayfada ikinci kez yazılmaz). İki tablo arasındaki ayırıcı kalın (SPLITTER px); üst ve alt bölmenin ayırıcıya
+ * bakan iç boşlukları eşit (PANE_GAP — ayırıcı üst tablonun son satırını kesmesin). Alt tablo yalnız bir tahta seçilince
+ * dolar (sekmeye girişte boş; başlık satırı yok — kullanıcı isteği).
  */
 qx.Class.define("ankamon.ui.health.Status", {
   extend: qx.ui.tabview.Page,
@@ -51,16 +53,12 @@ qx.Class.define("ankamon.ui.health.Status", {
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
 
-    const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-    this.__summary = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
-    head.add(this.__summary, { flex: 1 });
+    const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(12).set({ alignY: "middle" }));
     this.__info = new qx.ui.basic.Label("ⓘ Bulgular nereden gelir?").set({ textColor: "app-muted", cursor: "help" });
     head.add(this.__info);
+    this.__summary = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
+    head.add(this.__summary, { flex: 1 });
     this.add(head);
-    // Açıklama sayfada da soluk, küçük bir ipucu satırı (kullanıcı isteği: "Durum sekmesinde hint olarak"); rozetli
-    // biçimi sekme adının ve ⓘ'nin ipucu balonunda.
-    this.__hint = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true, textColor: "app-muted", font: "small" });
-    this.add(this.__hint);
     this.getButton().setToolTipText(this.__legendHtml(["watch", "ssh"]));
     this.__info.setToolTipText(this.__legendHtml(["watch", "ssh"]));
 
@@ -85,7 +83,8 @@ qx.Class.define("ankamon.ui.health.Status", {
     this.__levelRenderer(this.__boardTable, 3);
     this.__boardTable.getSelectionModel().addListener("changeSelection", () => this.__applyFindings());
     this.__boardTable.setToolTipText("Bir tahtayı seçin: aşağıda yalnız onun bulguları görünür");
-    const top = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ marginBottom: 5 });
+    const gap = ankamon.ui.health.Status.PANE_GAP;
+    const top = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ paddingBottom: gap });
     top.add(this.__boardTable, { flex: 1 });
     split.add(top, 1);
 
@@ -115,9 +114,7 @@ qx.Class.define("ankamon.ui.health.Status", {
       }
     });
     this.__findingTable.setToolTipText("Çift tıklayın: sürekli izleme bulgusu → Geçmiş'te o tahta; SSH denetimi bulgusu → Denetle (o tahta)");
-    const bottom = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ marginTop: 5 });
-    this.__findingTitle = new qx.ui.basic.Label("").set({ rich: true, font: "bold" });
-    bottom.add(this.__findingTitle);
+    const bottom = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ paddingTop: gap });
     bottom.add(this.__findingTable, { flex: 1 });
     split.add(bottom, 1);
   },
@@ -125,6 +122,8 @@ qx.Class.define("ankamon.ui.health.Status", {
   statics: {
     /** İki tablo arasındaki ayırıcının kalınlığı (px). */
     SPLITTER: 12,
+    /** Ayırıcıya bakan iç boşluk (px): üst bölmenin altı = alt bölmenin üstü. */
+    PANE_GAP: 8,
     /** Bu kadar saniyeden yeni zamanlar geçen süreyle yazılır ("2 saat 23 dk önce"). */
     RELATIVE_S: 10 * 3600,
 
@@ -160,7 +159,6 @@ qx.Class.define("ankamon.ui.health.Status", {
   members: {
     __page: null,
     __info: null,
-    __hint: null,
     __summary: null,
     __boardColumns: null,
     __boardTable: null,
@@ -172,7 +170,6 @@ qx.Class.define("ankamon.ui.health.Status", {
     __findingFilters: null,
     __findingRows: null,
     __shownFindings: null,
-    __findingTitle: null,
     __data: null,
 
     /** Düzey sütunu renkli ve kalın (metin süzgeç için düz kalır). */
@@ -180,16 +177,6 @@ qx.Class.define("ankamon.ui.health.Status", {
       const r = new qx.ui.table.cellrenderer.Conditional();
       Object.values(ankamon.page.Diagnose.LEVEL).forEach(L => r.addRegex(`^${L.text}$`, null, L.color, null, "bold"));
       table.getTableColumnModel().setDataCellRenderer(column, r);
-    },
-
-    /** İpucu satırının düz metni (kullanıcının verdiği metin; yalnız kullanıcının gördüğü yollar). */
-    __hintText(paths) {
-      return "Bulgular iki yoldan gelir; her satırda hangisinden geldiği yazar. " +
-        (paths.includes("watch") ? "Sürekli izleme Ankamon tahtaya bağlanmadan, tahtanın gönderdiği loglardan ve kendi okuduğu " +
-          "ölçümlerden birkaç dakikada bir çıkarır; burada yalnız şu an sürenler. " : "") +
-        (paths.includes("ssh") ? "SSH denetimi Ankamon tahtaya SSH ile girip ölçer (haftada bir kendiliğinden ya da Tara sekmesinden " +
-          "elle); her tahtanın en son denetimi. " : "") +
-        "Her denetimin ne olduğu, nasıl ve ne sıklıkla bakıldığı: Denetimler sekmesi.";
     },
 
     /** İki yolun açıklaması (ipucu): yalnız kullanıcının gördüğü yollar. */
@@ -202,7 +189,7 @@ qx.Class.define("ankamon.ui.health.Status", {
           "okuduğu ölçümlerden birkaç dakikada bir çıkarır; burada yalnız şu an sürenler. " : "") +
         (paths.includes("ssh") ? `${badge("ssh")} Ankamon tahtaya SSH ile girip ölçer (haftada bir kendiliğinden ya da Tara ` +
           "sekmesinden elle); her tahtanın en son denetimi. " : "") +
-        "Her denetimin ne olduğu, nasıl ve ne sıklıkla bakıldığı: <b>Denetimler</b> sekmesi.</div>";
+        "Her denetimin ne olduğu, nasıl ve ne sıklıkla bakıldığı: <b>Yardım ▸ Denetim türleri</b>.</div>";
     },
 
     /** @param data {Map} GET /api/board-health yanıtı */
@@ -216,7 +203,6 @@ qx.Class.define("ankamon.ui.health.Status", {
       const legend = this.__legendHtml(paths);
       this.getButton().setToolTipText(legend);
       this.__info.setToolTipText(legend);
-      this.__hint.setValue(qx.bom.String.escape(this.__hintText(paths)));
       const when = ankamon.ui.health.Status.when;
 
       const order = { bad: 3, warn: 2, info: 1, ok: 0 };
@@ -334,13 +320,10 @@ qx.Class.define("ankamon.ui.health.Status", {
       }
       const board = this.__selectedBoard();
       const filters = this.__filtersOf(this.__findingColumns, this.__findingFilters);
-      this.__shownFindings = this.__findingRows.filter(({ cells }) =>
-        (board === null || cells[0] === board) && filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
+      // Tahta seçilmeden boş (kullanıcı isteği: sekmeye girişte alt tablo boş gelsin).
+      this.__shownFindings = board === null ? [] : this.__findingRows.filter(({ cells }) =>
+        cells[0] === board && filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
       this.__findingTable.getTableModel().setData(this.__shownFindings.map(r => r.cells));
-      const name = board === null ? null : (this.__boardRows.find(r => r.id === board) || {}).name;
-      this.__findingTitle.setValue(name
-        ? `Bulgular — ${qx.bom.String.escape(String(name))} (${this.__shownFindings.length})`
-        : `Bulgular — tüm tahtalar (${this.__shownFindings.length})`);
     }
   }
 });

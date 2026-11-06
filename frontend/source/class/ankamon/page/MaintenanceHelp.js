@@ -116,19 +116,22 @@ qx.Class.define("ankamon.page.MaintenanceHelp", {
     <td>Denetlenemez; ilk açıldığı uygun anda denetlenir.</td></tr>
 </table>
 <p>Aynı soruya iki ayrı cevap verilmesin diye sürekli ölçülebilenler (BIOS pili, saat eşitlemesi) yalnız sürekli izlemede
-bakılır. Her denetimin listesi: <b>Denetimler</b> sekmesi.</p>
+bakılır. Her denetimin listesi: bu sekmenin <b>Denetim türleri</b> bölümü.</p>
 <h3>Sekmeler</h3>
 <ul>
   <li><b>Durum</b> — her tahtanın şu anki sağlığı: en kötü bulgusu, sürekli izlemede şu an sürenler, son denetim ya da
-      bulgunun zamanı (10 saatten yeniyse "2 saat 23 dk önce" gibi). Bir tahta seçince altta bulguları; her bulguda
+      bulgunun zamanı (10 saatten yeniyse "2 saat 23 dk önce" gibi). Bir tahta seçince altta bulguları (seçim yokken alt tablo boş); her bulguda
       <i>Yol, Kaynak, Nasıl bakıldı, Sıklık, Zaman</i>. "Aksiyon gereken ne?" sorusunun cevabı burası. Bulguya çift tık:
       kaydına gider (sürekli izleme → Geçmiş; SSH denetimi → Denetle, o tahtaya süzülmüş). İki yolun kısa açıklaması
-      sekme adının ve "ⓘ Bulgular nereden gelir?" yazısının ipucunda.</li>
+      sekme adının ve en soldaki "ⓘ Bulgular nereden gelir?" yazısının ipucunda.</li>
   <li><b>Denetle</b> — SSH denetimlerinin raporları (aşağıda anlatılıyor).</li>
-  <li><b>Geçmiş / Özet</b> — sürekli izleme kayıtları, sayfanın üstündeki rapor döneminde.</li>
+  <li><b>Geçmiş / Özet</b> — sürekli izleme kayıtları, sekmenin üstündeki <b>Rapor dönemi</b>nde (ikisi aynı dönemi
+      gösterir). Özet'te her sütun başlığının ve hücrenin üzerine gelince ne anlama geldiği yazar.</li>
   <li><b>Tara</b> — seçilen tahtalara o an bakmak: tam SSH denetimi ve/veya sürekli izleme denetimlerinin anlık yoklaması.</li>
-  <li><b>Denetimler</b> — bütün denetimler: yolu, kaynağı, nasıl ve ne sıklıkla bakıldığı, bulgu düzeyi.</li>
   <li><b>Bildirimler</b> — sürekli izleme bulgularının telefona ntfy bildirimi.</li>
+  <li><b>Yardım</b> — bu kılavuz ve <b>Denetim türleri</b>: bütün denetimler; yolu, kaynağı, nasıl ve ne sıklıkla bakıldığı,
+      bulgu düzeyi. Satıra çift tık: bütün ayrıntı; yönetici sıklığı, bulgu düzeyini ve anlık taranıp taranmayacağını
+      oradan değiştirir (SSH denetiminde yalnız otomatik denetim aralığı, bütün başlıklar için ortak).</li>
 </ul>
 <p>Zaman içindeki değişimin grafikleri (sıcaklık, işlemci, bellek, disk, ağ) <b>Tahtalar ▸ Sensörler</b>'de.</p>
 ${now}
@@ -138,8 +141,8 @@ ${now}
   <li>Sayfa açılınca <b>"Son durum — tüm tahtalar"</b> görünür: denetlenmiş <b>her tahtanın en son denetimi</b>, hangi
       taramada yapılmış olursa olsun, tek tabloda. Her satırda denetim zamanı ve kimin başlattığı
       (<i>otomatik</i> ya da <i>elle: kullanıcı</i>) yazar.</li>
-  <li>Bir tahtayı seçince bulguları, önerileriyle birlikte alttaki bölmede görünür; seçim yoksa grid'de görünen bütün
-      tahtalarınki. İki bölmenin arasındaki çubuk sürüklenerek boyları ayarlanır.</li>
+  <li>Bir tahtayı seçince bulguları, önerileriyle birlikte alttaki bölmede görünür (seçim yokken
+      bölme boştur). İki bölmenin arasındaki çubuk sürüklenerek boyları ayarlanır.</li>
   <li>Sütun başlığına tıklamak sıralar; başlıktaki kutu süzer: elle yazın ya da ▾ ile hazır listeden seçin
       (<b>Tahta, Genel durum, Acil, Dikkat, Bilgi</b>). <b>Göster</b> kutuları düzeye göre süzer (sunucuya gidilmez).</li>
   <li><b>Rapor</b> seçicisinde, "Son durum"un altında tek tek taramalar listelenir (en yeni 30). Bir taramayı seçince
@@ -201,7 +204,7 @@ ${now}
 </table>
 
 <p>BIOS (CMOS) pili ve saat eşitlemesi sürekli izlemede bakılır: <i>BIOS pili zayıf</i>, <i>NTP eşitlenmemiş</i>,
-<i>Tahta saati yanlış</i> (Denetimler sekmesi).</p>
+<i>Tahta saati yanlış</i> (Yardım ▸ Denetim türleri).</p>
 
 <h3>Sık karşılaşılan durumlar</h3>
 <div class="q">Bir tahta hep ${lv("bad")} "bağlanılamadı — SSH parolası reddedildi" görünüyor.</div>

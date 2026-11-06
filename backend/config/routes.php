@@ -93,6 +93,9 @@ return [
     ['PUT',    '/api/league-exclusions', [Api\LeagueExclusionsApi::class, 'update'], 'leagues.exclude'],
     // Tahtalar ▸ Anomaliler (bkz. AnomaliesApi, worker/ankamon/anomaly).
     ['GET',    '/api/anomalies',         [Api\AnomaliesApi::class, 'index'],   'anomalies'],
+    // Tahta sağlığı ▸ Yardım ▸ Denetim türleri: tür ayarları (sıklık, düzey, anlık taranır) ve SSH denetimi aralığı.
+    ['PUT',    '/api/anomaly-kinds',     [Api\AnomaliesApi::class, 'updateKind'], 'admin'],
+    ['PUT',    '/api/diagnose/interval', [Api\DiagnoseApi::class, 'setInterval'], 'admin'],
     // Tahta sağlığı ▸ Durum: sürekli izleme + SSH denetimi bulguları tek biçimde (yetki içeride: anomalies / diagnose).
     ['GET',    '/api/board-health',      [Api\BoardHealthApi::class, 'index'], 'user'],
     ['DELETE', '/api/board-sessions',    [Api\SessionsApi::class, 'delete'],   'sessions.manage'],

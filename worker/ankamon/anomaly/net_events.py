@@ -27,7 +27,8 @@
 
 Her biri yalnız tahtanın gönderdiği loglardan, art arda gelen olay ataklarıyla saptanır:
   - ssh_bruteforce: aynı kaynaktan kısa sürede çok başarısız SSH girişi ("Failed password", "Invalid user"). Kaynak
-    Ankamon'un kendisi de olabilir (ayarlardaki SSH parolası tahtanınkinden farklıysa): ayrıntıda kaynak adres yazar.
+    Ankamon'un kendisi de olabilir (ayarlardaki SSH parolası tahtanınkinden farklıysa): ayrıntıda kaynak adres ve — ağ
+    envanterinde (net_devices, ağ taraması) varsa — o adresin MAC adresi ve üreticisi yazar (kullanıcı isteği).
   - dhcp_issue: NetworkManager adres alamadı (no lease, zaman aşımı, başarısız). TiHA'nın bakım profili NetworkManager'ın
     bilgi satırlarını iletmez: yalnız bu satırları gönderen tahtalarda görülür.
   - nic_error: ağ kartı sürücüsünün zaman aşımı / takılma satırları (kern.warning düzeyinde, bakım profilinde de gelir).
@@ -41,9 +42,12 @@ from .log_events import event_rule
 # Program + zaman (dizinli, ucuz) önce süzülür, pahalı düzenli ifade yalnız kalan satırlara (MATERIALIZED): yoksa
 # planlayıcı ifadeyi penceredeki bütün satırlara uyguluyordu (6 saatte 131 bin satır, ~3 sn).
 _SSH = r"""
-WITH l AS MATERIALIZED (SELECT host, received_at, message FROM logs WHERE received_at >= %(since)s AND program = 'sshd')
-SELECT host, received_at AS at, substring(message FROM 'from ([0-9a-fA-F.:]+) port') AS key, message
-FROM l WHERE message ~ '^(Failed password for|Invalid user )'
+WITH l AS MATERIALIZED (SELECT host, received_at, message FROM logs WHERE received_at >= %(since)s AND program = 'sshd'),
+e AS MATERIALIZED (SELECT host, received_at AS at, substring(message FROM 'from ([0-9a-fA-F.:]+) port') AS key, message
+      FROM l WHERE message ~ '^(Failed password for|Invalid user )'),
+m AS (SELECT DISTINCT ON (host(ip)) host(ip) AS ip, mac::text AS mac, vendor FROM net_devices WHERE ip IS NOT NULL
+      ORDER BY host(ip), last_seen_at DESC NULLS LAST)
+SELECT e.*, m.mac, m.vendor FROM e LEFT JOIN m ON m.ip = e.key
 """
 
 
@@ -54,8 +58,11 @@ def _ssh_text(events, count):
         if m and m.group(1) not in users:
             users.append(m.group(1))
     source = events[0]["key"] or "bilinmeyen kaynak"
-    return (f"{source} adresinden {count} başarısız SSH girişi (hesaplar: {', '.join(users[:5]) or '?'})",
-            {"source": source, "users": users[:10]})
+    mac = next((e.get("mac") for e in reversed(events) if e.get("mac")), None)
+    vendor = next((e.get("vendor") for e in reversed(events) if e.get("vendor")), None)
+    who = f"MAC {mac}" + (f", {vendor}" if vendor else "") if mac else "MAC bilinmiyor (ağ envanterinde yok)"
+    return (f"{source} adresinden ({who}) {count} başarısız SSH girişi (hesaplar: {', '.join(users[:5]) or '?'})",
+            {"source": source, "mac": mac, "vendor": vendor, "users": users[:10]})
 
 
 ssh_rule = event_rule("ssh_bruteforce", _SSH, gap=datetime.timedelta(minutes=10), min_count=10, text=_ssh_text)

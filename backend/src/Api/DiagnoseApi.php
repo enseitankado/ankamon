@@ -31,8 +31,10 @@ declare(strict_types=1);
 namespace Ankamon\Api;
 
 use Ankamon\Core\ApiError;
+use Ankamon\Core\Audit;
 use Ankamon\Core\Db;
 use Ankamon\Core\Request;
+use Ankamon\Core\Settings;
 
 /**
  * Sorun tespiti raporları (frontend page/Diagnose.js). Taramalar "diagnose" türündeki görevlerdir —
@@ -145,7 +147,7 @@ final class DiagnoseApi
      */
     private static function schedule(): array
     {
-        $days = (float) (getenv('DIAGNOSE_INTERVAL_DAYS') ?: 7);
+        $days = self::intervalDays();
         $rows = Db::all(
             "SELECT b.id, extract(epoch FROM max(j.created_at))::bigint AS last
              FROM boards b
@@ -168,6 +170,7 @@ final class DiagnoseApi
         $known = array_filter($lasts, fn($l) => $l !== null);
         return [
             'interval_days' => $days,
+            'interval_default' => self::envIntervalDays(),
             'boards' => count($rows),
             'retry_hours' => (float) (getenv('DIAGNOSE_RETRY_HOURS') ?: 6),
             'failing' => array_column($failing, 'board'),
@@ -176,5 +179,34 @@ final class DiagnoseApi
             'next_from' => $known ? (int) (min($known) + $days * 86400 * 0.85) : null,
             'next_by' => $known ? (int) (min($known) + $days * 86400) : null,
         ];
+    }
+
+    /** Otomatik SSH denetimi aralığı (gün): yöneticinin ayarı (settings.diagnose_interval_days), yoksa ortam değişkeni. */
+    public static function intervalDays(): float
+    {
+        $set = Settings::get('diagnose_interval_days');
+        return is_numeric($set) && (float) $set > 0 ? (float) $set : self::envIntervalDays();
+    }
+
+    private static function envIntervalDays(): float
+    {
+        return (float) (getenv('DIAGNOSE_INTERVAL_DAYS') ?: 7);
+    }
+
+    /** Yönetici: {days: 1..60 | null (varsayılan)} — Yardım ▸ Denetim türleri penceresinden (SSH denetimi satırları). */
+    public function setInterval(Request $request, array $user): array
+    {
+        $days = $request->input('days');
+        if ($days === null || $days === '') {
+            Settings::set('diagnose_interval_days', null);
+        } else {
+            $days = (float) $days;
+            if ($days < 1 || $days > 60) {
+                throw ApiError::badRequest('Aralık 1 ile 60 gün arasında olmalı.');
+            }
+            Settings::set('diagnose_interval_days', $days);
+        }
+        Audit::log($user, $request, 'diagnose.interval', (string) ($days ?? 'varsayılan'));
+        return ['ok' => true, 'interval_days' => self::intervalDays()];
     }
 }

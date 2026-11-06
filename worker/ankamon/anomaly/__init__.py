@@ -83,21 +83,37 @@ _EPOCH = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 
 
 def run(conn) -> None:
+    overrides = _overrides(conn)
     for rule in RULES:
         try:
-            if _due(conn, rule):
+            if _due(conn, rule, overrides.get(rule.KIND) or {}):
                 _apply(conn, rule)
         except Exception:  # noqa: BLE001 — bir kuralın hatası diğerlerini durdurmasın
             log.exception("Anomali kuralı çalışmadı: %s", rule.KIND)
 
 
-def _due(conn, rule) -> bool:
-    """Kural EVERY (sn) verdiyse en son çalışmasından o kadar geçmeden yeniden çalışmaz (log taraması pahalı kurallar)."""
-    every = getattr(rule, "EVERY", 0)
-    if not every:
+def _overrides(conn) -> dict:
+    """Yöneticinin tür ayarları (Tahta sağlığı ▸ Yardım ▸ Denetim türleri; bkz. backend AnomaliesApi::updateKind)."""
+    try:
+        row = conn.execute("SELECT value FROM settings WHERE key = 'anomaly_kind_overrides'").fetchone()
+    except Exception:  # noqa: BLE001 — ayar okunamazsa varsayılanlarla devam
+        return {}
+    value = row["value"] if row else None
+    return value if isinstance(value, dict) else {}
+
+
+def _due(conn, rule, override: dict) -> bool:
+    """Kural EVERY (sn) verdiyse en son çalışmasından o kadar geçmeden yeniden çalışmaz (log taraması pahalı kurallar).
+    Yönetici sıklığı ayarladıysa (override every_s) o geçerlidir; tur 60 sn olduğundan birkaç sn pay bırakılır."""
+    every = override.get("every_s") or getattr(rule, "EVERY", 0)
+    try:
+        every = float(every)
+    except (TypeError, ValueError):
+        every = 0
+    if every <= 60:
         return True
     row = conn.execute("SELECT now() - value AS age FROM task_cursors WHERE name = %s", ("anomaly." + rule.KIND,)).fetchone()
-    return row is None or row["age"].total_seconds() >= every
+    return row is None or row["age"].total_seconds() >= every - 5
 
 
 def _since(conn, rule) -> datetime.datetime:

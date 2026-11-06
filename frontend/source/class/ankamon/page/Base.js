@@ -830,6 +830,11 @@ qx.Class.define("ankamon.page.Base", {
         // İpucu sütun adını tekrarlamaz (etiket hemen üstte); kutunun ne işe yaradığını söyler.
         field.setPlaceholder("Süz…");
         field.setToolTipText((column.hint || column.label) + " sütununda süz (birden çok değer: | ile ayırın)");
+        // Sütun tanımında hint varsa başlık etiketinin de ipucu olur (kutu → satır → FilterHeaderCell).
+        const cell = field.getLayoutParent() && field.getLayoutParent().getLayoutParent();
+        if (column.hint && cell instanceof ankamon.ui.table.FilterHeaderCell) {
+          cell.getChildControl("label").setToolTipText(column.hint);
+        }
         const previous = fields[column.id];
         field.addListener("changeValue", onChange, this);
         fields[column.id] = field;
