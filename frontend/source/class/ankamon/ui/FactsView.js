@@ -82,6 +82,9 @@ qx.Class.define("ankamon.ui.FactsView", {
       return f.mem_total_bytes ? ankamon.util.Format.bytes(f.mem_total_bytes) : "";
     },
 
+    /** boards.facts.wifi_monitor bu kadar saniyeden eskiyse "Monitör modu" gösterilmez (sürekli izlemede tur ~35 sn). */
+    WIFI_MONITOR_FRESH_S: 120,
+
     /**
      * Wi-Fi kartının etkin olup olmadığı — Bilgi kartı ve Tahtalar grid'inin "Wi-Fi" sütunu aynı
      * kuralı kullanır. Etkin = kart var + NetworkManager radyosu açık + rfkill engeli yok (actions/
@@ -97,6 +100,11 @@ qx.Class.define("ankamon.ui.FactsView", {
       }
       if (f.wifi_blocked === "hard") {
         return { text: "Devre dışı (donanım anahtarı/BIOS)", kind: "bad" };
+      }
+      // Wi-Fi Monitör kartı dinleme için monitör kipine alıyor (worker screen/wifi.py yazar, pencere kapanınca siler). Damga
+      // dinleme turlarında tazelenir; eskiyse (worker çöktü) gösterilmez — sütun kendiliğinden eski haline döner.
+      if (f.wifi_monitor && Date.now() / 1000 - f.wifi_monitor < this.WIFI_MONITOR_FRESH_S) {
+        return { text: "Monitör modu", kind: "warn" };
       }
       if (f.wifi_blocked === "soft" || f.wifi_radio === "disabled") {
         return { text: "Devre dışı", kind: "idle" };

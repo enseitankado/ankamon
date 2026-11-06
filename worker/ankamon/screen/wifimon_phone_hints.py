@@ -23,15 +23,13 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Wi-Fi Monitör: tahtanın duyduğu verici (Wi-Fi ağı, Bluetooth cihazı, Wi-Fi yoklaması) telefon olabilir mi? (bkz. wifi.py)
+"""Wi-Fi Monitör: tahtanın duyduğu verici (Wi-Fi ağı, Wi-Fi arayan ya da Wi-Fi'ye bağlı cihaz) telefon olabilir mi? (bkz. wifi.py)
 
 Kesin tanıma yoktur; kanıtlar satıra `hints` (kısa Türkçe gerekçeler) ve `phone` ("yes" güçlü kanıt, "maybe" zayıf, "" yok)
 olarak eklenir. Kullanılan işaretler:
 - Wi-Fi ağı (erişim noktası): telefon paylaşım noktası adları (iPhone, AndroidAP, Galaxy, Redmi…), telefon üreticisine ait
   BSSID (Wireshark manuf), yerel yönetimli (rastgele) BSSID — Android paylaşım noktaları böyledir, ama bazı kurumsal erişim
   noktalarının ek ağları da yerel yönetimli adres kullanır: zayıf kanıt.
-- Bluetooth: BlueZ'in sınıfa göre verdiği simge (Icon: phone), Class of Device ana sınıfı 2 (telefon), üretici verisi
-  (Apple 0x004c: iPhone/AirPods/Saat; Samsung 0x0075; Google 0x00e0; Xiaomi 0x038f; Huawei 0x027d), rastgele BLE adresi.
 - Wi-Fi arayan cihaz (yoklama): bağlı olmayan, Wi-Fi'si açık cihaz. Rastgele (yerel yönetimli) adres telefon/tablet/dizüstünde olağandır;
   sabit adresin üreticisi telefon üreticisiyse güçlü kanıt.
 - Wi-Fi'ye bağlı cihaz: bir erişim noktasına bağlı, veri gönderen cihaz. Rastgele adres (telefonların ağ başına "özel adresi")
@@ -55,9 +53,6 @@ _PHONE_VENDOR_RE = re.compile(
     r"apple|samsung|xiaomi|huawei|honor|oppo|vivo|realme|oneplus|google|motorola|nokia|hmd global|sony mobile|"
     r"\blg ?electronics|tcl|tecno|infinix|transsion|general mobile|zte|meizu|reeder|casper",
     re.IGNORECASE)
-_BT_MANUFACTURERS = {0x004C: "Apple", 0x0075: "Samsung", 0x00E0: "Google", 0x038F: "Xiaomi", 0x027D: "Huawei",
-                     0x0006: "Microsoft", 0x0087: "Garmin", 0x0157: "Huami"}
-_BT_PHONE_MANUFACTURERS = {0x004C, 0x0075, 0x00E0, 0x038F, 0x027D}
 
 
 def _vendor(addr: str) -> str:
@@ -83,27 +78,6 @@ def annotate_wifi_ap(row: dict) -> None:
     if row["random"]:
         hints.append("rastgele adres (Android paylaşım noktası olabilir)")
         phone = phone or "maybe"
-    row["hints"], row["phone"] = hints, phone
-
-
-def annotate_bluetooth(row: dict) -> None:
-    hints, phone = [], ""
-    row["vendor"] = "" if row.get("random") else _vendor(row.get("addr") or "")
-    if row.get("icon") == "phone" or ((row.get("cod") or 0) >> 8) & 0x1F == 2:
-        hints.append("cihaz sınıfı: telefon")
-        phone = "yes"
-    for key in row.get("mfr") or []:
-        name = _BT_MANUFACTURERS.get(key)
-        if name and not row["vendor"]:
-            row["vendor"] = name
-        if key in _BT_PHONE_MANUFACTURERS:
-            hints.append(f"{name} yayını (telefon, kulaklık ya da saat)")
-            phone = phone or "maybe"
-    if row["vendor"] and _PHONE_VENDOR_RE.search(row["vendor"]) and not phone:
-        hints.append("telefon üreticisi")
-        phone = "maybe"
-    if row.get("random"):
-        hints.append("rastgele BLE adresi (birkaç dakikada bir değişir)")
     row["hints"], row["phone"] = hints, phone
 
 

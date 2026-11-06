@@ -23,28 +23,32 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Sağ menü "Wi-Fi Monitör": tahtanın Wi-Fi kartı, bağlantısı, çevredeki ağlar ve Bluetooth cihazları (ws /screen/ws/wifi/<tahta id>).
+"""Sağ menü "Wi-Fi Monitör": tahtanın (sensörün) Wi-Fi kartı, bağlantısı ve çevredeki Wi-Fi vericileri (ws /screen/ws/wifi/<tahta id>).
+Bluetooth kullanılmaz (kullanıcı kararı 2026-11-06).
 
 Çoklu tahta penceresi (sınıfta telefon arama) her tahta için ayrı bağlantı açar; "sabit" verici listesi ayrı (PHP
 /api/wifimon/fixed), ayırma tarayıcıda yapılır. Bu köprü satırlara telefon kanıtlarını (wifimon_phone_hints.py) ve görülme
 geçmişini (wifimon_sightings.py) ekler.
 
 Varsayılan tek atış: bir tarama, sonuç, tahtada durum geri yüklenir, kapanış 1000. `?watch=1`: tarama döngüsü; tarayıcıdan "stop" iletisi
-ya da bağlantının kapanması biter. `?probe=1`: her taramadan sonra Wi-Fi yoklamaları da dinlenir (bkz. wifimon_probe_sniffer.py).
-Wi-Fi/Bluetooth kapalıysa tarama süresince geçici açılır, bağlantı kurulmaz, sonra eski durumuna döner: tahtadaki program ve geri yükleme güvenceleri wifi_remote_scan.py'de. Bu köprü SSH stdin'ine kalp atışı yazar; stdin'in
+ya da bağlantının kapanması biter. `?probe=1`: her taramadan sonra Wi-Fi trafiği de dinlenir (bkz. wifimon_probe_sniffer.py). `?force=1` (kullanıcı onayı:
+tahta kabloyla da bağlı): kart bir ağa bağlı olsa da bağlantısı oturum boyunca kesilip dinlenir, kapanışta yeniden kurulur —
+SSH Wi-Fi'den geliyorsa tahta yine dinlemez (bkz. wifi_remote_scan.py). Dinleme olan her turda boards.facts.wifi_monitor
+(epoch) yazılır, kapanışta silinir: Tahtalar grid'inin Wi-Fi sütunu "Monitör modu" gösterir (bkz. ui.FactsView.wifiStatus).
+Wi-Fi kapalıysa tarama süresince geçici açılır, bağlantı kurulmaz, sonra eski durumuna döner: tahtadaki program ve geri yükleme güvenceleri wifi_remote_scan.py'de. Bu köprü SSH stdin'ine kalp atışı yazar; stdin'in
 kapanması (ya da SSH'nin ölmesi) tahtadaki bekçiyi tetikler. Yetki: /screen/ws/ ile aynı ("screen", nginx).
 Sunucu iletileri, `phase` alanıyla:
   scanning {info}: tarama başladı.
-  data {radio, device, state, connection, rows: [{kind: wifi|bt, name, addr, signal, chan, freq, rate, security, active,
+  data {radio, device, state, connection, rows: [{kind: wifi, name, addr, signal, chan, freq, rate, security, active,
         random, vendor, hints, phone: yes|maybe|"", first_seen, seen_days}], info, at}.
   probes {rows: [{kind: probe, addr, signal, rssi, count, fp, ssids, random, vendor, hints, phone, first_seen, seen_days}
         | {kind: client (Wi-Fi'ye bağlı cihaz), addr, bssid, name (bağlı olduğu ağ adı), chan, signal, rssi, count, random,
            vendor, board_name (adres bir tahtanın kablolu/kablosuz MAC'iyse), hints, phone, first_seen, seen_days}],
         devices (yoklama yapan kestirilen cihaz sayısı), clients (bağlı cihaz sayısı),
-        note (boşsa dinlendi: nodev|tools|radio|busy|nomon|shared|monfail), secs, at}.
-  done {result: restored|shared|none|fail|lock, radio, policy (off: tahtada "Wi-Fi'yi kapat" kuralı var), wifi_temp, wifi_fail, bt}:
+        note (boşsa dinlendi: nodev|tools|radio|busy|nomon|shared|monfail|sshwifi), secs, at}.
+  done {result: restored|shared|none|fail|lock, radio, policy (off: tahtada "Wi-Fi'yi kapat" kuralı var), wifi_temp, wifi_fail}:
         geri yükleme sonucu (radyo durumu boards.facts'e de yazılır), ardından kapanış 1000.
-info: {wifi_temp: "0"|"1", wifi_fail, bt: absent|on|temp|fail:<neden>, disconnected}.
+info: {wifi_temp: "0"|"1", wifi_fail, disconnected, forced ("1": bağlantı kullanıcı onayıyla kesildi)}.
 Kapanış kodları: 4001 tahta yok · 4002 SSH · 4003 giriş reddedildi · 4009 tahtada nmcli yok · 4010 tahtada /run yazılamıyor.
 """
 
@@ -70,8 +74,6 @@ _HEARTBEAT_SECONDS = 5
 # Pencere kapanınca tahtadaki geri yüklemenin bitip @@DONE'un gelmesi için beklenen en uzun süre.
 _CLOSE_GRACE_SECONDS = 45
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|[\x01\x02]")
-_BT_DEVICE_RE = re.compile(r"^Device ((?:[0-9A-F]{2}:){5}[0-9A-F]{2})\b(.*)")
-_BT_RSSI_RE = re.compile(r"(-\d+)")
 
 
 def _fields(line: str) -> list[str]:
@@ -86,36 +88,6 @@ def _keyvals(lines: list[str]) -> dict:
 def rssi_to_percent(rssi: int) -> int:
     """-100 dBm ve altı %0, -50 dBm ve üstü %100 (NetworkManager'ın Wi-Fi yüzdesine yakın ölçek)."""
     return max(0, min(100, 2 * (rssi + 100)))
-
-
-def parse_bluetooth(lines: list[str]) -> list[dict]:
-    """`bluetoothctl info` blokları. RSSI (5.66: "RSSI: -60"; yeni sürümler: "RSSI: 0xffffffc4 (-60)") yoksa signal None."""
-    devices: list[dict] = []
-    dev = None
-    for raw in lines:
-        line = _ANSI_RE.sub("", raw).strip()
-        m = _BT_DEVICE_RE.match(line)
-        if m:
-            dev = {"kind": "bt", "addr": m.group(1), "name": "", "signal": None, "chan": "", "freq": "", "rate": "",
-                   "security": "", "active": False, "random": "(random)" in m.group(2), "icon": "", "cod": 0, "mfr": []}
-            devices.append(dev)
-        elif dev is not None and ":" in line:
-            key, value = (p.strip() for p in line.split(":", 1))
-            if key == "Name":
-                dev["name"] = value
-            elif key == "RSSI" and (r := _BT_RSSI_RE.search(value)):
-                dev["signal"] = rssi_to_percent(int(r.group(1)))
-            elif key == "Paired" and value == "yes":
-                dev["security"] = "eşli"
-            elif key == "Connected" and value == "yes":
-                dev["active"] = True
-            elif key == "Icon":
-                dev["icon"] = value
-            elif key == "Class" and re.fullmatch(r"0x[0-9a-fA-F]+", value):
-                dev["cod"] = int(value, 16)
-            elif key == "ManufacturerData Key" and re.match(r"0x[0-9a-fA-F]+", value):
-                dev["mfr"].append(int(value.split()[0], 16))
-    return devices
 
 
 def parse(sections: dict) -> dict:
@@ -134,13 +106,9 @@ def parse(sections: dict) -> dict:
         wifi.append({
             "kind": "wifi", "active": f[0].strip() == "*", "addr": f[1], "name": f[2], "chan": f[3], "freq": f[4], "rate": f[5],
             "signal": int(f[6]) if f[6].isdigit() else 0, "security": f[7]})
-    bluetooth = parse_bluetooth(sections.get("BT", []))
     for row in wifi:
         wifimon_phone_hints.annotate_wifi_ap(row)
-    for row in bluetooth:
-        wifimon_phone_hints.annotate_bluetooth(row)
-    by_signal = lambda n: (-n["active"], -(n["signal"] if n["signal"] is not None else -1))
-    out["rows"] = sorted(wifi, key=by_signal) + sorted(bluetooth, key=by_signal)
+    out["rows"] = sorted(wifi, key=lambda n: (-n["active"], -(n["signal"] if n["signal"] is not None else -1)))
     return out
 
 
@@ -209,6 +177,20 @@ def _wifimon_mark_boards(rows: list[dict]) -> None:
             row["hints"] = [f"Ankamon tahtası ({name})"]
 
 
+def _store_monitor(board_id: int, on: bool) -> None:
+    """boards.facts.wifi_monitor: dinleme (monitör kipi) olan turun zamanı; kapanışta silinir. Tahtalar grid'i bunu "Monitör
+    modu" diye gösterir (tazeyse — bkz. ui.FactsView.wifiStatus; worker çökerse damga eskir, sütun kendiliğinden düzelir)."""
+    try:
+        with db.connect() as conn:
+            if on:
+                conn.execute("UPDATE boards SET facts = facts || jsonb_build_object('wifi_monitor', %s::bigint) WHERE id = %s",
+                             (int(time.time()), board_id))
+            else:
+                conn.execute("UPDATE boards SET facts = facts - 'wifi_monitor' WHERE id = %s", (board_id,))
+    except Exception as exc:  # gösterge yazılamazsa izleme sürer
+        log.warning("Wi-Fi monitör durumu yazılamadı (tahta %s): %s", board_id, exc)
+
+
 def _store_radio(board_id: int, radio: str, state: str | None = None) -> None:
     """Kartın o anki radyo durumunu boards.facts'e yazar — Tahtalar grid'inin Wi-Fi sütunu anında doğru olsun (kullanıcı isteği):
     pencere açılınca ilk taramadaki durum (ör. geçici açıldı), kapanınca geri yüklemeden sonraki durum. Kapalıysa bağlantı
@@ -243,9 +225,10 @@ class WifiSocket(tornado.websocket.WebSocketHandler):
         self._board_id = int(board_id)
         watch = self.get_argument("watch", "0") == "1"
         probe = self.get_argument("probe", "0") == "1"
+        force = probe and self.get_argument("force", "0") == "1"
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
         self.proc = await asyncio.create_subprocess_exec(
-            "sshpass", "-e", "ssh", *self._ssh_opts, f"{ssh_user}@{board['ip']}", wifimon_remote_command(watch, probe),
+            "sshpass", "-e", "ssh", *self._ssh_opts, f"{ssh_user}@{board['ip']}", wifimon_remote_command(watch, probe, force),
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, env=env,
         )
         self._beat_task = asyncio.ensure_future(self._heartbeat())
@@ -273,6 +256,7 @@ class WifiSocket(tornado.websocket.WebSocketHandler):
         current = None
         finished = False
         stored = None  # boards.facts'e son yazılan (radyo, kart durumu): her taramada değil, değişince yazılır
+        monitoring = False  # bu oturum boards.facts.wifi_monitor yazdı mı (kapanışta silinir)
         try:
             while True:
                 raw = await proc.stdout.readline()
@@ -293,11 +277,17 @@ class WifiSocket(tornado.websocket.WebSocketHandler):
                     sections, current = {}, None
                 elif line == "@@PEND":
                     data = await asyncio.to_thread(_wifimon_build, parse_probes, self._board_id, sections)
+                    if not data["note"]:
+                        monitoring = True
+                        await asyncio.to_thread(_store_monitor, self._board_id, True)
                     await self.write_message(json.dumps(data, ensure_ascii=False))
                     sections, current = {}, None
                 elif line == "@@DONE":
                     finished = True
                     restored = _keyvals(sections.get("RESTORED", []))
+                    if monitoring:
+                        monitoring = False
+                        await asyncio.to_thread(_store_monitor, self._board_id, False)
                     await asyncio.to_thread(_store_radio, self._board_id, restored.get("radio", ""))
                     await self.write_message(json.dumps({"phase": "done", **restored}, ensure_ascii=False))
                     sections, current = {}, None
@@ -312,6 +302,8 @@ class WifiSocket(tornado.websocket.WebSocketHandler):
             if proc.returncode is None and not finished:
                 proc.kill()
             rc = await proc.wait()
+            if monitoring:
+                await asyncio.to_thread(_store_monitor, self._board_id, False)
         if self.ws_connection is not None:
             if finished:
                 self.close(1000, "done")

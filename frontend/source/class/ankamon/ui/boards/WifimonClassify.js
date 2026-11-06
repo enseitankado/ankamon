@@ -26,11 +26,15 @@
  */
 
 /**
- * Wi-Fi Monitör: tahtaların duyduğu vericileri "sabit" listesine ve telefon kanıtlarına göre ayırır (bkz. ui.boards.WifiMonitor).
+ * Wi-Fi Monitör: sensörlerin (seçili tahtaların) duyduğu vericileri "güvenilir" (sabit) listesine ve telefon kanıtlarına göre
+ * ayırır (bkz. ui.boards.WifiMonitor).
  *
- * Düzeyler (öne çıkma sırasıyla): phone (sabit değil + güçlü telefon kanıtı), maybe (sabit değil + zayıf kanıt), foreign
- * (sabit değil, kanıt yok), common (sabit değil ama aynı ağ adı seçili tahtaların çoğunda — okul ağı olası), fixed (sabit
- * listesinde ya da tahtanın kendi bağlı olduğu ağ). Telefon kanıtları worker'dan gelir (screen/wifimon_phone_hints.py).
+ * Düzeyler (öne çıkma sırasıyla): phone (güvenilir değil + güçlü telefon kanıtı), maybe (güvenilir değil + zayıf kanıt),
+ * foreign (güvenilir değil, kanıt yok), common (güvenilir değil ama AYNI erişim noktası — aynı MAC/BSSID — sensörlerin çoğunca
+ * duyuluyor: okulun AP'si olası), fixed (güvenilir listesinde, sensörün bağlı olduğu ağ ya da bir Ankamon tahtasının kendisi).
+ * Güven ve ortaklık yalnız MAC adresiyle kurulur (kullanıcı isteği 2026-11-06): aynı adı taşıyan bir telefon paylaşım noktası
+ * okulun ağı sayılmaz. Eski "ağ adı" (ssid) güven kayıtları uygulanmaz (Güvenilir listesinde eski kayıt olarak görünür).
+ * Telefon kanıtları worker'dan gelir (screen/wifimon_phone_hints.py).
  */
 qx.Class.define("ankamon.ui.boards.WifimonClassify", {
   type: "static",
@@ -38,14 +42,14 @@ qx.Class.define("ankamon.ui.boards.WifimonClassify", {
   statics: {
     LEVEL_ORDER: { phone: 0, maybe: 1, foreign: 2, common: 3, fixed: 4 },
 
-    /** Sabit listesinden arama dizini: "tür|değer|tahta" (tahta 0 = bütün tahtalar). */
+    /** Güvenilir listesinden arama dizini: "tür|değer|tahta" (tahta 0 = okul geneli). */
     index(fixed) {
       const map = new Map();
       (fixed || []).forEach(f => map.set(`${f.kind}|${f.value}|${f.board_id || 0}`, f));
       return map;
     },
 
-    /** Satırın değişmeyen anahtarı ("yeni" takibi için): rastgele adresli yoklamada adres değil parmak izi. */
+    /** Satırın değişmeyen anahtarı ("yeni" takibi ve grid satır kimliği): rastgele adresli yoklamada adres değil parmak izi. */
     rowKey(row) {
       if (row.kind === "probe" && row.random && row.fp) {
         return "probe-fp|" + row.fp;
@@ -53,67 +57,67 @@ qx.Class.define("ankamon.ui.boards.WifimonClassify", {
       return row.kind + "|" + row.addr;
     },
 
-    /** Satırın uyduğu sabit kaydı (yoksa null). */
+    /**
+     * Satırın uyduğu güven kaydı (yoksa null) — yalnız MAC ile: AP → "bssid", ağ arayan/bağlı cihaz → "probe" (cihaz adresi;
+     * aynı cihaz iki durumda da görülebilir). Önce bu sensöre (sınıfa) özgü, sonra okul geneli kayıt.
+     */
     fixedEntry(row, boardId, index) {
-      const find = (kind, value) => value ? index.get(`${kind}|${value}|${boardId}`) || index.get(`${kind}|${value}|0`) || null : null;
-      if (row.kind === "wifi") {
-        return find("bssid", row.addr) || find("ssid", row.name);
-      }
-      // Ağ arayan ve Wi-Fi'ye bağlı cihaz aynı "probe" (cihaz adresi) kaydına uyar: aynı cihaz iki durumda da görülebilir.
-      return find(row.kind === "bt" ? "bt" : "probe", row.addr);
+      const kind = row.kind === "wifi" ? "bssid" : "probe";
+      const value = row.addr;
+      return value ? index.get(`${kind}|${value}|${boardId}`) || index.get(`${kind}|${value}|0`) || null : null;
     },
 
     /**
-     * Ağ adı → onu duyan tahta sayısı (yalnız verisi gelmiş tahtalar). Seçili tahtaların en az yarısı ve en az 3 tahta
-     * aynı adı duyuyorsa ad "ortak" sayılır: okulun ağı olması olasıdır, telefon paylaşım noktası nadiren bu kadar yayılır.
+     * Adres → onu duyan sensörler [{id, name, signal}] (verisi gelmiş bütün sensörlerden; rastgele adresli yoklama hariç —
+     * adresi dakikalar içinde değişir). "x sensörde" kanıtı ve "Ortak" düzeyi buna dayanır (ağ adına değil).
      */
-    commonSsids(feeds) {
-      const seen = new Map();
-      let withData = 0;
+    hearers(feeds) {
+      const map = new Map();
       feeds.forEach(feed => {
-        if (!feed.data) {
-          return;
-        }
-        withData++;
-        new Set(feed.data.rows.filter(r => r.kind === "wifi" && r.name).map(r => r.name)).forEach(name => seen.set(name, (seen.get(name) || 0) + 1));
+        const rows = ((feed.data && feed.data.rows) || []).concat(Array.from((feed.probes || new Map()).values()).map(p => p.row));
+        rows.forEach(row => {
+          if (!row.addr || (row.kind === "probe" && row.random)) {
+            return;
+          }
+          const list = map.get(row.addr) || [];
+          if (!list.some(h => h.id === feed.board.id)) {
+            list.push({ id: feed.board.id, name: feed.name, signal: row.signal });
+            map.set(row.addr, list);
+          }
+        });
       });
-      const common = new Map();
-      seen.forEach((count, name) => {
-        if (count >= 3 && count >= Math.ceil(withData / 2)) {
-          common.set(name, count);
-        }
-      });
-      return common;
+      return map;
     },
 
     /**
-     * Bir tahtanın görünüm modeli: sınıflanmış satırlar (öne çıkma, sonra sinyal sırasıyla) ve düzey sayıları.
-     * @param feed {Map} tahta durumu (data: son tarama, probes: Map anahtar → {row, at})
+     * Bir sensörün görünüm modeli: sınıflanmış satırlar ve düzey sayıları.
+     * @param feed {Map} sensör durumu (data: son tarama, probes: Map anahtar → {row, at})
+     * @param hearers {Map} hearers() sonucu
+     * @param sensorCount {Integer} verisi gelmiş sensör sayısı ("Ortak" eşiği için)
      */
-    board(feed, index, common, now) {
+    board(feed, index, hearers, sensorCount, now) {
       const rows = [];
       const add = (row, extra) => {
         const fixed = this.fixedEntry(row, feed.board.id, index);
         const key = this.rowKey(row);
+        const heard = (row.addr && hearers.get(row.addr)) || [];
         let level;
-        if (fixed || row.active || row.board_name) { // board_name: cihaz bir Ankamon tahtasının kendisi (worker eşler)
+        if (fixed || row.active || row.board_name) {
           level = "fixed";
         } else if (row.phone === "yes") {
           level = "phone";
-        } else if (row.kind === "wifi" && row.name && common.has(row.name)) {
+        } else if (row.kind === "wifi" && heard.length >= 3 && heard.length >= Math.ceil(sensorCount / 2)) {
           level = "common";
         } else {
           level = row.phone === "maybe" ? "maybe" : "foreign";
         }
         const firstSeenRecently = row.first_seen && now / 1000 - row.first_seen < 86400 && (row.seen_days || 1) <= 1;
         const appeared = feed.initialKeys && !feed.initialKeys.has(key);
-        rows.push(Object.assign({ key, level, fixed, isNew: level !== "fixed" && !!(firstSeenRecently || appeared),
-          commonCount: row.kind === "wifi" ? common.get(row.name) || 0 : 0 }, extra || {}, { row }));
+        rows.push(Object.assign({ key, level, fixed, heard, isNew: level !== "fixed" && !!(firstSeenRecently || appeared) },
+          extra || {}, { row }));
       };
-      ((feed.data && feed.data.rows) || []).forEach(row => add(row));
+      ((feed.data && feed.data.rows) || []).filter(row => row.kind === "wifi").forEach(row => add(row, { lastAt: feed.data.at * 1000 }));
       (feed.probes || new Map()).forEach(p => add(p.row, { lastAt: p.at }));
-      rows.sort((a, b) => this.LEVEL_ORDER[a.level] - this.LEVEL_ORDER[b.level] ||
-        (b.row.signal ?? -1) - (a.row.signal ?? -1));
       const counts = { phone: 0, maybe: 0, foreign: 0, common: 0, fixed: 0 };
       rows.forEach(r => counts[r.level]++);
       return { rows, counts };

@@ -1150,7 +1150,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         // Wi-Fi Monitör: seçili çevrim içi tahtalar tek pencerede (sınıfta telefon arama; sabit/yabancı verici) — bkz. ui.boards.WifiMonitor.
         if (can("screen")) {
-          add(ICON.wifi, "Wi-Fi Monitör" + count, () => ankamon.ui.boards.WifiMonitor.open(online));
+          add(ICON.wifi, "Wi-Fi Monitör" + count, () => ankamon.ui.boards.WifiMonitor.open(online, user));
         }
         // Sohbet: her bilgisayar için ayrı pencere; çoklu seçimde sağ tıklanan tahta (bkz. ui.chat.Window).
         if (can("boards.chat")) {

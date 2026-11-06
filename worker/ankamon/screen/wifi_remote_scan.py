@@ -33,13 +33,20 @@ Program /run/ankamon-wifimon/prog.sh olarak yazılıp sh (dash) ile çalışır.
 - Geri yüklemeyi hem ana sürecin trap'i hem `setsid` ile ayrılmış bekçi yapar (ikisi de güvenli, iş bir kez yapılır). Bekçi sunucudan
   gelen stdin kalp atışını okur: EOF (SSH koptu, durdurma istendi), LEASE saniye sessizlik (ağ koptu) ya da ana sürecin ölmesi
   (kill -9) durumunda devreye girer. stdout'u /dev/null'dur; SSH oturumunu açık tutmaz.
-- Bluetooth: /sys/class/bluetooth/hci* varsa rfkill, servis ve güç açısından gerekirse geçici açılır, durum aynı şekilde döner. Yoksa atlanır.
+- Bluetooth kullanılmaz (kullanıcı kararı 2026-11-06: Wi-Fi Monitör yalnız Wi-Fi). Eski sürümün kalıcı başlangıç dosyasında
+  ($P/orig) BT_TEMP=1 kaldıysa geri yükleme Bluetooth'u yine eski durumuna döndürür.
 - Wi-Fi trafiği dinleme (PROBE=1, bkz. wifimon_probe_sniffer.py — yoklamalar ve bağlı cihazlar; dinleyiciye son taramanın
   listesi $TMP verilir, AP'lerin kanalları da dinlenir): Wi-Fi kartı BAĞLI DEĞİLSE (durum 20/30) kart NetworkManager'dan geçici
   bırakılır (`managed no`, çalışma zamanı ayarı; açılışta kendiliğinden döner), arabirim indirilir, monitör kipinde ankamon-mon0
   eklenir ve dinlenir; sonra arabirim silinir, kart yeniden `managed yes` olur (autoconnect "no" korunur, Arge 2'de denendi).
-  Kart bağlıysa ya da bağlanıyorsa dinlenmez (bağlantı kesilirdi). Aynı tahtada tek oturum dinler (flock -n). Geri alma işaretli
-  ($D/unmanaged): finish, bekçi ve restore_orig sahibi ölmüş/biten işareti temizler.
+  Kart bağlıysa ya da bağlanıyorsa dinlenmez (bağlantı kesilirdi) — FORCE=1 değilse. Aynı tahtada tek oturum dinler (flock -n).
+  Geri alma işaretli ($D/unmanaged): finish, bekçi ve restore_orig sahibi ölmüş/biten işareti temizler.
+- FORCE=1 (kullanıcı onayı: tahta kabloyla da bağlı, Wi-Fi bağlantısı dinleme süresince kopacak): kart bağlıysa bağlantı adı ve
+  autoconnect değeri kalıcı diske ($P/forced) yazılır, autoconnect kapatılır, bağlantı kesilir; oturum boyunca kopuk tutulur
+  (block_connect). Son oturum çıkınca (restore_orig) autoconnect döner ve bağlantı yeniden kurulur. Güç kesilirse açılışta
+  NetworkManager zaten kendisi bağlanır; dosya bir sonraki oturumda temizlenir.
+- SSH koruması: SSH istemcisine giden yol ($SSH_CLIENT, `ip route get`) Wi-Fi kartından geçiyorsa kart HİÇBİR koşulda monitör
+  kipine alınmaz (PROBE_NOTE=sshwifi) — yoksa tahtaya erişim kaybolurdu.
 
 - Tahtanın Ankamon Wi-Fi ayarı: "Wi-Fi'yi kapat" işleminin polkit kuralı ($RULE) varsa geri yüklemenin sonunda kart, açılıştaki
   durumu ne olursa olsun kapatılır (Tahtalar grid'inin Wi-Fi sütunu ve wifi-on/wifi-off işlemleriyle tutarlı).
@@ -47,7 +54,7 @@ Program /run/ankamon-wifimon/prog.sh olarak yazılıp sh (dash) ile çalışır.
 Bilinen sınır: geçici açıkken tahtanın gücü kesilirse trap da bekçi de çalışamaz; NetworkManager radyoyu açık hatırlar. Başlangıç
 durumu kalıcı diskte ($P/orig) olduğundan bir sonraki Wi-Fi Monitör oturumu önce onu geri yükler.
 
-Çıktı: önce @@INFO + @@START; her tarama @@RADIO/@@DEV/@@LIST/@@BT/@@INFO bölümleri + @@END; yoklama dinlendiyse ardından
+Çıktı: önce @@INFO + @@START; her tarama @@RADIO/@@DEV/@@LIST/@@INFO bölümleri + @@END; yoklama dinlendiyse ardından
 @@PROBE (JSON satırları) + @@PROBEINFO + @@PEND; sonda @@RESTORED + @@DONE.
 """
 
@@ -74,7 +81,6 @@ n() { timeout 15 nmcli "$@" 2>/dev/null; }
 b() { timeout 5 bluetoothctl "$@" </dev/null 2>/dev/null; }
 wifi_radio() { n -t -f WIFI general; }
 wifi_state() { [ -n "$1" ] && n -g GENERAL.STATE device show "$1" | cut -d' ' -f1; }
-bt_powered() { b show | sed -n 's/.*Powered: *\([a-z]*\).*/\1/p' | head -n1; }
 
 live_sessions() {
   c=0
@@ -93,16 +99,8 @@ capture() {
     W_AC=$(n -g GENERAL.AUTOCONNECT device show "$W_DEV")
     [ -n "$W_AC" ] || W_AC=yes
   fi
+  # Bluetooth'a dokunulmaz; alanlar eski sürümün orig dosyasıyla aynı biçim için yazılır (BT_TEMP=0).
   BT_PRESENT=0; BT_TEMP=0; BT_SVC=; BT_POW=; BT_RFK=
-  if ls -d /sys/class/bluetooth/hci* >/dev/null 2>&1 && command -v bluetoothctl >/dev/null 2>&1; then
-    BT_PRESENT=1
-    for r in /sys/class/rfkill/rfkill*; do
-      [ "$(cat "$r/type" 2>/dev/null)" = bluetooth ] && [ "$(cat "$r/soft" 2>/dev/null)" = 1 ] && BT_RFK="$BT_RFK $r"
-    done
-    BT_SVC=$(systemctl is-active bluetooth 2>/dev/null)
-    [ "$BT_SVC" = active ] && BT_POW=$(bt_powered)
-    { [ -n "$BT_RFK" ] || [ "$BT_SVC" != active ] || [ "$BT_POW" != yes ]; } && BT_TEMP=1
-  fi
   cat > "$O.new" <<EOF
 W_DEV='$W_DEV'
 W_TEMP=$W_TEMP
@@ -127,22 +125,44 @@ open_radios() {
       echo "W_FAIL=autoconnect" >> "$O"
     fi
   fi
-  [ "$BT_TEMP" = 1 ] || return 0
-  for r in $BT_RFK; do echo 0 > "$r/soft" 2>/dev/null; done
-  if [ "$BT_SVC" != active ] && ! timeout 15 systemctl start bluetooth >/dev/null 2>&1; then
-    echo "BT_FAIL=service" >> "$O"
-    return 0
-  fi
-  i=0; p=
-  while [ $i -lt 6 ]; do p=$(bt_powered); [ -n "$p" ] && break; sleep 1; i=$((i+1)); done
-  if [ "$p" != yes ]; then
-    b power on >/dev/null
-    sleep 1
-    [ "$(bt_powered)" = yes ] || echo "BT_FAIL=power" >> "$O"
-  fi
 }
 
 # Yoklama dinlemesinin geri alınması: $1 boşsa sahibi ne olursa olsun, değilse yalnız o sürecin ya da ölmüş sürecin işareti.
+# SSH istemcisine giden yolun arabirimi (Wi-Fi kartıysa monitör kipine alınmaz).
+ssh_dev() {
+  c=${SSH_CLIENT%% *}
+  [ -n "$c" ] && ip route get "$c" 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n1
+}
+
+# FORCE=1: bağlı kartın bağlantısını keser; adı ve autoconnect kalıcı diske (son oturum çıkınca force_restore geri kurar).
+force_disconnect() {
+  if [ ! -f "$P/forced" ]; then
+    f_conn=$(n -g GENERAL.CONNECTION device show "$W_DEV")
+    f_ac=$(n -g GENERAL.AUTOCONNECT device show "$W_DEV")
+    printf '%s\n%s\n%s\n' "$W_DEV" "${f_ac:-yes}" "$f_conn" > "$P/forced.new" || return 1
+    sync "$P/forced.new" 2>/dev/null
+    mv -f "$P/forced.new" "$P/forced"
+  fi
+  n device set "$W_DEV" autoconnect no >/dev/null
+  n device disconnect "$W_DEV" >/dev/null
+  i=0
+  while [ $i -lt 10 ]; do
+    case "$(wifi_state "$W_DEV")" in 20|30) DISCONNECTED=1; return 0 ;; esac
+    sleep 1 & CUR=$!; wait $CUR; CUR=; i=$((i+1))
+  done
+  return 1
+}
+
+force_restore() {
+  [ -f "$P/forced" ] || return 0
+  { read -r f_dev; read -r f_ac; read -r f_conn; } < "$P/forced"
+  n device set "$f_dev" autoconnect "${f_ac:-yes}" >/dev/null
+  if [ -n "$f_conn" ] && [ "$f_conn" != "--" ] && [ "$(wifi_radio)" = enabled ]; then
+    timeout 40 nmcli connection up id "$f_conn" ifname "$f_dev" >/dev/null 2>&1 || n device connect "$f_dev" >/dev/null
+  fi
+  rm -f "$P/forced"
+}
+
 probe_undo() {
   [ -f "$D/unmanaged" ] || { iw dev "$MON" del >/dev/null 2>&1; return 0; }
   read -r u_dev u_pid < "$D/unmanaged"
@@ -157,7 +177,12 @@ probe_sniff() {
   [ -n "$W_DEV" ] || { PROBE_NOTE=nodev; return 0; }
   { command -v iw && command -v python3; } >/dev/null 2>&1 || { PROBE_NOTE=tools; return 0; }
   [ "$(wifi_radio)" = enabled ] || { PROBE_NOTE=radio; return 0; }
-  case "$(wifi_state "$W_DEV")" in 20|30) ;; *) PROBE_NOTE=busy; return 0 ;; esac
+  # SSH bu karttan geliyorsa monitör kipi tahtaya erişimi keserdi: hiçbir koşulda (FORCE olsa da) dinlenmez.
+  [ -n "$SSH_DEV" ] && [ "$SSH_DEV" = "$W_DEV" ] && { PROBE_NOTE=sshwifi; return 0; }
+  case "$(wifi_state "$W_DEV")" in
+    20|30) ;;
+    *) if [ "$FORCE" = 1 ]; then force_disconnect || { PROBE_NOTE=busy; return 0; }; else PROBE_NOTE=busy; return 0; fi ;;
+  esac
   phy=$(iw dev "$W_DEV" info 2>/dev/null | sed -n 's/.*wiphy \([0-9]*\).*/phy\1/p')
   iw phy "$phy" info 2>/dev/null | grep -q '^[[:space:]]*\* monitor$' || { PROBE_NOTE=nomon; return 0; }
   exec 8>"$D/probe.lock"
@@ -182,6 +207,7 @@ probe_sniff() {
 
 restore_orig() {
   probe_undo
+  force_restore
   [ -f "$O" ] || { echo none; return 0; }
   . "$O"
   ok=1
@@ -212,7 +238,7 @@ restore_orig() {
 acquire() {
   (
     flock -w 40 9 || exit 1
-    if [ "$(live_sessions)" = 0 ] && [ -f "$O" ]; then restore_orig >/dev/null; fi
+    if [ "$(live_sessions)" = 0 ] && { [ -f "$O" ] || [ -f "$P/forced" ]; }; then restore_orig >/dev/null; fi
     if [ ! -f "$O" ]; then capture; . "$O"; open_radios; fi
     : > "$D/s.$1"
   ) 9>"$L"
@@ -248,18 +274,9 @@ guard() {
   rm -f "$D/list.$M" "$D/probe.$M"
 }
 
-bt_info() {
-  if [ "$BT_PRESENT" != 1 ]; then echo absent
-  elif [ -n "$BT_FAIL" ]; then echo "fail:$BT_FAIL"
-  elif [ "$BT_TEMP" = 1 ]; then echo temp
-  else echo on
-  fi
-}
-
 finish() {
   trap '' TERM HUP INT PIPE
   [ -n "$CUR" ] && kill "$CUR" 2>/dev/null
-  [ -n "$BTP" ] && kill "$BTP" 2>/dev/null
   probe_undo "$ME"
   res=$(release "$ME")
   rm -f "$TMP" "$PTMP"
@@ -267,7 +284,6 @@ finish() {
   echo "result=$res"
   echo "wifi_temp=$W_TEMP"
   echo "wifi_fail=$W_FAIL"
-  echo "bt=$(bt_info)"
   echo "radio=$(wifi_radio)"
   echo "policy=$([ -e "$RULE" ] && echo off)"
   echo '@@DONE'
@@ -278,13 +294,20 @@ info() {
   echo '@@INFO'
   echo "wifi_temp=$W_TEMP"
   echo "wifi_fail=$W_FAIL"
-  echo "bt=$(bt_info)"
   echo "disconnected=$DISCONNECTED"
+  echo "forced=$([ -f "$P/forced" ] && echo 1)"
 }
 
 # Geçici açık kart kendiliğinden bağlanmaya kalkarsa bağlantıyı keser. Autoconnect her seferinde yeniden kapatılır:
 # NetworkManager yeniden başlarsa bu çalışma zamanı ayarı "yes"e döner (Arge 1'de görüldü).
 block_connect() {
+  if [ -f "$P/forced" ] && [ -n "$W_DEV" ]; then
+    n device set "$W_DEV" autoconnect no >/dev/null
+    case "$(wifi_state "$W_DEV")" in
+      40|50|60|70|80|90|100) n device disconnect "$W_DEV" >/dev/null ;;
+    esac
+    return 0
+  fi
   { [ "$W_TEMP" = 1 ] && [ -z "$W_FAIL" ]; } || return 0
   n device set "$W_DEV" autoconnect no >/dev/null
   case "$(wifi_state "$W_DEV")" in
@@ -316,17 +339,7 @@ wifi_list() {
   done
 }
 
-bt_collect() {
-  macs=$(timeout 5 bluetoothctl devices </dev/null 2>/dev/null | grep -oE '([0-9A-F]{2}:){5}[0-9A-F]{2}' | sort -u | head -n 80)
-  for m in $macs; do timeout 3 bluetoothctl info "$m" </dev/null 2>/dev/null; done
-}
-
 scan_once() {
-  BTP=; t0=$(date +%s)
-  if [ "$BT_PRESENT" = 1 ] && [ -z "$BT_FAIL" ]; then
-    timeout 11 bluetoothctl --timeout 9 scan on </dev/null >/dev/null 2>&1 &
-    BTP=$!
-  fi
   wifi_wait_ready
   block_connect
   mode=yes
@@ -336,14 +349,6 @@ scan_once() {
   echo '@@RADIO'; wifi_radio
   echo '@@DEV'; n -t -f DEVICE,TYPE,STATE,CONNECTION device
   echo '@@LIST'; cat "$TMP"
-  echo '@@BT'
-  if [ -n "$BTP" ]; then
-    # RSSI yalnız keşif sürerken okunur: bluetoothctl (9 sn) bitmeden, 8. saniyede topla.
-    rem=$((t0+8-$(date +%s)))
-    if [ $rem -gt 0 ]; then sleep "$rem" & CUR=$!; wait $CUR; CUR=; fi
-    timeout 25 sh "$SELF" btcollect & CUR=$!; wait $CUR; CUR=
-    wait "$BTP" 2>/dev/null; BTP=
-  fi
   info
   echo '@@END'
   [ "$PROBE" = 1 ] || return 0
@@ -358,12 +363,14 @@ scan_once() {
 main() {
   WATCH=$1
   PROBE=$2
+  FORCE=$3
+  SSH_DEV=$(ssh_dev)
   PROBE_SECS=15
   [ "$WATCH" = 1 ] && PROBE_SECS=20
   ME=$$
   TMP=$D/list.$ME
   PTMP=$D/probe.$ME
-  CUR=; BTP=; PROBE_NOTE=; W_DEV=; W_TEMP=0; W_FAIL=; BT_PRESENT=0; BT_TEMP=0; BT_FAIL=; DISCONNECTED=0
+  CUR=; PROBE_NOTE=; W_DEV=; W_TEMP=0; W_FAIL=; BT_PRESENT=0; BT_TEMP=0; BT_FAIL=; DISCONNECTED=0
   exec 2>/dev/null 3<&0 </dev/null
   mkdir -p "$P" || { echo '@@RESTORED'; echo 'result=lock'; echo '@@DONE'; exit 1; }
   [ -f "$D/orig" ] && [ ! -f "$O" ] && mv -f "$D/orig" "$O"
@@ -385,14 +392,13 @@ main() {
 }
 
 case "$1" in
-  main) main "$2" "$3" ;;
+  main) main "$2" "$3" "$4" ;;
   guard) guard "$2" ;;
-  btcollect) bt_collect ;;
 esac
 """
 
 
-def wifimon_remote_command(watch: bool, probe: bool = False) -> str:
+def wifimon_remote_command(watch: bool, probe: bool = False, force: bool = False) -> str:
     """SSH ile tahtaya verilecek komut: programı (ve yoklama dinleyicisini) /run altına yazar, çalıştırır.
     Çıkış: 49 nmcli yok, 48 /run yazılamıyor."""
     return (
@@ -404,5 +410,5 @@ def wifimon_remote_command(watch: bool, probe: bool = False) -> str:
         "mv -f /run/ankamon-wifimon/prog.$$ /run/ankamon-wifimon/prog.sh || exit 48\n"
         + ("cat > /run/ankamon-wifimon/probe.py <<'ANKAMON_WIFIMON_PROBE_EOF' || exit 48"
            + WIFIMON_PROBE_SNIFFER_SOURCE + "ANKAMON_WIFIMON_PROBE_EOF\n" if probe else "")
-        + f"exec sh /run/ankamon-wifimon/prog.sh main {1 if watch else 0} {1 if probe else 0}\n"
+        + f"exec sh /run/ankamon-wifimon/prog.sh main {1 if watch else 0} {1 if probe else 0} {1 if force and probe else 0}\n"
     )

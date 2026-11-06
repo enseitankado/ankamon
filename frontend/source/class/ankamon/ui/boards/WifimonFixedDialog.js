@@ -26,25 +26,27 @@
  */
 
 /**
- * Wi-Fi Monitör "Sabit listesi…": sabit işaretlenmiş vericiler (ağ adı, erişim noktası, Bluetooth, yoklama yapan cihaz),
- * kapsamı (okul geneli / tahta) ve işaretleyen; seçilenler listeden çıkarılır (bkz. ui.boards.WifiMonitor, backend
+ * Wi-Fi Monitör "Güvenilir listesi…": güvenilir (sabit) işaretlenmiş vericiler — erişim noktası ya da Wi-Fi cihazı, MAC adresiyle —,
+ * kapsamı (okul geneli / sınıf) ve işaretleyen; seçilenler listeden çıkarılır. Eski "ağ adı" ve "Bluetooth" kayıtları artık
+ * uygulanmaz (güven yalnız MAC ile — kullanıcı isteği 2026-11-06), silinebilsinler diye listelenir (bkz. ui.boards.WifiMonitor, backend
  * WifimonFixedEmittersApi).
  */
 qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
   type: "static",
 
   statics: {
-    KIND_LABEL: { ssid: "Ağ adı (bütün erişim noktaları)", bssid: "Erişim noktası", bt: "Bluetooth", probe: "Wi-Fi cihazı (ağ arayan / bağlı)" },
+    KIND_LABEL: { ssid: "Ağ adı (eski kayıt — uygulanmıyor)", bssid: "Erişim noktası (MAC)", bt: "Bluetooth (eski kayıt — uygulanmıyor)",
+      probe: "Wi-Fi cihazı (MAC; ağ arayan / bağlı)" },
 
     /**
-     * @param getFixed {Function} () → güncel sabit listesi
+     * @param getFixed {Function} () → güncel güvenilir listesi
      * @param remove {Function} (ids) → Promise; siler ve listeyi tazeler
      */
     open(getFixed, remove) {
       const esc = qx.bom.String.escape;
       // Satırlar kırılmasın (kullanıcı isteği): geniş pencere (ekrana sığdığı kadar), hücreler tek satır; sığmazsa yatay kaydırma.
       const bounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280 };
-      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör — sabit listesi", Math.min(1180, bounds.width - 40), { maximizable: true });
+      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör — güvenilir listesi", Math.min(1180, bounds.width - 40), { maximizable: true });
       win.setHeight(480);
       const html = new qx.ui.embed.Html("").set({ overflowY: "auto", overflowX: "auto" });
       win.add(html, { flex: 1 });
@@ -67,7 +69,7 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
             `<td style="${td}">${esc(f.label || "")}</td>` +
             `<td style="${td}">${f.board_id ? esc(f.board_name || "#" + f.board_id) : "<b>Okul geneli</b>"}</td>` +
             `<td style="${td};opacity:.75">${esc(f.created_by || "")} · ${new Date(f.created_ts).toLocaleString("tr-TR")}</td></tr>`).join("") +
-          "</table>" : `<div style="padding:12px;opacity:.75">Sabit listesi boş.</div>`);
+          "</table>" : `<div style="padding:12px;opacity:.75">Güvenilir listesi boş.</div>`);
         all.setValue(false);
       };
       const boxes = () => Array.from(html.getContentElement().getDomElement().querySelectorAll("input[data-id]"));
@@ -77,7 +79,7 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
         if (!ids.length) {
           return;
         }
-        if (await ankamon.ui.Dialog.confirm(`${ids.length} kayıt sabit listesinden çıkarılacak; bu vericiler yeniden yabancı görünür.`, "Çıkar")) {
+        if (await ankamon.ui.Dialog.confirm(`${ids.length} kayıt güvenilir listesinden çıkarılacak; bu vericiler yeniden yabancı görünür.`, "Çıkar")) {
           await remove(ids);
           draw();
         }
