@@ -26,7 +26,8 @@
  */
 
 /**
- * Sağ menü / araç çubuğu "Wi-Fi Monitör": seçili bütün tahtalar TEK pencerede, tahta başına bir bölüm. Amaç sınıfa getirilmiş
+ * Sağ menü / araç çubuğu "Wi-Fi Monitör": seçili bütün tahtalar TEK pencerede — üstte tahta başına tek satırlık durum şeridi,
+ * altında bütün tahtaların vericileri TEK tabloda ("Bilgisayar" sütunuyla; kullanıcı isteği 2026-11-06). Amaç sınıfa getirilmiş
  * telefonları bulmak: tahtaların duyduğu Wi-Fi ağları, Bluetooth cihazları ve (kart bağlı değilse) Wi-Fi yoklamaları "sabit"
  * listesine (sınıfın/okulun olağan vericileri, sunucuda — /api/wifimon/fixed) göre ayrılır; sabit olmayanlar telefon kanıtına göre
  * öne çıkarılır (bkz. ui.boards.WifimonClassify, ui.boards.WifimonRender). Pencere zaten açıksa yeni tahtalar ona eklenir.
@@ -55,6 +56,12 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       "komşu sınıftaki telefon da duyulabilir. Okul ağına bağlı cihazlar için ağ envanterine bakın.",
 
     __win: null,
+
+    /**
+     * Message Bus konusu (veri: tahta kimliği): bir tahtanın Wi-Fi kartının durumu değişti (pencere açılınca geçici açıldı,
+     * kapanınca eski durumuna döndü). Sunucu yeni durumu boards.facts'e yazmıştır; Tahtalar listesi kendini tazeler.
+     */
+    RADIO_CHANGED: "ankamon.wifimon.radio",
 
     /**
      * @param boards {Array} tahtalar (çevrim içi olanlar)
@@ -112,6 +119,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       [baseline, manage, help].forEach(w => bar.add(w));
       win.add(bar);
       const summary = new qx.ui.embed.Html("").set({ height: 30, overflowY: "auto" });
+      let only = null; // şeritte tıklanan tahta: tablo yalnız onu gösterir
       win.add(summary);
       const html = new qx.ui.embed.Html("").set({ overflowY: "auto" });
       win.add(html, { flex: 1 });
@@ -139,8 +147,13 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           const common = Classify.commonSsids(list);
           const entries = list.map(feed => ({ feed, view: Classify.board(feed, fixedIndex, common, now) }));
           const opts = { showFixed: fixedBox.getValue(), canEdit, now };
-          html.setHtml(entries.map(({ feed, view }) => Render.section(feed, view, opts)).join(""));
-          summary.setHtml(`<div style="font-size:12px;line-height:22px">${Render.summary(entries)}</div>`);
+          if (only !== null && !feeds.has(only)) {
+            only = null;
+          }
+          html.setHtml(Render.grid(only === null ? entries : entries.filter(e => e.feed.board.id === only), opts));
+          summary.setHtml(`<div style="font-size:13px;line-height:22px">${Render.boards(entries, only)}</div>`);
+          // Şerit tahta sayısı kadar uzar (satır başı ~1–2 satır), çok tahtada kaydırılır.
+          summary.setHeight(Math.min(200, 6 + list.length * (list.some(f => (f.notes || []).some(Boolean)) ? 46 : 28)));
           win.setCaption(`Wi-Fi Monitör — ${list.length === 1 ? list[0].name : list.length + " tahta"}`);
         }, null, 120);
       };
@@ -183,6 +196,13 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           feed.notes = [feed.data ? cardLine(feed.data) : "", wifiNote(d.info, watching), btNote(d.info.bt, false)];
         } else if (d.phase === "data") {
           feed.data = d;
+          // Kartın o anki durumu (ör. tarama için geçici açıldı) Tahtalar listesinin Wi-Fi sütununa anında geçer: sunucu bu
+          // iletiyi göndermeden önce boards.facts'e yazdı (bkz. worker screen/wifi.py _store_radio).
+          const radioKey = `${d.radio}|${d.state}`;
+          if (radioKey !== feed.radioKey) {
+            feed.radioKey = radioKey;
+            qx.event.message.Bus.dispatchByName(this.RADIO_CHANGED, feed.board.id);
+          }
           const sniff = probeBox.getValue() && d.device;
           feed.status = sniff ? "Paketler dinleniyor…" : `Son tarama ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}`;
           feed.notes = [cardLine(d), wifiNote(d.info || {}, watching), btNote((d.info || {}).bt, false)];
@@ -206,6 +226,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
             feed.probes.forEach((p, key) => feed.initialKeys.add(key));
           }
         } else if (d.phase === "done") {
+          qx.event.message.Bus.dispatchByName(this.RADIO_CHANGED, feed.board.id); // geri yüklenen durum (bkz. "data")
           const parts = feed.data ? [cardLine(feed.data)] : [];
           if (d.result === "fail" || d.result === "lock") {
             parts.push(red("Tahtadaki kartın eski durumuna dönmesi doğrulanamadı; lütfen denetleyin."));
@@ -357,11 +378,11 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       });
       summary.addListenerOnce("appear", () => {
         summary.getContentElement().getDomElement().addEventListener("click", e => {
-          const el = e.target.closest && e.target.closest("[data-act=goto]");
-          const dom = html.getContentElement().getDomElement();
-          const target = el && dom && dom.querySelector(`#wifimon-board-${el.dataset.board}`);
-          if (target) {
-            target.scrollIntoView({ block: "start", behavior: "smooth" });
+          const el = e.target.closest && e.target.closest("[data-act=only]");
+          if (el) {
+            const id = Number(el.dataset.board);
+            only = only === id ? null : id;
+            render();
           }
         });
       });
@@ -383,6 +404,11 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         },
         closeAll: () => {
           closed = true;
+          // Pencere kapanınca tahtalar kartı kendisi geri yükler (birkaç sn), sunucu son durumu boards.facts'e yazar; kapanış
+          // iletisi bu pencereye artık gelmeyeceğinden Tahtalar listesi birkaç kez tazelenir (değişen durum anında görünsün).
+          const ids = Array.from(feeds.keys());
+          [4000, 9000, 20000].forEach(ms => qx.event.Timer.once(() =>
+            ids.forEach(id => qx.event.message.Bus.dispatchByName(ankamon.ui.boards.WifiMonitor.RADIO_CHANGED, id)), null, ms));
           ticker.stop();
           ticker.dispose();
           feeds.forEach(feed => discard(feed.ws));

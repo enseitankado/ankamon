@@ -42,9 +42,11 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
      */
     open(getFixed, remove) {
       const esc = qx.bom.String.escape;
-      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör — sabit listesi", 760, { maximizable: true });
+      // Satırlar kırılmasın (kullanıcı isteği): geniş pencere (ekrana sığdığı kadar), hücreler tek satır; sığmazsa yatay kaydırma.
+      const bounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280 };
+      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör — sabit listesi", Math.min(1180, bounds.width - 40), { maximizable: true });
       win.setHeight(480);
-      const html = new qx.ui.embed.Html("").set({ overflowY: "auto" });
+      const html = new qx.ui.embed.Html("").set({ overflowY: "auto", overflowX: "auto" });
       win.add(html, { flex: 1 });
       const all = new qx.ui.form.CheckBox("Tümünü seç");
       const del = new qx.ui.form.Button("Seçilenleri listeden çıkar");
@@ -56,7 +58,7 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
 
       const draw = () => {
         const list = getFixed();
-        const td = "padding:3px 8px;border-bottom:1px solid rgba(127,127,127,.2)";
+        const td = "padding:3px 8px;border-bottom:1px solid rgba(127,127,127,.2);white-space:nowrap";
         html.setHtml(list.length ? `<table style="border-collapse:collapse;width:100%;font-size:13px"><tr>` +
           ["", "Tür", "Değer", "Ad", "Kapsam", "İşaretleyen"].map(h => `<th style="${td};text-align:left">${h}</th>`).join("") + "</tr>" +
           list.map(f => `<tr><td style="${td}"><input type="checkbox" data-id="${f.id}"></td>` +

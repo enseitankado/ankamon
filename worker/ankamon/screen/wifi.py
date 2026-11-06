@@ -171,10 +171,10 @@ def _wifimon_build(parser, board_id: int, sections: dict) -> dict:
     return data
 
 
-def _store_radio(board_id: int, radio: str) -> None:
-    """Geri yüklemeden sonraki radyo durumunu boards.facts'e yazar: Tahtalar grid'inin Wi-Fi sütunu, pencere açıkken alınmış
-    (geçici açık) bir donanım bilgisini bir sonraki tam toplamaya kadar göstermesin. Kapalıysa bağlantı alanları da silinir
-    (hwfacts.mark_wifi_radio); açıksa yalnız radyo alanı yazılır (bağlantı bilgisi doğru kalır)."""
+def _store_radio(board_id: int, radio: str, state: str | None = None) -> None:
+    """Kartın o anki radyo durumunu boards.facts'e yazar — Tahtalar grid'inin Wi-Fi sütunu anında doğru olsun (kullanıcı isteği):
+    pencere açılınca ilk taramadaki durum (ör. geçici açıldı), kapanınca geri yüklemeden sonraki durum. Kapalıysa bağlantı
+    alanları da silinir (hwfacts.mark_wifi_radio); açıksa radyo ve (biliniyorsa) kart durumu yazılır."""
     if radio not in ("enabled", "disabled"):
         return
     try:
@@ -183,7 +183,8 @@ def _store_radio(board_id: int, radio: str) -> None:
                 mark_wifi_radio(conn, board_id, radio)
             else:
                 conn.execute("""UPDATE boards SET facts = facts || jsonb_build_object('wifi_radio', 'enabled')
-                                WHERE id = %s AND facts->>'wifi_iface' IS NOT NULL""", (board_id,))
+                                  || CASE WHEN %s::text IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('wifi_state', %s::text) END
+                                WHERE id = %s AND facts->>'wifi_iface' IS NOT NULL""", (state, state, board_id))
     except Exception as exc:  # durum yazılamazsa sonraki donanım toplaması düzeltir
         log.warning("Wi-Fi radyo durumu yazılamadı (tahta %s): %s", board_id, exc)
 
@@ -233,6 +234,7 @@ class WifiSocket(tornado.websocket.WebSocketHandler):
         sections: dict = {}
         current = None
         finished = False
+        stored = None  # boards.facts'e son yazılan (radyo, kart durumu): her taramada değil, değişince yazılır
         try:
             while True:
                 raw = await proc.stdout.readline()
@@ -245,6 +247,10 @@ class WifiSocket(tornado.websocket.WebSocketHandler):
                     sections, current = {}, None
                 elif line == "@@END":
                     data = await asyncio.to_thread(_wifimon_build, parse, self._board_id, sections)
+                    now = (data.get("radio") or "", data.get("state"))
+                    if now != stored:
+                        stored = now
+                        await asyncio.to_thread(_store_radio, self._board_id, now[0], now[1])
                     await self.write_message(json.dumps(data, ensure_ascii=False))
                     sections, current = {}, None
                 elif line == "@@PEND":
