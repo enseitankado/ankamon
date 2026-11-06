@@ -192,9 +192,12 @@ qx.Class.define("ankamon.page.Base", {
             cols.push(byId.get(id));
           }
         });
-        defaultUserCols.forEach(col => {
+        // Kayıtlı sırada olmayan (sonradan eklenmiş) sütun sona değil, varsayılan sıradaki önceki sütunun
+        // hemen arkasına girer (ör. 'Kablosuz MAC' 'Kablolu MAC'ın yanına) — kullanıcı isteği.
+        defaultUserCols.forEach((col, i) => {
           if (!cols.includes(col)) {
-            cols.push(col);
+            const prev = i > 0 ? cols.indexOf(defaultUserCols[i - 1]) : -1;
+            cols.splice(prev + 1, 0, col);
           }
         });
         apply(build(cols));
