@@ -105,6 +105,7 @@ qx.Class.define("ankamon.ui.taskmgr.TaskBoardPicker", {
             popup.hide();
           });
           row.add(again);
+          check.setUserData("again", true);
         }
         list.add(row);
       });
@@ -120,7 +121,14 @@ qx.Class.define("ankamon.ui.taskmgr.TaskBoardPicker", {
       syncAll();
       popup.add(all);
       // Kaydırma alanı içeriğe göre büyümez (qx): yükseklik tahta sayısından, en çok 600 px.
-      popup.add(new qx.ui.container.Scroll(list).set({ height: Math.min(600, checks.length * 28 + 6), maxHeight: 600 }), { flex: 1 });
+      // Genişlik de içeriğe göre büyümez: en uzun satırın (ad + durum [+ Yeniden bağlan]) ölçülen genişliği
+      // + kaydırma çubuğu; 420–820 px arası (satırlar kırılmasın/kesilmesin — kullanıcı isteği).
+      const textW = html => qx.bom.Label.getHtmlSize(html, { fontSize: "13px" }).width;
+      const widest = Math.max(0, ...checks.map(c => textW(c.getLabel()) + (c.getUserData("again") ? 120 : 0)));
+      popup.add(new qx.ui.container.Scroll(list).set({
+        height: Math.min(600, checks.length * 28 + 6), maxHeight: 600,
+        width: Math.max(420, Math.min(820, Math.ceil(widest) + 60))
+      }), { flex: 1 });
       const foot = new qx.ui.container.Composite(new qx.ui.layout.HBox(6));
       foot.add(new qx.ui.basic.Label("Hiçbiri seçili değilse hepsi gösterilir.").set({ textColor: "app-muted", alignY: "middle" }), { flex: 1 });
       const clear = new qx.ui.form.Button("Temizle");
