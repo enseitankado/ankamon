@@ -106,7 +106,7 @@ qx.Class.define("ankamon.page.MaintenanceHelp", {
     <td>Ankamon tahtaya root olarak <b>SSH ile girer</b>, yalnız okuma yapan komutlarla ölçer (tahtada hiçbir şey değişmez).</td></tr>
   <tr><th>Ne zaman</th><td>Sürekli: kurala göre dakikada bir ya da 5 dakikada bir.</td>
     <td>Her tahta haftada bir kendiliğinden (sunucu boştayken); istenince <b>Tara</b> sekmesinden ya da
-    <b>Denetim raporları ▸ Şimdi tara</b> ile.</td></tr>
+    <b>Denetle ▸ Şimdi tara</b> ile.</td></tr>
   <tr><th>Ne üretir</th><td>Zaman aralığı olan olay: ne zaman başladı, sürüyor mu, ne zaman bitti.</td>
     <td>Denetim anının fotoğrafı: o an diskin, servislerin, güncellemelerin durumu.</td></tr>
   <tr><th>Neyi iyi görür</th><td>Gelip geçen olaylar: ağ kopması, kaba kuvvet girişimi, sıcaklık yükselmesi, saat sapması,
@@ -119,11 +119,13 @@ qx.Class.define("ankamon.page.MaintenanceHelp", {
 bakılır. Her denetimin listesi: <b>Denetimler</b> sekmesi.</p>
 <h3>Sekmeler</h3>
 <ul>
-  <li><b>Durum</b> — her tahtanın şu anki sağlığı: en kötü bulgusu, sürekli izlemede şu an sürenler, son SSH denetiminin
-      sonucu. Bir tahta seçince altta bulguları; her bulguda <i>Yol, Kaynak, Nasıl bakıldı, Sıklık, Zaman</i>.
-      "Aksiyon gereken ne?" sorusunun cevabı burası. Bulguya çift tık: kaydına (Geçmiş ya da Denetim raporları) gider.</li>
+  <li><b>Durum</b> — her tahtanın şu anki sağlığı: en kötü bulgusu, sürekli izlemede şu an sürenler, son denetim ya da
+      bulgunun zamanı (10 saatten yeniyse "2 saat 23 dk önce" gibi). Bir tahta seçince altta bulguları; her bulguda
+      <i>Yol, Kaynak, Nasıl bakıldı, Sıklık, Zaman</i>. "Aksiyon gereken ne?" sorusunun cevabı burası. Bulguya çift tık:
+      kaydına gider (sürekli izleme → Geçmiş; SSH denetimi → Denetle, o tahtaya süzülmüş). İki yolun kısa açıklaması
+      sekme adının ve "ⓘ Bulgular nereden gelir?" yazısının ipucunda.</li>
+  <li><b>Denetle</b> — SSH denetimlerinin raporları (aşağıda anlatılıyor).</li>
   <li><b>Geçmiş / Özet</b> — sürekli izleme kayıtları, sayfanın üstündeki rapor döneminde.</li>
-  <li><b>Denetim raporları</b> — SSH denetimlerinin raporları (aşağıda anlatılıyor).</li>
   <li><b>Tara</b> — seçilen tahtalara o an bakmak: tam SSH denetimi ve/veya sürekli izleme denetimlerinin anlık yoklaması.</li>
   <li><b>Denetimler</b> — bütün denetimler: yolu, kaynağı, nasıl ve ne sıklıkla bakıldığı, bulgu düzeyi.</li>
   <li><b>Bildirimler</b> — sürekli izleme bulgularının telefona ntfy bildirimi.</li>
@@ -131,14 +133,15 @@ bakılır. Her denetimin listesi: <b>Denetimler</b> sekmesi.</p>
 <p>Zaman içindeki değişimin grafikleri (sıcaklık, işlemci, bellek, disk, ağ) <b>Tahtalar ▸ Sensörler</b>'de.</p>
 ${now}
 
-<h3>Denetim raporları nasıl okunur?</h3>
+<h3>Denetle sekmesi nasıl okunur?</h3>
 <ol>
   <li>Sayfa açılınca <b>"Son durum — tüm tahtalar"</b> görünür: denetlenmiş <b>her tahtanın en son denetimi</b>, hangi
-      taramada yapılmış olursa olsun, tek tabloda. Her satırın sağında denetim zamanı ve kimin başlattığı
+      taramada yapılmış olursa olsun, tek tabloda. Her satırda denetim zamanı ve kimin başlattığı
       (<i>otomatik</i> ya da <i>elle: kullanıcı</i>) yazar.</li>
-  <li>Satıra tıklayınca o tahtanın tüm bulguları, önerileriyle birlikte altında açılır. Başlıktaki <b>Tahta</b> okuna
-      tıklamak hepsini açar/kapatır.</li>
-  <li><b>Göster</b> kutularıyla düzey, <b>Tahta</b> seçicisiyle tek tahta süzülür (sunucuya gidilmez).</li>
+  <li>Bir tahtayı seçince bulguları, önerileriyle birlikte alttaki bölmede görünür; seçim yoksa grid'de görünen bütün
+      tahtalarınki. İki bölmenin arasındaki çubuk sürüklenerek boyları ayarlanır.</li>
+  <li>Sütun başlığına tıklamak sıralar; başlıktaki kutu süzer: elle yazın ya da ▾ ile hazır listeden seçin
+      (<b>Tahta, Genel durum, Acil, Dikkat, Bilgi</b>). <b>Göster</b> kutuları düzeye göre süzer (sunucuya gidilmez).</li>
   <li><b>Rapor</b> seçicisinde, "Son durum"un altında tek tek taramalar listelenir (en yeni 30). Bir taramayı seçince
       yalnız o taramada denetlenen tahtalar görünür.</li>
 </ol>
@@ -154,7 +157,7 @@ ${now}
 
 <h3>SSH denetimi ne zaman yapılır?</h3>
 <table>
-  <tr><th>Elle</th><td><b>Tara</b> sekmesinde <i>Tam SSH denetimi</i> seçili tahtaları, Denetim raporları'ndaki
+  <tr><th>Elle</th><td><b>Tara</b> sekmesinde <i>Tam SSH denetimi</i> seçili tahtaları, Denetle sekmesindeki
     <b>Şimdi tara</b> düğmesi o an <b>açık olan tüm tahtaları</b> denetler (aynı anda kaç tahta: sunucunun
     boş işlemci/belleğine göre). İlerleme düğmelerin yanında görünür.</td></tr>
   <tr><th>Otomatik</th><td>Her tahta <b>en az ${esc(days)} günde bir</b> kendiliğinden denetlenir. Saat <b>tahta başına</b>

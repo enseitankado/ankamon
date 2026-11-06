@@ -30,7 +30,7 @@
  *   - Sürekli izleme denetimlerinin anlık yoklaması ("anomaly_scan" görevi — bkz. worker/ankamon/anomaly/scan.py): kuralın
  *     tahtada çalışan küçük betiği SSH ile o an çalışır; sonuç bu sekmenin tablosunda, kayıt tutulmaz.
  *   - Tam SSH denetimi ("diagnose" görevi — bkz. worker/ankamon/executor/diagnose.py; yalnız "diagnose" yetkisiyle):
- *     haftalık otomatik denetimin aynısı; sonucu "Denetim raporları" sekmesine yazılır, Durum'a yansır.
+ *     haftalık otomatik denetimin aynısı; sonucu "Denetle" sekmesine yazılır, Durum'a yansır.
  * Son taramanın sonucu sekme yeniden açılınca gösterilir.
  *
  * Sol: tahta listesi (onay kutulu; arama, Tümü / Çevrim içi / Hiçbiri). Sağ üst: taranabilir anomali türleri.
@@ -130,6 +130,14 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       ];
       this.__boardTable = this.__page._createTable(columns, { checkable: true, prefsKey: "anomalies.scan.boards.columns" });
       this.__boardTable.getTableColumnModel().setDataCellRenderer(4, new ankamon.ui.table.StatusRenderer());
+      // Liste her zaman Durum sütununa göre (çevrim içi önce, sonra ada göre) sıralı (kullanıcı isteği): öteki sütunlar
+      // sıralanmaz, Durum başlığına tıklamak da sırayı bozmaz (iki yön aynı). keepSortOnReload her setData'da yeniden dizer.
+      const model = this.__boardTable.getTableModel();
+      const onlineFirst = (a, b) => (a[4] === b[4] ? 0 : a[4] === "Çevrim içi" ? -1 : 1) ||
+        String(a[2]).localeCompare(String(b[2]), "tr", { numeric: true });
+      [1, 2, 3, 5].forEach(col => model.setColumnSortable(col, false));
+      model.setSortMethods(4, { ascending: onlineFirst, descending: onlineFirst });
+      model.sortByColumn(4, true);
       // İşaret değişince seçim kümesi güncellenir (arama süzgeci gizlenen satırların seçimini korur).
       this.__boardTable.getTableModel().addListener("dataChanged", () => this.__syncChecked());
       box.add(this.__boardTable, { flex: 1 });
@@ -199,11 +207,11 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       this.__status = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
       run.add(this.__status, { flex: 1 });
       box.add(run);
-      // Tam SSH denetiminin sonucu burada değil, Denetim raporları sekmesinde: başlatılınca not ve geçiş düğmesi.
+      // Tam SSH denetiminin sonucu burada değil, Denetle sekmesinde: başlatılınca not ve geçiş düğmesi.
       this.__sshRow = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ visibility: "excluded", marginTop: 4 });
       this.__sshNote = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
       this.__sshRow.add(this.__sshNote, { flex: 1 });
-      const toReports = new qx.ui.form.Button("Denetim raporlarına git");
+      const toReports = new qx.ui.form.Button("Denetle sekmesine git");
       toReports.addListener("execute", () => this.__page.showReports());
       this.__sshRow.add(toReports);
       box.add(this.__sshRow);
@@ -251,9 +259,9 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         const heading = (path, text) => this.__kindBox.add(new qx.ui.basic.Label(
           `<span style="color:${P[path].color};font-weight:bold">${P[path].text}</span> — ${text}`).set({
           rich: true, wrap: true, allowGrowX: true, marginTop: 4, marginBottom: 4 }));
-        // Tam SSH denetimi: haftalık otomatik denetimin aynısı, seçili tahtalarda şimdi (sonucu Denetim raporları'nda).
+        // Tam SSH denetimi: haftalık otomatik denetimin aynısı, seçili tahtalarda şimdi (sonucu Denetle sekmesinde).
         if (this.__sshAllowed) {
-          heading("ssh", "Ankamon tahtaya SSH ile girip ölçer; sonucu <b>Denetim raporları</b> sekmesine yazılır ve Durum'a yansır.");
+          heading("ssh", "Ankamon tahtaya SSH ile girip ölçer; sonucu <b>Denetle</b> sekmesine yazılır ve Durum'a yansır.");
           this.__sshCheck = new qx.ui.form.CheckBox("Tam SSH denetimi (disk sağlığı, sıcaklık, boş alan, güncellemeler, servisler…)").set({
             value: this.__sshPref
           });
@@ -400,7 +408,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
           try {
             const job = await ankamon.io.Api.post("/jobs", { type: "diagnose", board_ids: online });
             this.__sshNote.setValue(`<b style="color:${ankamon.ui.health.Status.PATH.ssh.color}">SSH denetimi</b> başlatıldı ` +
-              `(${online.length} açık tahta, görev #${job.id}). Sonuç <b>Denetim raporları</b> sekmesinde ve Durum'da görünür.`);
+              `(${online.length} açık tahta, görev #${job.id}). Sonuç <b>Denetle</b> sekmesinde ve Durum'da görünür.`);
           } catch (e) {
             this.__sshNote.setValue("SSH denetimi başlatılamadı: " + qx.bom.String.escape(e.message || String(e)));
           }

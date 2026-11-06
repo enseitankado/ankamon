@@ -170,8 +170,8 @@ qx.Class.define("ankamon.ui.Shell", {
       // ui.health.Status. Kimlik "anomalies" kalır (nav_order, hatırlanan sekme); features: ikisinden biri yeterli, sekme
       // başına yetki sayfanın içinde. Eski "Bakım ▸ Bakım/Yardım" bağlantıları __openPage'de buraya yönlenir.
       { id: "anomalies", label: "Tahta sağlığı", features: ["anomalies", "diagnose"], collapsed: true, create: u => new ankamon.page.Anomalies(u),
-        tabs: [{ key: "status", label: "Durum" }, { key: "Geçmiş", label: "Geçmiş", feature: "anomalies" },
-          { key: "summary", label: "Özet", feature: "anomalies" }, { key: "reports", label: "Denetim raporları", feature: "diagnose" },
+        tabs: [{ key: "status", label: "Durum" }, { key: "reports", label: "Denetle", feature: "diagnose" },
+          { key: "Geçmiş", label: "Geçmiş", feature: "anomalies" }, { key: "summary", label: "Özet", feature: "anomalies" },
           { key: "Tarama", label: "Tara" }, { key: "catalog", label: "Denetimler" },
           { key: "notifications", label: "Bildirimler", feature: "anomalies" }, { key: "help", label: "Yardım" }] },
       // Bakım: "Sensörler" (Grafana) ve eklenti sekmeleri (ör. Ahenk) — bkz. page.Maintenance. Sorun tespiti raporu

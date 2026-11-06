@@ -36,7 +36,9 @@
  *
  * Üst tablo tahta başına bir satır (en kötü düzey, iki yolun özeti); alttaki tablo seçili tahtanın (seçim yoksa hepsinin)
  * bulguları: Yol, Kaynak, Nasıl bakıldı, Sıklık, Zaman. Çift tık: sürekli izleme bulgusu → o tahtanın Geçmiş'i; SSH denetimi
- * bulgusu → Denetim raporları. İki tablo da sütun süzgeçli (az çeşitli sütunlarda hazır değer listesi).
+ * bulgusu → Denetle (o tahtaya süzülmüş). İki tablo da sütun süzgeçli (az çeşitli sütunlarda hazır değer listesi).
+ * İki yolun açıklaması sayfada yer kaplamaz: sekme kulakçığının ve özet satırındaki ⓘ işaretinin ipucunda (kullanıcı isteği).
+ * İki tablo arasındaki ayırıcı kalın (SPLITTER px; kullanıcı isteği: ince çubuk zor tutuluyordu).
  */
 qx.Class.define("ankamon.ui.health.Status", {
   extend: qx.ui.tabview.Page,
@@ -49,12 +51,18 @@ qx.Class.define("ankamon.ui.health.Status", {
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
 
-    this.__legend = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true, selectable: true });
-    this.add(this.__legend);
+    const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
     this.__summary = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
-    this.add(this.__summary);
+    head.add(this.__summary, { flex: 1 });
+    this.__info = new qx.ui.basic.Label("ⓘ Bulgular nereden gelir?").set({ textColor: "app-muted", cursor: "help" });
+    head.add(this.__info);
+    this.add(head);
+    this.getButton().setToolTipText(this.__legendHtml(["watch", "ssh"]));
+    this.__info.setToolTipText(this.__legendHtml(["watch", "ssh"]));
 
     const split = new qx.ui.splitpane.Pane("vertical");
+    const thick = ankamon.ui.health.Status.SPLITTER;
+    split.getChildControl("splitter").set({ height: thick, minHeight: thick, maxHeight: thick });
     this.add(split, { flex: 1 });
 
     this.__boardColumns = [
@@ -62,7 +70,9 @@ qx.Class.define("ankamon.ui.health.Status", {
       { id: "online", label: "Açık mı", width: 90 },
       { id: "level", label: "Durum", width: 90 },
       { id: "watch", label: "Sürekli izleme (şu an)", width: 300 },
-      { id: "ssh", label: "Son SSH denetimi", width: 260 },
+      // İki yolun en yeni bakışı (SSH denetimi zamanı ya da sürekli izlemenin en yeni bulgusu) ve toplam bulgu sayıları;
+      // 10 saatten yeniyse geçen süre ("2 saat 23 dk önce" — kullanıcı isteği).
+      { id: "last", label: "Son denetim / bulgu", width: 300, hint: "Son SSH denetimi ya da sürekli izlemenin en yeni bulgusu" },
       { id: "count", label: "Bulgu", width: 70 }
     ];
     this.__boardTable = page._createTable(this.__boardColumns, { prefsKey: "health.status.boards.columns" });
@@ -100,7 +110,7 @@ qx.Class.define("ankamon.ui.health.Status", {
         this.__page.openFinding(row.finding);
       }
     });
-    this.__findingTable.setToolTipText("Çift tıklayın: sürekli izleme bulgusu → Geçmiş'te o tahta; SSH denetimi bulgusu → Denetim raporları");
+    this.__findingTable.setToolTipText("Çift tıklayın: sürekli izleme bulgusu → Geçmiş'te o tahta; SSH denetimi bulgusu → Denetle (o tahta)");
     const bottom = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ marginTop: 5 });
     this.__findingTitle = new qx.ui.basic.Label("").set({ rich: true, font: "bold" });
     bottom.add(this.__findingTitle);
@@ -109,6 +119,28 @@ qx.Class.define("ankamon.ui.health.Status", {
   },
 
   statics: {
+    /** İki tablo arasındaki ayırıcının kalınlığı (px). */
+    SPLITTER: 12,
+    /** Bu kadar saniyeden yeni zamanlar geçen süreyle yazılır ("2 saat 23 dk önce"). */
+    RELATIVE_S: 10 * 3600,
+
+    /** epoch sn → 10 saatten yeniyse "2 saat 23 dk önce", değilse tarih-saat. */
+    when(ts) {
+      if (!ts) {
+        return "";
+      }
+      const diff = Math.floor(Date.now() / 1000) - ts;
+      if (diff < 0 || diff >= ankamon.ui.health.Status.RELATIVE_S) {
+        return ankamon.util.Format.dateTime(ts * 1000);
+      }
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      if (!h && !m) {
+        return "az önce";
+      }
+      return (h ? `${h} saat ` : "") + `${m} dk önce`;
+    },
+
     PATH: {
       watch: { text: "Sürekli izleme", color: "#1a73e8" },
       ssh: { text: "SSH denetimi", color: "#7b1fa2" }
@@ -123,7 +155,7 @@ qx.Class.define("ankamon.ui.health.Status", {
 
   members: {
     __page: null,
-    __legend: null,
+    __info: null,
     __summary: null,
     __boardColumns: null,
     __boardTable: null,
@@ -145,6 +177,19 @@ qx.Class.define("ankamon.ui.health.Status", {
       table.getTableColumnModel().setDataCellRenderer(column, r);
     },
 
+    /** İki yolun açıklaması (ipucu): yalnız kullanıcının gördüğü yollar. */
+    __legendHtml(paths) {
+      const P = ankamon.ui.health.Status.PATH;
+      const badge = key => `<span style="display:inline-block;padding:0 7px;border-radius:9px;background:${P[key].color};color:#fff;font-weight:600">${P[key].text}</span>`;
+      return `<div style="max-width:560px;white-space:normal;line-height:1.5">` +
+        "Bulgular iki yoldan gelir; her satırda hangisinden geldiği yazar. " +
+        (paths.includes("watch") ? `${badge("watch")} Ankamon tahtaya bağlanmadan, tahtanın gönderdiği loglardan ve kendi ` +
+          "okuduğu ölçümlerden birkaç dakikada bir çıkarır; burada yalnız şu an sürenler. " : "") +
+        (paths.includes("ssh") ? `${badge("ssh")} Ankamon tahtaya SSH ile girip ölçer (haftada bir kendiliğinden ya da Tara ` +
+          "sekmesinden elle); her tahtanın en son denetimi. " : "") +
+        "Her denetimin ne olduğu, nasıl ve ne sıklıkla bakıldığı: <b>Denetimler</b> sekmesi.</div>";
+    },
+
     /** @param data {Map} GET /api/board-health yanıtı */
     setData(data) {
       const F = ankamon.util.Format;
@@ -153,14 +198,10 @@ qx.Class.define("ankamon.ui.health.Status", {
       const text = ankamon.ui.health.Status.levelText;
       this.__data = data;
       const paths = data.paths || [];
-      const badge = key => `<span style="display:inline-block;padding:0 7px;border-radius:9px;background:${P[key].color};color:#fff;font-weight:600">${P[key].text}</span>`;
-      this.__legend.setValue(
-        "Bulgular iki yoldan gelir; her satırda hangisinden geldiği yazar. " +
-        (paths.includes("watch") ? `${badge("watch")} Ankamon tahtaya <b>bağlanmadan</b>, tahtanın gönderdiği loglardan ve kendi ` +
-          "okuduğu ölçümlerden birkaç dakikada bir çıkarır; burada yalnız <b>şu an sürenler</b>. " : "") +
-        (paths.includes("ssh") ? `${badge("ssh")} Ankamon tahtaya <b>SSH ile girip ölçer</b> (haftada bir kendiliğinden ya da Tara ` +
-          "sekmesinden elle); her tahtanın en son denetimi. " : "") +
-        "Her denetimin ne olduğu, nasıl ve ne sıklıkla bakıldığı: <b>Denetimler</b> sekmesi.");
+      const legend = this.__legendHtml(paths);
+      this.getButton().setToolTipText(legend);
+      this.__info.setToolTipText(legend);
+      const when = ankamon.ui.health.Status.when;
 
       const order = { bad: 3, warn: 2, info: 1, ok: 0 };
       const byBoard = new Map();
@@ -177,22 +218,10 @@ qx.Class.define("ankamon.ui.health.Status", {
         const list = byBoard.get(b.id) || [];
         const watch = list.filter(f => f.path === "watch");
         const worst = list.reduce((w, f) => (order[f.level] > order[w] ? f.level : w), "ok");
-        let ssh = "—";
-        if (paths.includes("ssh")) {
-          if (!b.ssh) {
-            ssh = "Hiç denetlenmedi";
-          } else if (b.ssh.status !== "ok") {
-            ssh = `${b.ssh.at ? F.dateTime(b.ssh.at * 1000) : ""} · denetlenemedi`;
-          } else {
-            const sshList = list.filter(f => f.path === "ssh");
-            const bad = sshList.filter(f => f.level === "bad").length;
-            const warn = sshList.filter(f => f.level === "warn").length;
-            ssh = `${F.dateTime(b.ssh.at * 1000)} · ` + (bad || warn ? [bad && `${bad} acil`, warn && `${warn} dikkat`].filter(Boolean).join(", ") : "sorun yok");
-          }
-        }
+        const last = this.__lastText(list, paths.includes("ssh") ? b.ssh || false : null, when);
         const watchText = !paths.includes("watch") ? "—"
           : watch.length ? [...new Set(watch.map(f => f.check))].join(", ") : "Sorun yok";
-        return { id: b.id, name: b.name, cells: [b.id, b.name, b.online ? "Açık" : "Kapalı", text(worst), watchText, ssh, list.length] };
+        return { id: b.id, name: b.name, cells: [b.id, b.name, b.online ? "Açık" : "Kapalı", text(worst), watchText, last, list.length] };
       });
       // Kaydı silinmiş tahtanın süren bulguları da görünsün.
       byBoard.forEach((list, key) => {
@@ -201,7 +230,7 @@ qx.Class.define("ankamon.ui.health.Status", {
         }
         const worst = list.reduce((w, f) => (order[f.level] > order[w] ? f.level : w), "ok");
         this.__boardRows.push({ id: key, name: list[0].board, cells: [key, list[0].board || "?", "—", text(worst),
-          [...new Set(list.map(f => f.check))].join(", "), "—", list.length] });
+          [...new Set(list.map(f => f.check))].join(", "), this.__lastText(list, null, when), list.length] });
       });
       this.__boardRows.sort((a, b) => (order[this.__levelKey(b.cells[3])] - order[this.__levelKey(a.cells[3])]) ||
         String(a.name).localeCompare(String(b.name), "tr", { numeric: true }));
@@ -222,6 +251,28 @@ qx.Class.define("ankamon.ui.health.Status", {
           : "Şu an acil ya da dikkat gerektiren bulgu yok") +
         `</span> <span style="opacity:.7">· ${esc(String(this.__boardRows.length))} tahta · güncellendi ${F.dateTime(data.generated_at * 1000)}</span>`);
       this.__applyBoards();
+    },
+
+    /**
+     * "Son denetim / bulgu" hücresi: iki yolun en yeni zamanı (SSH denetimi ya da sürekli izlemenin en yeni bulgusu)
+     * + tahtanın iki yoldaki bulgu sayıları; SSH denetimi yapılamadıysa/hiç yapılmadıysa o da yazılır.
+     * @param list {Array} tahtanın bulguları @param ssh {Map|false|null} son SSH denetimi (false: hiç; null: yetki yok)
+     */
+    __lastText(list, ssh, when) {
+      const times = list.filter(f => f.path === "watch" && f.since).map(f => f.since);
+      if (ssh && ssh.at) {
+        times.push(ssh.at);
+      }
+      const at = times.length ? Math.max(...times) : null;
+      const bad = list.filter(f => f.level === "bad").length;
+      const warn = list.filter(f => f.level === "warn").length;
+      const parts = [at ? when(at) : "", bad || warn ? [bad && `${bad} acil`, warn && `${warn} dikkat`].filter(Boolean).join(", ") : "sorun yok"];
+      if (ssh === false) {
+        parts.push("SSH: hiç denetlenmedi");
+      } else if (ssh && ssh.status !== "ok") {
+        parts.push("SSH: denetlenemedi");
+      }
+      return parts.filter(Boolean).join(" · ");
     },
 
     __levelKey(label) {

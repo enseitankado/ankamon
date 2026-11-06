@@ -37,8 +37,9 @@
  *
  * Sekmeler (bu sırayla; her biri yalnız kendi yetkisiyle):
  *  - "Durum" (ui.health.Status): her tahtanın şu anki sağlığı, iki yolun bulguları tek tabloda (GET /api/board-health).
+ *  - "Denetle" (page.Diagnose; kimlik "reports", eski adı "Denetim raporları"): SSH denetimlerinin raporları (eski Bakım
+ *    sekmesi). Durum'un hemen sağında (kullanıcı isteği).
  *  - "Geçmiş" / "Özet" (ui.anomaly.History / Summary): sürekli izleme kayıtları, seçili dönem.
- *  - "Denetim raporları" (page.Diagnose): SSH denetimlerinin raporları (eski Bakım sekmesi).
  *  - "Tara" (ui.anomaly.Scan): seçilen tahtalarda o an yoklama — sürekli izleme denetimleri ve tam SSH denetimi.
  *  - "Denetimler" (ui.health.Catalog): bütün denetimler; yol, kaynak, nasıl/ne sıklıkla bakıldığı.
  *  - "Bildirimler" (ui.anomaly.Notifications), "Yardım" (page.MaintenanceHelp).
@@ -71,14 +72,15 @@ qx.Class.define("ankamon.page.Anomalies", {
     this.__tabs = new qx.ui.tabview.TabView();
     this.__status = new ankamon.ui.health.Status(this);
     this.__tabs.add(this.__status);
+    if (ssh) {
+      this.__reportsPage = new ankamon.page.Diagnose(user);
+      this.__reports = this.__hosted("reports", "Denetle", this.__reportsPage);
+    }
     if (watch) {
       this.__history = new ankamon.ui.anomaly.History(this);
       this.__summary = new ankamon.ui.anomaly.Summary(this);
       this.__tabs.add(this.__history);
       this.__tabs.add(this.__summary);
-    }
-    if (ssh) {
-      this.__reports = this.__hosted("reports", "Denetim raporları", new ankamon.page.Diagnose(user));
     }
     if (watch || ssh) {
       this.__scan = new ankamon.ui.anomaly.Scan(this);
@@ -92,7 +94,7 @@ qx.Class.define("ankamon.page.Anomalies", {
     }
     this.__help = this.__hosted("help", "Yardım", new ankamon.page.MaintenanceHelp(user));
     this._rememberTab(this.__tabs, "anomalies");
-    // Gömülü sayfalar (Denetim raporları, Yardım) kendi verilerini sekmeye geçilince tazeler.
+    // Gömülü sayfalar (Denetle, Yardım) kendi verilerini sekmeye geçilince tazeler.
     this.__tabs.addListener("changeSelection", e => {
       const hosted = e.getData()[0] && e.getData()[0].getUserData("page");
       if (hosted) {
@@ -152,6 +154,7 @@ qx.Class.define("ankamon.page.Anomalies", {
     __history: null,
     __summary: null,
     __reports: null,
+    __reportsPage: null,
     __scan: null,
     __catalog: null,
     __notifications: null,
@@ -212,11 +215,15 @@ qx.Class.define("ankamon.page.Anomalies", {
       }
     },
 
-    /** Durum'da çift tık: sürekli izleme bulgusu → Geçmiş'te o tahta; SSH denetimi bulgusu → Denetim raporları. */
+    /**
+     * Durum'da çift tık: sürekli izleme bulgusu → Geçmiş'te o tahta; SSH denetimi bulgusu → Denetle, tahta listesi o
+     * tahtaya süzülmüş (Durum her tahtanın en son denetimini gösterdiğinden Denetle "Son durum"a geçer).
+     */
     openFinding(f) {
       if (f.path === "watch" && this.__history) {
         this.showBoard(f.board);
       } else if (f.path === "ssh" && this.__reports) {
+        this.__reportsPage.showBoard(f.board);
         this.__tabs.setSelection([this.__reports]);
       }
     },

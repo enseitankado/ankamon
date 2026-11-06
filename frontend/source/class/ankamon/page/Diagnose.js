@@ -26,7 +26,7 @@
  */
 
 /**
- * Tahta sağlığı ▸ Denetim raporları (eski "Bakım ▸ Bakım", daha önce "Sorun tespiti"; bkz. page.Anomalies): SSH denetimi
+ * Tahta sağlığı ▸ Denetle (kimlik "reports"; eski "Denetim raporları", "Bakım ▸ Bakım", "Sorun tespiti"; bkz. page.Anomalies): SSH denetimi
  * raporları. YALNIZ tespit raporu (kullanıcı isteği — Tahtalar grid'i, Ekranlar vb. yok).
  *
  * Taramalar "diagnose" görevleridir (bkz. worker/ankamon/executor/diagnose.py): "Şimdi tara" o an
@@ -40,9 +40,12 @@
  * Tek tek taramalar seçicide kalır. Sayfanın ne yaptığı ve otomatik tarama takvimi "Bakım" sekme kulakçığının
  * ipucunda (bindTabButton), ayrıntısı Tahta sağlığı ▸ Yardım sekmesinde (bkz. page.MaintenanceHelp).
  *
- * Rapor tek tablodur: her tahta bir özet satırı, bulguları satıra tıklayınca hemen altında açılır
- * (varsayılan kapalı; başlıktaki ok tümünü açar/kapatır). Süzgeç (düzey + tahta) ikisine de uygulanır;
- * sunucuya gitmeden son rapor verisinden yeniden çizilir (bkz. __render).
+ * Rapor bir grid'dir: her tahta bir satır (Tahta, IP, Genel durum, Acil, Dikkat, Bilgi, Başlıca bulgu, Denetim zamanı,
+ * Başlatan). Sütunlar sıralanabilir ve başlıktaki kutuyla süzülür (serbest yazım + hazır değer listesi; Tahta, Genel durum,
+ * Acil, Dikkat, Bilgi'de liste her zaman — kullanıcı isteği, eski "Tahta" seçicisinin yerine). Altta seçili tahtanın (seçim
+ * yoksa grid'de görünen bütün tahtaların) bulguları ve önerileri; ayırıcı Durum'daki gibi kalın. "Göster" kutuları düzeye
+ * göre süzer. Hepsi sunucuya gitmeden son rapor verisinden yeniden çizilir (bkz. __render / __apply).
+ * Durum'daki SSH bulgusuna çift tık → showBoard(): "Son durum" + grid o tahtaya süzülür.
  */
 qx.Class.define("ankamon.page.Diagnose", {
   extend: ankamon.page.Base,
@@ -85,32 +88,56 @@ qx.Class.define("ankamon.page.Diagnose", {
 
     this.add(this.__createReportFilter());
 
+    const split = new qx.ui.splitpane.Pane("vertical");
+    const thick = ankamon.ui.health.Status.SPLITTER;
+    split.getChildControl("splitter").set({ height: thick, minHeight: thick, maxHeight: thick });
+    this.add(split, { flex: 1 });
+
+    // Sayı sütunları (Acil/Dikkat/Bilgi) da hazır listeli: "kaç acil bulgusu olan tahtalar" seçilebilsin.
+    this.__columns = [
+      { id: "board", label: "Tahta", width: 180, choices: true },
+      { id: "ip", label: "IP", width: 120, choices: false },
+      { id: "state", label: "Genel durum", width: 130, choices: true },
+      { id: "bad", label: "Acil", width: 75, choices: true },
+      { id: "warn", label: "Dikkat", width: 75, choices: true },
+      { id: "info", label: "Bilgi", width: 75, choices: true },
+      { id: "top", label: "Başlıca bulgu", width: 420, choices: false },
+      { id: "at", label: "Denetim zamanı", width: 150, choices: false },
+      { id: "by", label: "Başlatan", width: 140 }
+    ];
+    this.__table = this._createTable(this.__columns, { prefsKey: "diagnose.report.columns" });
+    this.__filters = this._addColumnFilters(this.__table, this.__columns, () => this.__apply(), { rows: () => this.__allRows || [] });
+    const C = ankamon.page.Diagnose.COL;
+    this.__table.getTableColumnModel().setDataCellRenderer(C.state, new ankamon.ui.table.DiagnoseStateRenderer());
+    // Sıralama: Genel durum en kötüden, sayılar sayı olarak, zaman ham zamanla (satır sonundaki gizli değerler).
+    const model = this.__table.getTableModel();
+    const num = v => (typeof v === "number" ? v : -1);
+    model.setSortMethods(C.state, (x, y) => x[C.rank] - y[C.rank]);
+    [C.bad, C.warn, C.info].forEach(col => model.setSortMethods(col, (x, y) => num(x[col]) - num(y[col])));
+    model.setSortMethods(C.at, (x, y) => (x[C.ts] || 0) - (y[C.ts] || 0));
+    this.__table.getSelectionModel().addListener("changeSelection", () => {
+      if (!this.__restoring) {
+        this.__selKey = this.__selectedKey();
+      }
+      this.__renderDetail();
+    });
+    // Sütuna göre sıralanınca qx seçimi satır NUMARASIYLA tutar (vurgu başka tahtaya kayardı): seçili tahta yeniden bulunur.
+    model.addListener("metaDataChanged", () => this.__reselect());
+    this.__table.setToolTipText("Bir tahtayı seçin: aşağıda yalnız onun bulguları ve önerileri görünür");
+    const top2 = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ marginBottom: 5 });
+    top2.add(this.__table, { flex: 1 });
+    split.add(top2, 1);
+
+    const bottom = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ marginTop: 5 });
+    this.__detailTitle = new qx.ui.basic.Label("").set({ rich: true, font: "bold" });
+    bottom.add(this.__detailTitle);
     this.__html = new qx.ui.embed.Html("").set({
       overflowX: "auto", overflowY: "auto", textColor: "text-primary-on-surface", backgroundColor: "surface",
       // "text" Tangible/Modern renk temalarında tanımlı değil (yazı siyah kalıyordu); bu ad tüm temalarda var.
       decorator: new qx.ui.decoration.Decorator().set({ width: 1, color: "app-border", radius: 4 })
     });
-    this.add(this.__html, { flex: 1 });
-    // Özet satırına (ya da başlıktaki tümü okuna) tıklama: o tahtanın ayrıntılarını aç/kapat (bkz. __render).
-    this.__expanded = new Set();
-    this.__html.addListener("tap", e => {
-      const el = e.getOriginalTarget();
-      const row = el && el.closest ? el.closest("[data-toggle]") : null;
-      if (!row) {
-        return;
-      }
-      const key = row.getAttribute("data-toggle");
-      if (key === "*") {
-        const all = this.__shownKeys || [];
-        const open = all.some(k => !this.__expanded.has(k));
-        all.forEach(k => (open ? this.__expanded.add(k) : this.__expanded.delete(k)));
-      } else if (this.__expanded.has(key)) {
-        this.__expanded.delete(key);
-      } else {
-        this.__expanded.add(key);
-      }
-      this.__render();
-    });
+    bottom.add(this.__html, { flex: 1 });
+    split.add(bottom, 1);
   },
 
   statics: {
@@ -120,12 +147,20 @@ qx.Class.define("ankamon.page.Diagnose", {
       info: { text: "Bilgi", color: "#1a73e8" },
       ok: { text: "Sorun yok", color: "#1e8e3e" }
     },
-    ORDER: ["bad", "warn", "info", "ok"]
+    ORDER: ["bad", "warn", "info", "ok"],
+    /** Tablo modeli sütunları (0 = tahta anahtarı); ts ve rank görünmeyen sıralama değerleri. */
+    COL: { board: 1, ip: 2, state: 3, bad: 4, warn: 5, info: 6, top: 7, at: 8, by: 9, ts: 10, rank: 11 }
   },
 
   members: {
-    __expanded: null,
-    __shownKeys: null,
+    __columns: null,
+    __table: null,
+    __filters: null,
+    __allRows: null,
+    __detailTitle: null,
+    __pendingBoard: null,
+    __selKey: null,
+    __restoring: false,
     __runBox: null,
     __progress: null,
     __status: null,
@@ -133,7 +168,6 @@ qx.Class.define("ankamon.page.Diagnose", {
     __started: null,
     __html: null,
     __levelBoxes: null,
-    __boardBox: null,
     __jobId: null,
     __job: null,
     __schedule: null,
@@ -218,7 +252,6 @@ qx.Class.define("ankamon.page.Diagnose", {
       const running = ["queued", "running"].includes(res.job.status);
       this.__progress.set({ maximum: Math.max(1, targets.length), value: done, visibility: running ? "visible" : "excluded" });
       this.__status.setValue(running ? ankamon.ui.JobSpinner.label(`Denetleniyor: ${done} / ${targets.length} tahta tamamlandı…`) : "");
-      this.__updateBoardFilter(targets);
       this.__render();
       if (running) {
         qx.event.Timer.once(() => this.__follow(jobId), this, 1000);
@@ -268,7 +301,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       const sc = this.__schedule;
       let s = "<b>SSH denetimi</b>: Ankamon tahtaya SSH ile girip donanım ve sistem sağlığını ölçer: disk (SMART) ve boş alan, " +
         "işlemci ve kasa sıcaklığı, fan, RAM, güncellemeler, başarısız servisler… Her tahta bir " +
-        "satırdır; satıra tıklayınca bulguları ve önerileri açılır. <b>Şimdi tara</b> açık tüm tahtaları hemen denetler " +
+        "satırdır (sütunlar süzülür ve sıralanır); tahtayı seçince bulguları ve önerileri altta görünür. <b>Şimdi tara</b> açık tüm tahtaları hemen denetler " +
         "(seçili tahtalar: <b>Tara</b> sekmesi). BIOS pili ve saat sürekli izlemededir.";
       s += `<br><br><b>Otomatik tarama:</b> her tahta en az ${esc(sc ? sc.interval_days : 7)} günde bir, sunucu yükü ve ` +
         "ağ trafiği düşükken; tahta yalnız açıkken taranabilir. Her tahtanın zamanı ayrı işlediğinden otomatik " +
@@ -282,7 +315,23 @@ qx.Class.define("ankamon.page.Diagnose", {
       this.__tabButton.setToolTipText(`<div style="max-width:520px;white-space:normal">${s}</div>`);
     },
 
-    /** Süzgeç satırı: düzey (çoklu) + tahta. Değişince yalnız yeniden çizilir (sunucuya gidilmez). */
+    /**
+     * Durum'daki SSH bulgusundan gelince: "Son durum" raporu (Durum her tahtanın en son denetimini gösterir) ve grid o
+     * tahtaya süzülür; satır gelince seçilir (bulguları altta açılsın).
+     */
+    showBoard(name) {
+      this.__pendingBoard = name;
+      const latest = this.__runBox.getChildren().find(it => it.getModel() === "latest");
+      if (latest && this.__jobId !== "latest") {
+        this.__runBox.setSelection([latest]);
+      } else {
+        this.__jobId = "latest";
+      }
+      this.__filters.board.setValue(`"${name}"`);
+      this.__apply();
+    },
+
+    /** Süzgeç satırı: düzey (çoklu). Tahta süzgeci grid'in kendi sütun süzgecindedir. */
     __createReportFilter() {
       const L = ankamon.page.Diagnose.LEVEL;
       const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(12).set({ alignY: "middle" }));
@@ -294,33 +343,7 @@ qx.Class.define("ankamon.page.Diagnose", {
         this.__levelBoxes[level] = box;
         row.add(box);
       });
-      row.add(new qx.ui.core.Spacer(12));
-      row.add(new qx.ui.basic.Label("Tahta:"));
-      this.__boardBox = new qx.ui.form.SelectBox().set({ width: 220 });
-      this.__boardBox.add(new qx.ui.form.ListItem("Tüm tahtalar", null, null));
-      this.__boardBox.addListener("changeSelection", this.__render, this);
-      row.add(this.__boardBox);
       return row;
-    },
-
-    /** Tahta süzgecinin seçeneklerini rapordaki tahtalarla eşitler (seçim korunur). */
-    __updateBoardFilter(targets) {
-      const box = this.__boardBox;
-      const current = box.getSelection()[0] ? box.getSelection()[0].getModel() : null;
-      const have = box.getChildren().slice(1).map(it => it.getModel());
-      const want = targets.slice().sort((a, b) => String(a.board).localeCompare(String(b.board), "tr"));
-      if (have.length === want.length && want.every((t, i) => t.board_id === have[i])) {
-        return;
-      }
-      box.removeListener("changeSelection", this.__render, this);
-      box.getChildren().slice(1).forEach(it => {
-        box.remove(it);
-        it.dispose();
-      });
-      want.forEach(t => box.add(new qx.ui.form.ListItem(t.board, null, t.board_id)));
-      const keep = box.getChildren().find(it => it.getModel() === current) || box.getChildren()[0];
-      box.setSelection([keep]);
-      box.addListener("changeSelection", this.__render, this);
     },
 
     __parse(t) {
@@ -334,136 +357,200 @@ qx.Class.define("ankamon.page.Diagnose", {
       }
     },
 
+    __jobRunning() {
+      return !!this.__job && ["queued", "running"].includes(this.__job.status);
+    },
+
+    /** Seçili düzeylerdeki bulgular. */
+    __visibleChecks(t) {
+      const levels = new Set(ankamon.page.Diagnose.ORDER.filter(l => this.__levelBoxes[l].getValue()));
+      const r = this.__parse(t);
+      return r ? r.checks.filter(c => levels.has(c.level)) : [];
+    },
+
+    /** Rapor verisinden grid satırları (Göster kutularına göre) → __apply. */
     __render() {
       this.__started.setValue(this.__startedHtml());
       this.__updateTabHint();
       const targets = this.__job ? this.__job.targets : [];
       const F = ankamon.util.Format;
-      const esc = s => qx.bom.String.escape(String(s ?? ""));
       const L = ankamon.page.Diagnose.LEVEL;
       const ORDER = ankamon.page.Diagnose.ORDER;
-      const badge = level => `<span style="display:inline-block;min-width:68px;padding:1px 8px;border-radius:10px;` +
-        `background:${L[level].color};color:#fff;font-weight:600;text-align:center">${L[level].text}</span>`;
+      const S = ankamon.ui.table.DiagnoseStateRenderer;
       // Yalnız görev SÜRERKEN "Denetleniyor/Sırada": görev bittiyse (ör. yürütücü yeniden başladı) hâlâ
       // queued/running duran satır yarıda kalmıştır — sonsuza dek "Denetleniyor…" görünmesin.
-      const jobRunning = !!this.__job && ["queued", "running"].includes(this.__job.status);
-      const halted = t => !jobRunning && ["queued", "running"].includes(t.status);
-      const pending = t => jobRunning && ["queued", "running"].includes(t.status);
-      const rank = t => {
-        if (pending(t)) {
-          return 9;
-        }
-        const r = this.__parse(t);
-        return r ? ORDER.indexOf(r.level) : -1; // bağlanılamayanlar en üstte
-      };
-
-      // Süzgeç: düzey + tahta. Bağlanılamayan = "Acil"; sürmekte/sırada olan her zaman görünür.
+      const jobRunning = this.__jobRunning();
       const levels = new Set(ORDER.filter(l => this.__levelBoxes[l].getValue()));
-      const boardSel = this.__boardBox.getSelection()[0];
-      const boardId = boardSel ? boardSel.getModel() : null;
-      const visibleChecks = t => {
+      this.__targets = new Map();
+      const rows = [];
+      targets.forEach(t => {
+        const key = String(t.board_id ?? t.board);
         const r = this.__parse(t);
-        return r ? r.checks.filter(c => levels.has(c.level)) : [];
-      };
-      const shown = t => {
-        if (boardId !== null && t.board_id !== boardId) {
-          return false;
+        const pending = jobRunning && ["queued", "running"].includes(t.status);
+        const halted = !jobRunning && ["queued", "running"].includes(t.status);
+        // Göster süzgeci: bağlanılamayan = "Acil"; sürmekte/sırada olan her zaman görünür.
+        if (!pending && (r ? !(levels.has(r.level) || this.__visibleChecks(t).length) : !levels.has("bad"))) {
+          return;
         }
-        if (pending(t)) {
-          return true;
+        let state, rank, counts = [null, null, null], top = "";
+        if (pending) {
+          state = t.status === "running" ? S.RUNNING : S.QUEUED;
+          rank = 9;
+        } else if (halted) {
+          state = S.HALTED;
+          rank = 1.5;
+          top = "Görev bu tahtada tamamlanamadan kesildi (ör. Ankamon yeniden başlatıldı); denetimi yeniden çalıştırın.";
+        } else if (!r) {
+          state = S.UNREACHABLE;
+          rank = -1; // bağlanılamayanlar en üstte
+          top = String(t.output || "").replace(/\s+/g, " ").trim();
+        } else {
+          state = L[r.level] ? L[r.level].text : r.level;
+          rank = ORDER.indexOf(r.level);
+          counts = ["bad", "warn", "info"].map(l => r.checks.filter(c => c.level === l).length);
+          const worst = r.checks.find(c => c.level === r.level && r.level !== "ok");
+          top = worst ? `${worst.title}: ${worst.detail}` : "";
         }
-        const r = this.__parse(t);
-        if (!r) {
-          return levels.has("bad");
-        }
-        return levels.has(r.level) || visibleChecks(t).length > 0;
-      };
-      const rows = targets.filter(shown)
-        .sort((a, b) => rank(a) - rank(b) || String(a.board).localeCompare(String(b.board), "tr"));
+        const ts = (r && r.collected_at) || t.finished_at || null;
+        const by = this.__job && this.__job.latest ? (t.run_auto ? "otomatik" : "elle: " + (t.run_by || "—"))
+          : (this.__job.auto ? "otomatik" : "elle: " + (this.__job.created_by || "—"));
+        this.__targets.set(key, t);
+        rows.push([key, t.board, t.ip || "", state, ...counts, top, ts ? F.dateTime(ts * 1000) : "", by, ts, rank]);
+      });
+      const C = ankamon.page.Diagnose.COL;
+      rows.sort((x, y) => x[C.rank] - y[C.rank] || String(x[C.board]).localeCompare(String(y[C.board]), "tr", { numeric: true }));
+      this.__allRows = rows;
+      this.__apply();
+    },
 
+    __targets: null,
+
+    /** Sütun süzgeçleri → tablo (seçim korunur). */
+    __apply() {
+      if (!this.__allRows) {
+        return;
+      }
+      const B = ankamon.page.Base;
+      const selected = this.__pendingBoard === null ? this.__selKey : null;
+      const filters = this.__columns.map((c, i) => ({ i: i + 1, text: (this.__filters[c.id].getValue() || "").trim() }))
+        .filter(f => f.text);
+      const shown = this.__allRows.filter(cells => filters.every(f => B.filterMatch(cells[f.i], f.text)));
+      const tm = this.__table.getTableModel();
+      tm.setData(shown);
+      let index = -1;
+      for (let row = 0; row < tm.getRowCount(); row++) {
+        const data = tm.getRowData(row);
+        if (this.__pendingBoard !== null ? data[1] === this.__pendingBoard : data[0] === selected) {
+          index = row;
+          break;
+        }
+      }
+      // Bekleyen tahta "Son durum" geldiğinde bulunduysa ya da o raporda hiç yoksa bırakılır.
+      if (this.__pendingBoard !== null && (index >= 0 || (this.__job && this.__job.latest))) {
+        this.__pendingBoard = null;
+      }
+      const sm = this.__table.getSelectionModel();
+      if (index >= 0) {
+        sm.setSelectionInterval(index, index);
+      } else {
+        sm.resetSelection();
+      }
+      this.__renderDetail();
+    },
+
+    /** Sıralamadan sonra seçili tahtanın (__selKey) satırını yeniden seçer. */
+    __reselect() {
+      const tm = this.__table.getTableModel();
+      const sm = this.__table.getSelectionModel();
+      this.__restoring = true;
+      try {
+        let index = -1;
+        for (let row = 0; this.__selKey !== null && row < tm.getRowCount(); row++) {
+          if (tm.getValue(0, row) === this.__selKey) {
+            index = row;
+            break;
+          }
+        }
+        if (index >= 0) {
+          sm.setSelectionInterval(index, index);
+        } else {
+          sm.resetSelection();
+        }
+      } finally {
+        this.__restoring = false;
+      }
+    },
+
+    __selectedKey() {
+      const sm = this.__table.getSelectionModel();
+      if (sm.isSelectionEmpty()) {
+        return null;
+      }
+      const row = this.__table.getTableModel().getRowData(sm.getLeadSelectionIndex());
+      return row ? row[0] : null;
+    },
+
+    /** Alt bölme: seçili tahtanın (seçim yoksa grid'de görünen bütün tahtaların) bulguları ve önerileri. */
+    __renderDetail() {
+      const esc = s => qx.bom.String.escape(String(s ?? ""));
+      const L = ankamon.page.Diagnose.LEVEL;
+      const badge = level => `<span style="display:inline-block;min-width:68px;padding:1px 8px;border-radius:10px;` +
+        `background:${L[level].color};color:#fff;font-weight:600;text-align:center">${L[level].text}</span>`;
       const css = "font:13px/1.45 sans-serif;padding:8px 10px 16px";
       const th = "text-align:left;padding:4px 8px;border-bottom:2px solid rgba(128,128,128,.4);white-space:nowrap";
       const td = "padding:4px 8px;border-bottom:1px solid rgba(128,128,128,.25);vertical-align:top";
-      const when = t => {
-        const r = this.__parse(t);
-        const ts = (r && r.collected_at) || t.finished_at;
-        const src = this.__job && this.__job.latest
-          ? `<div style="opacity:.6;font-size:12px">${t.run_auto ? "otomatik" : "elle: " + esc(t.run_by || "—")}</div>` : "";
-        return (ts ? esc(F.dateTime(ts * 1000)) : "") + src;
-      };
-      let h = `<div style="${css}">`;
-
-      if (!targets.length) {
-        h += "<p style=\"opacity:.7\">Rapor boş.</p></div>";
-        this.__html.setHtml(h);
-        return;
-      }
-      if (!rows.length) {
-        h += "<p style=\"opacity:.7\">Seçili süzgece uyan tahta yok.</p></div>";
-        this.__html.setHtml(h);
-        return;
-      }
-
-      // Tek tablo: her tahta bir özet satırı; ayrıntılar (yalnız seçili düzeylerdeki bulgular) satırın hemen
-      // altında, varsayılan KAPALI — satıra tıklayınca açılır (kullanıcı isteği). Açık olanlar __expanded'da
-      // (tahta kimliği) tutulur; rapor tazelense, süzgeç değişse de korunur.
-      const keyOf = t => String(t.board_id ?? t.board);
-      const canOpen = t => !pending(t) && !!this.__parse(t);
-      this.__shownKeys = rows.filter(canOpen).map(keyOf);
-      const allOpen = this.__shownKeys.length && this.__shownKeys.every(k => this.__expanded.has(k));
-      const arrow = open => `<span style="display:inline-block;width:14px;opacity:.7">${open ? "▾" : "▸"}</span>`;
-      h += `<table style="border-collapse:collapse;width:100%"><tr>` +
-        `<th style="${th};cursor:pointer;user-select:none" data-toggle="*" title="Tümünü aç/kapat">${arrow(allOpen)}Tahta</th>` +
-        `<th style="${th}">Genel durum</th><th style="${th}">Acil</th>` +
-        `<th style="${th}">Dikkat</th><th style="${th}">Bilgi</th><th style="${th}">Başlıca bulgu</th>` +
-        `<th style="${th}">Denetim zamanı</th></tr>`;
-      rows.forEach(t => {
-        const r = this.__parse(t);
-        const key = keyOf(t);
-        const open = canOpen(t) && this.__expanded.has(key);
-        let state, counts = ["", "", ""], top = "";
-        if (pending(t)) {
-          state = t.status === "running" ? ankamon.ui.JobSpinner.label("Denetleniyor…") : `<i style="opacity:.7">Sırada</i>`;
-        } else if (halted(t)) {
-          state = badge("warn") + " <span style=\"opacity:.8\">yarıda kaldı</span>";
-          top = "Görev bu tahtada tamamlanamadan kesildi (ör. Ankamon yeniden başlatıldı); denetimi yeniden çalıştırın.";
-        } else if (!r) {
-          state = badge("bad") + " <span style=\"opacity:.8\">bağlanılamadı</span>";
-          top = esc(t.output || "");
-        } else {
-          state = badge(r.level);
-          counts = ["bad", "warn", "info"].map(l => r.checks.filter(c => c.level === l).length || "");
-          const worst = r.checks.find(c => c.level === r.level && r.level !== "ok");
-          top = worst ? esc(`${worst.title}: ${worst.detail}`) : "";
+      const tm = this.__table.getTableModel();
+      const selected = this.__selectedKey();
+      const keys = [];
+      for (let row = 0; row < tm.getRowCount(); row++) {
+        const key = tm.getValue(0, row);
+        if (selected === null || key === selected) {
+          keys.push(key);
         }
-        const toggle = canOpen(t) ? ` data-toggle="${esc(key)}" style="cursor:pointer"` : "";
-        h += `<tr${toggle}><td style="${td};font-weight:600;white-space:nowrap">` +
-          `${canOpen(t) ? arrow(open) : "<span style=\"display:inline-block;width:14px\"></span>"}${esc(t.board)}` +
-          `<div style="font-weight:normal;opacity:.65;padding-left:14px">${esc(t.ip || "")}</div></td><td style="${td}">${state}</td>` +
-          counts.map(c => `<td style="${td};text-align:center">${c}</td>`).join("") +
-          `<td style="${td}">${top}</td><td style="${td};white-space:nowrap">${when(t)}</td></tr>`;
-        if (!open) {
+      }
+      const many = selected === null;
+      const name = many ? null : (this.__targets.get(selected) || {}).board;
+      this.__detailTitle.setValue(many ? `Bulgular ve öneriler — grid'deki tahtalar (${keys.length})`
+        : `Bulgular ve öneriler — ${esc(name)}`);
+      if (!this.__job || !this.__job.targets.length) {
+        this.__html.setHtml(`<div style="${css}"><p style="opacity:.7">Rapor boş.</p></div>`);
+        return;
+      }
+      if (!keys.length) {
+        this.__html.setHtml(`<div style="${css}"><p style="opacity:.7">Süzgeçlere uyan tahta yok.</p></div>`);
+        return;
+      }
+      let h = `<div style="${css}"><table style="border-collapse:collapse;width:100%"><tr>` +
+        (many ? `<th style="${th}">Tahta</th>` : "") +
+        `<th style="${th}">Düzey</th><th style="${th}">Denetim</th><th style="${th}">Bulgu</th><th style="${th}">Öneri</th></tr>`;
+      let any = false;
+      keys.forEach(key => {
+        const t = this.__targets.get(key);
+        if (!t) {
           return;
         }
-        // Ayrıntı satırı: tahtanın bulguları, girintili iç tablo.
-        h += `<tr><td colspan="7" style="padding:2px 8px 12px 30px;border-bottom:1px solid rgba(128,128,128,.25)">` +
-          `<table style="border-collapse:collapse;width:100%"><tr><th style="${th}">Düzey</th>` +
-          `<th style="${th}">Denetim</th><th style="${th}">Bulgu</th><th style="${th}">Öneri</th></tr>`;
-        const checks = visibleChecks(t);
-        if (!checks.length) {
-          h += `<tr><td colspan="4" style="${td};opacity:.7">Seçili düzeylerde bulgu yok.</td></tr>`;
+        const boardCell = many ? `<td style="${td};font-weight:600;white-space:nowrap">${esc(t.board)}</td>` : "";
+        if (!this.__parse(t)) {
+          if (!["queued", "running"].includes(t.status)) {
+            any = true;
+            h += `<tr>${boardCell}<td style="${td}">${badge("bad")}</td><td style="${td}">Bağlantı</td>` +
+              `<td style="${td}" colspan="2">${esc(t.output || "Denetlenemedi")}</td></tr>`;
+          }
+          return;
         }
         let lastGroup = null;
-        checks.forEach(c => {
+        this.__visibleChecks(t).forEach(c => {
+          any = true;
           const group = c.group !== lastGroup ? `<div style="opacity:.65;font-size:12px">${esc(c.group)}</div>` : "";
           lastGroup = c.group;
-          h += `<tr><td style="${td}">${badge(c.level)}</td><td style="${td}">${group}${esc(c.title)}</td>` +
+          h += `<tr>${boardCell}<td style="${td}">${badge(c.level)}</td><td style="${td}">${group}${esc(c.title)}</td>` +
             `<td style="${td}">${esc(c.detail)}</td><td style="${td}">${esc(c.advice || "")}</td></tr>`;
         });
-        h += "</table></td></tr>";
       });
-      h += "</table>";
-      this.__html.setHtml(h + "</div>");
+      if (!any) {
+        h += `<tr><td colspan="5" style="${td};opacity:.7">Seçili düzeylerde bulgu yok.</td></tr>`;
+      }
+      this.__html.setHtml(h + "</table></div>");
     }
   }
 });
