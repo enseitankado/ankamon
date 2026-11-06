@@ -706,8 +706,21 @@ class Tile {
     this.whoamiEl.classList.toggle("error", whoami.status === "error");
     // "querying": sürmekte olan iş — metni üst sayfa verir ("ali oturumu açılıyor…", "Oturum sorgulanıyor…").
     this.whoamiEl.textContent = whoami.status === "querying"
-      ? (whoami.text || "Oturum sorgulanıyor…") : (whoami.text || "Oturumu açık kullanıcı yok");
+      ? (whoami.text || "Oturum sorgulanıyor…") : (whoami.text || "Oturumu açık kullanıcı yok" + this.noSessionFor());
     this.whoamiEl.hidden = false;
+  }
+
+  /**
+   * " (23 dk)" / " (1 sa 12 dk)": tahtanın ne zamandır oturumsuz açık olduğu (kullanıcı isteği). Başlangıç
+   * üst sayfadan gelir (board.noSessionSince, epoch sn — BoardsApi no_session_since: oturumsuz kalınan
+   * açık aralığın başı ya da son oturumun bitişi); bilinmiyorsa boş. Dakikada bir tazelenir (bkz. tickWhoami).
+   */
+  noSessionFor() {
+    const since = this.board.noSessionSince;
+    if (!since) return "";
+    const min = Math.max(0, Math.floor((Date.now() / 1000 - since) / 60));
+    const h = Math.floor(min / 60), m = min % 60;
+    return " (" + (h ? `${h} sa ${m} dk` : `${m} dk`) + ")";
   }
 
   /** Bağlı kalmalı mı: sekme görünür, kutucuk görünür alanda ve tahta çevrimiçi (kapalı tahtaya SSH denenmez). */
@@ -1400,6 +1413,8 @@ function netHint(it, radio) {
 
 // TiHA otomatik kapatma geri sayımı (güç tasarrufu yazısının altında) — bkz. Tile.tickShutdown.
 setInterval(() => { if (!document.hidden) tiles.forEach(t => t.tickShutdown()); }, 1000);
+// "Oturumu açık kullanıcı yok (N dk)" süresi üst sayfa güncelleme göndermese de ilerlesin.
+setInterval(() => { if (!document.hidden) tiles.forEach(t => t.board.whoami && t.setWhoami(t.board.whoami)); }, 30000);
 
 // Siyah (güç tasarrufundaki) ekran algısı — bkz. Tile.checkBlank.
 setInterval(() => { if (!document.hidden) tiles.forEach(t => t.checkBlank()); }, 2000);

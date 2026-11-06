@@ -401,7 +401,7 @@ qx.Class.define("ankamon.page.Boards", {
             board.id, wasChecked.has(board.id),
             board.online ? "Çevrimiçi" : "Kapalı",
             board.label || board.hostname || board.ip,
-            board.hostname, board.ip, board.mac, board.wifi_mac || "", F.etap(board.etap),
+            board.hostname, board.ip, board.mac, board.wifi_mac || "", F.etap(board.etap, board.facts.cpu_model),
             ankamon.page.Boards.sessionText(board),
             (ankamon.ui.FactsView.wifiStatus(board.facts) || { text: "" }).text,
             ankamon.page.Boards.cableText(board),
@@ -963,12 +963,20 @@ qx.Class.define("ankamon.page.Boards", {
       const whoami = this.__whoamiState || new Map();
       const metrics = this.__metrics || {};
       return this.__orderedShown().map(b => {
+        // WoL yazısı (bkz. __sessionOps wolSent) tahta açılınca kalkar.
+        const w = whoami.get(b.id);
+        if (w && w.wol && b.online) {
+          whoami.delete(b.id);
+        }
         // Kutucuğun alt barı (bkz. screen/index.html Tile.setStats): grid'in İşlemci/Bellek/sensör
         // sütunlarıyla aynı son ölçümler — yalnız çevrimiçi tahtada (eski ölçüm kapalı tahtada yanıltır).
         const m = b.online ? metrics[b.id] : null;
         return {
           id: b.id, name: b.label || b.hostname || b.ip || ("#" + b.id), online: !!b.online,
           whoami: whoami.get(b.id) || null,
+          // "Oturumu açık kullanıcı yok (23 dk)": oturumsuz durumun başladığı an (epoch sn; bkz. BoardsApi
+          // no_session_since) — kutucuk süreyi kendisi sayar.
+          noSessionSince: b.online ? b.no_session_since || null : null,
           refresh: (this.__tileRefresh && this.__tileRefresh.get(b.id)) || 0,
           // Monitör DPMS ile kapalı (bkz. 025_board_display_state.sql): kutucukta "Ekran güç tasarrufu kipinde".
           powersave: !!b.online && ["Off", "Standby", "Suspend"].includes(b.display_state),
@@ -1181,6 +1189,16 @@ qx.Class.define("ankamon.page.Boards", {
         return st && st.status === "ok" && st.text ? st.text : "";
       };
       return {
+        // Bilgisayarı aç (WoL): görev başlayınca kapalı kutucuğun kullanıcı adı alanında "SS:DD:sn Magic paket
+        // gönderildi" (kullanıcı isteği). Tahta çevrimiçi olunca kalkar (bkz. __previewList).
+        wolSent: boards => {
+          if (!this.__whoamiState) {
+            this.__whoamiState = new Map();
+          }
+          const at = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          boards.forEach(b => this.__whoamiState.set(b.id, { status: "ok", text: `${at} Magic paket gönderildi`, wol: true }));
+          this.__pushPreview();
+        },
         query: boards => this.__startWhoamiQuery(boards.map(b => b.id)),
         login: (boards, acc) => this.__sessionJob(boards.map(b => b.id), { type: "login", username: acc.name },
           () => `${acc.name} oturumu açılıyor…`,

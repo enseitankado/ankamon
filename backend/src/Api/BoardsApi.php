@@ -48,6 +48,14 @@ final class BoardsApi
         b.source, b.monitor_enabled, b.exporter_port, b.online,
         b.ssh_ok, b.exporter_ok, b.facts - '{disk_layout,firmware_boot,uefi_vars}'::text[] AS facts, b.etap,
         b.session_username, b.session_locked, extract(epoch FROM b.session_checked_at)::bigint AS session_checked_at,
+        -- Ekran kutucuğunda 'Oturumu açık kullanıcı yok (23 dk)': tahta açık ve taze yoklama (5 dk, no_login
+        -- anomalisiyle aynı) oturum görmüyorsa, oturumsuz durumun başı = tahtanın son açık aralığının başı
+        -- (board_uptime) ile son biten oturumun bitişinin geç olanı. Bilinmiyorsa null.
+        CASE WHEN b.online AND b.session_username IS NULL AND b.session_checked_at > now() - interval '5 minutes'
+             THEN extract(epoch FROM GREATEST(
+                 (SELECT max(u.started_at) FROM board_uptime u WHERE lower(u.host) = lower(b.hostname)),
+                 (SELECT max(s.ended_at) FROM board_sessions s WHERE s.board_id = b.id)))::bigint
+        END AS no_session_since,
         b.display_state, b.netifs, b.autoshutdown, b.screen_locked, array_to_json(b.input_locks) AS input_locks,
         (SELECT r.source_board_id FROM screen_relays r WHERE r.target_board_id = b.id) AS relay_source,
         EXISTS (SELECT 1 FROM screen_relays r WHERE r.source_board_id = b.id) AS relay_is_source,

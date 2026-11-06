@@ -764,11 +764,16 @@ qx.Class.define("ankamon.ui.BoardOps", {
      * Seçili (kapalı) tahtaları ağdan uyandırır (WoL). Pencere gizlenmişse (bkz. POWER_HIDE_MS) uyandırma
      * yine yapılır, yalnız çıktı penceresi açılmaz — başlatma hatası ise her durumda gösterilir.
      * @param user {Map?} oturum sahibi (pencere gizleme tercihi okunur/yazılır)
+     * @param sessionOps {Map?} Tahtalar sayfasının işleyicileri (bkz. Boards.__sessionOps): varsa görev
+     *   başlayınca kutucuğun kullanıcı adı alanına "SS:DD:sn Magic paket gönderildi" yazılır (wolSent).
      */
-    wol(boards, user) {
+    wol(boards, user, sessionOps) {
       const ids = boards.map(b => b.id);
       if (ids.length) {
-        this.__powerJob({ type: "wol", board_ids: ids }, "Uyandırma (WoL)", "wol", "uyandırma", user, { intro: this.WOL_INTRO });
+        const job = this.__powerJob({ type: "wol", board_ids: ids }, "Uyandırma (WoL)", "wol", "uyandırma", user, { intro: this.WOL_INTRO });
+        if (sessionOps && sessionOps.wolSent) {
+          job.then(() => sessionOps.wolSent(boards)).catch(() => {});
+        }
       }
     },
 
@@ -784,13 +789,14 @@ qx.Class.define("ankamon.ui.BoardOps", {
       this.__powerJob(body, caption, kind, verb, user);
     },
 
+    /** @return {Promise} görev kimliği (başlatılamazsa reddedilir; hata zaten gösterilir) */
     __powerJob(body, caption, kind, verb, user, opts = {}) {
       const job = ankamon.io.Api.post("/jobs", body).then(res => res.id);
       const key = kind + ".hideUntil";
       const prefs = user ? user.ui_prefs || (user.ui_prefs = {}) : {};
       if ((prefs[key] || 0) > Date.now()) {
         job.catch(e => ankamon.ui.Dialog.error(e));
-        return;
+        return job;
       }
       let footer = null;
       if (user) {
@@ -806,6 +812,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         });
       }
       ankamon.ui.Jobs.show(job, caption, Object.assign({}, opts, { footer }));
+      return job;
     },
 
     // Uyandırma penceresinin çıktı kutusunun başındaki sabit açıklama (bkz. ui.Jobs opts.intro):
@@ -961,7 +968,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         const off = boards.filter(b => !b.online);
         const on = boards.filter(b => b.online);
         const n = list => (list.length > 1 ? ` (${list.length} tahta)` : "");
-        add(ICON.wol, "Bilgisayarı aç (WoL)" + n(off), () => this.wol(off, user));
+        add(ICON.wol, "Bilgisayarı aç (WoL)" + n(off), () => this.wol(off, user, sessionOps));
         menu.getChildren()[menu.getChildren().length - 1].setEnabled(off.length > 0);
         add(ICON.shutdown, "Bilgisayarı kapat" + n(on), () => this.shutdown(on, user));
         menu.getChildren()[menu.getChildren().length - 1].setEnabled(on.length > 0);

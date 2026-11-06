@@ -68,7 +68,7 @@ qx.Class.define("ankamon.ui.taskmgr.TaskBoardPicker", {
     __openPopup() {
       const win = this.__win;
       const F = ankamon.ui.taskmgr.Fmt;
-      const popup = new qx.ui.popup.Popup(new qx.ui.layout.VBox(4)).set({ padding: 6, minWidth: 260, maxWidth: 460 });
+      const popup = new qx.ui.popup.Popup(new qx.ui.layout.VBox(4)).set({ padding: 6, minWidth: 420, maxWidth: 820 });
       const checks = [];
       const all = new qx.ui.form.CheckBox("Tümü").set({ triState: true, font: "bold" });
       // Toplu değişiklikte (Tümü, Temizle) süzgeç bir kez uygulansın: her kutu ayrı ayrı tabloyu yeniden kurmasın.
@@ -85,8 +85,9 @@ qx.Class.define("ankamon.ui.taskmgr.TaskBoardPicker", {
         const state = link.getState();
         const info = state === "open" ? (m.snap ? `${m.procs.size} işlem` : "bağlı")
           : (state === "connecting" ? "bağlanıyor…" : "bağlanamadı");
-        const check = new qx.ui.form.CheckBox(`${state === "closed" ? "⚠ " : ""}${F.esc(link.getDisplay())}  ` +
-          `<span style="opacity:.6">(${F.esc(info)})</span>`).set({ value: win.hasBoardFilter() && win.isBoardChosen(link.getId()), rich: true });
+        // Satır kırılmasın (kullanıcı isteği): ad + durum tek satırda; pencere genişliği içeriğe göre büyür.
+        const check = new qx.ui.form.CheckBox(`<span style="white-space:nowrap">${state === "closed" ? "⚠ " : ""}` +
+          `${F.esc(link.getDisplay())}  <span style="opacity:.6">(${F.esc(info)})</span></span>`).set({ value: win.hasBoardFilter() && win.isBoardChosen(link.getId()), rich: true });
         check.setUserData("id", link.getId());
         if (state === "closed" && link.getError()) {
           check.setToolTipText(link.getError());
@@ -118,8 +119,8 @@ qx.Class.define("ankamon.ui.taskmgr.TaskBoardPicker", {
       });
       syncAll();
       popup.add(all);
-      // Kaydırma alanı içeriğe göre büyümez (qx): yükseklik tahta sayısından, en çok 360 px.
-      popup.add(new qx.ui.container.Scroll(list).set({ height: Math.min(360, checks.length * 28 + 6), maxHeight: 360 }), { flex: 1 });
+      // Kaydırma alanı içeriğe göre büyümez (qx): yükseklik tahta sayısından, en çok 600 px.
+      popup.add(new qx.ui.container.Scroll(list).set({ height: Math.min(600, checks.length * 28 + 6), maxHeight: 600 }), { flex: 1 });
       const foot = new qx.ui.container.Composite(new qx.ui.layout.HBox(6));
       foot.add(new qx.ui.basic.Label("Hiçbiri seçili değilse hepsi gösterilir.").set({ textColor: "app-muted", alignY: "middle" }), { flex: 1 });
       const clear = new qx.ui.form.Button("Temizle");

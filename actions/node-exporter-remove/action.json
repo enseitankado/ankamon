@@ -1,0 +1,9 @@
+{
+  "title": "Metrik izlemeyi kaldır (fan/pil/anakart sensörleri dahil)",
+  "description": "\"Metrik izlemeyi kur\" komutunun yaptıklarını geri alır: prometheus-node-exporter servisini durdurup paketi ayarlarıyla birlikte kaldırır (purge), anakart sensör sürücüsü dosyasını (/etc/modules-load.d/ankamon-sensors.conf, eski tiha-mon-sensors.conf) siler ve sürücüleri (it87/nct6775/f71882fg) bellekten çıkarır, sensors-detect'in /etc/modules'a eklediği bölümü temizler. lm-sensors paketi başka bir paket ona bağlı değilse kaldırılır. Ankamon bu tahtadan artık sensör verisi okuyamaz; toplanmış eski veriler sunucuda kalır. Yeniden kurmak için \"Metrik izlemeyi kur\" çalıştırılır.",
+  "category": "Sensörler",
+  "feature": "actions",
+  "confirm": true,
+  "timeout": 300,
+  "params": []
+}

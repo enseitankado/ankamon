@@ -76,8 +76,13 @@ qx.Class.define("ankamon.util.Format", {
      * ETAP faz bilgisinin grid metni (bkz. worker netscan/etap_phase.py, migration 017): "Faz 2 · Vestel",
      * "Faz 3 · Arçelik? (tahmin)", ETAP'a kayıtlı ama tahta olduğu bilinmeyen cihazda "ETAP cihazı".
      * "(tahmin)": faz eşlemesi çıkarım (doğrulanmadı) ya da yalnız MAC önekinden (donanım okunmadı).
+     * Faz 2'de marka yerine işlemci üreticisi yazılır (kullanıcı isteği): "Faz 2 - Intel" / "Faz 2 - AMD" —
+     * Faz 2 tahtalarının Intel ve AMD sürümleri ayrı bakım/sürücü ister. Kaynak önce tahtanın okunan
+     * işlemcisi (cpu: boards.facts.cpu_model), yoksa faz kaydındaki işlemci; ikisi de yoksa marka.
+     * @param info {Map|null} boards.etap / net_devices.etap
+     * @param cpu {String?} okunan işlemci adı
      */
-    etap(info) {
+    etap(info, cpu) {
       if (!info) {
         return "";
       }
@@ -85,8 +90,15 @@ qx.Class.define("ankamon.util.Format", {
         return "ETAP cihazı";
       }
       const faz = info.faz ? `Faz ${info.faz}` : "Faz ?";
-      const text = info.marka ? `${faz} · ${info.marka}` : faz;
+      const vendor = String(info.faz) === "2" ? this.cpuVendor(cpu || info.islemci) : null;
+      const text = vendor ? `${faz} - ${vendor}` : (info.marka ? `${faz} · ${info.marka}` : faz);
       return text + (info.guven === "cikarim" ? " (tahmin)" : "");
+    },
+
+    /** İşlemci adından üretici: "Intel" / "AMD" ya da null. */
+    cpuVendor(cpu) {
+      const c = String(cpu || "");
+      return /\bintel\b|intel\(r\)/i.test(c) ? "Intel" : (/\bamd\b/i.test(c) ? "AMD" : null);
     },
 
     /** @param seconds {Number} süre (saniye); "2 sa 14 dk" / "37 dk" / "12 sn" biçiminde döner */
