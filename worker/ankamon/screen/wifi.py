@@ -39,7 +39,8 @@ Sunucu iletileri, `phase` alanıyla:
         random, vendor, hints, phone: yes|maybe|"", first_seen, seen_days}], info, at}.
   probes {rows: [{kind: probe, addr, signal, rssi, count, fp, ssids, random, vendor, hints, phone, first_seen, seen_days}],
         devices (kestirilen cihaz sayısı), note (boşsa dinlendi: nodev|tools|radio|busy|nomon|shared|monfail), secs, at}.
-  done {result: restored|shared|none|fail|lock, radio, wifi_temp, wifi_fail, bt}: geri yükleme sonucu, ardından kapanış 1000.
+  done {result: restored|shared|none|fail|lock, radio, policy (off: tahtada "Wi-Fi'yi kapat" kuralı var), wifi_temp, wifi_fail, bt}:
+        geri yükleme sonucu (radyo durumu boards.facts'e de yazılır), ardından kapanış 1000.
 info: {wifi_temp: "0"|"1", wifi_fail, bt: absent|on|temp|fail:<neden>, disconnected}.
 Kapanış kodları: 4001 tahta yok · 4002 SSH · 4003 giriş reddedildi · 4009 tahtada nmcli yok · 4010 tahtada /run yazılamıyor.
 """
@@ -55,12 +56,16 @@ import time
 
 import tornado.websocket
 
+from .. import db
+from ..executor.hwfacts import mark_wifi_radio
 from . import wifimon_phone_hints, wifimon_sightings
 from .wifi_remote_scan import wifimon_remote_command
 
 log = logging.getLogger("ankamon.screen.wifi")
 
 _HEARTBEAT_SECONDS = 5
+# Pencere kapanınca tahtadaki geri yüklemenin bitip @@DONE'un gelmesi için beklenen en uzun süre.
+_CLOSE_GRACE_SECONDS = 45
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|[\x01\x02]")
 _BT_DEVICE_RE = re.compile(r"^Device ((?:[0-9A-F]{2}:){5}[0-9A-F]{2})\b(.*)")
 _BT_RSSI_RE = re.compile(r"(-\d+)")
@@ -166,6 +171,23 @@ def _wifimon_build(parser, board_id: int, sections: dict) -> dict:
     return data
 
 
+def _store_radio(board_id: int, radio: str) -> None:
+    """Geri yüklemeden sonraki radyo durumunu boards.facts'e yazar: Tahtalar grid'inin Wi-Fi sütunu, pencere açıkken alınmış
+    (geçici açık) bir donanım bilgisini bir sonraki tam toplamaya kadar göstermesin. Kapalıysa bağlantı alanları da silinir
+    (hwfacts.mark_wifi_radio); açıksa yalnız radyo alanı yazılır (bağlantı bilgisi doğru kalır)."""
+    if radio not in ("enabled", "disabled"):
+        return
+    try:
+        with db.connect() as conn:
+            if radio == "disabled":
+                mark_wifi_radio(conn, board_id, radio)
+            else:
+                conn.execute("""UPDATE boards SET facts = facts || jsonb_build_object('wifi_radio', 'enabled')
+                                WHERE id = %s AND facts->>'wifi_iface' IS NOT NULL""", (board_id,))
+    except Exception as exc:  # durum yazılamazsa sonraki donanım toplaması düzeltir
+        log.warning("Wi-Fi radyo durumu yazılamadı (tahta %s): %s", board_id, exc)
+
+
 class WifiSocket(tornado.websocket.WebSocketHandler):
     proc: asyncio.subprocess.Process | None = None
 
@@ -231,8 +253,9 @@ class WifiSocket(tornado.websocket.WebSocketHandler):
                     sections, current = {}, None
                 elif line == "@@DONE":
                     finished = True
-                    await self.write_message(json.dumps(
-                        {"phase": "done", **_keyvals(sections.get("RESTORED", []))}, ensure_ascii=False))
+                    restored = _keyvals(sections.get("RESTORED", []))
+                    await asyncio.to_thread(_store_radio, self._board_id, restored.get("radio", ""))
+                    await self.write_message(json.dumps({"phase": "done", **restored}, ensure_ascii=False))
                     sections, current = {}, None
                 elif line.startswith("@@"):
                     current = sections.setdefault(line[2:], [])
@@ -256,6 +279,9 @@ class WifiSocket(tornado.websocket.WebSocketHandler):
             self._end_remote()
 
     def on_close(self):
+        # Pencere kapandı: stdin EOF ile tahtadaki program durumu geri yükler ve @@DONE yazar; _pump onu okuyup radyo durumunu
+        # veritabanına işler. SSH hemen öldürülmez (yoksa son durum yazılamazdı); takılırsa bir süre sonra öldürülür.
         self._end_remote()
-        if self.proc and self.proc.returncode is None:
-            self.proc.kill()
+        proc = self.proc
+        if proc and proc.returncode is None:
+            asyncio.get_event_loop().call_later(_CLOSE_GRACE_SECONDS, lambda: proc.returncode is None and proc.kill())

@@ -40,8 +40,11 @@ Program /run/ankamon-wifimon/prog.sh olarak yazılıp sh (dash) ile çalışır.
   Kart bağlıysa ya da bağlanıyorsa dinlenmez (bağlantı kesilirdi). Aynı tahtada tek oturum dinler (flock -n). Geri alma işaretli
   ($D/unmanaged): finish, bekçi ve restore_orig sahibi ölmüş/biten işareti temizler.
 
-Bilinen sınır: geçici açıkken tahtanın gücü kesilirse trap da bekçi de çalışamaz; NetworkManager radyoyu açık hatırlar ve /run açılışta
-silindiğinden sonraki oturum da bunu bilemez.
+- Tahtanın Ankamon Wi-Fi ayarı: "Wi-Fi'yi kapat" işleminin polkit kuralı ($RULE) varsa geri yüklemenin sonunda kart, açılıştaki
+  durumu ne olursa olsun kapatılır (Tahtalar grid'inin Wi-Fi sütunu ve wifi-on/wifi-off işlemleriyle tutarlı).
+
+Bilinen sınır: geçici açıkken tahtanın gücü kesilirse trap da bekçi de çalışamaz; NetworkManager radyoyu açık hatırlar. Başlangıç
+durumu kalıcı diskte ($P/orig) olduğundan bir sonraki Wi-Fi Monitör oturumu önce onu geri yükler.
 
 Çıktı: önce @@INFO + @@START; her tarama @@RADIO/@@DEV/@@LIST/@@BT/@@INFO bölümleri + @@END; yoklama dinlendiyse ardından
 @@PROBE (JSON satırları) + @@PROBEINFO + @@PEND; sonda @@RESTORED + @@DONE.
@@ -54,8 +57,14 @@ from .wifimon_probe_sniffer import WIFIMON_PROBE_SNIFFER_SOURCE
 _WIFIMON_PROGRAM = r"""
 export LC_ALL=C.UTF-8 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 D=/run/ankamon-wifimon
-O=$D/orig
+# Başlangıç durumu kalıcı diskte: pencere açıkken tahtanın gücü kesilirse /run silinir ama bu dosya kalır; sonraki
+# Wi-Fi Monitör oturumu (canlı oturum yokken) önce bu durumu geri yükler.
+P=/var/lib/ankamon-wifimon
+O=$P/orig
 L=$D/lock
+# Tahtanın Ankamon Wi-Fi ayarı: "Wi-Fi'yi kapat" (actions/wifi-off) bu kuralı kurar, "Wi-Fi'yi aç" siler. Kural varsa
+# pencere kapanınca kart her durumda kapalı bırakılır.
+RULE=/etc/polkit-1/rules.d/49-ankamon-wifi-off.rules
 LEASE=25
 SELF=$0
 MON=ankamon-mon0
@@ -191,6 +200,11 @@ restore_orig() {
     [ "$BT_SVC" = active ] || timeout 15 systemctl stop bluetooth >/dev/null 2>&1
     for r in $BT_RFK; do echo 1 > "$r/soft" 2>/dev/null; done
   fi
+  if [ -e "$RULE" ] && [ -n "$W_DEV" ] && [ "$(wifi_radio)" = enabled ]; then
+    n radio wifi off >/dev/null
+    sleep 1
+    [ "$(wifi_radio)" = disabled ] || { n radio wifi off >/dev/null; [ "$(wifi_radio)" = disabled ] || ok=0; }
+  fi
   if [ $ok = 1 ]; then rm -f "$O"; echo restored; else echo fail; fi
 }
 
@@ -254,6 +268,7 @@ finish() {
   echo "wifi_fail=$W_FAIL"
   echo "bt=$(bt_info)"
   echo "radio=$(wifi_radio)"
+  echo "policy=$([ -e "$RULE" ] && echo off)"
   echo '@@DONE'
   exit 0
 }
@@ -349,6 +364,8 @@ main() {
   PTMP=$D/probe.$ME
   CUR=; BTP=; PROBE_NOTE=; W_DEV=; W_TEMP=0; W_FAIL=; BT_PRESENT=0; BT_TEMP=0; BT_FAIL=; DISCONNECTED=0
   exec 2>/dev/null 3<&0 </dev/null
+  mkdir -p "$P" || { echo '@@RESTORED'; echo 'result=lock'; echo '@@DONE'; exit 1; }
+  [ -f "$D/orig" ] && [ ! -f "$O" ] && mv -f "$D/orig" "$O"
   trap finish TERM HUP INT PIPE
   setsid sh "$SELF" guard "$ME" <&3 3<&- >/dev/null 2>&1 &
   exec 3<&-

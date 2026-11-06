@@ -184,7 +184,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         } else if (d.phase === "data") {
           feed.data = d;
           const sniff = probeBox.getValue() && d.device;
-          feed.status = sniff ? "Ortamdaki Wi-Fi trafiği koklanıyor…" : `Son tarama ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}`;
+          feed.status = sniff ? "Paketler dinleniyor…" : `Son tarama ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}`;
           feed.notes = [cardLine(d), wifiNote(d.info || {}, watching), btNote((d.info || {}).bt, false)];
           if (!sniff) {
             feed.initialKeys = feed.initialKeys || new Set(d.rows.map(Classify.rowKey));
@@ -214,6 +214,9 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           } else if (d.wifi_temp === "1") {
             parts.push(d.result === "shared" ? "Wi-Fi geçici açıldı; bu tahtadaki başka bir tarama bitince kapatılacak."
               : "Wi-Fi geçici açıldı, tarama sonrası kapatıldı.");
+          }
+          if (d.policy === "off" && d.radio === "disabled" && d.result !== "shared") {
+            parts.push("Bu tahtada Wi-Fi kapalı tutuluyor (Wi-Fi'yi kapat); kart kapalı bırakıldı.");
           }
           parts.push(btNote(d.bt, d.result !== "shared"));
           if (feed.probeInfo && feed.probeInfo.note) {
