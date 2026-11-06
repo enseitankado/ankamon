@@ -33,6 +33,7 @@
  * etiketli) sıralamaya katılır.
  *
  * toolbar(): lig sekmesinin düğme satırına kutuyu ve (leagues.exclude yetkisiyle) "Lig dışı…" düğmesini ekler.
+ * attachRowMenu(): kart satırlarında sağ tık "Lig dışı bırak" / "Lige geri al" (pencerenin kısayolu).
  * open(): seçim penceresi — bu eğitim-öğretim yılında ligde süresi olanlar (yıl toplamı çoktan aza) ve Tahtalar'daki
  * bütün tahtalar onay kutusuyla listelenir; arama kutusu ad/kullanıcı adı/bilgisayar adında arar.
  */
@@ -75,6 +76,77 @@ qx.Class.define("ankamon.ui.sessions.LeagueExclusions", {
           }
         }
       };
+    },
+
+    /**
+     * Lig kartındaki satırın (kürsü basamağı ya da çubuk satırı) sağ menü kimliği: HTML öznitelikleri. attachRowMenu()
+     * sağ tıklanan öğeden yukarı çıkarak bu öznitelikleri arar. @param kind {String} 'user' | 'board'
+     * @param value {String} kullanıcı adı / tahta host adı (league_exclusions.value) @param name {String} görünen ad
+     */
+    rowAttrs(kind, value, name, excluded) {
+      if (!value) {
+        return "";
+      }
+      const esc = qx.bom.String.escape;
+      return ` data-lg-kind="${esc(kind)}" data-lg-value="${esc(String(value))}" data-lg-name="${esc(String(name || value))}"` +
+        (excluded ? ' data-lg-out="1"' : "");
+    },
+
+    /**
+     * Lig kartlarının (qx.ui.embed.Html) sağ tık menüsü: "Lig dışı bırak" ya da — lig dışı satırda ("Lig
+     * dışındakileri de göster" açıkken) — "Lige geri al"; ayrıca "Lig dışındakiler…" penceresi. leagues.exclude yetkisi
+     * yoksa maddeler pasiftir. opts: league ('session' | 'break'), page (_can), onChange() (lig yeniden yüklenir).
+     */
+    attachRowMenu(html, opts) {
+      const Ex = ankamon.ui.sessions.LeagueExclusions;
+      html.addListener("contextmenu", e => {
+        const root = html.getContentElement().getDomElement();
+        let el = e.getOriginalTarget();
+        while (el && el !== root && !(el.getAttribute && el.getAttribute("data-lg-value"))) {
+          el = el.parentNode;
+        }
+        if (!el || el === root || !el.getAttribute) {
+          return; // satır dışı: tarayıcının kendi menüsü (metin kopyalama)
+        }
+        e.preventDefault();
+        const kind = el.getAttribute("data-lg-kind");
+        const value = el.getAttribute("data-lg-value");
+        const name = el.getAttribute("data-lg-name") || value;
+        const isOut = el.getAttribute("data-lg-out") === "1";
+        const allowed = !!(opts.page && opts.page._can("leagues.exclude"));
+        const ops = ankamon.ui.BoardOps;
+        const menu = new qx.ui.menu.Menu();
+        const toggle = ops.menuButton(isOut ? "↺" : "⊘", isOut ? `Lige geri al: ${name}` : `Lig dışı bırak: ${name}`,
+          () => Ex.setExcluded(opts.league, kind, value, !isOut).then(() => opts.onChange(),
+            err => ankamon.ui.Dialog.error(err)));
+        const manage = ops.menuButton("☰", "Lig dışındakiler…", () => Ex.open(opts.league, kind, opts.onChange));
+        if (!allowed) {
+          toggle.setEnabled(false);
+          manage.setEnabled(false);
+          toggle.setToolTipText("Lig dışı bırakma yetkiniz yok (leagues.exclude).");
+        }
+        menu.add(toggle);
+        menu.add(manage);
+        menu.addListenerOnce("disappear", () => qx.event.Timer.once(() => menu.destroy(), null, 0));
+        menu.openAtPoint({ left: e.getDocumentLeft(), top: e.getDocumentTop() });
+      });
+    },
+
+    /**
+     * Tek kaydı lig dışı bırakır ya da lige geri alır. PUT tam liste yazdığından güncel liste okunup değiştirilir.
+     * @return {Promise}
+     */
+    async setExcluded(league, kind, value, exclude) {
+      const data = await ankamon.io.Api.get(
+        `/league-exclusions?league=${encodeURIComponent(league)}&kind=${encodeURIComponent(kind)}`);
+      const values = new Set(data.excluded || []);
+      const v = kind === "user" ? String(value).toLowerCase() : String(value);
+      if (exclude) {
+        values.add(v);
+      } else {
+        values.delete(v);
+      }
+      await ankamon.io.Api.put("/league-exclusions", { league, kind, values: [...values] });
     },
 
     /** Seçim penceresi; kaydedilince onSaved() çağrılır. */

@@ -33,7 +33,8 @@
  * oturum kayıtları ya da loglar silinse de korunan ayrı tablodan (session_league_parts) gelir. Sekme göründükçe ve
  * görünürken dakikada bir tazelenir. "Sırala" ile kullanıcılar ya da tahtalar (en uzun süre oturumlu kalan tahtalar)
  * sıralanır. Görev gereği sürekli oturumlu kalan kullanıcı/tahtalar lig dışı bırakılabilir (ui.sessions.LeagueExclusions):
- * varsayılan görünümde sayılmazlar, "Lig dışındakileri de göster" ile soluk ve etiketli katılırlar.
+ * varsayılan görünümde sayılmazlar, "Lig dışındakileri de göster" ile soluk ve etiketli katılırlar. Kart satırına sağ
+ * tıklayınca "Lig dışı bırak" / "Lige geri al".
  */
 qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
   extend: qx.ui.tabview.Page,
@@ -67,6 +68,8 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
 
     this.__html = new qx.ui.embed.Html("").set({ overflowY: "auto" });
     this.add(this.__html, { flex: 1 });
+    // Kart satırlarına sağ tık: "Lig dışı bırak" / "Lige geri al" (bkz. LeagueExclusions.attachRowMenu).
+    ankamon.ui.sessions.LeagueExclusions.attachRowMenu(this.__html, { league: "session", page, onChange: () => this.load() });
 
     this.addListener("appear", () => this.load());
     this.__timer = new qx.event.Timer(ankamon.ui.sessions.ChampionsLeague.LEAGUE_REFRESH_MS);
@@ -199,6 +202,9 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
       const name = r => esc(boards ? r.board : (r.full_name || r.username));
       const sub = r => boards ? r.top_user : r.board;
       const shown = this.__out.withExcluded();
+      // Sağ tık menüsünün kimliği: kullanıcı adı ya da tahta host adı (league_exclusions.value).
+      const menuAttrs = r => ankamon.ui.sessions.LeagueExclusions.rowAttrs(boards ? "board" : "user",
+        boards ? r.host : r.username, boards ? r.board : (r.full_name || r.username), r.excluded);
 
       const card = p => {
         const rows = p.leaders || [];
@@ -212,13 +218,13 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
         // Kürsü: 2. solda, 1. ortada (en yüksek), 3. sağda.
         const podium = [1, 0, 2].filter(i => rows[i]).map(i => {
           const r = rows[i];
-          return `<div class="lg-step lg-step${i + 1}${r.excluded ? " lg-out" : ""}" title="${esc(this.__leaderTip(r, i + 1, boards))}">` +
+          return `<div class="lg-step lg-step${i + 1}${r.excluded ? " lg-out" : ""}"${menuAttrs(r)} title="${esc(this.__leaderTip(r, i + 1, boards))}">` +
             (i === 0 ? `<div class="lg-crown">🏆</div>` : "") +
             `<div class="lg-pname">${name(r)}</div><div class="lg-ptime">${esc(F.duration(r.seconds))}</div>` +
             `<div class="lg-block" style="background:${medals[i]}">${i + 1}</div></div>`;
         }).join("");
         const bars = rows.map((r, i) =>
-          `<div class="lg-row${i === 0 ? " lg-lead" : ""}${r.excluded ? " lg-out" : ""}" title="${esc(this.__leaderTip(r, i + 1, boards))}">` +
+          `<div class="lg-row${i === 0 ? " lg-lead" : ""}${r.excluded ? " lg-out" : ""}"${menuAttrs(r)} title="${esc(this.__leaderTip(r, i + 1, boards))}">` +
           `<span class="lg-rank" ${i < 3 ? `style="background:${medals[i]};color:#fff"` : ""}>${i + 1}</span>` +
           `<span class="lg-name">${name(r)}${sub(r) || r.excluded ? `<small>${outTag(r)}${esc(sub(r) || "")}</small>` : ""}</span>` +
           `<span class="lg-track"><span class="lg-bar" style="width:${Math.max(2, r.seconds / top * 100).toFixed(1)}%"></span></span>` +

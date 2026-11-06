@@ -32,7 +32,8 @@
  * ayrılır: oturum AÇIKKEN (turuncu) ve oturum KAPALIYKEN, giriş ekranında (mavi); çubuk ikisinin toplamı. Sıralama ölçütü
  * seçilebilir (toplam / oturum açık / oturum kapalı). Veri /break-league'den (bkz. backend BreakLeagueApi). Sekme
  * göründükçe ve görünürken dakikada bir tazelenir. Görev gereği sürekli açık kalan tahtalar lig dışı bırakılabilir
- * (ui.sessions.LeagueExclusions): varsayılan görünümde sayılmazlar, "Lig dışındakileri de göster" ile katılırlar.
+ * (ui.sessions.LeagueExclusions): varsayılan görünümde sayılmazlar, "Lig dışındakileri de göster" ile katılırlar;
+ * tahta satırına sağ tıklayınca "Lig dışı bırak" / "Lige geri al".
  */
 qx.Class.define("ankamon.ui.sessions.BreakLeague", {
   extend: qx.ui.tabview.Page,
@@ -49,7 +50,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
     refresh.addListener("execute", () => this.load());
     bar.add(refresh);
     bar.add(new qx.ui.basic.Label("Sırala:").set({ alignY: "middle", marginLeft: 8 }));
-    this.__sort = new qx.ui.form.SelectBox().set({ width: 300 });
+    this.__sort = new qx.ui.form.SelectBox().set({ width: 330 });
     ankamon.ui.sessions.BreakLeague.BREAK_SORTS.forEach(([key, label]) => {
       const item = new qx.ui.form.ListItem(label);
       item.setUserData("key", key);
@@ -71,6 +72,8 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
 
     this.__html = new qx.ui.embed.Html("").set({ overflowY: "auto" });
     this.add(this.__html, { flex: 1 });
+    // Tahta satırlarına sağ tık: "Lig dışı bırak" / "Lige geri al" (bkz. LeagueExclusions.attachRowMenu).
+    ankamon.ui.sessions.LeagueExclusions.attachRowMenu(this.__html, { league: "break", page, onChange: () => this.load() });
 
     this.addListener("appear", () => this.load());
     this.__timer = new qx.event.Timer(ankamon.ui.sessions.ChampionsLeague.LEAGUE_REFRESH_MS);
@@ -81,8 +84,8 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
   statics: {
     BREAK_SORTS: [
       ["total", "Teneffüste açık kaldığı süre (toplam)"],
-      ["session", "Oturum açıkken geçen süre"],
-      ["nosession", "Oturum kapalıyken geçen süre"]
+      ["session", "Teneffüste oturumu açıkken geçen süre"],
+      ["nosession", "Teneffüste oturumu kapalı iken geçen süre"]
     ],
     BREAK_COLORS: { session: "#e8833a", idle: "#3b82c4" },
     BREAK_LIST_LIMIT: 10 // API'nin varsayılan limit'i (bkz. BreakLeagueApi)
@@ -161,6 +164,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
       const C = ankamon.ui.sessions.BreakLeague.BREAK_COLORS;
       const outTag = r => r.excluded ? `<span class="lg-outtag">lig dışı</span>` : "";
       const out = r => r.excluded ? " lg-out" : "";
+      const menuAttrs = r => ankamon.ui.sessions.LeagueExclusions.rowAttrs("board", r.host, r.board, r.excluded);
       // Tarih biçimleri Şampiyonlar Ligi ile aynı (ortak yardımcı yok: o sınıfın üyeleri; küçük kopya).
       const date = ymd => {
         const [y, m, d] = ymd.split("-").map(Number);
@@ -184,13 +188,13 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
         const scale = Math.max(...rows.map(r => r.seconds), 1);
         const podium = [1, 0, 2].filter(i => rows[i]).map(i => {
           const r = rows[i];
-          return `<div class="lg-step lg-step${i + 1}${out(r)}" title="${esc(this.__breakTip(r, i + 1))}">` +
+          return `<div class="lg-step lg-step${i + 1}${out(r)}"${menuAttrs(r)} title="${esc(this.__breakTip(r, i + 1))}">` +
             (i === 0 ? `<div class="lg-crown">🏆</div>` : "") +
             `<div class="lg-pname">${esc(r.board)}</div><div class="lg-ptime">${esc(F.duration(this.__metric(r, sort)))}</div>` +
             `<div class="lg-block" style="background:${medals[i]}">${i + 1}</div></div>`;
         }).join("");
         const bars = rows.map((r, i) =>
-          `<div class="lg-row${i === 0 ? " lg-lead" : ""}${out(r)}" title="${esc(this.__breakTip(r, i + 1))}">` +
+          `<div class="lg-row${i === 0 ? " lg-lead" : ""}${out(r)}"${menuAttrs(r)} title="${esc(this.__breakTip(r, i + 1))}">` +
           `<span class="lg-rank" ${i < 3 ? `style="background:${medals[i]};color:#fff"` : ""}>${i + 1}</span>` +
           // "%24'ü/%51'i" ekleri sayıya göre değişir (ses uyumu): eksiz yazılır.
           `<span class="lg-name">${esc(r.board)}<small>${outTag(r)}${r.days} gün · teneffüs payı %${r.break_seconds ? Math.round(r.seconds / r.break_seconds * 100) : 0}</small></span>` +
