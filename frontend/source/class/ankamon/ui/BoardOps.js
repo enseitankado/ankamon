@@ -52,16 +52,20 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const form = new ankamon.ui.Form();
       const adding = !board;
       board = board || { monitor_enabled: true, exporter_port: 9100 };
-      // Yeni tahtada takma ad ve MAC zorunlu (bkz. BoardsApi::create): MAC tahtayı ağ taramasında bulur (IP
-      // girilmezse oradan dolar), uzaktan uyandırmayı sağlar. Bilgisayar adı elle girilmez — tahtanın
+      // Yeni tahtada takma ad ve kablolu MAC zorunlu (bkz. BoardsApi::create): kablolu MAC tahtayı ağ taramasında
+      // bulur (IP girilmezse oradan dolar), uzaktan uyandırmayı sağlar. Kablosuz MAC (Wi-Fi kartı) isteğe bağlı —
+      // tahta Wi-Fi'ye bağlanınca oturum yoklaması kendiliğinden doldurur. Bilgisayar adı elle girilmez — tahtanın
       // loglarından ve donanım bilgisinden öğrenilir.
       const mark = adding ? " *" : "";
       form.text("label", "Takma ad" + mark, board.label, "ör. A Blok 2. Derslik");
       form.text("location", "Konum", board.location, "ör. B blok, 2. kat");
       form.text("ip", "IP adresi", board.ip);
-      form.text("mac", "MAC adresi" + mark, board.mac, "de:ad:de:ad:de:ad").setToolTipText(
-        "İki nokta üst üste ile ayrılmış altı onaltılık çift (ör. de:ad:de:ad:de:ad). Uzaktan uyandırma ve ağ " +
-        "taramasında tahtayı bulmak için kullanılır.");
+      form.text("mac", "Kablolu MAC" + mark, board.mac, "de:ad:de:ad:de:ad").setToolTipText(
+        "Kablolu ağ kartının MAC adresi: iki nokta üst üste ile ayrılmış altı onaltılık çift (ör. de:ad:de:ad:de:ad). " +
+        "Uzaktan uyandırma ve ağ taramasında tahtayı bulmak için kullanılır.");
+      form.text("wifi_mac", "Kablosuz MAC", board.wifi_mac, "de:ad:de:ad:de:ad").setToolTipText(
+        "Wi-Fi kartının kalıcı (fabrika) MAC adresi — isteğe bağlı. Tahta açıkken Ankamon karttan okuyup kendiliğinden " +
+        "doldurur. Tahta Wi-Fi ile bağlıyken ağ taramasında tanınmasını sağlar; uzaktan uyandırma kablolu MAC ile yapılır.");
       form.text("exporter_port", "Sensör portu", String(board.exporter_port));
       form.check("monitor_enabled", "Sensör verisi toplansın", board.monitor_enabled)
         .setToolTipText("Sensör verisi bilgisayar ağda ulaşılabilir olduğunda toplanır.");
@@ -75,11 +79,15 @@ qx.Class.define("ankamon.ui.BoardOps", {
         const values = form.values();
         values.exporter_port = parseInt(values.exporter_port, 10) || 0;
         if (adding && (!values.label || !values.mac)) {
-          ankamon.ui.Dialog.error("Takma ad ve MAC adresi zorunlu.");
+          ankamon.ui.Dialog.error("Takma ad ve kablolu MAC adresi zorunlu.");
           return;
         }
         if (values.mac && !ankamon.page.Boards.MAC_RE.test(values.mac)) {
-          ankamon.ui.Dialog.error("MAC adresi de:ad:de:ad:de:ad biçiminde olmalı.");
+          ankamon.ui.Dialog.error("Kablolu MAC adresi de:ad:de:ad:de:ad biçiminde olmalı.");
+          return;
+        }
+        if (values.wifi_mac && !ankamon.page.Boards.MAC_RE.test(values.wifi_mac)) {
+          ankamon.ui.Dialog.error("Kablosuz MAC adresi de:ad:de:ad:de:ad biçiminde olmalı.");
           return;
         }
         try {
@@ -501,7 +509,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         ankamon.io.Api.get("/boards").then(res => {
           (Array.isArray(res) ? res : (res.boards || [])).forEach(b => {
             if (boardById.has(b.id)) {
-              boardById.set(b.id, Object.assign({}, b, boardById.get(b.id), { mac: b.mac }));
+              boardById.set(b.id, Object.assign({}, b, boardById.get(b.id), { mac: b.mac, wifi_mac: b.wifi_mac }));
             }
           });
           if (!stop) {
@@ -602,8 +610,8 @@ qx.Class.define("ankamon.ui.BoardOps", {
     },
 
     /**
-     * Bilgi kartı başlığındaki tahta kimliği: kod adı (takma ad), bilgisayar adı, MAC, IP, mimari, işlemci.
-     * @param board {Map|undefined} tahta kaydı (label, hostname, mac, ip)
+     * Bilgi kartı başlığındaki tahta kimliği: kod adı (takma ad), bilgisayar adı, kablolu/kablosuz MAC, IP, mimari, işlemci.
+     * @param board {Map|undefined} tahta kaydı (label, hostname, mac — kablolu kart, wifi_mac — Wi-Fi kartı, ip)
      * @param facts {Map|null} facts (arch, cpu_model)
      * @return {String} kaçırılmış HTML
      */
@@ -611,7 +619,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const esc = qx.bom.String.escape;
       const b = board || {};
       const f = facts || {};
-      return [["Kod adı", b.label], ["Bilgisayar adı", b.hostname], ["MAC", b.mac], ["IP", b.ip],
+      return [["Kod adı", b.label], ["Bilgisayar adı", b.hostname], ["Kablolu MAC", b.mac], ["Kablosuz MAC", b.wifi_mac], ["IP", b.ip],
         ["Mimari", f.arch], ["İşlemci", f.cpu_model]]
         .filter(pair => pair[1])
         .map(([k, v]) => `${esc(k)}: <b>${esc(String(v))}</b>`)

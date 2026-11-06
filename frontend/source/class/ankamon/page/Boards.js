@@ -66,7 +66,11 @@ qx.Class.define("ankamon.page.Boards", {
       { id: "name", label: "Takma ad / Ad" },
       { id: "hostname", label: "Bilgisayar adı", width: 150 },
       { id: "ip", label: "IP", width: 120 },
-      { id: "mac", label: "MAC", width: 140 },
+      // Kablolu MAC: kablolu ağ kartının MAC'i (boards.mac — tahtanın kimliği, uzaktan uyandırma, ağ taraması).
+      // Kablosuz MAC: Wi-Fi kartının kalıcı (fabrika) MAC'i (boards.wifi_mac, göç 043 — worker oturum yoklaması
+      // yazar; NetworkManager'ın taramadaki rastgele adresi değil).
+      { id: "mac", label: "Kablolu MAC", hint: "Kablolu ağ kartının MAC adresi (uzaktan uyandırma bununla)", width: 140 },
+      { id: "wifi_mac", label: "Kablosuz MAC", hint: "Wi-Fi kartının kalıcı (fabrika) MAC adresi", width: 140 },
       // FATİH fazı (bkz. util.Format.etap — anakart modelinden, yoksa maskelenmiş MAC önekinden).
       { id: "faz", label: "Faz", hint: "FATİH fazı ve tahta markası", width: 130 },
       // Anlık oturum (bkz. worker executor/session_probe.py — 30 sn'de bir SSH ile yoklanır; Oturum aç/
@@ -397,7 +401,7 @@ qx.Class.define("ankamon.page.Boards", {
             board.id, wasChecked.has(board.id),
             board.online ? "Çevrimiçi" : "Kapalı",
             board.label || board.hostname || board.ip,
-            board.hostname, board.ip, board.mac, F.etap(board.etap),
+            board.hostname, board.ip, board.mac, board.wifi_mac || "", F.etap(board.etap),
             ankamon.page.Boards.sessionText(board),
             (ankamon.ui.FactsView.wifiStatus(board.facts) || { text: "" }).text,
             ankamon.page.Boards.cableText(board),

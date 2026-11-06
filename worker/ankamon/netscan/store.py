@@ -99,11 +99,16 @@ def scannable(conn, detected: list[dict]) -> list[dict]:
 
 
 def _boards(conn) -> dict[str, dict]:
+    """MAC → tahta. boards.mac kablolu kartın MAC'i; Wi-Fi kartının kalıcı MAC'i (wifi_mac, göç 043) de aynı
+    tahtaya düşer — tahta ağa Wi-Fi ile de çıkabilir. Aynı adres iki tahtada varsa kablolu eşleşme kazanır."""
     rows = conn.execute(
-        "SELECT mac::text AS mac, coalesce(nullif(label, ''), hostname, '') AS name, hostname,"
-        " coalesce(facts->>'motherboard_model', '') AS model FROM boards WHERE mac IS NOT NULL"
+        "SELECT mac::text AS mac, wifi_mac::text AS wifi_mac, coalesce(nullif(label, ''), hostname, '') AS name,"
+        " hostname, coalesce(facts->>'motherboard_model', '') AS model FROM boards"
+        " WHERE mac IS NOT NULL OR wifi_mac IS NOT NULL"
     ).fetchall()
-    return {r["mac"]: r for r in rows}
+    out = {r["wifi_mac"]: r for r in rows if r["wifi_mac"]}
+    out.update({r["mac"]: r for r in rows if r["mac"]})
+    return out
 
 
 def known_ips(conn, network_id: int) -> list[str]:
@@ -205,7 +210,7 @@ def fill_labels(conn) -> int:
         """UPDATE net_devices d SET label = b.label
            FROM boards b
            WHERE d.label = '' AND coalesce(b.label, '') <> ''
-             AND (d.mac = b.mac OR (b.mac IS NULL AND b.ip IS NOT NULL AND d.ip = b.ip))
+             AND (d.mac = b.mac OR d.mac = b.wifi_mac OR (b.mac IS NULL AND b.ip IS NOT NULL AND d.ip = b.ip))
            RETURNING d.label"""
     ).fetchall()
     rows += conn.execute(
@@ -228,11 +233,19 @@ def fill_labels(conn) -> int:
 
 
 def fill_board_ips(conn) -> int:
-    """IP'si olmayan tahtalara (Tahta ekle'de yalnız MAC girilmiş) ağ taramasının o MAC için bulduğu adres."""
+    """IP'si olmayan tahtalara (Tahta ekle'de yalnız MAC girilmiş) ağ taramasının o MAC için bulduğu adres:
+    önce kablolu MAC (boards.mac), bulunamazsa Wi-Fi kartının MAC'i (boards.wifi_mac — tahta yalnız Wi-Fi ile
+    bağlıysa)."""
     rows = conn.execute(
         """UPDATE boards b SET ip = d.ip, updated_at = now()
            FROM net_devices d
            WHERE b.ip IS NULL AND b.mac = d.mac AND d.ip IS NOT NULL
+           RETURNING b.id"""
+    ).fetchall()
+    rows += conn.execute(
+        """UPDATE boards b SET ip = d.ip, updated_at = now()
+           FROM net_devices d
+           WHERE b.ip IS NULL AND b.wifi_mac = d.mac AND d.ip IS NOT NULL
            RETURNING b.id"""
     ).fetchall()
     if rows:
@@ -270,7 +283,9 @@ def update_etap(conn) -> int:
     for dev in conn.execute(
             """SELECT d.id, d.mac::text AS mac, d.etap, d.type_auto, d.model_auto,
                       b.facts->>'motherboard_model' AS mb
-               FROM net_devices d LEFT JOIN boards b ON b.mac = d.mac""").fetchall():
+               FROM net_devices d LEFT JOIN boards b ON b.id = (
+                   SELECT x.id FROM boards x WHERE x.mac = d.mac OR x.wifi_mac = d.mac
+                   ORDER BY (x.mac = d.mac) IS TRUE DESC, x.id LIMIT 1)""").fetchall():
         value = _etap_value(etap_phase.resolve(dev["mac"], dev["mb"]))
         sets, args = [], []
         if value != dev["etap"]:
@@ -379,7 +394,7 @@ def next_shares_target(conn, rescan_hours: int, requested_only: bool) -> dict | 
         " OR d.shares_scanned_at < now() - make_interval(hours => %s))")
     return conn.execute(
         f"""SELECT d.id, host(d.ip) AS ip, d.mac::text AS mac, d.hostname,
-                  EXISTS (SELECT 1 FROM boards b WHERE b.mac = d.mac OR b.ip = d.ip) AS is_board
+                  EXISTS (SELECT 1 FROM boards b WHERE b.mac = d.mac OR b.wifi_mac = d.mac OR b.ip = d.ip) AS is_board
            FROM net_devices d JOIN net_networks n ON n.id = d.network_id
            WHERE {_SHARE_CAND} AND {cond}
            ORDER BY d.shares_requested_at DESC NULLS LAST, d.shares_scanned_at NULLS FIRST, d.id

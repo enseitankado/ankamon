@@ -532,6 +532,7 @@ qx.Class.define("ankamon.ui.FactsView", {
 
       section("Kablolu ağ");
       row("Arayüz", f.eth_iface ? join(f.eth_iface, f.eth_chip) : null);
+      row("Kablolu MAC", f.eth_mac);
       row("Durum", f.eth_state
         ? { html: this.__badge(join(f.eth_state === "up" ? "Bağlı" : "Bağlı değil", f.eth_speed_mbps ? `${f.eth_speed_mbps} Mbit/sn` : null),
           f.eth_state === "up" ? "ok" : "idle") }
@@ -546,7 +547,8 @@ qx.Class.define("ankamon.ui.FactsView", {
         row("Wi-Fi", status ? { html: this.__badge(status.text, status.kind) } : null);
         row("Kart", f.wifi_chip);
         row("Arayüz / sürücü", join(f.wifi_iface, f.wifi_driver));
-        row("MAC adresi", f.wifi_mac);
+        // Kartın kalıcı (fabrika) adresi (bkz. worker hwfacts.py WIFI_MAC — taramadaki rastgele adres değil).
+        row("Kablosuz MAC", f.wifi_mac);
         const state = this.WIFI_STATE[f.wifi_state] || f.wifi_state;
         if (f.wifi_state === "connected") {
           row("Durum", {

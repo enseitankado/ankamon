@@ -121,12 +121,14 @@ def probe(board: dict, user: str, password: str, timeout: int = 8) -> dict:
 
 def store_extras(conn, board_id: int, res: dict) -> None:
     """Ağ arabirimleri, otomatik kapatma ve ekran kilidi durumunu yazar (bkz. göç 026, 035; None =
-    bilinmiyor/yok)."""
+    bilinmiyor/yok). Wi-Fi kartının kalıcı MAC'i okunduysa Tahtalar ▸ Kablosuz MAC'e (boards.wifi_mac, göç 043)
+    de yazılır — donanımdan okunan değer elle girileni günceller; kart okunamadıysa eski değer kalır."""
     conn.execute(
-        "UPDATE boards SET netifs = %s::jsonb, autoshutdown = %s::jsonb, screen_locked = %s, input_locks = %s WHERE id = %s",
+        "UPDATE boards SET netifs = %s::jsonb, autoshutdown = %s::jsonb, screen_locked = %s, input_locks = %s,"
+        " wifi_mac = COALESCE(%s::macaddr, wifi_mac) WHERE id = %s",
         (json.dumps(res.get("netifs")) if res.get("netifs") else None,
          json.dumps(res.get("shutdown")) if res.get("shutdown") else None,
-         bool(res.get("screen_locked")), res.get("input_locks") or [], board_id))
+         bool(res.get("screen_locked")), res.get("input_locks") or [], netif.wifi_mac(res.get("netifs")), board_id))
 
 
 def store_screen_lock(conn, board_id: int, locked: bool) -> None:

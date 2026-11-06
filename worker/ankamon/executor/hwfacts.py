@@ -42,6 +42,8 @@ import os
 import re
 import subprocess
 
+from . import netif
+
 CACHE_SECONDS = 3600  # "Bilgi kartı" aynı tahtaya bu süre içinde tekrar bağlanmaz.
 
 # Kurallar (gerçek ETAP tahtalarında gözlenenler):
@@ -124,6 +126,7 @@ for d in /sys/class/net/*; do
 done
 if [ -n "$eth" ]; then
     echo "ETH_IFACE=$eth"
+    echo "ETH_MAC=$(cat /sys/class/net/$eth/address 2>/dev/null)"
     echo "ETH_STATE=$(cat /sys/class/net/$eth/operstate 2>/dev/null)"
     echo "ETH_SPEED=$(cat /sys/class/net/$eth/speed 2>/dev/null | awk '$1>0{printf "%.0f", $1}')"
     echo "ETH_IP=$(ip -o -4 addr show dev $eth 2>/dev/null | awk '{print $4; exit}')"
@@ -131,7 +134,9 @@ if [ -n "$eth" ]; then
 fi
 if [ -n "$wifi" ]; then
     echo "WIFI_IFACE=$wifi"
-    echo "WIFI_MAC=$(cat /sys/class/net/$wifi/address 2>/dev/null)"
+    # Kalıcı (fabrika) adres: /sys/class/net/<wlan>/address NetworkManager taramasında rastgele olabilir.
+    wmac=$(cat /sys/class/net/$wifi/phy80211/macaddress 2>/dev/null)
+    echo "WIFI_MAC=${wmac:-$(cat /sys/class/net/$wifi/address 2>/dev/null)}"
     echo "WIFI_DRIVER=$(basename "$(readlink /sys/class/net/$wifi/device/driver 2>/dev/null)" 2>/dev/null)"
     dev=$(readlink -f /sys/class/net/$wifi/device)
     chip=$(lspci -s "$(basename "$dev")" 2>/dev/null | sed 's/^[^ ]* [^:]*: //')
@@ -260,6 +265,7 @@ _FIELDS = {
     "TIHA_VERSION": "tiha_version",
     "TIHA_PREPARED_AT": "tiha_prepared_at",
     "ETH_IFACE": "eth_iface",
+    "ETH_MAC": "eth_mac",
     "ETH_STATE": "eth_state",
     "ETH_SPEED": "eth_speed_mbps",
     "ETH_IP": "eth_ip",
@@ -675,8 +681,9 @@ def store(conn, board_id: int, facts: dict, ts: int) -> None:
     yazar. Yalnız _FIELDS alanları yazılır; eski sürümden kalan, artık toplanmayan anahtar yoktur."""
     data = {field: facts.get(field) for field in _ALL_FIELDS}
     data["hw_collected_at"] = ts
-    conn.execute("UPDATE boards SET facts = facts || %s::jsonb WHERE id = %s",
-                 (json.dumps(data, ensure_ascii=False), board_id))
+    # Wi-Fi kartının kalıcı MAC'i Tahtalar ▸ Kablosuz MAC'e de (boards.wifi_mac, göç 043; rastgele adres yazılmaz).
+    conn.execute("UPDATE boards SET facts = facts || %s::jsonb, wifi_mac = COALESCE(%s::macaddr, wifi_mac) WHERE id = %s",
+                 (json.dumps(data, ensure_ascii=False), netif.permanent_mac(data.get("wifi_mac")), board_id))
 
 
 # Wi-Fi radyosunu değiştiren hazır işlemler (actions/<id>) → işlemden sonraki radyo durumu.

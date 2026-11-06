@@ -107,7 +107,10 @@ final class NetworkApi
                               FROM net_shares sh WHERE sh.device_id = d.id), '[]') AS shares
              FROM net_devices d
              JOIN net_networks n ON n.id = d.network_id
-             LEFT JOIN boards b ON b.mac = d.mac
+             -- Cihaz bir tahtaya ait mi: kablolu MAC (boards.mac) ya da Wi-Fi kartının MAC'i (boards.wifi_mac, göç 043);
+             -- aynı adres iki kayıtta varsa kablolu eşleşme önce.
+             LEFT JOIN boards b ON b.id = (SELECT x.id FROM boards x WHERE x.mac = d.mac OR x.wifi_mac = d.mac
+                                           ORDER BY (x.mac = d.mac) IS TRUE DESC, x.id LIMIT 1)
              -- MAC ↔ takma ad kaydı (göç 016; okul envanterinden): grid'in Takma ad sütunu.
              LEFT JOIN net_known_aliases k ON k.mac = d.mac
              WHERE (? = 0 OR d.network_id = ?)

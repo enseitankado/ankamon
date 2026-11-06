@@ -42,7 +42,9 @@ final class BoardsApi
 {
     // facts'in disk/UEFI ayrıntıları (tahta başına ~20 KB — bkz. worker executor/hwfacts.py _DETAIL_FIELDS)
     // listeye konmaz: grid her yenilemede bunları taşımasın; Bilgi kartı "facts" görevinden okur.
-    private const COLUMNS = "b.id, b.hostname, b.mac::text AS mac, host(b.ip) AS ip, b.label, b.location, b.notes,
+    // mac = KABLOLU kartın MAC'i (tahtanın kimliği, WoL, ağ taraması — sütun adı tarihsel), wifi_mac = Wi-Fi kartının
+    // kalıcı MAC'i (göç 043; worker oturum yoklaması/donanım bilgisi yazar, elle de girilebilir).
+    private const COLUMNS = "b.id, b.hostname, b.mac::text AS mac, b.wifi_mac::text AS wifi_mac, host(b.ip) AS ip, b.label, b.location, b.notes,
         b.source, b.monitor_enabled, b.exporter_port, b.online,
         b.ssh_ok, b.exporter_ok, b.facts - '{disk_layout,firmware_boot,uefi_vars}'::text[] AS facts, b.etap,
         b.session_username, b.session_locked, extract(epoch FROM b.session_checked_at)::bigint AS session_checked_at,
@@ -89,23 +91,25 @@ final class BoardsApi
     public function create(Request $request, array $user): array
     {
         $fields = self::validatedBoardFields($request);
-        // Takma ad ve MAC zorunlu (Tahta ekle penceresi): MAC tahtayı ağ taramasında bulur ve uzaktan uyandırmayı
-        // sağlar; bilgisayar adı elle girilmez (loglardan / donanım bilgisinden öğrenilir).
+        // Takma ad ve kablolu MAC zorunlu (Tahta ekle penceresi): kablolu MAC tahtayı ağ taramasında bulur ve uzaktan
+        // uyandırmayı sağlar (WoL kablolu kartla; Wi-Fi WoL tahtalarda genelde çalışmaz); kablosuz MAC isteğe bağlı.
+        // Bilgisayar adı elle girilmez (loglardan / donanım bilgisinden öğrenilir).
         if (($fields['label'] ?? '') === '') {
             throw ApiError::badRequest('Takma ad gerekli.');
         }
         if (empty($fields['mac'])) {
-            throw ApiError::badRequest('MAC adresi gerekli (de:ad:de:ad:de:ad).');
+            throw ApiError::badRequest('Kablolu MAC adresi gerekli (de:ad:de:ad:de:ad).');
         }
         if (Db::value('SELECT 1 FROM boards WHERE mac = ?', [$fields['mac']])) {
-            throw ApiError::badRequest('Bu MAC adresiyle kayıtlı bir tahta zaten var.');
+            throw ApiError::badRequest('Bu kablolu MAC adresiyle kayıtlı bir tahta zaten var.');
         }
-        // IP girilmediyse ağ taramasının bu MAC için bildiği adres (yoksa tarama sonunda dolar — bkz.
-        // worker netscan/store.py fill_board_ips).
+        // IP girilmediyse ağ taramasının bu MAC için bildiği adres — önce kablolu, yoksa kablosuz MAC (yoksa tarama
+        // sonunda dolar — bkz. worker netscan/store.py fill_board_ips).
         if (empty($fields['ip'])) {
             $fields['ip'] = Db::value(
-                'SELECT host(ip) FROM net_devices WHERE mac = ? AND ip IS NOT NULL ORDER BY last_seen_at DESC NULLS LAST LIMIT 1',
-                [$fields['mac']]
+                'SELECT host(ip) FROM net_devices WHERE (mac = ? OR mac = ?) AND ip IS NOT NULL
+                  ORDER BY mac = ? DESC, last_seen_at DESC NULLS LAST LIMIT 1',
+                [$fields['mac'], $fields['wifi_mac'] ?? $fields['mac'], $fields['mac']]
             );
         }
         $fields['source'] = 'manual';
@@ -244,12 +248,15 @@ final class BoardsApi
             }
             $fields['ip'] = $ip === '' ? null : $ip;
         }
-        if ($request->has('mac')) {
-            $mac = strtolower(trim((string) $request->input('mac')));
-            if ($mac !== '' && !preg_match('/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/', $mac)) {
-                throw ApiError::badRequest('Geçersiz MAC adresi: de:ad:de:ad:de:ad biçiminde olmalı.');
+        // mac: kablolu kartın MAC'i; wifi_mac: Wi-Fi kartının MAC'i (isteğe bağlı) — aynı biçim denetimi.
+        foreach (['mac' => 'Kablolu', 'wifi_mac' => 'Kablosuz'] as $key => $kind) {
+            if ($request->has($key)) {
+                $mac = strtolower(trim((string) $request->input($key)));
+                if ($mac !== '' && !preg_match('/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/', $mac)) {
+                    throw ApiError::badRequest("Geçersiz $kind MAC adresi: de:ad:de:ad:de:ad biçiminde olmalı.");
+                }
+                $fields[$key] = $mac === '' ? null : $mac;
             }
-            $fields['mac'] = $mac === '' ? null : $mac;
         }
         if ($request->has('monitor_enabled')) {
             $fields['monitor_enabled'] = (bool) $request->input('monitor_enabled');

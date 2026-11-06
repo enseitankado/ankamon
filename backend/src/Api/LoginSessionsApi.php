@@ -75,7 +75,8 @@ final class LoginSessionsApi
              ) pc ON true
              LEFT JOIN LATERAL (
                SELECT coalesce(
-                 (SELECT nullif(b.label, '') FROM boards b WHERE b.mac = pc.mac AND b.label <> '' LIMIT 1),
+                 (SELECT nullif(b.label, '') FROM boards b WHERE (b.mac = pc.mac OR b.wifi_mac = pc.mac) AND b.label <> ''
+                   ORDER BY (b.mac = pc.mac) IS TRUE DESC LIMIT 1),
                  (SELECT nullif(d.label, '') FROM net_devices d WHERE d.mac = pc.mac AND d.label <> ''
                    ORDER BY d.last_seen_at DESC NULLS LAST LIMIT 1),
                  (SELECT k.label FROM net_known_aliases k WHERE k.mac = pc.mac)) AS alias

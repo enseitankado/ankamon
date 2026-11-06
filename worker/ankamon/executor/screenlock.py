@@ -53,7 +53,7 @@ açılınca pencere en üstte görünse de ekrana çizilmiyordu (Arge 1'de 2026-
 pencere bileşim durumu değişince kapanır, bekçi onu hemen yeniden açar.
 
 Kilit yazısının altında tahtanın kimliği (info.json, kilitlerken Ankamon'daki kayıttan): takma ad (kod adı)
-büyükçe, altında bilgisayar adı, ETAP modeli/fazı, MAC ve IP — kilitli tahtayı bulmak/bildirmek için.
+büyükçe, altında bilgisayar adı, ETAP modeli/fazı, kablolu/kablosuz MAC ve IP — kilitli tahtayı bulmak/bildirmek için.
 
 Oturum yoklaması (executor/session_probe.py) SCRIPT'teki "L" satırıyla kilit durumunu okur
 (boards.screen_locked — göç 035); Tahtalar grid'inin "Oturum" hücresi "… / Kilitli" yazar.
@@ -425,7 +425,8 @@ if [ -n "$was" ]; then echo "Ekran kilidi açıldı."; else echo "Tahtada ekran 
 def identities(conn, board_ids: list[int]) -> dict[int, dict]:
     """Kilit ekranında yazacak kimlik: {board_id: {"code", "rows": [[ad, değer], …]}} (boş değerler atlanır)."""
     rows = conn.execute(
-        "SELECT id, label, hostname, mac::text AS mac, host(ip) AS ip, etap FROM boards WHERE id = ANY(%s)",
+        "SELECT id, label, hostname, mac::text AS mac, wifi_mac::text AS wifi_mac, host(ip) AS ip, etap"
+        " FROM boards WHERE id = ANY(%s)",
         (board_ids,)).fetchall()
     out = {}
     for r in rows:
@@ -437,7 +438,8 @@ def identities(conn, board_ids: list[int]) -> dict[int, dict]:
                                             f"Faz {etap['faz']}" if etap.get("faz") else "") if x)
         out[r["id"]] = {"code": (r["label"] or "").strip(),
                         "rows": [["Bilgisayar adı", r["hostname"] or ""], ["ETAP", model],
-                                 ["MAC", (r["mac"] or "").upper()], ["IP", r["ip"] or ""]]}
+                                 ["Kablolu MAC", (r["mac"] or "").upper()],
+                                 ["Kablosuz MAC", (r["wifi_mac"] or "").upper()], ["IP", r["ip"] or ""]]}
     return out
 
 
