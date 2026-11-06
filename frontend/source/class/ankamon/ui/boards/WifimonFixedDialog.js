@@ -34,7 +34,7 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
   type: "static",
 
   statics: {
-    KIND_LABEL: { ssid: "Ağ adı (bütün erişim noktaları)", bssid: "Erişim noktası", bt: "Bluetooth", probe: "Yoklama yapan cihaz" },
+    KIND_LABEL: { ssid: "Ağ adı (bütün erişim noktaları)", bssid: "Erişim noktası", bt: "Bluetooth", probe: "Wi-Fi cihazı (ağ arayan / bağlı)" },
 
     /**
      * @param getFixed {Function} () → güncel sabit listesi

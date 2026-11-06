@@ -34,7 +34,8 @@ Program /run/ankamon-wifimon/prog.sh olarak yazılıp sh (dash) ile çalışır.
   gelen stdin kalp atışını okur: EOF (SSH koptu, durdurma istendi), LEASE saniye sessizlik (ağ koptu) ya da ana sürecin ölmesi
   (kill -9) durumunda devreye girer. stdout'u /dev/null'dur; SSH oturumunu açık tutmaz.
 - Bluetooth: /sys/class/bluetooth/hci* varsa rfkill, servis ve güç açısından gerekirse geçici açılır, durum aynı şekilde döner. Yoksa atlanır.
-- Yoklama dinleme (PROBE=1, bkz. wifimon_probe_sniffer.py): Wi-Fi kartı BAĞLI DEĞİLSE (durum 20/30) kart NetworkManager'dan geçici
+- Wi-Fi trafiği dinleme (PROBE=1, bkz. wifimon_probe_sniffer.py — yoklamalar ve bağlı cihazlar; dinleyiciye son taramanın
+  listesi $TMP verilir, AP'lerin kanalları da dinlenir): Wi-Fi kartı BAĞLI DEĞİLSE (durum 20/30) kart NetworkManager'dan geçici
   bırakılır (`managed no`, çalışma zamanı ayarı; açılışta kendiliğinden döner), arabirim indirilir, monitör kipinde ankamon-mon0
   eklenir ve dinlenir; sonra arabirim silinir, kart yeniden `managed yes` olur (autoconnect "no" korunur, Arge 2'de denendi).
   Kart bağlıysa ya da bağlanıyorsa dinlenmez (bağlantı kesilirdi). Aynı tahtada tek oturum dinler (flock -n). Geri alma işaretli
@@ -165,7 +166,7 @@ probe_sniff() {
   echo "$W_DEV $ME" > "$D/unmanaged"
   if n device set "$W_DEV" managed no >/dev/null && ip link set "$W_DEV" down 2>/dev/null &&
      iw phy "$phy" interface add "$MON" type monitor >/dev/null 2>&1 && ip link set "$MON" up 2>/dev/null; then
-    timeout $(($1+5)) python3 "$D/probe.py" "$MON" "$1" > "$PTMP" & CUR=$!; wait $CUR; CUR=
+    timeout $(($1+5)) python3 "$D/probe.py" "$MON" "$1" "$TMP" > "$PTMP" & CUR=$!; wait $CUR; CUR=
   else
     PROBE_NOTE=monfail
   fi

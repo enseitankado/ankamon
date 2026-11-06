@@ -37,8 +37,11 @@ Sunucu iletileri, `phase` alanıyla:
   scanning {info}: tarama başladı.
   data {radio, device, state, connection, rows: [{kind: wifi|bt, name, addr, signal, chan, freq, rate, security, active,
         random, vendor, hints, phone: yes|maybe|"", first_seen, seen_days}], info, at}.
-  probes {rows: [{kind: probe, addr, signal, rssi, count, fp, ssids, random, vendor, hints, phone, first_seen, seen_days}],
-        devices (kestirilen cihaz sayısı), note (boşsa dinlendi: nodev|tools|radio|busy|nomon|shared|monfail), secs, at}.
+  probes {rows: [{kind: probe, addr, signal, rssi, count, fp, ssids, random, vendor, hints, phone, first_seen, seen_days}
+        | {kind: client (Wi-Fi'ye bağlı cihaz), addr, bssid, name (bağlı olduğu ağ adı), chan, signal, rssi, count, random,
+           vendor, board_name (adres bir tahtanın kablolu/kablosuz MAC'iyse), hints, phone, first_seen, seen_days}],
+        devices (yoklama yapan kestirilen cihaz sayısı), clients (bağlı cihaz sayısı),
+        note (boşsa dinlendi: nodev|tools|radio|busy|nomon|shared|monfail), secs, at}.
   done {result: restored|shared|none|fail|lock, radio, policy (off: tahtada "Wi-Fi'yi kapat" kuralı var), wifi_temp, wifi_fail, bt}:
         geri yükleme sonucu (radyo durumu boards.facts'e de yazılır), ardından kapanış 1000.
 info: {wifi_temp: "0"|"1", wifi_fail, bt: absent|on|temp|fail:<neden>, disconnected}.
@@ -142,33 +145,68 @@ def parse(sections: dict) -> dict:
 
 
 def parse_probes(sections: dict) -> dict:
-    """@@PROBE (dinleyicinin JSON satırları) → probes iletisi. Cihaz kestirimi: kalıcı adres başına bir cihaz, rastgele
-    adresler parmak izine (fp) göre birleşir (aynı cihazın değişen adresleri çoğunlukla aynı fp'yi taşır)."""
-    rows = []
+    """@@PROBE (dinleyicinin JSON satırları) → probes iletisi. Yoklama cihaz kestirimi: kalıcı adres başına bir cihaz, rastgele
+    adresler parmak izine (fp) göre birleşir (aynı cihazın değişen adresleri çoğunlukla aynı fp'yi taşır). Bağlı cihazlar
+    (t: "c") ayrı satırlar: telefonun ağ başına rastgele adresi o ağda sabit kaldığından adres başına bir cihaz sayılır."""
+    rows, clients = [], []
     for line in sections.get("PROBE", []):
         try:
             e = json.loads(line)
         except ValueError:
             continue
         rssi = e.get("rssi")
+        if e.get("t") == "c":
+            clients.append({"kind": "client", "addr": str(e.get("addr", "")).upper(), "bssid": str(e.get("bssid", "")).upper(),
+                            "name": str(e.get("ssid") or ""), "chan": str(e.get("chan") or ""), "rssi": rssi,
+                            "signal": rssi_to_percent(rssi) if isinstance(rssi, int) else None, "count": int(e.get("count") or 0),
+                            "freq": "", "rate": "", "security": "", "active": False})
+            continue
         rows.append({"kind": "probe", "addr": str(e.get("addr", "")).upper(), "name": ", ".join(e.get("ssids") or []),
                      "ssids": e.get("ssids") or [], "rssi": rssi, "signal": rssi_to_percent(rssi) if isinstance(rssi, int) else None,
                      "count": int(e.get("count") or 0), "fp": str(e.get("fp") or ""), "chan": "", "freq": "", "rate": "",
                      "security": "", "active": False})
     for row in rows:
         wifimon_phone_hints.annotate_probe(row)
+    for row in clients:
+        wifimon_phone_hints.annotate_client(row)
     devices = len({r["addr"] for r in rows if not r["random"]}) + len({r["fp"] for r in rows if r["random"]})
     info = _keyvals(sections.get("PROBEINFO", []))
+    rows += clients
     rows.sort(key=lambda r: -(r["signal"] if r["signal"] is not None else -1))
-    return {"phase": "probes", "rows": rows, "devices": devices, "note": info.get("note", ""),
+    return {"phase": "probes", "rows": rows, "devices": devices, "clients": len(clients), "note": info.get("note", ""),
             "secs": int(info["secs"]) if info.get("secs", "").isdigit() else None, "at": int(time.time())}
 
 
 def _wifimon_build(parser, board_id: int, sections: dict) -> dict:
     """İş parçacığında: ayrıştırma (ilk çağrıda ~8 MB'lık üretici tablosu yüklenir) + görülme geçmişi (veritabanı)."""
     data = parser(sections)
+    _wifimon_mark_boards(data["rows"])
     wifimon_sightings.record_and_annotate(board_id, data["rows"])
     return data
+
+
+def _wifimon_mark_boards(rows: list[dict]) -> None:
+    """Wi-Fi'ye bağlı ya da ağ arayan cihaz bir tahtanın kendisiyse (boards.mac kablolu, boards.wifi_mac kablosuz — göç 043)
+    satıra board_name eklenir: arayüz onu sabit sayar (sınıftaki telefon değil, komşu tahta). Hata izlemeyi durdurmaz."""
+    devices = [r for r in rows if r["kind"] in ("client", "probe") and not r.get("random")]
+    if not devices:
+        return
+    try:
+        with db.connect() as conn:
+            got = conn.execute(
+                """SELECT upper(m) AS mac, coalesce(nullif(b.label, ''), b.hostname, '#' || b.id) AS name
+                   FROM boards b, unnest(ARRAY[b.mac::text, b.wifi_mac::text]) AS m
+                   WHERE m IS NOT NULL AND upper(m) = ANY(%s::text[])""",
+                ([r["addr"] for r in devices],)).fetchall()
+    except Exception as exc:
+        log.warning("Wi-Fi Monitör tahta MAC eşlemesi yapılamadı: %s", exc)
+        return
+    names = {g["mac"]: g["name"] for g in got}
+    for row in devices:
+        name = names.get(row["addr"])
+        if name:
+            row["board_name"], row["phone"] = name, ""
+            row["hints"] = [f"Ankamon tahtası ({name})"]
 
 
 def _store_radio(board_id: int, radio: str, state: str | None = None) -> None:

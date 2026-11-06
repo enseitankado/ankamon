@@ -23,26 +23,39 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Wi-Fi Monitör: tahtada çalışan Wi-Fi yoklama (probe request) dinleyicisi (bkz. wifi_remote_scan.py, wifi.py).
+"""Wi-Fi Monitör: tahtada çalışan Wi-Fi dinleyicisi — yoklamalar ve bağlı cihazlar (bkz. wifi_remote_scan.py, wifi.py).
 
-Bağlı olmayan ama Wi-Fi'si açık telefonlar çevredeki ağları aramak için ara ara "probe request" yayar; tahtanın kartı monitör
-kipindeki ek bir arabirimle (ankamon-mon0) bunları duyar. Program /run/ankamon-wifimon/probe.py olarak yazılır, tahtanın kendi
-python3'ü ile (yalnız standart kitaplık) çalışır: AF_PACKET ham soket, radiotap başlığından sinyal (dBm), 802.11 yönetim
-çerçevesinden gönderen adres ve aranan ağ adları. 2,4 GHz kanal 1/6/11 arasında gezinir (telefonların tam taraması her
-kanalı dolaştığından bir kanal yeterli olur; kısmi taramalar için üçü).
+Tahtanın kartı monitör kipindeki ek bir arabirimle (ankamon-mon0) o an ayarlı kanaldaki bütün 802.11 çerçevelerini duyar;
+program bunlardan üç türü kullanır:
+- Yoklama (probe request): bağlı olmayan ama Wi-Fi'si açık cihazlar çevredeki ağları aramak için ara ara yayar.
+- Bağlı cihazın gönderdiği veri çerçevesi (ToDS=1, FromDS=0; boş "null data" dahil): bir erişim noktasına BAĞLI cihaz.
+  Yalnız cihazın kendi gönderdiği çerçeve sayılır — sinyal cihazın sinyalidir (yakınlık ipucu). AP'nin cihaza gönderdiği
+  çerçeve (FromDS) sayılmaz: cihaz AP'nin kapsamında herhangi bir yerde (başka kat) olabilir. İçerik şifrelidir, okunmaz;
+  yalnız başlıktaki adresler (cihaz, AP) kullanılır.
+- Beacon: BSSID → ağ adı (bağlı cihazın hangi ağa bağlı olduğunu adlandırmak için).
+Program /run/ankamon-wifimon/probe.py olarak yazılır, tahtanın kendi python3'ü ile (yalnız standart kitaplık) çalışır: AF_PACKET
+ham soket, radiotap başlığından sinyal (dBm).
 
-Çıktı: her gönderen adres için bir JSON satırı {addr, rssi (en güçlü, dBm), count, fp, ssids}. `fp`, çerçevedeki bilgi
-öğelerinin (desteklenen hızlar, HT/VHT/genişletilmiş yetenekler, üretici öğelerinin OUI'si) özetidir: rastgele adres
-kullanan aynı cihazın yoklamaları çoğunlukla aynı `fp`yi taşır, cihaz sayısı kestirimi buna dayanır (bkz. wifi.py).
+Kanal planı: 2,4 GHz 1/6/11 (yoklama için yeterli: telefonların tam taraması her kanalı dolaşır) + son taramada (nmcli
+listesi, 3. argüman) yakın AP'lerin bulunduğu en kalabalık 4 kanal (5 GHz dahil) — bağlı cihaz yalnız AP'sinin kanalında duyulur.
+Kartın ayarlayamadığı kanal (desteklemiyor/yasaklı) turdan düşer. Her kanalda 1 sn.
+
+Çıktı (JSON satırları):
+  {t: "p", addr, rssi (en güçlü, dBm), count, fp, ssids} — yoklama yapan adres başına. `fp`, çerçevedeki bilgi öğelerinin
+    (desteklenen hızlar, HT/VHT/genişletilmiş yetenekler, üretici öğelerinin OUI'si) özetidir: rastgele adres kullanan aynı
+    cihazın yoklamaları çoğunlukla aynı `fp`yi taşır, cihaz sayısı kestirimi buna dayanır (bkz. wifi.py).
+  {t: "c", addr, bssid, ssid, chan, rssi, count} — bağlı cihaz başına. Bozuk çerçeveden doğan hayalet adresleri elemek için
+    AP'si bilinen (taramada/beacon'da görülen) ya da en az 2 çerçevesi duyulan cihazlar yazılır; AP adresleri cihaz sayılmaz.
 """
 
 from __future__ import annotations
 
 WIFIMON_PROBE_SNIFFER_SOURCE = r'''
-import hashlib, json, socket, struct, subprocess, sys, time
+import hashlib, json, re, socket, struct, subprocess, sys, time
 
 MON, SECS = sys.argv[1], float(sys.argv[2])
-CHANNELS = (1, 6, 11)
+LIST = sys.argv[3] if len(sys.argv) > 3 else ""
+BASE_CHANNELS = [1, 6, 11]
 FP_IDS = (1, 45, 50, 59, 70, 107, 127, 191, 255)
 ALIGN = {0: (8, 8), 1: (1, 1), 2: (1, 1), 3: (2, 4), 4: (1, 2)}
 
@@ -93,18 +106,42 @@ def ssid(ies):
     return ""
 
 
+def channel_plan(path):
+    """nmcli -t listesi (IN-USE:BSSID:SSID:CHAN:FREQ:RATE:SIGNAL:SECURITY, ':' kaçışlı) → kanallar ve BSSID → ağ adı."""
+    names, extra = {}, {}
+    try:
+        lines = open(path, encoding="utf-8", errors="replace").read().splitlines() if path else []
+    except OSError:
+        lines = []
+    for line in lines:
+        f = [p.replace("\\:", ":").replace("\\\\", "\\") for p in re.split(r"(?<!\\):", line)]
+        if len(f) < 7 or not f[1]:
+            continue
+        names[f[1].lower()] = f[2]
+        if f[3].isdigit() and int(f[3]) not in BASE_CHANNELS and f[6].isdigit() and int(f[6]) >= 25:
+            extra[int(f[3])] = extra.get(int(f[3]), 0) + 1
+    busiest = [ch for ch, _ in sorted(extra.items(), key=lambda kv: -kv[1])][:4]
+    return BASE_CHANNELS + busiest, names
+
+
+channels, ap_names = channel_plan(LIST)
 s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3))
 s.bind((MON, 0))
 s.settimeout(0.3)
-seen = {}
+probes, clients = {}, {}
 end = time.time() + SECS
-hop, ci = 0.0, 0
+hop, ci, chan = 0.0, 0, None
 while time.time() < end:
     now = time.time()
     if now >= hop:
-        subprocess.call(["iw", "dev", MON, "set", "channel", str(CHANNELS[ci % len(CHANNELS)])],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        ci, hop = ci + 1, now + 1.0
+        while channels:
+            want = channels[ci % len(channels)]
+            if subprocess.call(["iw", "dev", MON, "set", "channel", str(want)],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0:
+                chan, ci = want, ci + 1
+                break
+            channels.remove(want)  # kart bu kanalı ayarlayamıyor: turdan düşer
+        hop = now + 1.0
     try:
         d = s.recv(4096)
     except socket.timeout:
@@ -113,19 +150,45 @@ while time.time() < end:
     if flags & 0x40:
         continue
     f = d[rlen:-4] if flags & 0x10 else d[rlen:]
-    if len(f) < 24 or f[0] != 0x40:
+    if len(f) < 24:
+        continue
+    fc0, fc1 = f[0], f[1]
+    if fc0 == 0x80 and len(f) >= 36:  # beacon: BSSID → ağ adı
+        bssid = f[16:22].hex(":")
+        if bssid not in ap_names:
+            ap_names[bssid] = ssid(f[36:])
+        continue
+    if fc0 & 0x0C == 0x08 and fc1 & 0x03 == 0x01:  # veri çerçevesi, cihazdan AP'ye (ToDS)
+        if f[10] & 0x01:
+            continue
+        addr, bssid = f[10:16].hex(":"), f[4:10].hex(":")
+        if addr == bssid:
+            continue
+        e = clients.get(addr)
+        if e is None:
+            e = clients[addr] = {"t": "c", "addr": addr, "bssid": bssid, "chan": chan, "rssi": sig, "count": 0}
+        e["count"] += 1
+        if sig is not None and (e["rssi"] is None or sig > e["rssi"]):
+            e["rssi"], e["bssid"], e["chan"] = sig, bssid, chan
+        continue
+    if fc0 != 0x40:
         continue
     addr = f[10:16].hex(":")
     ies = f[24:]
-    e = seen.get(addr)
+    e = probes.get(addr)
     if e is None:
-        e = seen[addr] = {"addr": addr, "rssi": sig, "count": 0, "fp": fingerprint(ies), "ssids": []}
+        e = probes[addr] = {"t": "p", "addr": addr, "rssi": sig, "count": 0, "fp": fingerprint(ies), "ssids": []}
     e["count"] += 1
     if sig is not None and (e["rssi"] is None or sig > e["rssi"]):
         e["rssi"] = sig
     name = ssid(ies)
     if name and name not in e["ssids"] and len(e["ssids"]) < 8:
         e["ssids"].append(name)
-for e in seen.values():
+for e in probes.values():
+    print(json.dumps(e, ensure_ascii=False))
+for e in clients.values():
+    if e["addr"] in ap_names or (e["bssid"] not in ap_names and e["count"] < 2):
+        continue
+    e["ssid"] = ap_names.get(e["bssid"], "")
     print(json.dumps(e, ensure_ascii=False))
 '''

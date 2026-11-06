@@ -34,6 +34,9 @@ olarak eklenir. Kullanılan işaretler:
   (Apple 0x004c: iPhone/AirPods/Saat; Samsung 0x0075; Google 0x00e0; Xiaomi 0x038f; Huawei 0x027d), rastgele BLE adresi.
 - Wi-Fi arayan cihaz (yoklama): bağlı olmayan, Wi-Fi'si açık cihaz. Rastgele (yerel yönetimli) adres telefon/tablet/dizüstünde olağandır;
   sabit adresin üreticisi telefon üreticisiyse güçlü kanıt.
+- Wi-Fi'ye bağlı cihaz: bir erişim noktasına bağlı, veri gönderen cihaz. Rastgele adres (telefonların ağ başına "özel adresi")
+  zayıf kanıt; telefon üreticisi güçlü kanıt; bağlandığı ağ adı telefon paylaşım noktasına benziyorsa (öğrencinin
+  arkadaşının hotspot'u) zayıf kanıt. Tahta, yazıcı gibi kalıcı adresli altyapı cihazları kanıtsız kalır (sabit işaretlenir).
 """
 
 from __future__ import annotations
@@ -101,6 +104,23 @@ def annotate_bluetooth(row: dict) -> None:
         phone = "maybe"
     if row.get("random"):
         hints.append("rastgele BLE adresi (birkaç dakikada bir değişir)")
+    row["hints"], row["phone"] = hints, phone
+
+
+def annotate_client(row: dict) -> None:
+    hints, phone = [], ""
+    addr = row.get("addr") or ""
+    row["random"] = oui.is_random(addr)
+    row["vendor"] = _vendor(addr)
+    if row["random"]:
+        hints.append("rastgele adres (telefonların ağa özel adresi olabilir)")
+        phone = "maybe"
+    if row["vendor"] and _PHONE_VENDOR_RE.search(row["vendor"]):
+        hints.append("telefon üreticisi")
+        phone = "yes"
+    if row.get("name") and _HOTSPOT_SSID_RE.search(row["name"]):
+        hints.append("hotspot'a bağlı (bağlandığı ağın adı telefon paylaşım noktası gibi)")
+        phone = phone or "maybe"
     row["hints"], row["phone"] = hints, phone
 
 

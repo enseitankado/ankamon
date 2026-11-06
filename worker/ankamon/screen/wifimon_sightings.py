@@ -27,7 +27,8 @@
 
 Arayüz "yeni" rozetini (bu tahtada son 24 saatte ilk kez) ve "N günde görüldü" bilgisini buradan alır. Yalnız kalıcı adresler
 yazılır: rastgele (yerel yönetimli) adresler dakikalar içinde değiştiğinden geçmişleri anlamsızdır ve tabloyu şişirir —
-Wi-Fi ağlarında BSSID ise rastgele de olsa paylaşım noktası boyunca sabit kaldığından yazılır. 90 günden eski kayıtlar saatte
+Wi-Fi ağlarında BSSID ise rastgele de olsa paylaşım noktası boyunca sabit kaldığından yazılır; Wi-Fi'ye bağlı cihazın
+(client) rastgele adresi de telefonların ağa özel adresi olduğundan o ağda sabit kalır, yazılır. 90 günden eski kayıtlar saatte
 bir silinir. Hata (veritabanı yok/yetişmiyor) Wi-Fi Monitör'ü durdurmaz: geçmiş alanları boş döner.
 """
 
@@ -45,7 +46,7 @@ _last_prune = 0.0
 
 
 def _stable(row: dict) -> bool:
-    return bool(row.get("addr")) and (row["kind"] == "wifi" or not row.get("random"))
+    return bool(row.get("addr")) and (row["kind"] in ("wifi", "client") or not row.get("random"))
 
 
 def record_and_annotate(board_id: int, rows: list[dict]) -> None:

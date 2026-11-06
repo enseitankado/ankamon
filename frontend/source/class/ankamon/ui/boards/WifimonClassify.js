@@ -59,6 +59,7 @@ qx.Class.define("ankamon.ui.boards.WifimonClassify", {
       if (row.kind === "wifi") {
         return find("bssid", row.addr) || find("ssid", row.name);
       }
+      // Ağ arayan ve Wi-Fi'ye bağlı cihaz aynı "probe" (cihaz adresi) kaydına uyar: aynı cihaz iki durumda da görülebilir.
       return find(row.kind === "bt" ? "bt" : "probe", row.addr);
     },
 
@@ -95,7 +96,7 @@ qx.Class.define("ankamon.ui.boards.WifimonClassify", {
         const fixed = this.fixedEntry(row, feed.board.id, index);
         const key = this.rowKey(row);
         let level;
-        if (fixed || row.active) {
+        if (fixed || row.active || row.board_name) { // board_name: cihaz bir Ankamon tahtasının kendisi (worker eşler)
           level = "fixed";
         } else if (row.phone === "yes") {
           level = "phone";

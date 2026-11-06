@@ -41,15 +41,15 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
       common: { label: "Ortak", color: "#6b7280", bg: "rgba(107,114,128,.10)", tip: "Sabit değil ama seçili tahtaların çoğu bu ağ adını duyuyor: okul ağı olası." },
       fixed: { label: "Sabit", color: "#6b7280", bg: "transparent", tip: "Sabit listesinde (ya da tahtanın bağlı olduğu ağ)." }
     },
-    KIND_LABEL: { wifi: "Wi-Fi ağı", bt: "Bluetooth", probe: "Wi-Fi arayan cihaz" },
+    KIND_LABEL: { wifi: "Wi-Fi ağı", bt: "Bluetooth", probe: "Wi-Fi arayan cihaz", client: "Wi-Fi'ye bağlı cihaz" },
     PROBE_NOTE: {
-      nodev: "Wi-Fi kartı yok; yoklama dinlenemedi.",
-      tools: "Tahtada iw ya da python3 yok; yoklama dinlenemedi.",
+      nodev: "Wi-Fi kartı yok; Wi-Fi trafiği dinlenemedi.",
+      tools: "Tahtada iw ya da python3 yok; Wi-Fi trafiği dinlenemedi.",
       radio: "Wi-Fi açılamadığından yoklama dinlenemedi.",
-      busy: "Wi-Fi kartı bir ağa bağlı/bağlanıyor; bağlantı kesilmesin diye yoklama dinlenmedi.",
-      nomon: "Wi-Fi kartı monitör kipini desteklemiyor; yoklama dinlenemedi.",
-      shared: "Bu tahtada başka bir pencere yoklama dinliyor; bu turda atlandı.",
-      monfail: "Monitör arabirimi kurulamadı; yoklama dinlenemedi."
+      busy: "Wi-Fi kartı bir ağa bağlı/bağlanıyor; bağlantı kesilmesin diye Wi-Fi trafiği dinlenmedi.",
+      nomon: "Wi-Fi kartı monitör kipini desteklemiyor; Wi-Fi trafiği dinlenemedi.",
+      shared: "Bu tahtada başka bir pencere Wi-Fi trafiğini dinliyor; bu turda atlandı.",
+      monfail: "Monitör arabirimi kurulamadı; Wi-Fi trafiği dinlenemedi."
     },
 
     chip(text, color, bg, tip) {
@@ -74,7 +74,7 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
 
     /** Satırın işlem düğmeleri: güvenilir (sabit) işaretle — bu sınıfta / okul genelinde — ya da sabitten çıkar. */
     __actions(item, boardId, canEdit) {
-      if (!canEdit || item.row.active) {
+      if (!canEdit || item.row.active || item.row.board_name) { // board_name: Ankamon tahtası, kendiliğinden sabit
         return "";
       }
       const esc = qx.bom.String.escape;
@@ -82,10 +82,11 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
       if (item.fixed) {
         return this.__button("unfix", "Sabitten çıkar", "Bu kaydı sabit listesinden siler.", `data-id="${item.fixed.id}"`);
       }
-      if (row.kind !== "wifi" && row.random) {
+      // Wi-Fi'ye bağlı cihazın rastgele adresi telefonların ağa özel adresidir, o ağda sabit kaldığından sabitlenebilir.
+      if (row.kind !== "wifi" && row.kind !== "client" && row.random) {
         return `<span style="opacity:.6;font-size:11px" title="Rastgele adres birkaç dakikada bir değiştiğinden sabitlenemez.">sabitlenemez</span>`;
       }
-      const kind = row.kind === "wifi" ? "bssid" : row.kind;
+      const kind = row.kind === "wifi" ? "bssid" : row.kind === "client" ? "probe" : row.kind;
       const base = `data-kind="${kind}" data-value="${esc(row.addr)}" data-label="${esc(row.name || "")}"`;
       // Wi-Fi ağında "AP" (erişim noktası), Bluetooth/Wi-Fi arayan cihazda "cihaz" denir.
       const what = row.kind === "wifi" ? "AP" : "cihaz";
@@ -143,6 +144,13 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
           parts.push(term(`${row.count} yoklama`, "Dinleme süresince duyulan yoklama sayısı."));
         }
       }
+      if (row.kind === "client") {
+        parts.unshift(term("ağa bağlı", "Bir erişim noktasına bağlı ve veri gönderiyor (içerik şifreli; yalnız adresler görülür). " +
+          `Ağ: ${row.name || "(adı bilinmiyor)"} · erişim noktası ${row.bssid || "?"}` + (row.chan ? ` · kanal ${row.chan}` : "")));
+        if (row.count) {
+          parts.push(term(`${row.count} çerçeve`, "Dinleme süresince bu cihazdan duyulan veri çerçevesi sayısı (yoğun trafik = cihaz kullanılıyor)."));
+        }
+      }
       if (item.commonCount) {
         parts.push(term(`${item.commonCount} tahtada`, `${item.commonCount} tahta bu ağ adını duyuyor: okul ağı olası.`));
       }
@@ -198,7 +206,8 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
         const row = item.row;
         const lv = this.LEVELS[item.level];
         const name = row.kind === "probe" ? (row.ssids && row.ssids.length ? row.ssids.join(", ") : "(ağ adı vermeden)")
-          : row.name || (row.kind === "wifi" ? "(gizli ağ)" : "(adsız)");
+          : row.kind === "client" ? (row.board_name ? `${row.board_name} → ${row.name || "?"}` : "→ " + (row.name || "(ağ adı bilinmiyor)"))
+            : row.name || (row.kind === "wifi" ? "(gizli ağ)" : "(adsız)");
         const dim = item.level === "fixed" ? "opacity:.55;" : "";
         return `<tr style="${dim}background:${lv.bg}">` +
           `<td style="${td}">${this.chip(lv.label, lv.color, "transparent", lv.tip)}</td>` +
@@ -242,6 +251,10 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
         if (pi && !pi.note) {
           chips.push(this.chip(`Yoklama ≈${pi.devices} cihaz`, "#1a73e8", "rgba(26,115,232,.10)",
             `Son ${pi.secs || "?"} sn dinlemede ağ arayan cihaz kestirimi (rastgele adresler parmak izine göre birleştirildi).`));
+          if (pi.clients) {
+            chips.push(this.chip(`Bağlı ${pi.clients} cihaz`, "#1a73e8", "rgba(26,115,232,.10)",
+              `Son ${pi.secs || "?"} sn dinlemede bir Wi-Fi ağına bağlı ve veri gönderen cihaz sayısı (yalnız dinlenen kanallarda).`));
+          }
         }
         const lead = c.phone ? L.phone.color : c.maybe ? L.maybe.color : c.foreign ? L.foreign.color : "#2fa84a";
         const busy = feed.busy ? ankamon.ui.JobSpinner.html() + " " : "";

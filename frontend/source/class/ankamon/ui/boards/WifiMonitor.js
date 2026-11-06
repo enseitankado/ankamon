@@ -40,7 +40,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
   type: "static",
 
   statics: {
-    /** Sürekli izlemede yoklama satırı son duyuluşundan bu kadar sonra listeden düşer. */
+    /** Sürekli izlemede yoklama ve bağlı cihaz satırı son duyuluşundan bu kadar sonra listeden düşer. */
     PROBE_KEEP_MS: 5 * 60 * 1000,
 
     HELP: "Bu pencere seçili tahtaların çevresindeki kablosuz vericileri gösterir. Sınıfın/okulun olağan ağlarını ve cihazlarını " +
@@ -48,11 +48,14 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       "düğmeleriyle ya da toptan (sınıflar boşken) <i>Görünenleri sabit yap</i> ile; sonra gerisi <b>yabancı</b> olarak öne " +
       "çıkar. <b>Neler görülebilir:</b> telefonun paylaşım noktası (hotspot) açıksa Wi-Fi ağı olarak; Bluetooth'u açıksa Bluetooth " +
       "cihazı olarak (iPhone'lar ve çoğu Android sürekli BLE yayını yapar); Wi-Fi'si açık ama bağlı değilse, ara ara gönderdiği " +
-      "<b>yoklamalarla</b> (probe request — yalnız tahtanın Wi-Fi kartı bir ağa bağlı DEĞİLSE dinlenir; dinleme sırasında kart birkaç " +
-      "saniye NetworkManager'dan bırakılır). <b>Sınırlar:</b> ekranı kapalı telefon yoklamayı seyrek yapar, bir taramada " +
+      "<b>yoklamalarla</b> (probe request); bir Wi-Fi ağına bağlıysa (okul ağı, arkadaşının hotspot'u) gönderdiği veri " +
+      "çerçeveleriyle <b>Wi-Fi'ye bağlı cihaz</b> olarak (içerik şifreli, yalnız adresler görülür). Bu ikisi Wi-Fi trafiği " +
+      "dinlenerek bulunur: yalnız tahtanın Wi-Fi kartı bir ağa bağlı DEĞİLSE yapılır, dinleme sırasında kart birkaç saniye " +
+      "NetworkManager'dan bırakılır; 2,4 GHz kanal 1/6/11 ve yakındaki erişim noktalarının kanalları (5 GHz dahil, kart " +
+      "destekliyorsa) sırayla dinlenir. Bir Ankamon tahtasının kendi adresi (kablolu/kablosuz MAC) sabit sayılır. <b>Sınırlar:</b> ekranı kapalı telefon yoklamayı seyrek yapar, bir taramada " +
       "duyulmayabilir — <i>Sürekli izle</i> açık bırakın; telefonlar rastgele adres kullandığından yoklama cihaz sayısı " +
-      "kestirimdir; uçak kipindeki ya da Wi-Fi'si ve Bluetooth'u kapalı telefon görülemez; Wi-Fi'ye bağlı telefonun kendi trafiği " +
-      "(başka ağın kanalında) dinlenmez; sinyal gücü yalnız kaba bir yakınlık ipucudur (duvar, gövde, anten yönü değiştirir), " +
+      "kestirimdir; uçak kipindeki ya da Wi-Fi'si ve Bluetooth'u kapalı telefon görülemez; bağlı telefon yalnız dinlenen kanalda " +
+      "ve o anda bir şey gönderiyorsa görülür (boşta telefon seyrek gönderir); sinyal gücü yalnız kaba bir yakınlık ipucudur (duvar, gövde, anten yönü değiştirir), " +
       "komşu sınıftaki telefon da duyulabilir. Okul ağına bağlı cihazlar için ağ envanterine bakın.",
 
     __win: null,
@@ -106,9 +109,10 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       const watchBox = new qx.ui.form.CheckBox("Sürekli izle").set({
         toolTipText: "Açıkken liste sürekli tazelenir; tahtada geçici açılan radyo izleme bitene kadar açık kalır."
       });
-      const probeBox = new qx.ui.form.CheckBox("Yoklamaları dinle").set({
+      const probeBox = new qx.ui.form.CheckBox("Wi-Fi trafiğini dinle").set({
         value: true,
-        toolTipText: "Wi-Fi'si açık ama bağlı olmayan cihazların ağ arama yoklamalarını dinler (yalnız Wi-Fi kartı bir ağa bağlı değilse)."
+        toolTipText: "Ağ arayan cihazların yoklamalarını ve bir ağa bağlı cihazların veri çerçevelerini dinler (yalnız tahtanın " +
+          "Wi-Fi kartı bir ağa bağlı değilse; kart dinleme süresince monitör kipine alınır)."
       });
       const fixedBox = new qx.ui.form.CheckBox("Sabitleri göster");
       const baseline = new qx.ui.form.Button("Görünenleri sabit yap…").set({
@@ -221,7 +225,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           feed.probeInfo = d;
           feed.status = `Son tarama ${new Date(d.at * 1000).toLocaleTimeString("tr-TR")}`;
           if (d.note) {
-            feed.notes.push(Render.PROBE_NOTE[d.note] || "Yoklama dinlenemedi.");
+            feed.notes.push(Render.PROBE_NOTE[d.note] || "Wi-Fi trafiği dinlenemedi.");
           }
           if (!feed.initialKeys) {
             feed.initialKeys = new Set(((feed.data && feed.data.rows) || []).map(Classify.rowKey));
@@ -331,10 +335,14 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         feeds.forEach(feed => {
           const rows = ((feed.data && feed.data.rows) || []).concat(Array.from(feed.probes.values()).map(p => p.row));
           rows.forEach(row => {
-            if (!row.addr || row.active || (row.kind !== "wifi" && row.random) || Classify.fixedEntry(row, feed.board.id, fixedIndex)) {
+            // Wi-Fi'ye bağlı cihazın rastgele adresi o ağda sabit kalır (telefonun ağa özel adresi): o da sabitlenir, "probe"
+            // (cihaz adresi) kaydı olarak. Tahtanın kendisi (board_name) zaten sabit sayılır.
+            if (!row.addr || row.active || row.board_name || (row.kind !== "wifi" && row.kind !== "client" && row.random) ||
+                Classify.fixedEntry(row, feed.board.id, fixedIndex)) {
               return;
             }
-            items.push({ kind: row.kind === "wifi" ? "bssid" : row.kind, value: row.addr, board_id: feed.board.id, label: row.name || "" });
+            const kind = row.kind === "wifi" ? "bssid" : row.kind === "client" ? "probe" : row.kind;
+            items.push({ kind, value: row.addr, board_id: feed.board.id, label: row.name || "" });
           });
         });
         if (!items.length) {
