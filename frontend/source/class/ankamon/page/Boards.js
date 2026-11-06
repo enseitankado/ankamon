@@ -408,7 +408,15 @@ qx.Class.define("ankamon.page.Boards", {
 
       const shown = this.__rows.filter(({ cells }) =>
         colFilters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
-      this.__table.getTableModel().setData(this.__inScreenOrder(shown).map(r => r.cells));
+      // Sıralı listede setData önce sırasız veriyle dataChanged, sonra yeniden sıralayıp metaDataChanged yayar
+      // (Base.keepSortOnReload): aradaki sırasız sıra kutucuklara gitmesin — her tazelemede kutucuklar iki kez
+      // yer değiştiriyor, tam ekrandaki kutucuk DOM'da taşınınca tam ekrandan düşüyordu. Sıra bir kez, sonda eşitlenir.
+      this.__settingRows = true;
+      try {
+        this.__table.getTableModel().setData(this.__inScreenOrder(shown).map(r => r.cells));
+      } finally {
+        this.__settingRows = false;
+      }
       this.__syncShownOrder();
     },
 
@@ -426,7 +434,7 @@ qx.Class.define("ankamon.page.Boards", {
 
     /** Gösterilen tahtalar, tablonun o anki satır sırasıyla; Ekranlar kutucukları aynı sırada çizilir. */
     __syncShownOrder() {
-      if (!this.__rows) {
+      if (!this.__rows || this.__settingRows) {
         return;
       }
       const byId = new Map(this.__rows.map(r => [r.board.id, r.board]));
@@ -902,6 +910,9 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     __screensPaused: false,
+
+    /** __apply'ın setData'sı sürerken true: ara (sırasız) model olayları kutucuk sırasına yansımaz (bkz. __syncShownOrder). */
+    __settingRows: false,
 
     /**
      * O an GÖSTERİLEN (süzülmüş) tahtalar, listenin satır sırasıyla (bkz. __syncShownOrder): liste

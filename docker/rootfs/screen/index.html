@@ -1432,7 +1432,9 @@ function setBoards(list) {
     // kutucukları yeniden eklemek, o an sürüklenen kutucuğun yerel sürüklemesini iptal ediyordu.
     // Sürükleme sürerken sıraya dokunulmaz: canlı yerleşimle değişmiş sıra, üst sayfanın henüz eski
     // sırayı taşıyan tazelemesiyle geri alınmasın (bırakınca tm-reorder ile yeni sıra kaydedilir).
-    if (!drag && grid.children[i] !== t.el) grid.insertBefore(t.el, grid.children[i] || null);
+    // Tam ekrandaki kutucuk taşınmaz: DOM'da yer değiştiren öğe tarayıcıda tam ekrandan çıkar (sıra, tam ekran bitince
+    // bir sonraki listede düzelir; diğer kutucuklar onun çevresine dizilir).
+    if (!drag && grid.children[i] !== t.el && t.el !== document.fullscreenElement) grid.insertBefore(t.el, grid.children[i] || null);
     t.setBoard(b);
   });
   if (!list.length && !empty) {
