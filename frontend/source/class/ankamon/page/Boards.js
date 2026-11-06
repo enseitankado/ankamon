@@ -114,6 +114,8 @@ qx.Class.define("ankamon.page.Boards", {
     // storageKey: sütun genişliği + görünürlüğü localStorage'da kalıcı olur, sütun görünürlüğü
     // menüsü açılır (bkz. Base.js _createTable).
     this.__table = this._createTable(this.__columns, { checkable: true, storageKey: "boards.columns" });
+    // Sütun başlığıyla sıralama kullanıcı adına sunucuda saklanır, sayfa açılınca geri yüklenir (kullanıcı isteği).
+    ankamon.page.Base.rememberSort(this.__table, this.__columns, this.__table.getUserData("offset"), "boards.columns", this._user);
     // "Durum" sütunu: Çevrimiçi yeşil, Kapalı kırmızı (bkz. ui.table.StatusRenderer).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "status"),
       new ankamon.ui.table.StatusRenderer());
@@ -311,6 +313,9 @@ qx.Class.define("ankamon.page.Boards", {
     }
     if (this.__onChatWindows) {
       qx.event.message.Bus.unsubscribe(ankamon.ui.chat.Window.CHANGED, this.__onChatWindows, this);
+    }
+    if (this.__onWifiRadio) {
+      qx.event.message.Bus.unsubscribe(ankamon.ui.boards.WifiMonitor.RADIO_CHANGED, this.__onWifiRadio, this);
     }
   },
 
@@ -591,6 +596,18 @@ qx.Class.define("ankamon.page.Boards", {
       // Sohbet açık tahtanın kutucuğu yüksek çözünürlükte akar: tahtadaki sohbet penceresi okunur.
       this.__onChatWindows = () => this.__pushChat();
       qx.event.message.Bus.subscribe(ankamon.ui.chat.Window.CHANGED, this.__onChatWindows, this);
+      // Wi-Fi Monitör bir tahtanın kartını açtı/eski durumuna döndürdü: Wi-Fi sütunu anında güncellensin (kullanıcı isteği).
+      // Aynı anda birçok tahtadan gelebilir — tek tazelemede toplanır.
+      this.__onWifiRadio = () => {
+        if (!this.__wifiRefreshQueued) {
+          this.__wifiRefreshQueued = true;
+          qx.event.Timer.once(() => {
+            this.__wifiRefreshQueued = false;
+            this._refresh().catch(() => {});
+          }, this, 300);
+        }
+      };
+      qx.event.message.Bus.subscribe(ankamon.ui.boards.WifiMonitor.RADIO_CHANGED, this.__onWifiRadio, this);
 
       // Görünürlük yoklaması: hem görünüm değişimini hem Shell'deki sayfa değişimini yakalar.
       this.__screensTimer = new qx.event.Timer(1000);
@@ -950,6 +967,9 @@ qx.Class.define("ankamon.page.Boards", {
 
     /** __apply'ın setData'sı sürerken true: ara (sırasız) model olayları kutucuk sırasına yansımaz (bkz. __syncShownOrder). */
     __settingRows: false,
+
+    /** Wi-Fi Monitör'ün radyo değişikliği bildirimiyle sıraya alınmış tek tazeleme (bkz. __onWifiRadio). */
+    __wifiRefreshQueued: false,
 
     /**
      * O an GÖSTERİLEN (süzülmüş) tahtalar, listenin satır sırasıyla (bkz. __syncShownOrder): liste

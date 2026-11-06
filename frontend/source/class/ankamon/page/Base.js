@@ -241,6 +241,34 @@ qx.Class.define("ankamon.page.Base", {
       });
     },
 
+    /**
+     * Sütun başlığıyla yapılan sıralama kullanıcı başına sunucuda (users.ui_prefs["<key>.sort"] = {id, asc}, bkz.
+     * AuthApi::prefs) saklanır ve tablo kurulurken geri yüklenir (kullanıcı isteği: Tahtalar). Sıralama kalkınca
+     * (clearSorting) kayıt silinir. Model keepSortOnReload'lu olmalı (veri gelince kayıtlı sıra korunur).
+     * @param columns {Array} kullanıcı sütunları [{id}] — tablo modelinde `offset`'ten itibaren bu sırayla
+     */
+    rememberSort(table, columns, offset, key, user) {
+      const model = table.getTableModel();
+      const prefs = user.ui_prefs || (user.ui_prefs = {});
+      const sortKey = key + ".sort";
+      const saved = prefs[sortKey];
+      const index = saved && columns.findIndex(column => column.id === saved.id);
+      if (index >= 0 && index !== null) {
+        model.sortByColumn(index + offset, saved.asc !== false);
+      }
+      let last = JSON.stringify(saved || null);
+      model.addListener("metaDataChanged", () => {
+        const col = model.getSortColumnIndex();
+        const column = col >= offset ? columns[col - offset] : null;
+        const value = column ? { id: column.id, asc: model.isSortAscending() } : null;
+        const text = JSON.stringify(value);
+        if (text !== last) {
+          last = text;
+          ankamon.page.Base.savePref(user, sortKey, value);
+        }
+      });
+    },
+
     /** Tek bir arayüz tercihini sunucuya yazar (bkz. AuthApi::prefs); null anahtarı siler. */
     savePref(user, name, value) {
       const prefs = user.ui_prefs || (user.ui_prefs = {});
