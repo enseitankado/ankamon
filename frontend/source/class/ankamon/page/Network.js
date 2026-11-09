@@ -104,7 +104,7 @@ qx.Class.define("ankamon.page.Network", {
       // Cihaz log gönderiyorsa son gönderme anı (son 24 saatte "x saat y dakika önce", daha eskiyse tarih) — kullanıcı isteği 2026-11-09.
       { id: "lastlog", label: "Son log", hint: "Cihazın Ankamon'a son log gönderdiği an (son 24 saatte ne kadar önce, daha eskiyse tarih ve saat)", width: 140 },
       // Keşif: satırın listeye nasıl girdiği — ağ taraması, log gönderimi ya da elle ekleme (kullanıcı isteği 2026-11-09).
-      { id: "discovery", label: "Keşif", hint: "Cihazın bu listeye nasıl girdiği: ağ taraması, log gönderimi (önce loglarından tanındı) ya da elle ekleme", width: 120 },
+      { id: "discovery", label: "Keşif", hint: "Cihazı bulan bütün kaynaklar (ilk sıradaki listeye ilk giriş yolu): Ankamon sunucusu, ağ taraması, log gönderimi, elle ekleme", width: 160 },
       { id: "notes", label: "Not", width: 150 },
       // FATİH fazı (bkz. util.Format.etap). Sona eklendi: servis alt satırları sabit sütun sırası kullanır.
       { id: "faz", label: "Faz", width: 130 },
@@ -321,7 +321,9 @@ qx.Class.define("ankamon.page.Network", {
           d.services_scanned_at ? String(d.services.length) : "",
           d.iface || "",
           F.ago(d.first_seen_at), d.online ? "şimdi" : F.ago(d.last_seen_at), ankamon.page.Network.logTime(d.last_log_at),
-          ankamon.page.Network.DISCOVERY[d.discovery] || d.discovery || "",
+          // Bütün keşif kaynakları; ilk sıradaki satırın listeye ilk giriş yolu (kullanıcı isteği 2026-11-09).
+          [...new Set([d.discovery].concat(d.discoveries || []))].filter(Boolean)
+            .map(k => ankamon.page.Network.DISCOVERY[k] || k).join(", "),
           d.notes || "",
           F.etap(d.etap),
           normNum(d), flowText(d)
@@ -534,6 +536,10 @@ qx.Class.define("ankamon.page.Network", {
     },
 
     async __edit(device) {
+      if (device) {
+        this.__showDetails(device); // düzenleme Bilgisayar ayrıntıları penceresinde
+        return;
+      }
       const networks = (this.__networks || []).filter(n => n.attached || (device && n.id === device.network_id));
       if (!device && !networks.length) {
         ankamon.ui.Dialog.alert("Henüz bağlı bir ağ yok; cihaz eklenecek ağ bulunamadı.");
@@ -564,91 +570,13 @@ qx.Class.define("ankamon.page.Network", {
     },
 
     /**
-     * Bilgisayar ayrıntıları (ayrı pencere; çift tıklama ve sağ menü — kullanıcı isteği): grid'in TÜM sütunlarının
-     * (gizlenmiş olanlar dahil) değerleri iki sütunlu tabloda; ardından varsa açık portlar/servisler ve ağ
-     * paylaşımları. Metin fareyle seçilip kopyalanabilir; "Tümünü kopyala" hepsini düz metin verir. "Düzenle"
-     * yalnız network.manage yetkisiyle.
+     * Bilgisayar ayrıntıları (çift tıklama, sağ menü, Düzenle — kullanıcı isteği 2026-11-09): düzenle kipinde açılan
+     * sekmeli pencere (Genel / Tahta / Portlar ve paylaşımlar), alt düğme Kaydet — bkz. ui.network.DeviceWindow.
      */
     __showDetails(device) {
-      if (!device) {
-        return;
+      if (device) {
+        ankamon.ui.network.DeviceWindow.open({ device, user: this._user, onSaved: () => this.refresh() });
       }
-      const F = ankamon.util.Format;
-      const row = (this.__rows || []).find(r => r.device.id === device.id);
-      const cells = row ? row.cells : [];
-      const strip = v => String(v ?? "").replace(/<[^>]+>/g, "").trim();
-      const when = (secs, rel) => (secs ? `${rel} (${F.dateTime(secs * 1000)})` : rel || "");
-      const fields = this.__columns.filter(c => c.id !== "exp").map(c => {
-        const i = this.__columns.indexOf(c) + 2;
-        let value = strip(cells[i]);
-        if (c.id === "first") {
-          value = when(device.first_seen_at, value);
-        } else if (c.id === "lastlog") {
-          value = device.last_log_at ? F.dateTime(device.last_log_at * 1000) : "log gelmedi";
-        } else if (c.id === "os" && value && device.os_guess_at) {
-          value += ` (tespit: ${F.dateTime(device.os_guess_at * 1000)})`;
-        } else if (c.id === "seen") {
-          value = device.online ? "şimdi (çevrim içi)" : when(device.last_seen_at, value);
-        } else if (c.id === "ports" && !value) {
-          value = device.services_scanned_at ? "0" : "taranmadı";
-        }
-        return [c.label, value || "—"];
-      });
-      const name = ankamon.ui.network.Ops.deviceName(device) || device.ip || device.mac;
-      const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
-      const win = ankamon.ui.Dialog.window("Bilgisayar ayrıntıları — " + name, Math.min(720, root.width - 40), { maximizable: true });
-      win.set({ height: Math.min(720, root.height - 40) });
-
-      // Tablolar seçilebilir HTML (kullanıcı isteği: değerler fareyle seçilip panoya kopyalanabilsin) — qx
-      // tablo hücreleri seçilemiyordu. Hepsi kaydırılabilir tek sütunda; "Tümünü kopyala" düz metin verir.
-      const esc = qx.bom.String.escape;
-      const body = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
-      const plain = [];
-      const table = (title, columns, rows, widths) => {
-        const cell = "padding:4px 8px;border-bottom:1px solid rgba(128,128,128,.25);vertical-align:top;" +
-          "overflow-wrap:anywhere;text-align:left";
-        const html = '<table style="border-collapse:collapse;width:100%;font:inherit;table-layout:fixed">' +
-          "<colgroup>" + widths.map(w => (typeof w === "number" ? `<col style="width:${w}px">` : "<col>")).join("") + "</colgroup>" +
-          (title ? "<tr>" + columns.map(c => `<th style="${cell};font-weight:bold">${esc(c)}</th>`).join("") + "</tr>" : "") +
-          rows.map(r => "<tr>" + r.map((v, i) =>
-            `<td style="${cell}${!title && i === 0 ? ";opacity:.75" : ""}">${esc(String(v ?? ""))}</td>`).join("") + "</tr>").join("") +
-          "</table>";
-        if (title) {
-          body.add(new qx.ui.basic.Label(title).set({ font: "bold", marginTop: 8, selectable: true }));
-          plain.push("", title, columns.join("\t"));
-        }
-        body.add(new qx.ui.basic.Label(html).set({ rich: true, wrap: true, selectable: true, allowGrowX: true }));
-        rows.forEach(r => plain.push(title ? r.join("\t") : `${r[0]}: ${r[1]}`));
-      };
-      table(null, ["Alan", "Değer"], fields, [180, "1*"]);
-      if (device.services.length) {
-        table(`Açık portlar / servisler (${device.services.length})`, ["Port", "Servis", "Ürün / sürüm", "Ek bilgi"],
-          device.services.map(s => [`${s.port}/${s.proto}`, s.service || "", [s.product, s.version].filter(Boolean).join(" "), s.extra || ""]),
-          [90, 130, 200, "1*"]);
-      }
-      if (device.shares && device.shares.length) {
-        table(`Ağ paylaşımları (${device.shares.length})`, ["Tür", "Paylaşım", "Açıklama"],
-          device.shares.map(sh => [sh.stype === "printer" ? "🖨 yazıcı" : "📁 klasör", sh.path || sh.name, sh.comment || ""]),
-          [100, 240, "1*"]);
-      }
-      win.add(new qx.ui.container.Scroll(body), { flex: 1 });
-      const buttons = [];
-      const copyAll = new qx.ui.form.Button("Tümünü kopyala").set({ toolTipText: "Tüm ayrıntıları düz metin olarak panoya kopyalar" });
-      copyAll.addListener("execute", () => ankamon.util.Clipboard.copy(`Bilgisayar ayrıntıları — ${name}\n` + plain.join("\n")));
-      buttons.push(copyAll);
-      if (this._can("network.manage")) {
-        const edit = new qx.ui.form.Button("Düzenle");
-        edit.addListener("execute", () => {
-          win.close();
-          this.__edit(device);
-        });
-        buttons.push(edit);
-      }
-      const close = new qx.ui.form.Button("Kapat");
-      close.addListener("execute", () => win.close());
-      buttons.push(close);
-      ankamon.ui.Dialog.buttons(win, buttons);
-      win.open();
     },
 
     /** "Ağlar" düğmesinin menüsü: ağ başına alt menü (bkz. ui.network.Ops.networkMenu). */
@@ -706,7 +634,7 @@ qx.Class.define("ankamon.page.Network", {
             () => ankamon.ui.network.PingWindow.show(pingable));
         }
         add("⟳", "Servisleri tara" + count, () => this.__scanServices(devices));
-        add(ICON.edit, "Düzenle", () => this.__edit(device));
+        add(ICON.edit, "Düzenle", () => this.__showDetails(device));
         add(ICON.delete, "Sil" + count, () => this.__remove(devices));
       }
       return menu;

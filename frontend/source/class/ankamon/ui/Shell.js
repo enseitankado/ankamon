@@ -159,7 +159,8 @@ qx.Class.define("ankamon.ui.Shell", {
       // kendisi ağaçta ilk alt seçenek olarak da durur; Tahtalar'a tıklamak onu seçer (varsayılan seçenek).
       // "Tahtalar" → "Bilgisayarlar" → "Ağ" (kullanıcı isteği 2026-11-09; kimlik "boards" kalır). Ağ envanteri sayfası
       // ("network") onun altında "Ağ" alt menüsü.
-      { id: "boards", label: "Ağ", feature: "boards", selfLeaf: "Liste", create: u => new ankamon.page.Boards(u) },
+      // Ağ ▸ Liste (ağ envanteri, "network") + Ağ ▸ Akıllı Tahtalar (bu sayfa; eski adı "Liste") — kullanıcı isteği 2026-11-09.
+      { id: "boards", label: "Ağ", feature: "boards", selfLeaf: "Akıllı Tahtalar", create: u => new ankamon.page.Boards(u) },
       // parent: ağaçta o sayfanın düğümünün ALTINDA. Üst sayfa kullanıcıya kapalıysa kökte gösterilir — bkz. __createTree.
       // collapsed: kökte olsa da katlı başlar (uzun sekme listesi menüyü doldurmasın — bkz. __rememberOpen).
       // Sekmeleri ağaçta da (kullanıcı isteği: zaman çizelgesi sol menüden açılsın). key: Oturumlar sekmesinde
@@ -202,7 +203,8 @@ qx.Class.define("ankamon.ui.Shell", {
       // Ağ envanteri: bütün ağların cihazları tek listede (kullanıcı isteği 2026-11-09: ağ başına alt düğüm yok; ağ
       // işlemleri sayfadaki "Ağlar" düğmesinde — bkz. page.Network). Üst menü "Ağ"ın (boards) altında (kullanıcı isteği
       // 2026-11-09); o kullanıcıya kapalıysa kökte.
-      { id: "network", label: "Ağ", feature: "network", parent: "boards", create: u => new ankamon.page.Network(u) },
+      // Ağ ▸ Liste (kullanıcı isteği 2026-11-09: eski "Ağ ▸ Ağ"); first: üst düğümün kendi seçeneğinden (Akıllı Tahtalar) önce.
+      { id: "network", label: "Liste", feature: "network", parent: "boards", first: true, create: u => new ankamon.page.Network(u) },
       // Ankamon'un kendi bakımı (servisler, zamanlanmış işler, veritabanı, yapılandırma) — yalnız yönetici.
       { id: "system", label: "Sistem", admin: true, retap: true, create: u => new ankamon.page.System(u) },
       // Kullanıcılar ve Ayarlar "Sistem"in altında (kullanıcı isteği).
@@ -484,6 +486,8 @@ qx.Class.define("ankamon.ui.Shell", {
       if (page.retap) {
         this.__addRetap(node);
       }
+      // first: true alt sayfalar üst düğümün kendi seçeneğinden (selfLeaf) ÖNCE (ör. Ağ ▸ Liste, Akıllı Tahtalar).
+      children.filter(child => child.first).forEach(child => node.add(this.__buildNode(child, childrenOf)));
       if (page.selfLeaf) {
         // Sayfanın kendisi ilk alt seçenek (ör. Tahtalar ▸ Liste): üst düğüme tıklamak bunu seçer (bkz. changeSelection).
         const self = new qx.ui.tree.TreeFile(page.selfLeaf);
@@ -504,7 +508,7 @@ qx.Class.define("ankamon.ui.Shell", {
         node.add(leaf);
       });
       if (children.length) {
-        children.forEach(child => node.add(this.__buildNode(child, childrenOf)));
+        children.filter(child => !child.first).forEach(child => node.add(this.__buildNode(child, childrenOf)));
       }
       if (branch) {
         this.__rememberOpen(node, page.id);

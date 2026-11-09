@@ -77,10 +77,12 @@ final class NetworkApi
         ];
     }
 
-    /** ?network=<id> (0/boş: tüm ağlar). Her cihaz kendi servis listesiyle döner. */
+    /** ?network=<id> (0/boş: tüm ağlar), ?board=<id> (yalnız o tahtanın cihaz satırı — Bilgisayar ayrıntıları penceresi).
+     * Her cihaz kendi servis listesiyle döner. */
     public function devices(Request $request): array
     {
         $network = $request->queryInt('network', 0, 0, PHP_INT_MAX);
+        $board = $request->queryInt('board', 0, 0, PHP_INT_MAX);
         $state = $this->state();
         $devices = Db::all(
             "SELECT d.id, d.network_id, n.cidr::text AS network, d.mac::text AS mac, host(d.ip) AS ip, d.hostname,
@@ -107,6 +109,14 @@ final class NetworkApi
                     -- Tahtalar'a loglarından (syslog) ya da elle (manual) girmişse o ilk yol.
                     CASE WHEN d.source = 'scan' AND b.source IN ('syslog', 'manual') AND b.created_at < d.first_seen_at
                          THEN b.source ELSE d.source END AS discovery,
+                    -- Bütün keşif kaynakları (Keşif sütunu — kullanıcı isteği 2026-11-09): sunucunun kendisi, ağ taraması
+                    -- (ARP'de görüldü), log gönderimi (cihaz IP'sinden ya da tahta kaydına log geldi), elle ekleme.
+                    array_to_json(array_remove(ARRAY[
+                        CASE WHEN d.source = 'self' THEN 'self' END,
+                        CASE WHEN d.source = 'scan' OR (d.source <> 'self' AND d.last_seen_at IS NOT NULL) THEN 'scan' END,
+                        CASE WHEN d.last_log_at IS NOT NULL OR b.last_log_at IS NOT NULL OR b.source = 'syslog' THEN 'syslog' END,
+                        CASE WHEN d.source = 'manual' OR b.source = 'manual' THEN 'manual' END
+                    ], NULL)) AS discoveries,
                     k.label AS known_alias,
                     COALESCE((SELECT json_agg(json_build_object('proto', s.proto, 'port', s.port, 'service', s.service,
                                   'product', s.product, 'version', s.version, 'extra', s.extra) ORDER BY s.port, s.proto)
@@ -122,13 +132,14 @@ final class NetworkApi
                                            ORDER BY (x.mac = d.mac) IS TRUE DESC, x.id LIMIT 1)
              -- MAC ↔ takma ad kaydı (göç 016; okul envanterinden): grid'in Takma ad sütunu.
              LEFT JOIN net_known_aliases k ON k.mac = d.mac
-             WHERE (? = 0 OR d.network_id = ?)
-             ORDER BY d.ip NULLS LAST, d.mac",
-            [$network, $network]
+             WHERE (? = 0 OR d.network_id = ?) AND (? = 0 OR b.id = ?)
+             ORDER BY d.online DESC, d.last_seen_at DESC NULLS LAST, d.ip NULLS LAST, d.mac",
+            [$network, $network, $board, $board]
         );
         foreach ($devices as &$device) {
             $device['services'] = json_decode((string) $device['services'], true) ?: [];
             $device['shares'] = json_decode((string) $device['shares'], true) ?: [];
+            $device['discoveries'] = json_decode((string) $device['discoveries'], true) ?: [];
         }
         unset($device);
         // ETAP faz bilgisi (bkz. migration 018, worker netscan/etap_phase.py); yoksa null.

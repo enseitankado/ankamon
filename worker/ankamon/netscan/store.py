@@ -238,6 +238,41 @@ def fill_labels(conn) -> int:
     return len(rows)
 
 
+def boards_from_devices(conn) -> int:
+    """Ağ ▸ Akıllı Tahtalar satırları Ağ ▸ Liste'den beslenir (kullanıcı isteği 2026-11-09): Liste'de cihaz türü
+    "Akıllı tahta" olan (elle seçilmiş ya da tarayıcının tahmini — MAC öneki) ama Tahtalar'da kaydı olmayan her cihaz
+    için tahta kaydı açılır (source 'scan'; takma ad, bilgisayar adı ve IP cihazdan). Kayıt yalnız AÇILIR: türü sonradan
+    değişen cihazın tahta kaydı silinmez (geçmişi/oturumları var) — gerekirse Akıllı Tahtalar'dan elle silinir."""
+    rows = conn.execute(
+        f"""INSERT INTO boards (mac, ip, label, hostname, source)
+            SELECT DISTINCT ON (d.mac) d.mac, d.ip, COALESCE(NULLIF(d.label, ''), k.label, ''), NULLIF(d.hostname, ''), 'scan'
+            FROM net_devices d LEFT JOIN net_known_aliases k ON k.mac = d.mac
+            WHERE COALESCE(NULLIF(d.device_type, ''), d.type_auto) = '{classify.BOARD}' AND d.source <> 'self'
+              AND NOT EXISTS (SELECT 1 FROM boards b WHERE b.mac = d.mac OR b.wifi_mac = d.mac)
+            ORDER BY d.mac, d.online DESC, d.last_seen_at DESC NULLS LAST
+            RETURNING id, host(ip) AS ip, mac::text AS mac"""
+    ).fetchall()
+    for r in rows:
+        activity.record(conn, f"Yeni tahta (ağ envanterinde akıllı tahta): {r['mac']} ({r['ip'] or 'IP yok'})")
+    return len(rows)
+
+
+def device_ips_from_boards(conn) -> int:
+    """Liste'deki cihazın IP'si en güncel keşiften (kullanıcı isteği 2026-11-09): tahtanın IP'si tarayıcıdan sonra
+    loglarından (gönderenin MAC'i tahtanınkiyle eşleşerek — bkz. tasks/boards_from_logs) değiştiyse ve yeni adres
+    cihazın ağındaysa cihaz satırı da o adrese geçer. Tersi (tarama → tahta) fill_board_ips'te."""
+    rows = conn.execute(
+        """UPDATE net_devices d SET ip = b.ip
+           FROM boards b, net_networks n
+           WHERE n.id = d.network_id AND b.mac = d.mac AND b.ip IS NOT NULL AND b.ip << n.cidr
+             AND d.ip IS DISTINCT FROM b.ip AND b.last_log_at > COALESCE(d.last_seen_at, 'epoch'::timestamptz)
+           RETURNING d.id"""
+    ).fetchall()
+    if rows:
+        bump(conn)
+    return len(rows)
+
+
 def fill_board_ips(conn) -> int:
     """Tahtaların IP'si, ağ taramasının o MAC için bulduğu adresle (hangi ağda olursa olsun):
       - IP'si olmayan tahta (Tahta ekle'de yalnız MAC girilmiş): bilinen herhangi bir adres;

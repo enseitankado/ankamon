@@ -52,7 +52,7 @@ qx.Class.define("ankamon.page.Boards", {
   extend: ankamon.page.Base,
 
   construct(user) {
-    super(user, "Bilgisayarlar");
+    super(user, "Akıllı Tahtalar");
     // Üstteki düğme satırı (Yenile, Tümünü işaretle, İşaretleri kaldır, Ekle, Düzenle, Sil, Komut çalıştır,
     // Yansıt, Kapat, Uyandır) kaldırıldı (kullanıcı isteği): hepsi satır/kutucuk sağ menüsünde (bkz.
     // __rowMenu — işaretleme ve "Tahta ekle…" de orada); sayfa REFRESH_MS'de bir kendiliğinden yenilenir.
@@ -1393,7 +1393,7 @@ qx.Class.define("ankamon.page.Boards", {
 
     /** Tahta ekle / Düzenle penceresi — ortak (bkz. ui.BoardOps.editBoard; Bakım ▸ Ahenk sağ menüsü de kullanır). */
     __edit(board) {
-      ankamon.ui.BoardOps.editBoard(board, () => this.refresh());
+      ankamon.ui.BoardOps.editBoard(board, () => this.refresh(), this._user);
     },
 
     /**

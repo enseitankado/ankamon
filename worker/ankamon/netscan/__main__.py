@@ -277,7 +277,13 @@ def _sweep(conn) -> None:
     filled = store.fill_labels(conn)
     if filled:
         log.info("takma ad dolduruldu: %d kayıt", filled)
+    created = store.boards_from_devices(conn)
+    if created:
+        log.info("ağ envanterindeki akıllı tahtalar için tahta kaydı açıldı: %d", created)
     ips = store.fill_board_ips(conn)
+    moved = store.device_ips_from_boards(conn)
+    if moved:
+        log.info("cihaz IP'si tahtanın güncel (log) adresiyle güncellendi: %d", moved)
     if ips:
         log.info("tahta IP'si ağ taramasından dolduruldu: %d kayıt", ips)
     # ETAP faz bilgisi (Tahtalar + Ağ grid'leri "Faz" sütunu; bkz. etap_phase.py).

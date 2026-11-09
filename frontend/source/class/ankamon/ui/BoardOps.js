@@ -35,71 +35,30 @@ qx.Class.define("ankamon.ui.BoardOps", {
 
   statics: {
     /**
-     * Tahta ekle (board null) / Düzenle penceresi: Tahtalar'ın ve Bakım ▸ Ahenk'in sağ menüsündeki "Düzenle"
-     * (tek kaynak). Verilen satırda kayıt alanları yoksa (ör. Ahenk grid'i) tahta /api/boards/{id}'den okunur.
-     * @param board {Map|null} @param onSaved {Function?} kayıttan sonra (grid'i tazelemek için)
+     * Tahta ekle (board null) / Düzenle. Düzenle artık Bilgisayar ayrıntıları penceresi (kullanıcı isteği 2026-11-09):
+     * cihazın ağ envanteri satırı + "Tahta" sekmesinde tahtaya özel alanlar (bkz. ui.network.DeviceWindow, boardForm).
+     * Tahtalar'ın ve Bakım ▸ Ahenk'in sağ menüsündeki "Düzenle" buradan geçer (tek kaynak). Verilen satırda kayıt
+     * alanları yoksa (ör. Ahenk grid'i) tahta /api/boards/{id}'den okunur.
+     * @param board {Map|null} @param onSaved {Function?} kayıttan sonra (grid'i tazelemek için) @param user {Map?}
      */
-    async editBoard(board, onSaved) {
-      if (board && board.id && board.mac === undefined) {
-        try {
-          board = (await ankamon.io.Api.get("/boards/" + board.id)).board;
-        } catch (e) {
-          ankamon.ui.Dialog.error(e);
-          return;
-        }
+    async editBoard(board, onSaved, user = null) {
+      if (board && board.id) {
+        ankamon.ui.network.DeviceWindow.open({ board, onSaved, user });
+        return;
       }
-      const win = ankamon.ui.Dialog.window(board ? "Tahtayı düzenle" : "Tahta ekle", 460);
-      const form = new ankamon.ui.Form();
-      const adding = !board;
-      board = board || { monitor_enabled: true, exporter_port: 9100 };
-      // Yeni tahtada takma ad ve kablolu MAC zorunlu (bkz. BoardsApi::create): kablolu MAC tahtayı ağ taramasında
-      // bulur (IP girilmezse oradan dolar), uzaktan uyandırmayı sağlar. Kablosuz MAC (Wi-Fi kartı) isteğe bağlı —
-      // tahta Wi-Fi'ye bağlanınca oturum yoklaması kendiliğinden doldurur. Bilgisayar adı elle girilmez — tahtanın
-      // loglarından ve donanım bilgisinden öğrenilir.
-      const mark = adding ? " *" : "";
-      form.text("label", "Takma ad" + mark, board.label, "ör. A Blok 2. Derslik");
-      form.text("location", "Konum", board.location, "ör. B blok, 2. kat");
-      form.text("ip", "IP adresi", board.ip);
-      form.text("mac", "Kablolu MAC" + mark, board.mac, "de:ad:de:ad:de:ad").setToolTipText(
-        "Kablolu ağ kartının MAC adresi: iki nokta üst üste ile ayrılmış altı onaltılık çift (ör. de:ad:de:ad:de:ad). " +
-        "Uzaktan uyandırma ve ağ taramasında tahtayı bulmak için kullanılır.");
-      form.text("wifi_mac", "Kablosuz MAC", board.wifi_mac, "de:ad:de:ad:de:ad").setToolTipText(
-        "Wi-Fi kartının kalıcı (fabrika) MAC adresi — isteğe bağlı. Tahta açıkken Ankamon karttan okuyup kendiliğinden " +
-        "doldurur. Tahta Wi-Fi ile bağlıyken ağ taramasında tanınmasını sağlar; uzaktan uyandırma kablolu MAC ile yapılır.");
-      form.text("exporter_port", "Sensör portu", String(board.exporter_port));
-      form.check("monitor_enabled", "Sensör verisi toplansın", board.monitor_enabled)
-        .setToolTipText("Sensör verisi bilgisayar ağda ulaşılabilir olduğunda toplanır.");
-      // Tahtalar MAC adresinden tanınır (ETAP / Vestel); uymayan gerçek tahta bu işaretle tahta sayılır (göç 046).
-      form.check("smart_board", "Bu bir akıllı tahtadır", !!board.smart_board)
-        .setToolTipText("Ankamon bir cihazın akıllı tahta olduğunu MAC adresinden anlar (ETAP tahtalarının üretici önekleri). " +
-          "MAC'i bu öneklere uymayan bir tahtayı işaretleyin: ağ bağdaştırıcısı fark etmeksizin tahta sayılır ve IP'si loglarından güncellenir.");
-      form.addField("notes", "Not", new qx.ui.form.TextArea(board.notes || "").set({ wrap: true, autoSize: true, minimalLineHeight: 3 }));
-      win.add(form);
-
+      const win = ankamon.ui.Dialog.window("Tahta ekle", 460);
+      const fields = this.boardForm(null);
+      win.add(fields.form);
       const cancel = new qx.ui.form.Button("Vazgeç");
       const save = new qx.ui.form.Button("Kaydet");
       cancel.addListener("execute", () => win.close());
       save.addListener("execute", async () => {
-        const values = form.values();
-        values.exporter_port = parseInt(values.exporter_port, 10) || 0;
-        if (adding && (!values.label || !values.mac)) {
-          ankamon.ui.Dialog.error("Takma ad ve kablolu MAC adresi zorunlu.");
-          return;
-        }
-        if (values.mac && !ankamon.page.Boards.MAC_RE.test(values.mac)) {
-          ankamon.ui.Dialog.error("Kablolu MAC adresi de:ad:de:ad:de:ad biçiminde olmalı.");
-          return;
-        }
-        if (values.wifi_mac && !ankamon.page.Boards.MAC_RE.test(values.wifi_mac)) {
-          ankamon.ui.Dialog.error("Kablosuz MAC adresi de:ad:de:ad:de:ad biçiminde olmalı.");
+        const values = fields.read();
+        if (!values) {
           return;
         }
         try {
-          if (board.id) {
-            await ankamon.io.Api.patch("/boards/" + board.id, values);
-          } else {
-            await ankamon.io.Api.post("/boards", values);
-          }
+          await ankamon.io.Api.post("/boards", values);
           win.close();
           if (onSaved) {
             onSaved();
@@ -110,6 +69,61 @@ qx.Class.define("ankamon.ui.BoardOps", {
       });
       ankamon.ui.Dialog.buttons(win, [cancel, save]);
       win.open();
+    },
+
+    /**
+     * Tahta kaydının düzenlenebilir alanları (boards tablosu, PATCH /api/boards/{id}) — TEK liste: Tahta ekle penceresi
+     * ve Bilgisayar ayrıntıları ▸ Tahta sekmesi buradan kurulur; tahtaya yeni düzenlenebilir alan eklenince ikisinde de
+     * kendiliğinden görünür (kullanıcı isteği 2026-11-09).
+     * @param board {Map|null} null: yeni tahta (takma ad ve kablolu MAC zorunlu)
+     * @return {Map} {form, read()} — read(): doğrulanmış değerler ya da (hata gösterilip) null
+     */
+    boardForm(board) {
+      const form = new ankamon.ui.Form();
+      const adding = !board;
+      board = board || { monitor_enabled: true, exporter_port: 9100 };
+      // Yeni tahtada takma ad ve kablolu MAC zorunlu (bkz. BoardsApi::create): kablolu MAC tahtayı ağ taramasında
+      // bulur (IP girilmezse oradan dolar), uzaktan uyandırmayı sağlar. Kablosuz MAC (Wi-Fi kartı) isteğe bağlı —
+      // tahta Wi-Fi'ye bağlanınca oturum yoklaması kendiliğinden doldurur. Bilgisayar adı elle girilmez — tahtanın
+      // loglarından ve donanım bilgisinden öğrenilir.
+      const mark = adding ? " *" : "";
+      form.text("label", "Takma ad" + mark, board.label, "ör. A Blok 2. Derslik");
+      form.text("location", "Konum", board.location, "ör. B blok, 2. kat");
+      form.text("ip", "IP adresi", board.ip).setToolTipText(
+        "Tahtanın bilinen adresi. Ağ taraması tahtanın MAC'ini başka adreste görürse ya da tahta yeni adresinden log " +
+        "gönderirse kendiliğinden güncellenir.");
+      form.text("mac", "Kablolu MAC" + mark, board.mac, "de:ad:de:ad:de:ad").setToolTipText(
+        "Kablolu ağ kartının MAC adresi: iki nokta üst üste ile ayrılmış altı onaltılık çift (ör. de:ad:de:ad:de:ad). " +
+        "Uzaktan uyandırma ve ağ taramasında tahtayı bulmak için kullanılır.");
+      form.text("wifi_mac", "Kablosuz MAC", board.wifi_mac, "de:ad:de:ad:de:ad").setToolTipText(
+        "Wi-Fi kartının kalıcı (fabrika) MAC adresi — isteğe bağlı. Tahta açıkken Ankamon karttan okuyup kendiliğinden " +
+        "doldurur. Tahta Wi-Fi ile bağlıyken ağ taramasında tanınmasını sağlar; uzaktan uyandırma kablolu MAC ile yapılır.");
+      form.text("exporter_port", "Sensör portu", String(board.exporter_port ?? 9100));
+      form.check("monitor_enabled", "Sensör verisi toplansın", board.monitor_enabled !== false)
+        .setToolTipText("Sensör verisi bilgisayar ağda ulaşılabilir olduğunda toplanır.");
+      // Tahtalar MAC adresinden tanınır (ETAP / Vestel); uymayan gerçek tahta bu işaretle tahta sayılır (göç 046).
+      form.check("smart_board", "Bu bir akıllı tahtadır", !!board.smart_board)
+        .setToolTipText("Ankamon bir cihazın akıllı tahta olduğunu MAC adresinden anlar (ETAP tahtalarının üretici önekleri). " +
+          "MAC'i bu öneklere uymayan bir tahtayı işaretleyin: ağ bağdaştırıcısı fark etmeksizin tahta sayılır ve IP'si loglarından güncellenir.");
+      form.addField("notes", "Not", new qx.ui.form.TextArea(board.notes || "").set({ wrap: true, autoSize: true, minimalLineHeight: 3 }));
+      const read = () => {
+        const values = form.values();
+        values.exporter_port = parseInt(values.exporter_port, 10) || 0;
+        if (adding && (!values.label || !values.mac)) {
+          ankamon.ui.Dialog.error("Takma ad ve kablolu MAC adresi zorunlu.");
+          return null;
+        }
+        if (values.mac && !ankamon.page.Boards.MAC_RE.test(values.mac)) {
+          ankamon.ui.Dialog.error("Kablolu MAC adresi de:ad:de:ad:de:ad biçiminde olmalı.");
+          return null;
+        }
+        if (values.wifi_mac && !ankamon.page.Boards.MAC_RE.test(values.wifi_mac)) {
+          ankamon.ui.Dialog.error("Kablosuz MAC adresi de:ad:de:ad:de:ad biçiminde olmalı.");
+          return null;
+        }
+        return values;
+      };
+      return { form, read };
     },
 
     /** Tahtada açılışta parola sıfırlama servisi uyarısı: parola kutusunun yanındaki kısa not ve ipucu. */
