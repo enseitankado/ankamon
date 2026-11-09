@@ -89,7 +89,6 @@ qx.Class.define("ankamon.page.Network", {
       { id: "exp", label: "", width: 30 },
       { id: "status", label: "Durum", width: 90 },
       { id: "name", label: "Takma ad / Ad", width: 200 },
-      { id: "ip", label: "IP", width: 120 },
       // IP/maske (ör. 10.255.187.23/24) ve sunucunun o ağa bağlı olduğu arabirim — kullanıcı isteği 2026-11-09.
       { id: "ip_mask", label: "IP/Maske", width: 140 },
       { id: "mac", label: "MAC", width: 140 },
@@ -99,12 +98,13 @@ qx.Class.define("ankamon.page.Network", {
       { id: "hostname", label: "Bilgisayar adı", width: 150 },
       { id: "os", label: "İşletim sistemi", width: 160 },
       { id: "ports", label: "Açık port", width: 80 },
-      { id: "network", label: "Ağ", width: 130 },
       { id: "iface", label: "Ağ arabirimi", hint: "Sunucunun bu cihazı gördüğü ağ arabirimi", width: 110 },
       { id: "first", label: "İlk görülme", width: 110 },
       { id: "seen", label: "Son görülme", width: 110 },
-      // Cihaz log gönderiyorsa son gönderme anı (son 24 saatte SS:DD, daha eskiyse tarih) — kullanıcı isteği 2026-11-09.
-      { id: "lastlog", label: "Son log", hint: "Cihazın Ankamon'a son log gönderdiği an (son 24 saatte saat:dakika, daha eskiyse tarih ve saat)", width: 100 },
+      // Cihaz log gönderiyorsa son gönderme anı (son 24 saatte "x saat y dakika önce", daha eskiyse tarih) — kullanıcı isteği 2026-11-09.
+      { id: "lastlog", label: "Son log", hint: "Cihazın Ankamon'a son log gönderdiği an (son 24 saatte ne kadar önce, daha eskiyse tarih ve saat)", width: 140 },
+      // Keşif: satırın listeye nasıl girdiği — ağ taraması, log gönderimi ya da elle ekleme (kullanıcı isteği 2026-11-09).
+      { id: "discovery", label: "Keşif", hint: "Cihazın bu listeye nasıl girdiği: ağ taraması, log gönderimi (önce loglarından tanındı) ya da elle ekleme", width: 120 },
       { id: "notes", label: "Not", width: 150 },
       // FATİH fazı (bkz. util.Format.etap). Sona eklendi: servis alt satırları sabit sütun sırası kullanır.
       { id: "faz", label: "Faz", width: 130 },
@@ -191,6 +191,9 @@ qx.Class.define("ankamon.page.Network", {
     },
 
     /** "Son log" hücresi: son 24 saatte "SS:DD", daha eskiyse "GG.AA.YYYY SS:DD"; log yoksa boş. */
+    /** Keşif sütunu: NetworkApi "discovery" → metin. */
+    DISCOVERY: { scan: "Ağ taraması", syslog: "Log gönderimi", manual: "Elle eklendi", self: "Ankamon sunucusu" },
+
     logTime(secs) {
       if (!secs) {
         return "";
@@ -198,8 +201,11 @@ qx.Class.define("ankamon.page.Network", {
       const d = new Date(secs * 1000);
       const pad = n => String(n).padStart(2, "0");
       const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      if (Date.now() - d.getTime() < 24 * 3600 * 1000) {
-        return hm;
+      const ago = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000)); // dakika
+      if (ago < 24 * 60) {
+        const h = Math.floor(ago / 60);
+        const m = ago % 60;
+        return ago < 1 ? "az önce" : (h ? `${h} saat ` : "") + (m || !h ? `${m} dakika ` : "") + "önce";
       }
       return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${hm}`;
     },
@@ -274,7 +280,6 @@ qx.Class.define("ankamon.page.Network", {
       this.__showState(data);
 
       const wasChecked = new Set(this.__checkedDevices().map(d => d.id));
-      const netName = new Map(nets.networks.map(n => [n.id, Ops.networkLabel(n)]));
       // "Ağ etkinliği" hücresi: öncelik PASİF görülen akış yoğunluğu (tüm cihazlar; flow_kbps/pps + baskın
       // protokol — bkz. worker netscan/flows.py). Görünürde akış yoksa Windows gönderim hızı (IP ID,
       // activity_pps) yedek gösterilir. flow_at 10 dk'dan eskiyse görülen akış yok sayılır.
@@ -311,11 +316,12 @@ qx.Class.define("ankamon.page.Network", {
         cells: [
           d.id, wasChecked.has(d.id), (d.services.length + (d.shares ? d.shares.length : 0)) ? "▸" : "",
           d.online ? "Çevrim içi" : "Çevrim dışı",
-          Ops.deviceName(d), d.ip || "", d.ip_mask || "", d.mac, d.vendor || (d.mac && /^.[26ae]/i.test(d.mac) ? "(rastgele MAC)" : ""),
+          Ops.deviceName(d), d.ip_mask || "", d.mac, d.vendor || (d.mac && /^.[26ae]/i.test(d.mac) ? "(rastgele MAC)" : ""),
           d.device_type || "", d.model || "", d.hostname || "", d.os_guess || "",
           d.services_scanned_at ? String(d.services.length) : "",
-          netName.get(d.network_id) || d.network, d.iface || "",
+          d.iface || "",
           F.ago(d.first_seen_at), d.online ? "şimdi" : F.ago(d.last_seen_at), ankamon.page.Network.logTime(d.last_log_at),
+          ankamon.page.Network.DISCOVERY[d.discovery] || d.discovery || "",
           d.notes || "",
           F.etap(d.etap),
           normNum(d), flowText(d)
@@ -354,13 +360,12 @@ qx.Class.define("ankamon.page.Network", {
 
       const col = this.__model.getSortColumnIndex();
       const asc = this.__model.isSortAscending();
-      const ipCol = 2 + this.__columns.findIndex(c => c.id === "ip");
       const ipMaskCol = 2 + this.__columns.findIndex(c => c.id === "ip_mask");
       const logCol = 2 + this.__columns.findIndex(c => c.id === "lastlog");
       const activityCol = 2 + this.__columns.findIndex(c => c.id === "activity");
       const detailCol = 2 + this.__columns.findIndex(c => c.id === "activity_detail");
       if (col >= 2) {
-        const key = (col === ipCol || col === ipMaskCol) ? (r => ankamon.page.Network.ipKey(r.device.ip))
+        const key = col === ipMaskCol ? (r => ankamon.page.Network.ipKey(r.device.ip))
           : col === logCol ? (r => r.device.last_log_at || 0)
           : (col === activityCol || col === detailCol) ? (r => ankamon.page.Network.activityKey(r.device))
           : (r => String(r.cells[col] ?? "").toLocaleLowerCase("tr"));

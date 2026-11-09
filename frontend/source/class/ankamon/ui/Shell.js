@@ -157,8 +157,9 @@ qx.Class.define("ankamon.ui.Shell", {
       // Tahtalar (kullanıcı isteği 2026-11-06): altında "Liste" (bu sayfa — liste/ekran seçimi sayfanın içinde, bkz.
       // page.Boards), Sensörler ve eklenti sekmeleri (Ahenk; "diagnose" sayfasının sekmeleri, inline). selfLeaf: sayfanın
       // kendisi ağaçta ilk alt seçenek olarak da durur; Tahtalar'a tıklamak onu seçer (varsayılan seçenek).
-      // "Tahtalar" → "Bilgisayarlar" (kullanıcı isteği 2026-11-09; kimlik "boards" kalır).
-      { id: "boards", label: "Bilgisayarlar", feature: "boards", selfLeaf: "Liste", create: u => new ankamon.page.Boards(u) },
+      // "Tahtalar" → "Bilgisayarlar" → "Ağ" (kullanıcı isteği 2026-11-09; kimlik "boards" kalır). Ağ envanteri sayfası
+      // ("network") onun altında "Ağ" alt menüsü.
+      { id: "boards", label: "Ağ", feature: "boards", selfLeaf: "Liste", create: u => new ankamon.page.Boards(u) },
       // parent: ağaçta o sayfanın düğümünün ALTINDA. Üst sayfa kullanıcıya kapalıysa kökte gösterilir — bkz. __createTree.
       // collapsed: kökte olsa da katlı başlar (uzun sekme listesi menüyü doldurmasın — bkz. __rememberOpen).
       // Sekmeleri ağaçta da (kullanıcı isteği: zaman çizelgesi sol menüden açılsın). key: Oturumlar sekmesinde
@@ -199,8 +200,9 @@ qx.Class.define("ankamon.ui.Shell", {
       { id: "logs", label: "Loglar", feature: "logs", parent: "system", collapsed: true, create: u => new ankamon.page.Logs(u),
         tabs: () => ankamon.ui.Shell.LOG_KINDS.map(kind => ({ key: kind.mode, label: kind.label })) },
       // Ağ envanteri: bütün ağların cihazları tek listede (kullanıcı isteği 2026-11-09: ağ başına alt düğüm yok; ağ
-      // işlemleri sayfadaki "Ağlar" düğmesinde — bkz. page.Network).
-      { id: "network", label: "Ağ", feature: "network", create: u => new ankamon.page.Network(u) },
+      // işlemleri sayfadaki "Ağlar" düğmesinde — bkz. page.Network). Üst menü "Ağ"ın (boards) altında (kullanıcı isteği
+      // 2026-11-09); o kullanıcıya kapalıysa kökte.
+      { id: "network", label: "Ağ", feature: "network", parent: "boards", create: u => new ankamon.page.Network(u) },
       // Ankamon'un kendi bakımı (servisler, zamanlanmış işler, veritabanı, yapılandırma) — yalnız yönetici.
       { id: "system", label: "Sistem", admin: true, retap: true, create: u => new ankamon.page.System(u) },
       // Kullanıcılar ve Ayarlar "Sistem"in altında (kullanıcı isteği).

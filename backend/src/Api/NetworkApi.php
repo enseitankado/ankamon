@@ -103,6 +103,10 @@ final class NetworkApi
                     extract(epoch FROM d.activity_at)::bigint AS activity_at, d.activity_pps,
                     extract(epoch FROM d.flow_at)::bigint AS flow_at, d.flow_pps, d.flow_kbps, d.flow_proto,
                     b.id AS board_id, COALESCE(NULLIF(b.label, ''), b.hostname) AS board_name,
+                    -- Keşif: satır listeye nasıl girdi (scan|syslog|manual|self). Taramayla açılmış ama cihaz daha önce
+                    -- Tahtalar'a loglarından (syslog) ya da elle (manual) girmişse o ilk yol.
+                    CASE WHEN d.source = 'scan' AND b.source IN ('syslog', 'manual') AND b.created_at < d.first_seen_at
+                         THEN b.source ELSE d.source END AS discovery,
                     k.label AS known_alias,
                     COALESCE((SELECT json_agg(json_build_object('proto', s.proto, 'port', s.port, 'service', s.service,
                                   'product', s.product, 'version', s.version, 'extra', s.extra) ORDER BY s.port, s.proto)
