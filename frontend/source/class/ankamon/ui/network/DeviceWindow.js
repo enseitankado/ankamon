@@ -171,7 +171,11 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
           ["Bilgisayar adı", board.hostname || "—"],
           ["Durum", board.online ? "Çevrim içi" : "Çevrim dışı"],
           ["Son log", board.last_log_at ? F.dateTime(board.last_log_at * 1000) : "—"],
-          ["Model", facts.model || facts.product_name || "—"]
+          ["Model", facts.product || "—"],
+          ["İşlemci", facts.cpu_model || "—"],
+          ["İşletim sistemi", facts.os_name || "—"],
+          ["BIOS", [facts.bios_vendor, facts.bios_version, facts.bios_date].filter(Boolean).join(" ") || "—"],
+          ["Seri no", facts.serial || facts.board_serial || "—"]
         ];
         body.add(new qx.ui.basic.Label("Tahta bilgileri").set({ font: "bold", marginTop: 6 }));
         body.add(this.__htmlTable(null, ["Alan", "Değer"], info, [170, "1*"], plain));
