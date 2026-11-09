@@ -25,9 +25,11 @@
 
 """Ağ rolleri: hangi arabirim tahta ağı, hangisi idari ağ (Ayarlar ▸ Ağ arabirimleri; settings.network_roles).
 
-Sunucu iki ağa bağlı olabilir: tahta ağı (tahtaları görmek/yönetmek) ve idari ağ (panele erişim). Tahta
-işleri — ağ taraması, pasif akış gözlemi, servis/paylaşım/etkinlik taramaları ve syslog'dan otomatik tahta
-kaydı — yalnız tahta ağında yapılır; idari ağa taşmaz. Panel, web terminal, syslog alımı, WoL, ekran
+Sunucu iki (ya da daha çok) ağa bağlı olabilir: tahta ağı (tahtaları görmek/yönetmek) ve idari ağ (panele erişim).
+Tahtalar BÜTÜN ağlarda algılanır (kullanıcı isteği 2026-11-09): cihaz keşfi (ARP) her bağlı ağda, tahta olup olmadığına
+MAC karar verir (netscan/boardmac.py); loglardan tahta kaydı/IP güncellemesi MAC eşleşmesine bakar
+(tasks/boards_from_logs.py). Rol yalnız şunları tahta ağıyla sınırlar: pasif akış gözlemi ve tahta OLMAYAN
+cihazların servis/paylaşım/etkinlik/ad taramaları; MAC'i bilinmeyen log kaynağına güvenilip güvenilmeyeceği. Panel, web terminal, syslog alımı, WoL, ekran
 yansıtma ve Avahi iki ağda da çalışır (rol onları kısıtlamaz).
 
 Kural (Python: is_board_net, SQL: board_net_sql — ikisi aynı):

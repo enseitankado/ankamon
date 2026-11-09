@@ -39,8 +39,12 @@ log = logging.getLogger("ankamon.netscan")
 
 # Üst üste bu kadar taramada görülmeyen cihaz çevrimdışı sayılır (telefonlar uykuda ARP'yi kaçırabilir).
 MISSES_BEFORE_OFFLINE = 2
-# Aday sorgularında: cihazın ağı tahta ağı mı (Ayarlar ▸ Ağ arabirimleri; bkz. netroles).
-_BOARD_NET = netroles.board_net_sql("n")
+# Aday sorgularında: cihazın ağı tahta ağı mı (Ayarlar ▸ Ağ arabirimleri; bkz. netroles) YA DA cihazın kendisi tahta
+# (MAC'iyle sınıflandırılmış, elle tahta seçilmiş ya da Tahtalar'da kayıtlı). Ayrıntılı taramalar (servis, paylaşım,
+# etkinlik, ad) idari ağdaki sıradan bilgisayarlara yapılmaz ama tahtalar hangi ağda olursa olsun taranır
+# (kullanıcı isteği 2026-11-09: tahtalar bütün ağ bağdaştırıcılarından algılanır).
+_BOARD_NET = ("(" + netroles.board_net_sql("n") + f" OR d.type_auto = '{classify.BOARD}' OR d.device_type = '{classify.BOARD}'"
+              " OR EXISTS (SELECT 1 FROM boards bb WHERE bb.mac = d.mac OR bb.wifi_mac = d.mac))")
 
 
 def bump(conn) -> None:
@@ -78,19 +82,21 @@ def sync_networks(conn, detected: list[dict]) -> list[dict]:
         activity.record(conn, f"Ağ: sunucu artık bu ağa bağlı değil — {row['cidr']}", "warn")
     if changed or gone:
         bump(conn)
-    return _scannable(detected, netroles.roles(conn))
+    # Cihaz keşfi (ARP) bütün bağlı ağlarda — taraması açık olanlar (Ağ sayfasındaki ağ başına anahtar): tahtalar
+    # hangi bağdaştırıcıdan olursa olsun bulunsun (kullanıcı isteği 2026-11-09).
+    return _scannable(detected, netroles.roles(conn), board_only=False)
 
 
-def _scannable(detected: list[dict], role: dict) -> list[dict]:
-    """Taranacak ağlar: taraması açık VE tahta ağı olanlar (bkz. netroles); tarama arabirimi role göre seçilir."""
-    nets = [n for n in detected if n["scan_enabled"] and netroles.is_board_net(n["ifaces"], role)]
+def _scannable(detected: list[dict], role: dict, board_only: bool = True) -> list[dict]:
+    """Taranacak ağlar: taraması açık olanlar; board_only ise yalnız tahta ağı (bkz. netroles). Arabirim role göre."""
+    nets = [n for n in detected if n["scan_enabled"] and (not board_only or netroles.is_board_net(n["ifaces"], role))]
     for n in nets:
         n["iface"] = netroles.scan_iface(n, role)
     return nets
 
 
 def scannable(conn, detected: list[dict]) -> list[dict]:
-    """sync_networks'ün yazmadan eşi (pasif akış gözlemi için): kayıtlı scan_enabled'a ve role göre süzer."""
+    """Pasif akış gözlemi için ağlar: kayıtlı scan_enabled'a ve role göre — YALNIZ tahta ağı (idari ağın trafiği izlenmez)."""
     enabled = {r["cidr"]: r["scan_enabled"] for r in conn.execute(
         "SELECT cidr::text AS cidr, scan_enabled FROM net_networks").fetchall()}
     for n in detected:
@@ -233,19 +239,27 @@ def fill_labels(conn) -> int:
 
 
 def fill_board_ips(conn) -> int:
-    """IP'si olmayan tahtalara (Tahta ekle'de yalnız MAC girilmiş) ağ taramasının o MAC için bulduğu adres:
-    önce kablolu MAC (boards.mac), bulunamazsa Wi-Fi kartının MAC'i (boards.wifi_mac — tahta yalnız Wi-Fi ile
-    bağlıysa)."""
+    """Tahtaların IP'si, ağ taramasının o MAC için bulduğu adresle (hangi ağda olursa olsun):
+      - IP'si olmayan tahta (Tahta ekle'de yalnız MAC girilmiş): bilinen herhangi bir adres;
+      - IP'si değişmiş tahta (DHCP — kullanıcı bildirimi 2026-11-09: Arge 1 yeni adres alınca kapalı görünüyordu):
+        tarama MAC'i 15 dk içinde çevrim içi gördüyse o adres.
+    Önce kablolu MAC (boards.mac), o çevrim içi değilse Wi-Fi kartının MAC'i (boards.wifi_mac). MAC ARP ile görülür,
+    sahte kaynak adresiyle değiştirilemez."""
+    fresh = "d.online AND d.last_seen_at > now() - interval '15 minutes'"
     rows = conn.execute(
-        """UPDATE boards b SET ip = d.ip, updated_at = now()
-           FROM net_devices d
-           WHERE b.ip IS NULL AND b.mac = d.mac AND d.ip IS NOT NULL
+        f"""UPDATE boards b SET ip = d.ip, updated_at = now()
+           FROM (SELECT DISTINCT ON (mac) mac, ip, online, last_seen_at FROM net_devices
+                 WHERE ip IS NOT NULL ORDER BY mac, online DESC, last_seen_at DESC NULLS LAST) d
+           WHERE b.mac = d.mac AND (b.ip IS NULL OR ({fresh} AND b.ip IS DISTINCT FROM d.ip))
            RETURNING b.id"""
     ).fetchall()
     rows += conn.execute(
-        """UPDATE boards b SET ip = d.ip, updated_at = now()
-           FROM net_devices d
-           WHERE b.ip IS NULL AND b.wifi_mac = d.mac AND d.ip IS NOT NULL
+        f"""UPDATE boards b SET ip = d.ip, updated_at = now()
+           FROM (SELECT DISTINCT ON (mac) mac, ip, online, last_seen_at FROM net_devices
+                 WHERE ip IS NOT NULL ORDER BY mac, online DESC, last_seen_at DESC NULLS LAST) d
+           WHERE b.wifi_mac = d.mac AND (b.ip IS NULL OR ({fresh} AND b.ip IS DISTINCT FROM d.ip))
+             AND NOT EXISTS (SELECT 1 FROM net_devices w WHERE w.mac = b.mac AND w.online
+                             AND w.last_seen_at > now() - interval '15 minutes')
            RETURNING b.id"""
     ).fetchall()
     if rows:

@@ -69,6 +69,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
       form.text("exporter_port", "Sensör portu", String(board.exporter_port));
       form.check("monitor_enabled", "Sensör verisi toplansın", board.monitor_enabled)
         .setToolTipText("Sensör verisi bilgisayar ağda ulaşılabilir olduğunda toplanır.");
+      // Tahtalar MAC adresinden tanınır (ETAP / Vestel); uymayan gerçek tahta bu işaretle tahta sayılır (göç 046).
+      form.check("smart_board", "Bu bir akıllı tahtadır", !!board.smart_board)
+        .setToolTipText("Ankamon bir cihazın akıllı tahta olduğunu MAC adresinden anlar (ETAP tahtalarının üretici önekleri). " +
+          "MAC'i bu öneklere uymayan bir tahtayı işaretleyin: ağ bağdaştırıcısı fark etmeksizin tahta sayılır ve IP'si loglarından güncellenir.");
       form.addField("notes", "Not", new qx.ui.form.TextArea(board.notes || "").set({ wrap: true, autoSize: true, minimalLineHeight: 3 }));
       win.add(form);
 

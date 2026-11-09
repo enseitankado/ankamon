@@ -33,17 +33,23 @@ Yalnız zamanında teslim edilen loglar sayılır: tahta bağlantısı kopukken 
 o günkü (eski) bilgisayar adını taşır; onlar yeni kayıt açmamalı, IP'yi de değiştirmemeli (imajdan
 klonlanan tahta, kaynak tahtanın kuyruğunu da taşıyıp kendi IP'sinden gönderebilir).
 
-Syslog portu iki ağdan da (tahta + idari) log kabul eder; ama Ayarlar ▸ Ağ arabirimleri'nde rol seçildiyse
-YALNIZ tahta ağından gelen kaynaklar tahta kaydı açar/IP günceller (bkz. netroles). Aksi halde idari ağdan
-tek bir sahte syslog paketi bir tahtanın IP'sini kendi adresine çevirip yönetim bağlantılarını (root
-parolasıyla SSH) üstüne çekebilirdi. İdari ağdan gelen loglar yine Loglar'da görünür.
+Tahtalar sunucunun BÜTÜN ağ bağdaştırıcılarından algılanır (kullanıcı isteği 2026-11-09 — önceden yalnız tahta
+ağından); tahta olup olmadığına gönderen adresin MAC'i karar verir (bkz. netscan.boardmac — ARP tablosu, yoksa ağ
+taraması):
+  - Kayıtlı tahta (bilgisayar adı eşleşir): IP yalnız gönderenin MAC'i tahtanın kablolu/kablosuz MAC'iyle eşleşirse
+    güncellenir; tahtanın MAC'i kayıtlı değilse MAC bir tahta MAC'iyse ya da tahta "Bu bir akıllı tahtadır" diye
+    işaretliyse (boards.smart_board). MAC henüz bilinmiyorsa yalnız tahta ağından gelen kaynak güvenilir (eski kural).
+    Böylece herhangi bir ağdan atılan sahte syslog paketi (başka MAC) bir tahtanın IP'sini kendi adresine çevirip
+    yönetim bağlantılarını (root parolasıyla SSH) üstüne çekemez.
+  - Yeni kayıt: yalnız gönderenin MAC'i bir tahta MAC'iyse (ETAP faz veritabanı / Vestel) açılır.
+Tahta olmayan kaynakların logları yine Loglar'da görünür.
 """
 
 import ipaddress
 import logging
 
 from .. import activity, netroles
-from ..netscan import ifaces
+from ..netscan import boardmac, ifaces
 
 log = logging.getLogger(__name__)
 
@@ -103,35 +109,66 @@ def _board_source(conn):
     return accept
 
 
+def _ip_trusted(board: dict, ip: str, mac: str | None, from_board_net) -> bool:
+    """Kayıtlı tahtanın IP'si bu kaynaktan güncellenebilir mi (bkz. modül başı)."""
+    if mac:
+        own = {m for m in (board["mac"], board["wifi_mac"]) if m}
+        if own:
+            return mac in own
+        return board["smart_board"] or boardmac.is_board_mac(mac)
+    return from_board_net(ip)
+
+
 def run(conn) -> None:
     from_board_net = _board_source(conn)
+    macs = boardmac.ip_macs(conn)
+    boards = {r["host"]: r for r in conn.execute(
+        """SELECT lower(hostname) AS host, id, mac::text AS mac, wifi_mac::text AS wifi_mac, smart_board
+           FROM boards WHERE hostname IS NOT NULL""").fetchall()}
     for row in conn.execute(RECENT).fetchall():
-        if not from_board_net(row["ip"]):
-            log.debug("tahta ağı dışından log kaynağı (envantere işlenmedi): %s (%s)", row["host"], row["ip"])
+        ip = row["ip"]
+        mac = macs.get(ip) if ip else None
+        board = boards.get((row["host"] or "").lower())
+        if board:
+            trusted = not ip or _ip_trusted(board, ip, mac, from_board_net)
+            if not trusted:
+                log.debug("IP güncellenmedi (MAC eşleşmiyor): %s %s (%s)", row["host"], ip, mac)
+            conn.execute(
+                """UPDATE boards SET ip = CASE WHEN %(trusted)s THEN COALESCE(%(ip)s::inet, ip) ELSE ip END,
+                          last_log_at = %(last_log_at)s, updated_at = now() WHERE id = %(id)s""",
+                dict(row, trusted=trusted, id=board["id"]),
+            )
             continue
-        updated = conn.execute(
-            """UPDATE boards
-               SET ip = COALESCE(%(ip)s::inet, ip), last_log_at = %(last_log_at)s, updated_at = now()
-               WHERE lower(hostname) = lower(%(host)s)""",
-            row,
-        ).rowcount
-        if updated:
+        board_mac = boardmac.is_board_mac(mac)
+        # Bilgisayar adı değişmiş kayıtlı tahta (TiHA dinamik adı): MAC'iyle bulunur, IP'si güncellenir (ad
+        # board_identity görevinde bağlanır).
+        if mac and conn.execute(
+                """UPDATE boards SET ip = %(ip)s::inet, last_log_at = %(last_log_at)s, updated_at = now()
+                   WHERE mac = %(mac)s::macaddr OR (wifi_mac = %(mac)s::macaddr AND NOT EXISTS (
+                       SELECT 1 FROM boards x WHERE x.mac = %(mac)s::macaddr))""",
+                dict(row, mac=mac)).rowcount:
             continue
-        # Elle (yalnız IP ile) eklenmiş kayıt varsa adını tamamla; yoksa yeni kayıt aç.
-        if row["ip"]:
+        # Elle (yalnız IP ile) eklenmiş kayıt varsa adını tamamla: kaynak o kaydın MAC'iyle ya da tahta MAC'iyle.
+        updated = 0
+        if ip and (board_mac or (mac is None and from_board_net(ip))):
             updated = conn.execute(
                 """UPDATE boards SET hostname = %(host)s, last_log_at = %(last_log_at)s, updated_at = now()
                    WHERE ip = %(ip)s::inet AND hostname IS NULL""",
                 row,
             ).rowcount
-        if not updated:
-            if _looks_fake(row["host"], row["ip"]):
-                log.info("şüpheli kaynak yok sayıldı (otomatik kayıt açılmadı): %s (%s)", row["host"], row["ip"])
-                continue
-            conn.execute(
-                """INSERT INTO boards (hostname, ip, source, last_log_at)
-                   VALUES (%(host)s, %(ip)s::inet, 'syslog', %(last_log_at)s)""",
-                row,
-            )
-            log.info("yeni tahta: %s (%s)", row["host"], row["ip"])
-            activity.record(conn, f"Yeni tahta bulundu (log): {row['host']} ({row['ip'] or 'IP yok'})")
+        if updated:
+            continue
+        if not board_mac:
+            log.debug("tahta MAC'i olmayan log kaynağı (kayıt açılmadı): %s (%s, MAC %s)", row["host"], ip, mac or "bilinmiyor")
+            continue
+        if _looks_fake(row["host"], ip):
+            log.info("şüpheli kaynak yok sayıldı (otomatik kayıt açılmadı): %s (%s)", row["host"], ip)
+            continue
+        conn.execute(
+            """INSERT INTO boards (hostname, ip, mac, source, last_log_at)
+               VALUES (%(host)s, %(ip)s::inet, %(mac)s::macaddr, 'syslog', %(last_log_at)s)
+               ON CONFLICT DO NOTHING""",
+            dict(row, mac=mac),
+        )
+        log.info("yeni tahta: %s (%s, MAC %s)", row["host"], ip, mac)
+        activity.record(conn, f"Yeni tahta bulundu (log): {row['host']} ({ip or 'IP yok'}, MAC {mac})")

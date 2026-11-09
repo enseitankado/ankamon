@@ -116,8 +116,8 @@ qx.Class.define("ankamon.page.Settings", {
       ).set({ rich: true, wrap: true, textColor: "app-muted" }));
       tabs.add(access);
 
-      // Ağ rolleri (bkz. worker/ankamon/netroles.py): sunucu tahta ağına ve idari ağa ayrı kartlarla
-      // bağlıysa tahta işleri yalnız tahta ağında yapılır; idari ağa taşmaz.
+      // Ağ rolleri (bkz. worker/ankamon/netroles.py): tahtalar her ağda MAC'iyle algılanır (2026-11-09); akış gözlemi
+      // ve sıradan cihazların ayrıntılı taramaları yalnız tahta ağında.
       const netPage = this.__page("Ağ arabirimleri");
       const roles = settings.network_roles || {};
       const boardIface = this.__ifaceBox(settings.interfaces, roles.board_iface, "Otomatik (bağlı her ağ)");
@@ -130,8 +130,11 @@ qx.Class.define("ankamon.page.Settings", {
       netForm.add(adminIface, { row: 1, column: 1 });
       this.__section(netPage, "Ağ arabirimleri",
         "Sunucu tahta ağına ve idari ağa ayrı kartlarla bağlıysa hangisinin hangisi olduğunu seçin. " +
-        "<b>Yalnız tahta ağında</b> yapılanlar: ağ taraması ve görülen akış gözlemi, servis/paylaşım/etkinlik " +
-        "taramaları, loglardan otomatik tahta kaydı ve tahta IP'sinin güncellenmesi; tahtaların Samba parolası da " +
+        "<b>Tahtalar bütün ağ kartlarından algılanır</b>: cihaz keşfi her bağlı ağda yapılır ve bir cihazın tahta olup " +
+        "olmadığına MAC adresi karar verir (ETAP tahta önekleri; uymayan tahta Tahtayı düzenle'de \"Bu bir akıllı " +
+        "tahtadır\" ile işaretlenir). Loglardan tahta kaydı ve IP güncellemesi de MAC'e bakar (gönderenin MAC'i " +
+        "tahtanınkiyle eşleşmezse IP değişmez). <b>Yalnız tahta ağında</b> yapılanlar: görülen akış gözlemi ve " +
+        "sıradan cihazların servis/paylaşım/etkinlik taramaları (tahtalar her ağda taranır); tahtaların Samba parolası " +
         "yalnız kayıtlı tahtalarda denenir. <b>İki ağda da</b> çalışanlar: panel, web terminal, log alımı " +
         `(port ${settings.syslog_port}), Wake-on-LAN (tahtanın ağına, o arabirimin maskesiyle), ekran yansıtma ` +
         "ve yerel ad duyurusu (Avahi). Yalnız idari ağ seçilirse, yalnız o karta bağlı ağlar dışındaki her ağ " +

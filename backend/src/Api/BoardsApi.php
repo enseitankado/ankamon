@@ -45,7 +45,7 @@ final class BoardsApi
     // mac = KABLOLU kartın MAC'i (tahtanın kimliği, WoL, ağ taraması — sütun adı tarihsel), wifi_mac = Wi-Fi kartının
     // kalıcı MAC'i (göç 043; worker oturum yoklaması/donanım bilgisi yazar, elle de girilebilir).
     private const COLUMNS = "b.id, b.hostname, b.mac::text AS mac, b.wifi_mac::text AS wifi_mac, host(b.ip) AS ip, b.label, b.location, b.notes,
-        b.source, b.monitor_enabled, b.exporter_port, b.online,
+        b.source, b.monitor_enabled, b.smart_board, b.exporter_port, b.online,
         b.ssh_ok, b.exporter_ok, b.facts - '{disk_layout,firmware_boot,uefi_vars}'::text[] AS facts, b.etap,
         b.session_username, b.session_locked, extract(epoch FROM b.session_checked_at)::bigint AS session_checked_at,
         -- Ekran kutucuğunda 'Oturumu açık kullanıcı yok (23 dk)': tahta açık ve taze yoklama (5 dk, no_login
@@ -268,6 +268,10 @@ final class BoardsApi
         }
         if ($request->has('monitor_enabled')) {
             $fields['monitor_enabled'] = (bool) $request->input('monitor_enabled');
+        }
+        // "Bu bir akıllı tahtadır": MAC'i tahta MAC'i olmasa da tahta sayılır (bkz. migration 046, worker boards_from_logs).
+        if ($request->has('smart_board')) {
+            $fields['smart_board'] = (bool) $request->input('smart_board');
         }
         if ($request->has('exporter_port')) {
             $port = (int) $request->input('exporter_port');
