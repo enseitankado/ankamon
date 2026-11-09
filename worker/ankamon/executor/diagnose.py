@@ -52,12 +52,44 @@ from . import hwfacts
 _IGNORED_UNITS = {"openipmi.service"}
 
 _IO_RE = r"I/O error|ata[0-9.]+: (failed command|exception)|EXT4-fs error|link is slow to respond|Buffer I/O error|blk_update_request"
+# Disk G/Ç hatası satırları tahtanın KENDİ diski ile tahtaya takılan USB bellek / harici disk diye ayrılır (kullanıcı
+# bildirimi 2026-11-09: B-ELK.ATL3'te "6 disk G/Ç hatası … sdb1" Acil görünüp SATA kablosu önerilmişti; sdb1 düzgün
+# çıkarılmadan sökülen FAT/exFAT USB bellekti — "device offline error … lost async page write"). Aygıt adı (sda/sdb)
+# açılıştan açılışa değişir (USB bellek takılıyken açılınca sda olabiliyor), bu yüzden ayrım HER AÇILIŞIN kendi çekirdek
+# günlüğünden yapılır ("Linux version" satırı yeni açılış): o açılışta "scsi hostN: usb-storage" ile bağlanan ya da
+# "Attached SCSI removable disk" denen aygıt ve exFAT birimi USB'dir. FAT tek başına kanıt DEĞİL: tahtanın kendi
+# diskindeki EFI bölümü (sda1) de FAT'tır. Kanıtı olmayan her satır (ataN, kök disk…) tahtanın diski sayılır.
+# Çıktı: dahili sayı, dahili son satır, USB sayı, USB son satır (alt alta). LC_ALL=C şart: Türkçe yerelde tolower("I")
+# "ı" verir ve "I/O error" hiç eşleşmezdi.
+_IO_AWK = r"""
+function flush(  i, l, d) {
+  for (i = 1; i <= n; i++) {
+    l = L[i]; d = ""
+    if (match(l, /sd[a-z]+/)) d = substr(l, RSTART, RLENGTH)
+    if (d != "" && usb[d]) { uc++; us = l } else { ic++; is = l }
+  }
+  n = 0; split("", usb); split("", uh)
+}
+/kernel: Linux version / { flush() }
+/scsi host[0-9]+: usb-storage/ { if (match($0, /scsi host[0-9]+/)) uh[substr($0, RSTART + 9, RLENGTH - 9)] = 1 }
+/ sd [0-9]+:[0-9]+:[0-9]+:[0-9]+: \[sd[a-z]+\]/ {
+  h = ""
+  if (match($0, / sd [0-9]+:/)) h = substr($0, RSTART + 4, RLENGTH - 5)
+  if (match($0, /\[sd[a-z]+\]/)) { d = substr($0, RSTART + 1, RLENGTH - 2); if ((h in uh) || $0 ~ /removable/) usb[d] = 1 }
+}
+/exFAT-fs \(sd[a-z]+/ { if (match($0, /\(sd[a-z]+/)) usb[substr($0, RSTART + 1, RLENGTH - 1)] = 1 }
+tolower($0) ~ re { L[++n] = $0 }
+END { flush(); print ic + 0; print is; print uc + 0; print us }
+"""
 CHECK_SCRIPT = r"""
 export LC_ALL=C
 echo "DG_FAILED_UNITS=$(systemctl --failed --no-legend --plain 2>/dev/null | awk '{print $1}' | paste -sd, -)"
 k=$(journalctl -k --since "-7 days" -q --no-pager 2>/dev/null)
-echo "DG_IO_ERRORS=$(printf '%s\n' "$k" | grep -ciE '__IO__')"
-echo "DG_IO_SAMPLE=$(printf '%s\n' "$k" | grep -iE '__IO__' | tail -n 1 | cut -c1-200)"
+io=$(printf '%s\n' "$k" | LC_ALL=C awk -v re="$(printf '%s' '__IO__' | LC_ALL=C tr 'A-Z' 'a-z')" '__AWK__')
+echo "DG_IO_ERRORS=$(printf '%s\n' "$io" | sed -n 1p)"
+echo "DG_IO_SAMPLE=$(printf '%s\n' "$io" | sed -n 2p | cut -c1-200)"
+echo "DG_USB_IO_ERRORS=$(printf '%s\n' "$io" | sed -n 3p)"
+echo "DG_USB_IO_SAMPLE=$(printf '%s\n' "$io" | sed -n 4p | cut -c1-200)"
 echo "DG_OOM=$(printf '%s\n' "$k" | grep -ciE 'out of memory|oom-kill')"
 echo "DG_THROTTLE=$(printf '%s\n' "$k" | grep -ciE 'temperature above threshold|clock throttled')"
 echo "DG_ROOT_RO=$(awk '$2=="/"{split($4,o,","); print (o[1]=="ro")?1:0; exit}' /proc/mounts)"
@@ -91,7 +123,7 @@ top -b -n 2 -d 1 -o %CPU -w 200 2>/dev/null | awk '/^top -/{n++} n==2 && /^ *PID
 # sürer; sunucu saati SSH döner dönmez alınır, bkz. _ssh DG_SERVER_EPOCH) ki fark gerçek sapmayı versin.
 echo "DG_UPTIME=$(cut -d. -f1 /proc/uptime)"
 echo "DG_EPOCH=$(date +%s)"
-""".replace("__IO__", _IO_RE)
+""".replace("__IO__", _IO_RE).replace("__AWK__", _IO_AWK)
 
 SCRIPT = hwfacts.SCRIPT + CHECK_SCRIPT
 
@@ -142,6 +174,8 @@ def _extra(output: str) -> dict:
         "failed_units": [u for u in split("DG_FAILED_UNITS") if u not in _IGNORED_UNITS],
         "io_errors": num("DG_IO_ERRORS"),
         "io_sample": values.get("DG_IO_SAMPLE", "").strip() or None,
+        "usb_io_errors": num("DG_USB_IO_ERRORS"),
+        "usb_io_sample": values.get("DG_USB_IO_SAMPLE", "").strip() or None,
         "oom": num("DG_OOM"),
         "throttle": num("DG_THROTTLE"),
         "root_ro": num("DG_ROOT_RO"),
@@ -335,6 +369,14 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
             "Disk bir süre yanıt vermemiş (tahta donmuş ya da SSH'a cevap vermemiş olabilir). SMART temiz olsa bile "
             "SATA kablosu/bağlantısı, güç beslemesi ya da disk denetleyicisi sorunlu olabilir: kabloyu yeniden "
             "takın ya da değiştirin; tekrarlarsa diski değiştirin.")
+    if extra.get("usb_io_errors"):
+        # Tahtanın diskiyle ilgisi yok (bkz. _IO_AWK): yalnız bilgi.
+        add(g, "USB bellek / harici disk hataları (son 7 gün)", "info",
+            f"Tahtaya takılan çıkarılabilir diskte (USB) {extra['usb_io_errors']} G/Ç hatası kaydı; tahtanın kendi diski "
+            f"değil. Son: {extra['usb_io_sample'] or '—'}",
+            "USB bellek ya da harici disk, yazma sürerken (ör. dosya kopyalandıktan hemen sonra) çıkarılmış. "
+            "Kullanıcılara belleği çıkarmadan önce \"Güvenli kaldır\"ı hatırlatın; bellekteki son kopyalanan dosyalar "
+            "bozulmuş olabilir. Hep aynı bellekte ya da aynı USB girişinde tekrarlıyorsa bellek ya da giriş arızalı olabilir.")
 
     # 3) İşlemci sıcaklığı — son 24 saat ortalaması, filo ortalamasından %20+ yüksek
     g = "İşlemci sıcaklığı"

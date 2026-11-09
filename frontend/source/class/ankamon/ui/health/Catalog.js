@@ -82,7 +82,7 @@ qx.Class.define("ankamon.ui.health.Catalog", {
     /** SSH denetiminin başlıkları (bkz. worker executor/diagnose.py — g = "…" grupları). */
     SSH_GROUPS: [
       ["Donanım kapasitesi", "Dikkat", "RAM ve disk boyutu, tahtaların ortalamasıyla kıyas."],
-      ["Disk sağlığı (SMART)", "Acil / Dikkat", "Diskin kendi sağlık testi, okunamayan sektörler, yıpranma işaretleri, eşiği aşan öznitelikler (Acil), SSD kalan ömrü, disk sıcaklığı, son 7 günde çekirdeğin bildirdiği disk hataları."],
+      ["Disk sağlığı (SMART)", "Acil / Dikkat / Bilgi", "Diskin kendi sağlık testi, okunamayan sektörler, yıpranma işaretleri, eşiği aşan öznitelikler (Acil), SSD kalan ömrü, disk sıcaklığı, son 7 günde çekirdeğin bildirdiği disk hataları (tahtaya takılan USB bellek / harici diskteki hatalar ayrı ve yalnız Bilgi düzeyinde: çoğu, bellek düzgün çıkarılmadan sökülünce olur)."],
       ["İşlemci sıcaklığı", "Acil / Dikkat", "Son 24 saatin sıcaklık ölçümleri filonun geri kalanıyla kıyaslanır; ısı yüzünden işlemcinin yavaşlatılması. (Ani yükselmeler ayrıca sürekli izlemede: İşlemci sıcaklığı yüksek.)"],
       ["Soğutma ve kasa", "Acil / Dikkat", "İşlemci fanı dönüyor mu, kasa içi sıcaklık."],
       ["Boş disk alanı", "Acil / Dikkat", "Kök dosya sistemi doluluğu, dosya sayısı sınırı (inode)."],
