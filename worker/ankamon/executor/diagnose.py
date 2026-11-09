@@ -59,37 +59,79 @@ _IO_RE = r"I/O error|ata[0-9.]+: (failed command|exception)|EXT4-fs error|link i
 # günlüğünden yapılır ("Linux version" satırı yeni açılış): o açılışta "scsi hostN: usb-storage" ile bağlanan ya da
 # "Attached SCSI removable disk" denen aygıt ve exFAT birimi USB'dir. FAT tek başına kanıt DEĞİL: tahtanın kendi
 # diskindeki EFI bölümü (sda1) de FAT'tır. Kanıtı olmayan her satır (ataN, kök disk…) tahtanın diski sayılır.
-# Çıktı: dahili sayı, dahili son satır, USB sayı, USB son satır (alt alta). LC_ALL=C şart: Türkçe yerelde tolower("I")
+# Çıktı: dahili sayı, dahili son satır, USB sayı, USB son satır, hatalı bellek(ler)in kimliği (alt alta; ";" ayraçlı). LC_ALL=C şart: Türkçe yerelde tolower("I")
 # "ı" verir ve "I/O error" hiç eşleşmezdi.
 _IO_AWK = r"""
-function flush(  i, l, d) {
+function flush(  i, l, d, x) {
   for (i = 1; i <= n; i++) {
     l = L[i]; d = ""
     if (match(l, /sd[a-z]+/)) d = substr(l, RSTART, RLENGTH)
-    if (d != "" && usb[d]) { uc++; us = l } else { ic++; is = l }
+    if (d != "" && usb[d]) {
+      uc++; us = l; x = describe(d)
+      if (x != "" && index(";" devs ";", ";" x ";") == 0) devs = (devs == "" ? x : devs ";" x)
+    } else { ic++; is = l }
   }
-  n = 0; split("", usb); split("", uh)
+  n = 0; split("", usb); split("", uh); split("", dport); split("", dhost); split("", lab)
+  split("", vid); split("", man); split("", prod); split("", ser); split("", smod); split("", hport)
 }
+# Bellek kimliği: üretici/ürün (USB, yoksa SCSI modeli), USB kimliği, seri no, birim adı (udisksd bağlama yolu).
+function describe(d,  p, h, name, out, v) {
+  p = dport[d]; h = dhost[d]
+  name = man[p]; if (prod[p] != "") name = (name == "" ? prod[p] : name " " prod[p])
+  if (name == "" && smod[h] != "") name = smod[h]
+  out = (name == "" ? "USB bellek" : name)
+  if (vid[p] != "") out = out ", USB kimliği " vid[p]
+  if (ser[p] != "") out = out ", seri no " ser[p]
+  v = lab[d]
+  if (v != "") out = out (v ~ /^[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$|^[0-9a-fA-F-]{32,36}$/ ? ", etiketsiz birim (UUID " v ")" : ", birim adı \"" v "\"")
+  return out
+}
+function after(s, key,  i) { i = index(s, key); return i ? substr(s, i + length(key)) : "" }
 /kernel: Linux version / { flush() }
-/scsi host[0-9]+: usb-storage/ { if (match($0, /scsi host[0-9]+/)) uh[substr($0, RSTART + 9, RLENGTH - 9)] = 1 }
+/ usb [0-9]+-[0-9.]+: New USB device found, idVendor=/ {
+  if (match($0, / usb [0-9]+-[0-9.]+:/)) { pp = substr($0, RSTART + 5, RLENGTH - 6)
+    v1 = after($0, "idVendor="); v1 = substr(v1, 1, 4); v2 = after($0, "idProduct="); v2 = substr(v2, 1, 4); vid[pp] = v1 ":" v2 }
+}
+/ usb [0-9]+-[0-9.]+: (Manufacturer|Product|SerialNumber): / {
+  if (match($0, / usb [0-9]+-[0-9.]+:/)) { pp = substr($0, RSTART + 5, RLENGTH - 6)
+    if ($0 ~ /: Manufacturer: /) man[pp] = after($0, ": Manufacturer: ")
+    else if ($0 ~ /: Product: /) prod[pp] = after($0, ": Product: ")
+    else ser[pp] = after($0, ": SerialNumber: ") }
+}
+/scsi host[0-9]+: usb-storage/ {
+  if (match($0, /scsi host[0-9]+/)) { hh = substr($0, RSTART + 9, RLENGTH - 9); uh[hh] = 1
+    pp = after($0, ": usb-storage "); sub(/:.*/, "", pp); hport[hh] = pp }
+}
+/ scsi [0-9]+:[0-9]+:[0-9]+:[0-9]+: Direct-Access / {
+  if (match($0, / scsi [0-9]+:/)) { hh = substr($0, RSTART + 6, RLENGTH - 7); m = after($0, "Direct-Access")
+    sub(/ +PQ: .*/, "", m); gsub(/  +/, " ", m); sub(/^ +/, "", m); smod[hh] = m }
+}
 / sd [0-9]+:[0-9]+:[0-9]+:[0-9]+: \[sd[a-z]+\]/ {
   h = ""
   if (match($0, / sd [0-9]+:/)) h = substr($0, RSTART + 4, RLENGTH - 5)
-  if (match($0, /\[sd[a-z]+\]/)) { d = substr($0, RSTART + 1, RLENGTH - 2); if ((h in uh) || $0 ~ /removable/) usb[d] = 1 }
+  if (match($0, /\[sd[a-z]+\]/)) { d = substr($0, RSTART + 1, RLENGTH - 2); dhost[d] = h
+    if ((h in uh) || $0 ~ /removable/) { usb[d] = 1; dport[d] = hport[h] } }
 }
 /exFAT-fs \(sd[a-z]+/ { if (match($0, /\(sd[a-z]+/)) usb[substr($0, RSTART + 1, RLENGTH - 1)] = 1 }
-tolower($0) ~ re { L[++n] = $0 }
-END { flush(); print ic + 0; print is; print uc + 0; print us }
+/udisksd.*Mounted \/dev\/sd[a-z]+[0-9]* at / {
+  if (match($0, /\/dev\/sd[a-z]+/)) { d = substr($0, RSTART + 5, RLENGTH - 5); v = after($0, " at ")
+    sub(/ on behalf of .*/, "", v); sub(/\.$/, "", v); sub(/.*\//, "", v); lab[d] = v }
+}
+/ kernel: / && tolower($0) ~ re { L[++n] = $0 }
+END { flush(); print ic + 0; print is; print uc + 0; print us; print devs }
 """
 CHECK_SCRIPT = r"""
 export LC_ALL=C
 echo "DG_FAILED_UNITS=$(systemctl --failed --no-legend --plain 2>/dev/null | awk '{print $1}' | paste -sd, -)"
 k=$(journalctl -k --since "-7 days" -q --no-pager 2>/dev/null)
-io=$(printf '%s\n' "$k" | LC_ALL=C awk -v re="$(printf '%s' '__IO__' | LC_ALL=C tr 'A-Z' 'a-z')" '__AWK__')
+j=$(journalctl --since "-7 days" -q --no-pager _TRANSPORT=kernel + SYSLOG_IDENTIFIER=udisksd 2>/dev/null)
+[ -n "$j" ] || j=$k
+io=$(printf '%s\n' "$j" | LC_ALL=C awk -v re="$(printf '%s' '__IO__' | LC_ALL=C tr 'A-Z' 'a-z')" '__AWK__')
 echo "DG_IO_ERRORS=$(printf '%s\n' "$io" | sed -n 1p)"
 echo "DG_IO_SAMPLE=$(printf '%s\n' "$io" | sed -n 2p | cut -c1-200)"
 echo "DG_USB_IO_ERRORS=$(printf '%s\n' "$io" | sed -n 3p)"
 echo "DG_USB_IO_SAMPLE=$(printf '%s\n' "$io" | sed -n 4p | cut -c1-200)"
+echo "DG_USB_IO_DEVICES=$(printf '%s\n' "$io" | sed -n 5p | cut -c1-400)"
 echo "DG_OOM=$(printf '%s\n' "$k" | grep -ciE 'out of memory|oom-kill')"
 echo "DG_THROTTLE=$(printf '%s\n' "$k" | grep -ciE 'temperature above threshold|clock throttled')"
 echo "DG_ROOT_RO=$(awk '$2=="/"{split($4,o,","); print (o[1]=="ro")?1:0; exit}' /proc/mounts)"
@@ -176,6 +218,7 @@ def _extra(output: str) -> dict:
         "io_sample": values.get("DG_IO_SAMPLE", "").strip() or None,
         "usb_io_errors": num("DG_USB_IO_ERRORS"),
         "usb_io_sample": values.get("DG_USB_IO_SAMPLE", "").strip() or None,
+        "usb_io_devices": [x.strip() for x in values.get("DG_USB_IO_DEVICES", "").split(";") if x.strip()],
         "oom": num("DG_OOM"),
         "throttle": num("DG_THROTTLE"),
         "root_ro": num("DG_ROOT_RO"),
@@ -370,9 +413,12 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
             "SATA kablosu/bağlantısı, güç beslemesi ya da disk denetleyicisi sorunlu olabilir: kabloyu yeniden "
             "takın ya da değiştirin; tekrarlarsa diski değiştirin.")
     if extra.get("usb_io_errors"):
-        # Tahtanın diskiyle ilgisi yok (bkz. _IO_AWK): yalnız bilgi.
-        add(g, "USB bellek / harici disk hataları (son 7 gün)", "info",
-            f"Tahtaya takılan çıkarılabilir diskte (USB) {extra['usb_io_errors']} G/Ç hatası kaydı; tahtanın kendi diski "
+        # Tahtanın diskiyle ilgisi yok (bkz. _IO_AWK) ama bellekteki dosyalar bozulmuş olabilir: Dikkat (kullanıcı isteği
+        # 2026-11-09; önce Bilgi'ydi). Bellek kimliği ve birim adı günlükten (çekirdek USB satırları + udisksd).
+        devs = extra.get("usb_io_devices") or []
+        which = f" ({'; '.join(devs)})" if devs else ""
+        add(g, "USB bellek / harici disk hataları (son 7 gün)", "warn",
+            f"Tahtaya takılan çıkarılabilir diskte{which} {extra['usb_io_errors']} G/Ç hatası kaydı; tahtanın kendi diski "
             f"değil. Son: {extra['usb_io_sample'] or '—'}",
             "USB bellek ya da harici disk, yazma sürerken (ör. dosya kopyalandıktan hemen sonra) çıkarılmış. "
             "Kullanıcılara belleği çıkarmadan önce \"Güvenli kaldır\"ı hatırlatın; bellekteki son kopyalanan dosyalar "
