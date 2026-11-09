@@ -52,7 +52,7 @@ qx.Class.define("ankamon.page.Boards", {
   extend: ankamon.page.Base,
 
   construct(user) {
-    super(user, "Tahtalar");
+    super(user, "Bilgisayarlar");
     // Üstteki düğme satırı (Yenile, Tümünü işaretle, İşaretleri kaldır, Ekle, Düzenle, Sil, Komut çalıştır,
     // Yansıt, Kapat, Uyandır) kaldırıldı (kullanıcı isteği): hepsi satır/kutucuk sağ menüsünde (bkz.
     // __rowMenu — işaretleme ve "Tahta ekle…" de orada); sayfa REFRESH_MS'de bir kendiliğinden yenilenir.

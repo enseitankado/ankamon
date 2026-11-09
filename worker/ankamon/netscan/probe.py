@@ -176,10 +176,14 @@ def service_scan(ip: str, top_ports: int) -> dict | None:
     --version-light kaldırıldı: varsayılan yoğunluk (7) servisleri belirgin biçimde daha iyi tanır.
     Elenen (Windows güvenlik duvarı) hostlarda açık portları kaçırmamak için 2 deneme.
 
-    Dönüş: {hostname, os, os_type, os_vendor, ports:[{proto, port, service, product, version, extra, devicetype}]}
+    İşletim sistemi (bkz. osguess): --osscan-guess nmap'in düşük doğruluklu tahminini de verdirir (doğruluk os_accuracy'de;
+    eşik osguess'te), smb-os-discovery yalnız SMB portu açıksa çalışır (portrule) ve Windows/Samba sürümünü adıyla verir.
+
+    Dönüş: {hostname, os, os_accuracy, os_type, os_vendor, smb_os,
+            ports:[{proto, port, service, product, version, extra, ostype, devicetype}]}
     """
     out = _run([
-        "nmap", "-sS", "-sV", "-O", "--osscan-limit", "-Pn", "-T3",
+        "nmap", "-sS", "-sV", "-O", "--osscan-limit", "--osscan-guess", "--script", "smb-os-discovery", "-Pn", "-T3",
         "--top-ports", str(top_ports), "--max-retries", "2", "--host-timeout", "240s",
         "-oX", "-", ip,
     ], timeout=300)
@@ -190,17 +194,20 @@ def service_scan(ip: str, top_ports: int) -> dict | None:
     except ET.ParseError:
         return None
     host = root.find("host")
+    empty = {"hostname": "", "os": "", "os_accuracy": 0, "os_type": "", "os_vendor": "", "smb_os": "", "ports": []}
     if host is None:
-        return {"hostname": "", "os": "", "os_type": "", "os_vendor": "", "ports": []}
-    result = {"hostname": "", "os": "", "os_type": "", "os_vendor": "", "ports": []}
+        return empty
+    result = dict(empty, ports=[])
     name = host.find("hostnames/hostname")
     if name is not None:
         result["hostname"] = name.get("name", "")
-    match = host.find("os/osmatch")
-    if match is not None and int(match.get("accuracy", "0")) >= 85:
+    match = host.find("os/osmatch")  # nmap en yüksek doğrulukluyu ilk yazar
+    if match is not None:
         result["os"] = match.get("name", "")
+        result["os_accuracy"] = int(match.get("accuracy", "0") or 0)
         cls = match.find("osclass")
-        if cls is not None:
+        # Tür tahmini (classify) eskisi gibi yalnız güvenilir eşleşmenin sınıfını kullanır.
+        if cls is not None and result["os_accuracy"] >= 85:
             result["os_type"] = cls.get("type", "")
             result["os_vendor"] = cls.get("vendor", "")
     for port in host.findall("ports/port"):
@@ -216,8 +223,17 @@ def service_scan(ip: str, top_ports: int) -> dict | None:
             "product": get("product"),
             "version": get("version"),
             "extra": " ".join(x for x in (get("extrainfo"), get("ostype")) if x),
+            "ostype": get("ostype"),
             "devicetype": get("devicetype"),
         })
+    for script in host.findall("hostscript/script"):
+        if script.get("id") == "smb-os-discovery":
+            elem = script.find("elem[@key='os']")
+            text = (elem.text or "").strip() if elem is not None else ""
+            if not text:  # eski nmap: yalnız çıktı metni ("OS: Windows 10 Pro 19045 (Windows 10 Pro 6.3)")
+                m = re.search(r"OS:\s*([^\n]+)", script.get("output", ""))
+                text = m.group(1).strip() if m else ""
+            result["smb_os"] = text
     return result
 
 

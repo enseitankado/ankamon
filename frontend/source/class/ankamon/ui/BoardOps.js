@@ -1086,7 +1086,8 @@ qx.Class.define("ankamon.ui.BoardOps", {
         // "Bilgi kartı" burada değil: Tahtalar sayfasındaki "Logları göster"in hemen altında (kullanıcı
         // isteği) — bkz. page.Boards __rowMenu.
 
-        // Kullanıcılar ▸ Oturum aç ▸ <hesap>, Oturumu kapat, Oturumu kilitle, Oturumları sorgula, Oturum geçmişi, Kullanıcı sil…
+        // Oturumlar (eski etiketi "Kullanıcılar" — kullanıcı isteği 2026-11-09) ▸ Oturum aç ▸ <hesap>, Oturumu kapat, Oturumu
+        // kilitle, Oturumları sorgula, Oturum geçmişi, Oturum hareketleri, Parola ayarla…, Kullanıcı ekle…, Kullanıcı sil…
         const sessions = sub();
         if (can("boards.login")) {
           sessions.add(this.menuButton(ICON.sessions, "Oturum aç" + count, null,
@@ -1115,9 +1116,13 @@ qx.Class.define("ankamon.ui.BoardOps", {
         // Kullanıcı sil…: hesap(lar) seçilir, dosyaları silme varsayılan açık (bkz. deleteUsers; işi
         // hazır işlem "user-delete" yapar — Komut çalıştır listesinde de var).
         if (can("boards.users")) {
+          // Kullanıcı ekle…: hazır işlem "user-add" (Komut çalıştır listesindeki) seçili açılır — kullanıcı isteği 2026-11-09.
+          if (can("actions")) {
+            subAdd(sessions, "＋", "Kullanıcı ekle…" + count, () => this.run(online, user, "user-add"));
+          }
           subAdd(sessions, ICON.delete, "Kullanıcı sil…" + count, () => this.deleteUsers(online));
         }
-        group(ICON.sessions, "Kullanıcılar", sessions);
+        group(ICON.sessions, "Oturumlar", sessions);
 
         // Dosyalar ▸ Dosya yöneticisi, Bilgisayarlar arasında kopyala, Dosyaları dağıt/topla, Yedekle/Geri al (kullanıcı isteği: eski
         // "Yedekle" + "Dosya yöneticisi" tek grupta; Dosya yöneticisi ilk sırada). Bilgisayarı aç/kapat
@@ -1162,7 +1167,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         power();
         const sessions = sub();
         sessionHistory(sessions);
-        group(ICON.sessions, "Kullanıcılar", sessions);
+        group(ICON.sessions, "Oturumlar", sessions);
       }
       if (board.online) {
         power();

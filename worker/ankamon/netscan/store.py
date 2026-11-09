@@ -33,7 +33,7 @@ from concurrent.futures import ThreadPoolExecutor
 from psycopg.types.json import Jsonb
 
 from .. import activity, netroles
-from . import classify, etap_phase, oui, probe
+from . import classify, etap_phase, oui, osguess, probe
 
 log = logging.getLogger("ankamon.netscan")
 
@@ -335,6 +335,8 @@ def apply_services(conn, dev: dict, scan: dict | None) -> None:
                                is_board=bool(board) or _etap_board(dev["mac"]),
                                is_gateway=dev["ip"] == dev.get("gateway"), is_self=False, scan=scan)
     model = classify.guess_model(scan, board["model"] if board else "")
+    # İşletim sistemi: bu taramada bulunamazsa önceki tahmin korunur (yenisi gelene kadar hatırlanır — bkz. osguess).
+    os_name = osguess.guess(scan, is_board=bool(board) or _etap_board(dev["mac"]))
     with conn.transaction():
         conn.execute(
             "DELETE FROM net_services WHERE device_id = %s AND NOT (proto || '/' || port = ANY(%s))",
@@ -351,12 +353,15 @@ def apply_services(conn, dev: dict, scan: dict | None) -> None:
             )
         conn.execute(
             """UPDATE net_devices SET services_scanned_at = now(), services_requested_at = NULL,
-                   os_guess = %s, scan_info = %s,
+                   os_guess = CASE WHEN %s <> '' THEN %s ELSE os_guess END,
+                   os_guess_at = CASE WHEN %s <> '' THEN now() ELSE os_guess_at END, scan_info = %s,
                    type_auto = CASE WHEN %s <> '' THEN %s ELSE type_auto END,
                    model_auto = CASE WHEN %s <> '' THEN %s ELSE model_auto END,
                    hostname = CASE WHEN hostname = '' THEN %s ELSE hostname END
                WHERE id = %s""",
-            (scan["os"], Jsonb({"os_type": scan["os_type"], "os_vendor": scan["os_vendor"]}),
+            (os_name, os_name, os_name,
+             Jsonb({"os_type": scan["os_type"], "os_vendor": scan["os_vendor"], "os_nmap": scan["os"],
+                    "os_accuracy": scan.get("os_accuracy", 0), "smb_os": scan.get("smb_os", "")}),
              kind, kind, model, model, scan["hostname"], dev["id"]),
         )
     bump(conn)

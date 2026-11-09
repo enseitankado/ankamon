@@ -87,7 +87,12 @@ final class NetworkApi
                     d.label, d.vendor, COALESCE(NULLIF(d.device_type, ''), d.type_auto) AS device_type,
                     d.device_type AS device_type_manual, d.type_auto,
                     COALESCE(NULLIF(d.model, ''), d.model_auto) AS model, d.model AS model_manual, d.model_auto,
-                    d.os_guess, d.notes, d.source, d.online, d.etap,
+                    d.os_guess, extract(epoch FROM d.os_guess_at)::bigint AS os_guess_at, d.notes, d.source, d.online, d.etap,
+                    -- IP/maske ve sunucunun o ağa bağlı olduğu arabirim(ler) (kullanıcı isteği 2026-11-09: tek listede iki sütun).
+                    CASE WHEN d.ip IS NULL THEN NULL ELSE host(d.ip) || '/' || masklen(n.cidr) END AS ip_mask,
+                    array_to_string(n.ifaces, ', ') AS iface,
+                    -- Son log: cihazın IP'sinden (worker tasks/net_device_logs.py) ya da bağlı tahtanın kaydından (ad eşleşmesi).
+                    extract(epoch FROM GREATEST(d.last_log_at, b.last_log_at))::bigint AS last_log_at,
                     extract(epoch FROM d.first_seen_at)::bigint AS first_seen_at,
                     extract(epoch FROM d.last_seen_at)::bigint AS last_seen_at,
                     extract(epoch FROM d.state_changed_at)::bigint AS state_changed_at,

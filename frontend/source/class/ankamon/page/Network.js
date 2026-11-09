@@ -26,8 +26,9 @@
  */
 
 /**
- * Ağ envanteri (sol menü "Ağ" ve altındaki her ağ): ağdaki bütün cihazlar — o an çevrim dışı
- * olanlar dahil. Cihazların kimliği MAC adresidir. Tahtalar grid'iyle aynı kalıp (satır başı onay
+ * Ağ envanteri (sol menü "Ağ"): sunucunun bağlı olduğu BÜTÜN ağların cihazları tek listede — o an çevrim dışı
+ * olanlar dahil (kullanıcı isteği 2026-11-09: ağ başına alt menü yok; cihazın ağı "Ağ", "IP/Maske" ve "Ağ arabirimi"
+ * sütunlarında, ağ işlemleri — yeniden adlandır, taramayı durdur/başlat, bağlı olmayan ağı sil — "Ağlar" düğmesinde). Cihazların kimliği MAC adresidir. Tahtalar grid'iyle aynı kalıp (satır başı onay
  * kutuları, sütun süzgeçleri, sütun genişliği/görünürlüğü kullanıcıya göre saklanır, sağ menü).
  *
  * Her cihaz satırının altında açık portları/servisleri alt satırlar olarak durur (varsayılan kapalı;
@@ -64,6 +65,9 @@ qx.Class.define("ankamon.page.Network", {
         await Ops.scanNow();
         this.__pollState();
       }).set({ toolTipText: "Bağlı bütün ağlarda varlık taramasını hemen başlatır (makine çok yoğunsa yine ertelenir)" });
+      // Ağ işlemleri (eskiden sol menüdeki ağ düğümlerinin sağ menüsü): ağ başına alt menü.
+      const netsButton = this._addButton("Ağlar ▾", () => this.__openNetworksMenu(netsButton))
+        .set({ toolTipText: "Ağ başına işlemler: yeniden adlandır, taramayı durdur/başlat, bağlı olmayan ağı sil" });
     }
 
     // Tarayıcı durumu: metin + tarama sürerken ilerleme çubukları (varlık taraması, servis kuyruğu).
@@ -86,6 +90,8 @@ qx.Class.define("ankamon.page.Network", {
       { id: "status", label: "Durum", width: 90 },
       { id: "name", label: "Takma ad / Ad", width: 200 },
       { id: "ip", label: "IP", width: 120 },
+      // IP/maske (ör. 10.255.187.23/24) ve sunucunun o ağa bağlı olduğu arabirim — kullanıcı isteği 2026-11-09.
+      { id: "ip_mask", label: "IP/Maske", width: 140 },
       { id: "mac", label: "MAC", width: 140 },
       { id: "vendor", label: "Marka (üretici)", width: 180 },
       { id: "type", label: "Cihaz türü", width: 140 },
@@ -94,8 +100,11 @@ qx.Class.define("ankamon.page.Network", {
       { id: "os", label: "İşletim sistemi", width: 160 },
       { id: "ports", label: "Açık port", width: 80 },
       { id: "network", label: "Ağ", width: 130 },
+      { id: "iface", label: "Ağ arabirimi", hint: "Sunucunun bu cihazı gördüğü ağ arabirimi", width: 110 },
       { id: "first", label: "İlk görülme", width: 110 },
       { id: "seen", label: "Son görülme", width: 110 },
+      // Cihaz log gönderiyorsa son gönderme anı (son 24 saatte SS:DD, daha eskiyse tarih) — kullanıcı isteği 2026-11-09.
+      { id: "lastlog", label: "Son log", hint: "Cihazın Ankamon'a son log gönderdiği an (son 24 saatte saat:dakika, daha eskiyse tarih ve saat)", width: 100 },
       { id: "notes", label: "Not", width: 150 },
       // FATİH fazı (bkz. util.Format.etap). Sona eklendi: servis alt satırları sabit sütun sırası kullanır.
       { id: "faz", label: "Faz", width: 130 },
@@ -181,6 +190,20 @@ qx.Class.define("ankamon.page.Network", {
       return ip.split(".").reduce((acc, part) => acc * 256 + (parseInt(part, 10) || 0), 0);
     },
 
+    /** "Son log" hücresi: son 24 saatte "SS:DD", daha eskiyse "GG.AA.YYYY SS:DD"; log yoksa boş. */
+    logTime(secs) {
+      if (!secs) {
+        return "";
+      }
+      const d = new Date(secs * 1000);
+      const pad = n => String(n).padStart(2, "0");
+      const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      if (Date.now() - d.getTime() < 24 * 3600 * 1000) {
+        return hm;
+      }
+      return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${hm}`;
+    },
+
     /** "Ağ etkinliği" sütununun sayısal sıralama anahtarı (büyüklük; göreli). Hücre metni "N kbit/sn · PROTO"
      * olduğundan sözlüksel sıralanırdı; bunun yerine cihaz verisinden sayı üretilir (bkz. flowText):
      * gözlenen akış (kbit/sn) en üst bant, Windows IP-ID gönderim hızı (pkt/sn) orta bant, ölçülmemiş en altta. */
@@ -223,6 +246,7 @@ qx.Class.define("ankamon.page.Network", {
     __deleteButton: null,
     __servicesButton: null,
     __fixingChecks: false,
+    __netsMenu: null,
 
     /**
      * Sol ağaçtan ağ seçimi (0: bütün ağlar). Shell sayfayı göstermeden ÖNCE çağırır; liste
@@ -287,11 +311,12 @@ qx.Class.define("ankamon.page.Network", {
         cells: [
           d.id, wasChecked.has(d.id), (d.services.length + (d.shares ? d.shares.length : 0)) ? "▸" : "",
           d.online ? "Çevrim içi" : "Çevrim dışı",
-          Ops.deviceName(d), d.ip || "", d.mac, d.vendor || (d.mac && /^.[26ae]/i.test(d.mac) ? "(rastgele MAC)" : ""),
+          Ops.deviceName(d), d.ip || "", d.ip_mask || "", d.mac, d.vendor || (d.mac && /^.[26ae]/i.test(d.mac) ? "(rastgele MAC)" : ""),
           d.device_type || "", d.model || "", d.hostname || "", d.os_guess || "",
           d.services_scanned_at ? String(d.services.length) : "",
-          netName.get(d.network_id) || d.network,
-          F.ago(d.first_seen_at), d.online ? "şimdi" : F.ago(d.last_seen_at), d.notes || "",
+          netName.get(d.network_id) || d.network, d.iface || "",
+          F.ago(d.first_seen_at), d.online ? "şimdi" : F.ago(d.last_seen_at), ankamon.page.Network.logTime(d.last_log_at),
+          d.notes || "",
           F.etap(d.etap),
           normNum(d), flowText(d)
         ]
@@ -305,7 +330,11 @@ qx.Class.define("ankamon.page.Network", {
       } else if (net && !net.attached) {
         note = "Sunucu artık bu ağa bağlı değil — kayıtlar son bilinen durumlarıyla gösteriliyor.";
       } else if (net && !net.scan_enabled) {
-        note = "Bu ağın taraması kapalı (sol menüde ağın sağ tık menüsünden açılabilir).";
+        note = "Bu ağın taraması kapalı (Ağlar düğmesinden açılabilir).";
+      }
+      const paused = nets.networks.filter(n => n.attached && !n.scan_enabled);
+      if (!net && paused.length) {
+        note = `Taraması kapalı ağ: ${paused.map(n => Ops.networkLabel(n)).join(", ")} (Ağlar düğmesinden açılabilir).`;
       }
       const online = data.devices.filter(d => d.online).length;
       this.__note.setValue(`${data.devices.length} cihaz, ${online} çevrim içi, ${data.devices.length - online} çevrim dışı.` +
@@ -326,10 +355,13 @@ qx.Class.define("ankamon.page.Network", {
       const col = this.__model.getSortColumnIndex();
       const asc = this.__model.isSortAscending();
       const ipCol = 2 + this.__columns.findIndex(c => c.id === "ip");
+      const ipMaskCol = 2 + this.__columns.findIndex(c => c.id === "ip_mask");
+      const logCol = 2 + this.__columns.findIndex(c => c.id === "lastlog");
       const activityCol = 2 + this.__columns.findIndex(c => c.id === "activity");
       const detailCol = 2 + this.__columns.findIndex(c => c.id === "activity_detail");
       if (col >= 2) {
-        const key = col === ipCol ? (r => ankamon.page.Network.ipKey(r.cells[col]))
+        const key = (col === ipCol || col === ipMaskCol) ? (r => ankamon.page.Network.ipKey(r.device.ip))
+          : col === logCol ? (r => r.device.last_log_at || 0)
           : (col === activityCol || col === detailCol) ? (r => ankamon.page.Network.activityKey(r.device))
           : (r => String(r.cells[col] ?? "").toLocaleLowerCase("tr"));
         shown = shown.slice().sort((a, b) => {
@@ -346,6 +378,7 @@ qx.Class.define("ankamon.page.Network", {
 
       const out = [];
       const blank = this.__columns.map(() => "");
+      const ix = id => 2 + this.__columns.findIndex(c => c.id === id); // alt satır hücreleri sütun kimliğiyle
       shown.forEach(row => {
         const d = row.device;
         const subCount = d.services.length + (d.shares ? d.shares.length : 0);
@@ -356,17 +389,17 @@ qx.Class.define("ankamon.page.Network", {
           // Önce ağ paylaşımları (klasör/yazıcı simgesiyle), sonra açık portlar/servisler.
           (d.shares || []).forEach(sh => {
             const cells = [`h:${d.id}:${sh.name}`, false].concat(blank);
-            cells[3] = "paylaşım";
-            cells[4] = `└ ${sh.stype === "printer" ? "🖨" : "📁"} ${sh.path || sh.name}`;
-            cells[9] = sh.comment || "";
+            cells[ix("status")] = "paylaşım";
+            cells[ix("name")] = `└ ${sh.stype === "printer" ? "🖨" : "📁"} ${sh.path || sh.name}`;
+            cells[ix("model")] = sh.comment || "";
             out.push(cells);
           });
           d.services.forEach(s => {
             const cells = [`s:${d.id}:${s.proto}/${s.port}`, false].concat(blank);
-            cells[3] = "açık";
-            cells[4] = `└ ${s.port}/${s.proto}  ${s.service || ""}`;
-            cells[9] = [s.product, s.version].filter(Boolean).join(" ");
-            cells[11] = s.extra || "";
+            cells[ix("status")] = "açık";
+            cells[ix("name")] = `└ ${s.port}/${s.proto}  ${s.service || ""}`;
+            cells[ix("model")] = [s.product, s.version].filter(Boolean).join(" ");
+            cells[ix("os")] = s.extra || "";
             out.push(cells);
           });
         }
@@ -545,6 +578,10 @@ qx.Class.define("ankamon.page.Network", {
         let value = strip(cells[i]);
         if (c.id === "first") {
           value = when(device.first_seen_at, value);
+        } else if (c.id === "lastlog") {
+          value = device.last_log_at ? F.dateTime(device.last_log_at * 1000) : "log gelmedi";
+        } else if (c.id === "os" && value && device.os_guess_at) {
+          value += ` (tespit: ${F.dateTime(device.os_guess_at * 1000)})`;
         } else if (c.id === "seen") {
           value = device.online ? "şimdi (çevrim içi)" : when(device.last_seen_at, value);
         } else if (c.id === "ports" && !value) {
@@ -607,6 +644,29 @@ qx.Class.define("ankamon.page.Network", {
       buttons.push(close);
       ankamon.ui.Dialog.buttons(win, buttons);
       win.open();
+    },
+
+    /** "Ağlar" düğmesinin menüsü: ağ başına alt menü (bkz. ui.network.Ops.networkMenu). */
+    __openNetworksMenu(button) {
+      const Ops = ankamon.ui.network.Ops;
+      const nets = this.__networks || [];
+      if (!nets.length) {
+        ankamon.ui.Dialog.alert("Henüz ağ bulunmadı.");
+        return;
+      }
+      if (this.__netsMenu) {
+        this.__netsMenu.destroy();
+      }
+      const menu = this.__netsMenu = new qx.ui.menu.Menu();
+      nets.forEach(net => {
+        const label = `${Ops.networkLabel(net)} (${net.online}/${net.devices})` + (net.attached ? "" : " — bağlı değil") +
+          (net.scan_enabled ? "" : " — tarama kapalı");
+        const item = new qx.ui.menu.Button(label, null, null, Ops.networkMenu(net, () => this.refresh()));
+        item.setToolTipText(`${net.cidr} · arabirim: ${(net.ifaces || []).join(", ") || "—"} · ağ geçidi: ${net.gateway || "—"}`);
+        menu.add(item);
+      });
+      menu.setOpener(button);
+      menu.open();
     },
 
     __rowMenu(device, devices) {

@@ -65,8 +65,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       { id: "manage", label: "Yönet", icon: "mouse", primary: "Bilgisayarı yönet", mirror: "Yönet" },
       { id: "lock", label: "Kilit", icon: "lock", primary: "Kilitle" },
       { id: "command", label: "Komut", icon: "terminal2", primary: "Hazır / Serbest komut çalıştır", sep: true },
-      // Etiket "Kullanıcılar" → "Oturum" (kullanıcı isteği, 2026-11-05); menüdeki grup adı (CONTAINERS) değişmedi.
-      { id: "users", label: "Oturum", icon: "users" },
+      // Sağ menüdeki grup "Kullanıcılar" → "Oturumlar" oldu (kullanıcı isteği, 2026-11-09); düğme de aynı adla.
+      { id: "users", label: "Oturumlar", icon: "users" },
       { id: "files", label: "Dosyalar", icon: "folders", primary: "Dosya yöneticisi" },
       { id: "taskmgr", label: "Görevler", icon: "activity", primary: "Görev yöneticisi" },
       { id: "web", label: "Web sitesi", icon: "worldWww", primary: "Web sitesi aç…", sep: true },
@@ -79,7 +79,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     ],
 
     /** Alt menüsü düğmelere dağıtılan üst maddeler → içindeki bilinmeyen maddenin grubu. */
-    CONTAINERS: { "Komut çalıştır": "command", "Yönet": "manage", "Ekran": "watch", "Kullanıcılar": "users", "Dosyalar": "files",
+    CONTAINERS: { "Komut çalıştır": "command", "Yönet": "manage", "Ekran": "watch", "Oturumlar": "users", "Dosyalar": "files",
       "Web filtresi": "manage" },
 
     /** Menü maddesi → grup (menüdeki etiket, tahta sayısı eki olmadan — bkz. BoardOps.menuButton). */
