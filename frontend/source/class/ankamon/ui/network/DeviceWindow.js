@@ -122,7 +122,8 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
     __show(device, board, user, onSaved) {
       const can = f => user.is_admin || (user.features || []).includes(f);
       const Ops = ankamon.ui.network.Ops;
-      const name = device ? (Ops.deviceName(device) || device.ip || device.mac) : (board.label || board.hostname || board.ip || board.mac);
+      // Tahtaya bağlı cihazda başlık da grid'deki tahta adı (tek takma ad — Genel ▸ Takma ad ile aynı).
+      const name = (board && board.label) || (device ? (Ops.deviceName(device) || device.ip || device.mac) : (board.hostname || board.ip || board.mac));
       const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
       const win = ankamon.ui.Dialog.window("Bilgisayar ayrıntıları — " + name, Math.min(760, root.width - 40), { maximizable: true });
       win.set({ height: Math.min(760, root.height - 40) });
