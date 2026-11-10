@@ -35,7 +35,7 @@ Hiçbiri yoksa boş bırakılır; kullanıcı arayüzden elle türü seçebilir 
 
 from __future__ import annotations
 
-# Arayüzdeki "Cihaz türü" seçim listesiyle aynı adlar (bkz. frontend page/Network.js TYPES).
+# Arayüzdeki "Varlık türü" seçim listesiyle aynı adlar (bkz. frontend page/Network.js TYPES).
 PC = "Bilgisayar"
 SERVER = "Sunucu"
 BOARD = "Akıllı tahta"

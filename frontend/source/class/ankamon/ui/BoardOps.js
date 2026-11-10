@@ -48,6 +48,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       }
       const win = ankamon.ui.Dialog.window("Tahta ekle", 460);
       const fields = this.boardForm(null);
+      fields.form.softPlaceholders(); // örnek değerler ("ör. A Blok…", "de:ad:…") girilmiş değer sanılmasın
       win.add(fields.form);
       const cancel = new qx.ui.form.Button("Vazgeç");
       const save = new qx.ui.form.Button("Kaydet");
@@ -740,8 +741,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
      * Seçili tahtaları kapatır (SSH ile). Birden fazlaysa önce onay alır (onay her zaman sorulur; "bir
      * daha gösterme" yalnız çıktı penceresi içindir — bkz. __powerJob).
      * @param user {Map?} oturum sahibi (pencere gizleme tercihi)
+     * @param sessionOps {Map?} Tahtalar sayfasının işleyicileri (bkz. Boards.__sessionOps): varsa kapatma komutu
+     *   tahtaya ulaşınca kutucuğun sol altında "Kapanıyor…" (shutdownSent; kullanıcı isteği 2026-11-10).
      */
-    async shutdown(boards, user) {
+    async shutdown(boards, user, sessionOps) {
       const ids = boards.map(b => b.id);
       if (!ids.length) {
         return;
@@ -753,7 +756,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
           return;
         }
       }
-      this.__powerJob({ type: "action", action: "shutdown", board_ids: ids }, "Kapatma çıktısı", "shutdown", "kapatma", user);
+      const job = this.__powerJob({ type: "action", action: "shutdown", board_ids: ids }, "Kapatma çıktısı", "shutdown", "kapatma", user);
+      if (sessionOps && sessionOps.shutdownSent) {
+        job.then(jobId => sessionOps.shutdownSent(jobId, boards)).catch(() => {});
+      }
     },
 
     /** Seçili tahtaları yeniden başlatır (hazır işlem "reboot"). Birden fazlaysa önce onay alır. @param user {Map?} */
@@ -988,7 +994,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         const n = list => (list.length > 1 ? ` (${list.length} tahta)` : "");
         add(ICON.wol, "Bilgisayarı aç (WoL)" + n(off), () => this.wol(off, user, sessionOps));
         menu.getChildren()[menu.getChildren().length - 1].setEnabled(off.length > 0);
-        add(ICON.shutdown, "Bilgisayarı kapat" + n(on), () => this.shutdown(on, user));
+        add(ICON.shutdown, "Bilgisayarı kapat" + n(on), () => this.shutdown(on, user, sessionOps));
         menu.getChildren()[menu.getChildren().length - 1].setEnabled(on.length > 0);
         add(ICON.reboot, "Bilgisayarı yeniden başlat" + n(on), () => this.reboot(on, user));
         menu.getChildren()[menu.getChildren().length - 1].setEnabled(on.length > 0);

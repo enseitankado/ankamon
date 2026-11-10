@@ -171,8 +171,10 @@ qx.Class.define("ankamon.ui.Shell", {
       // Ligler (kullanıcı isteği 2026-11-06): eskiden Oturumlar'ın "Şampiyonlar Ligi" / "Teneffüs Ligi" sekmeleri; adları
       // "Kullanım sıralaması" / "Ders arası sıralaması" oldu (bkz. page.Leagues). Eski bağlantılar __openPage'de yönlenir.
       // Bilgisayarlar'ın altında (kullanıcı isteği 2026-11-09); simge tek renkli metin karakteri (♛ — 🏆 emoji sarı çiziliyordu).
-      { id: "leagues", label: "Ligler", feature: "logs", parent: "boards", collapsed: true, create: u => new ankamon.page.Leagues(u),
-        tabs: [{ key: "league", label: "Kullanım sıralaması" }, { key: "breakLeague", label: "Ders arası sıralaması" }] },
+      // Simgesiz (kullanıcı isteği 2026-11-10: noIcon). "Ders arası sıralaması" → "Teneffüsler"; sayfadaki "Kullanıcılar /
+      // Tahtalar" seçimi kalktı, her sıralamanın altında Kullanıcılar ve Bilgisayarlar yaprağı (group — bkz. __buildNode).
+      { id: "leagues", label: "Ligler", feature: "logs", parent: "boards", collapsed: true, noIcon: true, create: u => new ankamon.page.Leagues(u),
+        tabs: () => ankamon.page.Leagues.TABS.map(tab => ({ key: tab.key, label: tab.label, group: tab.group })) },
       // Tahta sağlığı: sorun tespiti (SSH denetimi) ile anomaliler (sürekli izleme) tek bölümde — bkz. page.Anomalies,
       // ui.health.Status. Kimlik "anomalies" kalır (nav_order, hatırlanan sekme); features: ikisinden biri yeterli, sekme
       // başına yetki sayfanın içinde. Eski "Bakım ▸ Bakım/Yardım" bağlantıları __openPage'de buraya yönlenir.
@@ -198,30 +200,32 @@ qx.Class.define("ankamon.ui.Shell", {
         tabs: () => [{ key: "metrics", label: "Sensörler", feature: "metrics" }]
           .concat(ankamon.ext.Extensions.maintenanceTabs().map(t => ({ key: t.key, label: t.label, feature: t.feature }))) },
       // Loglar Sistem'in altında (kullanıcı isteği 2026-11-06); Sistem'e yetkisi olmayanlarda kökte (bkz. __createTree).
-      { id: "logs", label: "Loglar", feature: "logs", parent: "system", collapsed: true, create: u => new ankamon.page.Logs(u),
+      { id: "logs", label: "Loglar", feature: "logs", parent: "system", collapsed: true, noIcon: true, create: u => new ankamon.page.Logs(u),
         tabs: () => ankamon.ui.Shell.LOG_KINDS.map(kind => ({ key: kind.mode, label: kind.label })) },
       // Ağ envanteri: bütün ağların cihazları tek listede (kullanıcı isteği 2026-11-09: ağ başına alt düğüm yok; ağ
       // işlemleri sayfadaki "Ağlar" düğmesinde — bkz. page.Network). Üst menü "Ağ"ın (boards) altında (kullanıcı isteği
       // 2026-11-09); o kullanıcıya kapalıysa kökte.
-      // Ağ ▸ Liste (kullanıcı isteği 2026-11-09: eski "Ağ ▸ Ağ"); first: üst düğümün kendi seçeneğinden (Akıllı Tahtalar) önce.
-      { id: "network", label: "Liste", feature: "network", parent: "boards", first: true, create: u => new ankamon.page.Network(u) },
+      // Ağ ▸ Varlıklar (kullanıcı isteği 2026-11-10: eski "Ağ ▸ Liste", simgesiz); first: üst düğümün kendi seçeneğinden
+      // (Akıllı Tahtalar) önce. Akıllı Tahtalar listesi buradaki "Akıllı tahta" türlü satırlardan belirlenir (bkz. BoardsApi LISTED).
+      { id: "network", label: "Varlıklar", feature: "network", parent: "boards", first: true, noIcon: true, create: u => new ankamon.page.Network(u) },
       // Ankamon'un kendi bakımı (servisler, zamanlanmış işler, veritabanı, yapılandırma) — yalnız yönetici.
       { id: "system", label: "Sistem", admin: true, retap: true, create: u => new ankamon.page.System(u) },
       // Kullanıcılar ve Ayarlar "Sistem"in altında (kullanıcı isteği).
       // Disk kullanımı ve veri silme (eski açılır pencere — kullanıcı isteği: Sistem altında sayfa).
-      { id: "diskusage", label: "Disk kullanımı", feature: "logs.manage", parent: "system", retap: true, create: u => new ankamon.page.DiskUsage(u),
+      // Sistem'in alt seçenekleri simgesiz (kullanıcı isteği 2026-11-10: noIcon).
+      { id: "diskusage", label: "Disk kullanımı", feature: "logs.manage", parent: "system", retap: true, noIcon: true, create: u => new ankamon.page.DiskUsage(u),
         tabs: () => [{ key: "summary", label: "Özet" }].concat(ankamon.ui.DiskUsage.specs().map(spec => ({ key: spec.mode, label: spec.label }))) },
       // Konteynerdeki kritik yazılımlar: sürüm, durum, Ankamon'daki işlevi (yalnız yönetici).
-      { id: "software", label: "Yazılımlar", admin: true, parent: "system", retap: true, create: u => new ankamon.page.Software(u) },
+      { id: "software", label: "Yazılımlar", admin: true, parent: "system", retap: true, noIcon: true, create: u => new ankamon.page.Software(u) },
       // Kullanıcılar ▸ Kullanıcılar (yalnız yönetici) + Oturumlar ('logins'): features yöneticide her zaman
       // sağlanır; 'logins' yetkili kullanıcı sayfayı yalnız Oturumlar sekmesiyle görür (bkz. page.Users).
-      { id: "users", label: "Kullanıcılar", features: ["logins"], parent: "system", create: u => new ankamon.page.Users(u),
+      { id: "users", label: "Kullanıcılar", features: ["logins"], parent: "system", noIcon: true, create: u => new ankamon.page.Users(u),
         tabs: [{ key: "users", label: "Hesaplar", admin: true }, { key: "logins", label: "Oturumlar", feature: "logins" }] },
       // admin/feature yok: herkese açık (kendi tema tercihini herkes değiştirebilir); sayfa içinde
       // sistem ayarları (SSH/Samba/keşif) yalnız admin'e gösterilir — bkz. page.Settings. Sistem
       // yalnız yöneticiye açık olduğundan diğer kullanıcılarda kökte görünür (bkz. __createTree).
       // Sekmeler yalnız yöneticide (diğer kullanıcı yalnız kendi temasını görür, sekme yok).
-      { id: "settings", label: "Ayarlar", parent: "system", create: u => new ankamon.page.Settings(u),
+      { id: "settings", label: "Ayarlar", parent: "system", noIcon: true, create: u => new ankamon.page.Settings(u),
         tabs: ["Görünüm", "Tahta erişimi", "Ağ arabirimleri", "Ders saatleri", "Eklentiler"].map(label => ({ key: label, label, admin: true })) }
     ],
     LOG_KINDS: [
@@ -477,7 +481,8 @@ qx.Class.define("ankamon.ui.Shell", {
       // inline alt sayfa: kendi düğümü yok, sekmeleri doğrudan bu düğümün altında (ör. Tahtalar ▸ Sensörler/Ahenk).
       const children = all.filter(child => !child.inline);
       const inlineTabs = all.filter(child => child.inline).flatMap(child => this.__tabsOf(child).map(tab => ({ page: child, tab })));
-      const label = `${ankamon.ui.Shell.ICON[page.id] || ""} ${page.label}`.trim();
+      // noIcon: düğüm simgesiz (ICON'daki karakter sağ menüler vb. için kalır).
+      const label = `${page.noIcon ? "" : ankamon.ui.Shell.ICON[page.id] || ""} ${page.label}`.trim();
       const tabs = this.__tabsOf(page).map(tab => ({ page, tab }));
       const branch = children.length || tabs.length || inlineTabs.length || page.selfLeaf;
       const node = branch ? new qx.ui.tree.TreeFolder(label) : new qx.ui.tree.TreeFile(label);
@@ -499,13 +504,31 @@ qx.Class.define("ankamon.ui.Shell", {
         node.setUserData("selfLeaf", self);
       }
       // Sekmeler alt seçenek: seçilince sayfa o sekmede açılır; seçiliyken yeniden tıklamak sayfayı yeniler.
+      // tab.group: aynı gruptaki sekmeler o adlı bir ara düğümün altında (ör. Ligler ▸ Teneffüsler ▸ Kullanıcılar); ara
+      // düğüme tıklamak ilk sekmesini açar (selfLeaf gibi vurgu ona geçer).
+      const groups = {};
       tabs.concat(inlineTabs).forEach(({ page: owner, tab }) => {
         const leaf = new qx.ui.tree.TreeFile(tab.label);
         this.__hideThemeIcon(leaf);
         leaf.setUserData("page", owner);
         leaf.setUserData("tab", tab.key);
         this.__addRetap(leaf);
-        node.add(leaf);
+        if (!tab.group) {
+          node.add(leaf);
+          return;
+        }
+        let group = groups[tab.group];
+        if (!group) {
+          group = groups[tab.group] = new qx.ui.tree.TreeFolder(tab.group);
+          this.__hideThemeIcon(group);
+          group.setUserData("page", owner);
+          group.setUserData("tab", tab.key);
+          group.setUserData("group", true);
+          group.setUserData("selfLeaf", leaf);
+          node.add(group);
+          this.__rememberOpen(group, `${page.id}.${tab.group}`);
+        }
+        group.add(leaf);
       });
       if (children.length) {
         children.filter(child => !child.first).forEach(child => node.add(this.__buildNode(child, childrenOf)));
@@ -594,7 +617,7 @@ qx.Class.define("ankamon.ui.Shell", {
       // Alt düğümler de aranır (ör. "Bakım" altındaki "Anomaliler"); kip yaprakları hariç. İstenen
       // sekmenin yaprağı varsa o (ör. Genel bakış ▸ Sensörler → Bakım ▸ Sensörler), yoksa sayfanın düğümü.
       const items = this.__tree.getRoot().getItems(true);
-      const leaf = (data.tab && items.find(n => n.getUserData("page") === page && n.getUserData("tab") === data.tab)) ||
+      const leaf = (data.tab && items.find(n => n.getUserData("page") === page && n.getUserData("tab") === data.tab && !n.getUserData("group"))) ||
         items.find(n => n.getUserData("page") === page && n.getUserData("self")) ||
         items.find(n => n.getUserData("page") === page && !n.getUserData("tab"));
       if (leaf) {
@@ -614,7 +637,7 @@ qx.Class.define("ankamon.ui.Shell", {
     /** Sekmeli sayfa açılınca ağaçta o an açık sekmenin yaprağı vurgulanır (sessizce; üst klasör açılır). */
     __selectTabLeaf(page, key) {
       const leaf = key && this.__tree.getRoot().getItems(true)
-        .find(n => n.getUserData("page") === page && n.getUserData("tab") === key);
+        .find(n => n.getUserData("page") === page && n.getUserData("tab") === key && !n.getUserData("group"));
       if (leaf) {
         this.__reveal(leaf);
         // Az önce açılan klasörün yaprakları henüz yerleşmedi: seçim onu görünür alana kaydırırken

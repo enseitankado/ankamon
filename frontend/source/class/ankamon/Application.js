@@ -60,6 +60,8 @@ qx.Class.define("ankamon.Application", {
       ankamon.ui.ToolTipPolicy.install();
       // Bütün pencerelerin başlığı ince (küçük yazı, az dolgu) — pencereler açılmadan önce kurulmalı.
       ankamon.ui.Dialog.installSlimWindowCaptions();
+      // Ön plandaki pencere ESC ile kapanır (kaydedilmemiş değişiklik varsa onayla — bkz. ui.WindowEscClose).
+      ankamon.ui.WindowEscClose.install();
 
       const boot = document.getElementById("boot");
       if (boot) {

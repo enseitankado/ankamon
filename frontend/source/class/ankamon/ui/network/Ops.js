@@ -125,11 +125,11 @@ qx.Class.define("ankamon.ui.network.Ops", {
         form.text("hostname", "Bilgisayar adı", d.hostname);
         const type = new qx.ui.form.ComboBox().set({ value: d.device_type_manual || "", placeholder: d.type_auto ? `otomatik: ${d.type_auto}` : "otomatik" });
         this.TYPES.forEach(t => type.add(new qx.ui.form.ListItem(t)));
-        form.addField("device_type", "Cihaz türü", type);
+        form.addField("device_type", "Varlık türü", type);
         form.text("model", "Marka / model", d.model_manual, d.model_auto ? `otomatik: ${d.model_auto}` : "ör. HP LaserJet M402dn");
         form.text("notes", "Not", d.notes);
         win.add(form);
-        win.add(new qx.ui.basic.Label("Tür ve model boş bırakılırsa tarayıcının tahmini gösterilir.")
+        win.add(new qx.ui.basic.Label("Varlık türü ve model boş bırakılırsa tarayıcının tahmini gösterilir.")
           .set({ textColor: "app-muted", rich: true, wrap: true }));
 
         const cancel = new qx.ui.form.Button("Vazgeç");

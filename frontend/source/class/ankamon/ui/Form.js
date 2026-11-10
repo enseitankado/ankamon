@@ -38,6 +38,10 @@ qx.Class.define("ankamon.ui.Form", {
     this.__fields = {};
   },
 
+  statics: {
+    __softSheet: null
+  },
+
   members: {
     __row: null,
     __fields: null,
@@ -70,6 +74,32 @@ qx.Class.define("ankamon.ui.Form", {
       this.__fields[key] = field;
       this.__row++;
       return field;
+    },
+
+    /**
+     * Metin alanlarının ipucu (placeholder) yazısı temanın ipucu renginden daha açık/soluk (kullanıcı isteği 2026-11-10,
+     * Tahta ekle: örnek değerler girilmiş değer sanılmasın). Renk temanın "text-placeholder"ının yarı saydamı — açık
+     * temada açılır, koyu temada söner; tema değişince pencere yeniden açıldığında yeni renk. Firefox'un ::placeholder
+     * opacity'si (0.54) sıfırlanır ki iki tarayıcıda aynı görünsün.
+     */
+    softPlaceholders() {
+      const color = qx.theme.manager.Color.getInstance().resolve("text-placeholder") || "#888";
+      const rule = `color:color-mix(in srgb, ${color} 65%, transparent) !important;opacity:1`;
+      const sheet = ankamon.ui.Form.__softSheet || (ankamon.ui.Form.__softSheet = qx.bom.Stylesheet.createElement(""));
+      qx.bom.Stylesheet.removeAllRules(sheet);
+      ["::placeholder", "::-webkit-input-placeholder"].forEach(pseudo => {
+        try {
+          qx.bom.Stylesheet.addRule(sheet, `input.ankamon-soft-placeholder${pseudo}, textarea.ankamon-soft-placeholder${pseudo}`, rule);
+        } catch (e) {
+          // tarayıcı bu sözde öğeyi tanımıyor: diğeri yeter
+        }
+      });
+      Object.values(this.__fields).forEach(widget => {
+        if (widget instanceof qx.ui.form.AbstractField) {
+          widget.getContentElement().addClass("ankamon-soft-placeholder");
+        }
+      });
+      return this;
     },
 
     /** Daha önce eklenmiş alan. */

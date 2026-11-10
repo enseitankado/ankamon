@@ -31,18 +31,21 @@
  * (altın/gümüş/bronz), altta ilk on yatay çubukla (çubuk boyu liderin süresine göre; lider vurgulu). Tahtanın yönetici
  * ve sistem hesabı (etapadmin, root) sıralamaya girmez. Veri /session-league'den (bkz. backend SessionLeagueApi):
  * oturum kayıtları ya da loglar silinse de korunan ayrı tablodan (session_league_parts) gelir. Sekme göründükçe ve
- * görünürken dakikada bir tazelenir. "Sırala" ile kullanıcılar ya da tahtalar (en uzun süre oturumlu kalan tahtalar)
- * sıralanır. Görev gereği sürekli oturumlu kalan kullanıcı/tahtalar lig dışı bırakılabilir (ui.sessions.LeagueExclusions):
+ * görünürken dakikada bir tazelenir. Kullanıcılar ya da tahtalar (en uzun süre oturumlu kalan tahtalar) ayrı sekmede
+ * sıralanır (page.Leagues TABS). Görev gereği sürekli oturumlu kalan kullanıcı/tahtalar lig dışı bırakılabilir (ui.sessions.LeagueExclusions):
  * varsayılan görünümde sayılmazlar, "Lig dışındakileri de göster" ile soluk ve etiketli katılırlar. Kart satırına sağ
  * tıklayınca "Lig dışı bırak" / "Lige geri al".
  */
 qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
   extend: qx.ui.tabview.Page,
 
-  /** @param page {ankamon.page.Sessions} yetki denetimi (_can) için */
-  construct(page) {
+  /**
+   * @param page {ankamon.page.Leagues} yetki denetimi (_can) için
+   * @param by {String} "users" | "boards" — sıralanan (sekme başına sabit; etiket/kimlik page.Leagues TABS'tan)
+   */
+  construct(page, by) {
     super("Kullanım sıralaması"); // eski adı "Şampiyonlar Ligi" (Ligler sayfası — bkz. page.Leagues)
-    this.setUserData("key", "league"); // sekme kimliği (sol menü yaprağı, hatırlanan sekme — bkz. ui.Shell.PAGES)
+    this.__byFixed = by === "boards" ? "boards" : "users";
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
 
@@ -50,15 +53,6 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
     const refresh = new qx.ui.form.Button("Yenile");
     refresh.addListener("execute", () => this.load());
     bar.add(refresh);
-    bar.add(new qx.ui.basic.Label("Sırala:").set({ alignY: "middle", marginLeft: 8 }));
-    this.__by = new qx.ui.form.SelectBox().set({ width: 130 });
-    [["users", "Kullanıcılar"], ["boards", "Tahtalar"]].forEach(([key, label]) => {
-      const item = new qx.ui.form.ListItem(label);
-      item.setUserData("key", key);
-      this.__by.add(item);
-    });
-    this.__by.addListener("changeSelection", () => this.load());
-    bar.add(this.__by);
     this.__out = ankamon.ui.sessions.LeagueExclusions.toolbar(bar, {
       league: "session", page, kind: () => this.__byKey() === "boards" ? "board" : "user", onChange: () => this.load()
     });
@@ -126,7 +120,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
   members: {
     __status: null,
     __html: null,
-    __by: null,
+    __byFixed: null,
     __out: null,
     __timer: null,
     __loading: false,
@@ -157,8 +151,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
     },
 
     __byKey() {
-      const item = this.__by.getSelection()[0];
-      return item ? item.getUserData("key") : "users";
+      return this.__byFixed;
     },
 
     /** "2026-11-02" → "2 Kas 2026" */

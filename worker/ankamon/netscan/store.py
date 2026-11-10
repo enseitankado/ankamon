@@ -239,10 +239,11 @@ def fill_labels(conn) -> int:
 
 
 def boards_from_devices(conn) -> int:
-    """Ağ ▸ Akıllı Tahtalar satırları Ağ ▸ Liste'den beslenir (kullanıcı isteği 2026-11-09): Liste'de cihaz türü
+    """Ağ ▸ Akıllı Tahtalar satırları Ağ ▸ Varlıklar'dan beslenir (kullanıcı isteği 2026-11-09): Varlıklar'da varlık türü
     "Akıllı tahta" olan (elle seçilmiş ya da tarayıcının tahmini — MAC öneki) ama Tahtalar'da kaydı olmayan her cihaz
     için tahta kaydı açılır (source 'scan'; takma ad, bilgisayar adı ve IP cihazdan). Kayıt yalnız AÇILIR: türü sonradan
-    değişen cihazın tahta kaydı silinmez (geçmişi/oturumları var) — gerekirse Akıllı Tahtalar'dan elle silinir."""
+    değişen cihazın tahta kaydı silinmez (geçmişi/oturumları var), Akıllı Tahtalar listesinden gizlenir (bkz. backend
+    BoardsApi LISTED); tür geri alınınca yeniden görünür."""
     rows = conn.execute(
         f"""INSERT INTO boards (mac, ip, label, hostname, source)
             SELECT DISTINCT ON (d.mac) d.mac, d.ip, COALESCE(NULLIF(d.label, ''), k.label, ''), NULLIF(d.hostname, ''), 'scan'
@@ -258,7 +259,7 @@ def boards_from_devices(conn) -> int:
 
 
 def device_ips_from_boards(conn) -> int:
-    """Liste'deki cihazın IP'si en güncel keşiften (kullanıcı isteği 2026-11-09): tahtanın IP'si tarayıcıdan sonra
+    """Varlıklar'daki cihazın IP'si en güncel keşiften (kullanıcı isteği 2026-11-09): tahtanın IP'si tarayıcıdan sonra
     loglarından (gönderenin MAC'i tahtanınkiyle eşleşerek — bkz. tasks/boards_from_logs) değiştiyse ve yeni adres
     cihazın ağındaysa cihaz satırı da o adrese geçer. Tersi (tarama → tahta) fill_board_ips'te."""
     rows = conn.execute(

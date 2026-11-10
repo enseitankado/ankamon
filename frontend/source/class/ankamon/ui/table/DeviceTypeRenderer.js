@@ -26,7 +26,7 @@
  */
 
 /**
- * "Cihaz türü" sütunu için hücre çizici: türün metninin SOLUNA türe özgü minik bir cihaz piktogramı koyar.
+ * "Varlık türü" sütunu için hücre çizici: türün metninin SOLUNA türe özgü minik bir cihaz piktogramı koyar.
  * Simgeler satır içi SVG'dir (14 px, çizgi rengi currentColor → temanın metin rengini alır): resim/kaynak
  * dosyası yoktur — bu derlenmiş build'de resim tabanlı simgelerin URL'si güvenilmez (bkz. ui.Shell sınıf
  * başı notu). Türler ui.network.Ops.TYPES ve worker netscan/classify.py ile aynı adlardır; bilinmeyen/boş

@@ -35,7 +35,7 @@
  * (ui.sessions.LeagueExclusions): varsayılan görünümde sayılmazlar, "Lig dışındakileri de göster" ile katılırlar;
  * tahta satırına sağ tıklayınca "Lig dışı bırak" / "Lige geri al".
  *
- * "Bazında: Bilgisayar / Kullanıcı adı": aynı üç ölçü (oturum açıkken / kapalıyken / toplam) kullanıcı adı bazında da
+ * Bilgisayarlar / Kullanıcılar sekmesi (page.Leagues TABS): aynı üç ölçü (oturum açıkken / kapalıyken / toplam) kullanıcı adı bazında da
  * sıralanır (/break-league?by=users). Kullanıcı bazında oturum kapalı süre, tahtayı o açılışta oturumunu en son kapatıp
  * giriş ekranında açık bırakan kullanıcıya yazılır; açılıştan beri kimse oturum açmadıysa kimseye yazılmaz (kart
  * altında ayrıca gösterilir). etapadmin/root sayılmaz; kullanıcı lig dışı listesi tahta listesinden ayrıdır.
@@ -43,10 +43,13 @@
 qx.Class.define("ankamon.ui.sessions.BreakLeague", {
   extend: qx.ui.tabview.Page,
 
-  /** @param page {ankamon.page.Sessions} yetki denetimi (_can) için */
-  construct(page) {
-    super("Ders arası sıralaması"); // eski adı "Teneffüs Ligi" (Ligler sayfası — bkz. page.Leagues)
-    this.setUserData("key", "breakLeague"); // sekme kimliği (sol menü yaprağı — bkz. ui.Shell.PAGES)
+  /**
+   * @param page {ankamon.page.Leagues} yetki denetimi (_can) için
+   * @param by {String} "boards" | "users" — bazında (sekme başına sabit; etiket/kimlik page.Leagues TABS'tan)
+   */
+  construct(page, by) {
+    super("Teneffüsler"); // eski adları "Teneffüs Ligi", "Ders arası sıralaması" (Ligler sayfası — bkz. page.Leagues)
+    this.__byFixed = by === "users" ? "users" : "boards";
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
 
@@ -54,19 +57,6 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
     const refresh = new qx.ui.form.Button("Yenile");
     refresh.addListener("execute", () => this.load());
     bar.add(refresh);
-    // Bilgisayar (tahta) ya da kullanıcı adı bazında: üç ölçü (oturum açık / kapalı / toplam) ikisinde de.
-    bar.add(new qx.ui.basic.Label("Bazında:").set({ alignY: "middle", marginLeft: 8 }));
-    this.__by = new qx.ui.form.SelectBox().set({ width: 140 });
-    ankamon.ui.sessions.BreakLeague.BREAK_BY.forEach(([key, label]) => {
-      const item = new qx.ui.form.ListItem(label);
-      item.setUserData("key", key);
-      this.__by.add(item);
-    });
-    this.__by.addListener("changeSelection", () => {
-      this.__updateLegend();
-      this.load();
-    });
-    bar.add(this.__by);
     bar.add(new qx.ui.basic.Label("Sırala:").set({ alignY: "middle", marginLeft: 8 }));
     this.__sort = new qx.ui.form.SelectBox().set({ width: 330 });
     ankamon.ui.sessions.BreakLeague.BREAK_SORTS.forEach(([key, label]) => {
@@ -103,10 +93,6 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
       ["session", "Teneffüste oturumu açıkken geçen süre"],
       ["nosession", "Teneffüste oturumu kapalı iken geçen süre"]
     ],
-    BREAK_BY: [
-      ["boards", "Bilgisayar"],
-      ["users", "Kullanıcı adı"]
-    ],
     BREAK_COLORS: { session: "#e8833a", idle: "#3b82c4" },
     BREAK_LIST_LIMIT: 10 // API'nin varsayılan limit'i (bkz. BreakLeagueApi)
   },
@@ -117,7 +103,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
   },
 
   members: {
-    __by: null,
+    __byFixed: null,
     __legend: null,
     __sort: null,
     __out: null,
@@ -129,8 +115,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
 
     /** "boards" (bilgisayar/tahta bazında) | "users" (kullanıcı adı bazında). */
     __byKey() {
-      const item = this.__by.getSelection()[0];
-      return item ? item.getUserData("key") : "boards";
+      return this.__byFixed;
     },
 
     /** Renk açıklaması; kullanıcı bazında mavi kısım kullanıcının giriş ekranında açık bıraktığı süredir. */

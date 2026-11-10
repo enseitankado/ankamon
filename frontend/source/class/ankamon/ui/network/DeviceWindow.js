@@ -26,7 +26,7 @@
  */
 
 /**
- * Bilgisayar ayrıntıları penceresi (kullanıcı isteği 2026-11-09): Ağ ▸ Liste'de satıra çift tıklama / sağ menü
+ * Bilgisayar ayrıntıları penceresi (kullanıcı isteği 2026-11-09): Ağ ▸ Varlıklar'da satıra çift tıklama / sağ menü
  * "Bilgisayar ayrıntıları" / "Düzenle" ve Ağ ▸ Akıllı Tahtalar'daki "Düzenle" (eski "Tahtayı düzenle" penceresinin
  * yerini aldı — bkz. ui.BoardOps.editBoard). Düzenle kipinde açılır, alttaki düğme "Kaydet".
  *
@@ -67,7 +67,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
       this.__show(device, board, user, opts.onSaved);
     },
 
-    /** Genel sekmesindeki salt okunur bilgiler: [etiket, değer] (Ağ ▸ Liste sütunlarıyla aynı içerik, tam tarihlerle). */
+    /** Genel sekmesindeki salt okunur bilgiler: [etiket, değer] (Ağ ▸ Varlıklar sütunlarıyla aynı içerik, tam tarihlerle). */
     infoRows(d) {
       const F = ankamon.util.Format;
       const Ops = ankamon.ui.network.Ops;
@@ -80,7 +80,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         ["IP/Maske", d.ip_mask || d.ip || "—"],
         ["MAC", d.mac],
         ["Marka (üretici)", d.vendor || "—"],
-        ["Cihaz türü", d.device_type || "—"],
+        ["Varlık türü", d.device_type || "—"],
         ["Model", d.model || "—"],
         ["Bilgisayar adı", d.hostname || "—"],
         ["İşletim sistemi", d.os_guess ? d.os_guess + (d.os_guess_at ? ` (tespit: ${F.dateTime(d.os_guess_at * 1000)})` : "") : "—"],
@@ -144,8 +144,8 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
           typeBox = new qx.ui.form.ComboBox().set({ value: device.device_type_manual || "",
             placeholder: device.type_auto ? `otomatik: ${device.type_auto}` : "otomatik" });
           Ops.TYPES.forEach(t => typeBox.add(new qx.ui.form.ListItem(t)));
-          typeBox.setToolTipText("Boş bırakılırsa tarayıcının tahmini kullanılır. 'Akıllı tahta' türündeki cihazlar Akıllı Tahtalar listesine kendiliğinden eklenir.");
-          deviceForm.addField("device_type", "Cihaz türü", typeBox);
+          typeBox.setToolTipText("Boş bırakılırsa tarayıcının tahmini kullanılır. Akıllı Tahtalar listesi türü 'Akıllı tahta' olan varlıklardan kendiliğinden oluşur: başka bir türe çevrilen cihaz listeden çıkar.");
+          deviceForm.addField("device_type", "Varlık türü", typeBox);
           deviceForm.text("model", "Marka / model", device.model_manual, device.model_auto ? `otomatik: ${device.model_auto}` : "ör. HP LaserJet M402dn");
           deviceForm.text("notes", "Not", device.notes);
           body.add(deviceForm);
@@ -202,7 +202,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         }
         if (!count) {
           body.add(new qx.ui.basic.Label(device.services_scanned_at
-            ? "Açık port ya da ağ paylaşımı bulunmadı." : "Bu cihazın portları henüz taranmadı (Ağ ▸ Liste ▸ Servisleri tara).")
+            ? "Açık port ya da ağ paylaşımı bulunmadı." : "Bu cihazın portları henüz taranmadı (Ağ ▸ Varlıklar ▸ Servisleri tara).")
             .set({ textColor: "app-muted", rich: true, wrap: true }));
         }
         page.add(new qx.ui.container.Scroll(body), { flex: 1 });

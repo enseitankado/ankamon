@@ -83,9 +83,23 @@ final class BoardsApi
           AND (lower(host) = lower(b.hostname) OR from_ip = host(b.ip))
     ) rl ON true";
 
+    /** Ağ ▸ Varlıklar'daki türün tahta karşılığı (bkz. worker netscan/classify.py BOARD). */
+    private const BOARD_TYPE = 'Akıllı tahta';
+
+    /**
+     * Ağ ▸ Akıllı Tahtalar listesi Ağ ▸ Varlıklar'dan belirlenir (kullanıcı isteği 2026-11-10): tahta, MAC'i (kablolu
+     * ya da kablosuz) Varlıklar'da türü "Akıllı tahta" olan bir satıra düşüyorsa listededir; Varlıklar'da türü başka
+     * bir şeye çevrilirse listeden kendiliğinden çıkar (kayıt, geçmişi/oturumları için silinmez — tür geri alınınca
+     * döner). Varlıklar'da henüz hiç görülmemiş kayıt (elle eklenmiş, ağda henüz taranmamış tahta) listede kalır.
+     * Varlıklar'da türü "Akıllı tahta" olup kaydı olmayan cihaza kayıt worker'da açılır (netscan store.boards_from_devices).
+     */
+    private const LISTED = "(EXISTS (SELECT 1 FROM net_devices d WHERE d.mac IN (b.mac, b.wifi_mac)
+            AND COALESCE(NULLIF(d.device_type, ''), d.type_auto) = '" . self::BOARD_TYPE . "')
+        OR NOT EXISTS (SELECT 1 FROM net_devices d WHERE d.mac IN (b.mac, b.wifi_mac)))";
+
     public function index(): array
     {
-        $boards = Db::all('SELECT ' . self::COLUMNS . ' ' . self::FROM . ' ORDER BY b.label, b.hostname, b.ip');
+        $boards = Db::all('SELECT ' . self::COLUMNS . ' ' . self::FROM . ' WHERE ' . self::LISTED . ' ORDER BY b.label, b.hostname, b.ip');
         return ['boards' => array_map(self::boardRowForPanel(...), $boards)];
     }
 
@@ -125,6 +139,12 @@ final class BoardsApi
         $id = Db::value(
             'INSERT INTO boards (' . implode(', ', $columns) . ') VALUES (' . implode(', ', array_fill(0, count($columns), '?')) . ') RETURNING id',
             array_values($fields)
+        );
+        // Tahta ekle = "bu cihaz akıllı tahtadır": Varlıklar'da bu MAC'lerle görülmüş cihazın türü başka bir şeyse
+        // "Akıllı tahta" yapılır — yoksa liste (LISTED) yeni kaydı hemen gizlerdi.
+        Db::exec(
+            "UPDATE net_devices SET device_type = ? WHERE mac IN (?, ?) AND COALESCE(NULLIF(device_type, ''), type_auto) <> ?",
+            [self::BOARD_TYPE, $fields['mac'], $fields['wifi_mac'] ?? $fields['mac'], self::BOARD_TYPE]
         );
         Audit::log($user, $request, 'board.create', $fields['label'] . ' ' . $fields['mac']);
         return ['id' => $id];

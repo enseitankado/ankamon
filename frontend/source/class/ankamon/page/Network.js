@@ -93,7 +93,7 @@ qx.Class.define("ankamon.page.Network", {
       { id: "ip_mask", label: "IP/Maske", width: 140 },
       { id: "mac", label: "MAC", width: 140 },
       { id: "vendor", label: "Marka (üretici)", width: 180 },
-      { id: "type", label: "Cihaz türü", width: 140 },
+      { id: "type", label: "Varlık türü", width: 140 },
       { id: "model", label: "Model", width: 180 },
       { id: "hostname", label: "Bilgisayar adı", width: 150 },
       { id: "os", label: "İşletim sistemi", width: 160 },
@@ -125,7 +125,7 @@ qx.Class.define("ankamon.page.Network", {
     // "Durum" sütunu: çevrim içi yeşil, çevrim dışı kırmızı (bkz. ui.table.StatusRenderer).
     // Sütun indeksi: id + onay kutusu (2) + "exp" (0) + "status" (1) = 3.
     this.__table.getTableColumnModel().setDataCellRenderer(3, new ankamon.ui.table.StatusRenderer());
-    // "Cihaz türü" hücresine türe özgü minik ikon (bkz. ui.table.DeviceTypeRenderer).
+    // "Varlık türü" hücresine türe özgü minik ikon (bkz. ui.table.DeviceTypeRenderer).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "type"),
       new ankamon.ui.table.DeviceTypeRenderer());
     this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply,

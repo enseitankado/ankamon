@@ -280,6 +280,8 @@ qx.Class.define("ankamon.page.Boards", {
 
     // Kilit teyidinden sonra kutucuk akışının yenilenmesi için en uzun bekleme (bkz. __refreshTile).
     TILE_REFRESH_MS: 8000,
+    // "Kapanıyor…" yazısı (bkz. __sessionOps shutdownSent) tahta bu süre içinde kapanmadıysa kalkar.
+    SHUTDOWN_NOTE_MS: 3 * 60 * 1000,
 
     // Ekran görünümü kapandıktan (Liste ya da başka sayfa) bu kadar sonra önizleme akışları duraklar
     // (kutucuklar son görüntüleriyle kalır — bkz. __pausePreview).
@@ -983,9 +985,10 @@ qx.Class.define("ankamon.page.Boards", {
       const whoami = this.__whoamiState || new Map();
       const metrics = this.__metrics || {};
       return this.__orderedShown().map(b => {
-        // WoL yazısı (bkz. __sessionOps wolSent) tahta açılınca kalkar.
+        // WoL yazısı (bkz. __sessionOps wolSent) tahta açılınca kalkar; "Kapanıyor…" (shutdownSent) tahta kapanınca
+        // ya da kapanmadıysa SHUTDOWN_NOTE_MS sonra.
         const w = whoami.get(b.id);
-        if (w && w.wol && b.online) {
+        if (w && ((w.wol && b.online) || (w.off && (!b.online || Date.now() - w.off > ankamon.page.Boards.SHUTDOWN_NOTE_MS)))) {
           whoami.delete(b.id);
         }
         // Kutucuğun alt barı (bkz. screen/index.html Tile.setStats): grid'in İşlemci/Bellek/sensör
@@ -1172,6 +1175,10 @@ qx.Class.define("ankamon.page.Boards", {
     /** "Oturumları sorgula": seçili tahtalarda o an oturum açmış kullanıcıyı paralel sorgular;
      * eşzamanlılık worker'da yüke göre dinamik (bkz. whoami.dynamic_concurrency). */
     __startWhoamiQuery(boardIds, quiet = false) {
+      if (quiet) {
+        // Kendiliğinden sorgu (kutucuk canlıya geçti) "Kapanıyor…" yazan tahtayı atlar (bkz. __sessionOps shutdownSent).
+        boardIds = boardIds.filter(id => !((this.__whoamiState && this.__whoamiState.get(id)) || {}).off);
+      }
       this.__sessionJob(boardIds, { type: "whoami" }, () => "Oturum sorgulanıyor…",
         t => (t.status === "ok" ? { status: "ok", text: t.output } : { status: "error", text: "Sorgulanamadı" }), quiet);
     },
@@ -1184,7 +1191,8 @@ qx.Class.define("ankamon.page.Boards", {
     __queueLiveWhoami(id) {
       const board = this.__boards.get(id);
       const st = this.__whoamiState && this.__whoamiState.get(id);
-      if (!board || !board.online || !this._can("screen") || (st && st.status === "querying")) {
+      // "Kapanıyor…" (bkz. __sessionOps shutdownSent) kapanana dek kalır: kendiliğinden oturum sorgusu üstüne yazmaz.
+      if (!board || !board.online || !this._can("screen") || (st && (st.status === "querying" || st.off))) {
         return;
       }
       if (!this.__liveQueue) {
@@ -1218,6 +1226,17 @@ qx.Class.define("ankamon.page.Boards", {
           const at = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
           boards.forEach(b => this.__whoamiState.set(b.id, { status: "ok", text: `${at} Magic paket gönderildi`, wol: true }));
           this.__pushPreview();
+        },
+        // Bilgisayarı kapat: komut tahtaya ulaşınca (iş hedefi "ok" — "Kapatma komutu verildi.") kutucuğun sol altında
+        // "Kapanıyor…" (kullanıcı isteği 2026-11-10); ulaşamazsa kutucuk olduğu gibi kalır (hata çıktı penceresinde).
+        // Tahta kapanınca kalkar (bkz. __previewList).
+        shutdownSent: (jobId, boards) => {
+          if (!this.__whoamiState) {
+            this.__whoamiState = new Map();
+          }
+          const before = new Map(boards.map(b => [b.id, this.__whoamiState.get(b.id)]));
+          this.__pollSession(jobId, new Set(boards.map(b => b.id)),
+            t => (t.status === "ok" ? { status: "ok", text: "Kapanıyor…", off: Date.now() } : before.get(t.board_id)));
         },
         query: boards => this.__startWhoamiQuery(boards.map(b => b.id)),
         login: (boards, acc) => this.__sessionJob(boards.map(b => b.id), { type: "login", username: acc.name },
@@ -1361,7 +1380,16 @@ qx.Class.define("ankamon.page.Boards", {
             return;
           }
           pending.delete(t.board_id);
-          this.__whoamiState.set(t.board_id, resultOf(t));
+          const state = resultOf(t);
+          const cur = this.__whoamiState.get(t.board_id);
+          if (cur && cur.off && !(state && state.off)) {
+            return; // kapatma komutu ulaştı: öncesinde başlamış bir sorgunun sonucu "Kapanıyor…"yu silmesin
+          }
+          if (state) {
+            this.__whoamiState.set(t.board_id, state);
+          } else {
+            this.__whoamiState.delete(t.board_id);
+          }
           changed = true;
         });
         if (changed) {
