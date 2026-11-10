@@ -89,7 +89,7 @@ qx.Class.define("ankamon.ui.ssh.ActivityWindow", {
     win.add(bar);
 
     const columns = [
-      ["start", "Başlangıç", 140], ["state", "Durum", 70], ["dur", "Süre", 70], ["name", "Cihaz", 170],
+      ["start", "Başlangıç", 90], ["state", "Durum", 70], ["dur", "Süre", 70], ["name", "Cihaz", 170],
       ["target", "Hedef", 150], ["src", "Kaynak", 130], ["tool", "Araç", 50], ["extra", "Port / tünel", 110],
       ["cmd", "Komut", null]
     ];
@@ -177,7 +177,11 @@ qx.Class.define("ankamon.ui.ssh.ActivityWindow", {
         const cmd = String(c.cmd || "").replace(/\s+/g, " ").trim().slice(0, 400);
         const state = c.end ? (c.lost ? "Kayıp" : "Bitti") : "● Açık";
         const dur = F.duration((c.end || now) - c.start);
-        const row = [c.key, new Date(c.start * 1000).toLocaleString("tr-TR"), state, dur, name, c.target, src, c.tool, extra, cmd];
+        // Bugün başlayanlar yalnız saatle (sütun dar kalsın); daha eskiler tarih + saat.
+        const started = new Date(c.start * 1000);
+        const when = started.toDateString() === new Date().toDateString()
+          ? started.toLocaleTimeString("tr-TR") : started.toLocaleString("tr-TR");
+        const row = [c.key, when, state, dur, name, c.target, src, c.tool, extra, cmd];
         if (text && !row.slice(1).join(" ").toLocaleLowerCase("tr").includes(text)) {
           return;
         }

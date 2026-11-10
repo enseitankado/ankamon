@@ -164,8 +164,10 @@ qx.Class.define("ankamon.ui.ssh.ActivityStore", {
             }
           } else if (ev.ev === "end") {
             const conn = this.__conns.get(ev.pid + ":" + ev.start);
-            if (conn && !conn.end) {
+            // Sunucu "kayıp" dedikten sonra gerçek bitiş satırı geldiyse (süreç zombiyken sorgulanmıştı) o geçerli.
+            if (conn && (!conn.end || conn.lost)) {
               conn.end = ev.ts;
+              conn.lost = false;
               changed = true;
             }
           }

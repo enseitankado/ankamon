@@ -69,9 +69,9 @@ qx.Class.define("ankamon.ui.StatusBar", {
       ["scan", "Ağ taraması", 190, "network"],
       ["ssh", "SSH bağlantıları", 120, "admin"],
       ["cpu", "CPU", 64, null],
-      ["ram", "RAM", 150, null],
-      ["disk", "Disk", 150, null],
-      ["net", "Ağ trafiği", 165, null]
+      ["ram", "RAM", 190, null],
+      ["disk", "Disk", 168, null],
+      ["net", "Ağ trafiği", 180, null]
     ],
     PREFS_KEY: "statusbar.panels"
   },
