@@ -32,6 +32,7 @@ namespace Ankamon\Api;
 
 use Ankamon\Core\ApiError;
 use Ankamon\Core\Audit;
+use Ankamon\Core\NetifControl;
 use Ankamon\Core\Request;
 use Ankamon\Core\Settings;
 
@@ -99,6 +100,8 @@ final class SettingsApi
     private static function interfaces(): array
     {
         $list = [];
+        $serverAddr = (string) ($_SERVER['SERVER_ADDR'] ?? '');
+        $disabledByUs = NetifControl::disabled();
         foreach (net_get_interfaces() ?: [] as $name => $info) {
             $name = (string) $name;
             if ($name === 'lo' || preg_match('/^(docker|br-|veth)/', $name) || !preg_match('/^[A-Za-z0-9_.:@-]{1,32}$/', $name)) {
@@ -108,6 +111,10 @@ final class SettingsApi
             $kind = is_dir("$sys/wireless") || is_link("$sys/phy80211") ? 'wireless' : (file_exists("$sys/device") ? 'wired' : 'virtual');
             $mac = is_readable("$sys/address") ? trim((string) @file_get_contents("$sys/address")) : '';
             $speed = is_readable("$sys/speed") ? (int) trim((string) @file_get_contents("$sys/speed")) : 0;
+            // enabled = yönetsel olarak açık (IFF_UP); carrier = bağlantı var (kablo takılı / Wi-Fi bağlı) — yalnız açıkken okunur.
+            $flags = is_readable("$sys/flags") ? hexdec(trim((string) @file_get_contents("$sys/flags"))) : (($info['up'] ?? false) ? 1 : 0);
+            $enabled = (bool) ($flags & 1);
+            $carrier = $enabled && is_readable("$sys/carrier") && trim((string) @file_get_contents("$sys/carrier")) === '1';
             $addresses = [];
             foreach ($info['unicast'] ?? [] as $u) {
                 if (($u['family'] ?? 0) === 2 /* AF_INET; sockets eklentisi yok */ && isset($u['address'], $u['netmask'])) {
@@ -115,15 +122,36 @@ final class SettingsApi
                     $addresses[] = $u['address'] . '/' . $bits;
                 }
             }
+            $ipv4 = array_map(fn ($a) => explode('/', $a)[0], $addresses);
             $list[] = [
-                'name' => $name, 'up' => (bool) ($info['up'] ?? false), 'kind' => $kind,
-                'mac' => $mac !== '00:00:00:00:00:00' ? $mac : '', 'speed' => $speed > 0 ? $speed : null, 'addresses' => $addresses,
+                'name' => $name, 'up' => $enabled, 'enabled' => $enabled, 'carrier' => $carrier, 'kind' => $kind,
+                'mac' => $mac !== '00:00:00:00:00:00' ? $mac : '', 'speed' => $speed > 0 && $carrier ? $speed : null, 'addresses' => $addresses,
+                // Bu isteği yapan tarayıcının bağlandığı sunucu adresi bu kartta mı (kapatılırsa panel bağlantısı kopar).
+                'serving' => $serverAddr !== '' && in_array($serverAddr, $ipv4, true),
+                'disabled_by_ankamon' => in_array($name, $disabledByUs, true),
             ];
         }
         // Önce fiziksel kartlar (kablolu, kablosuz), sonra sanal arabirimler; her grupta ada göre.
         $rank = ['wired' => 0, 'wireless' => 1, 'virtual' => 2];
         usort($list, fn ($a, $b) => ($rank[$a['kind']] <=> $rank[$b['kind']]) ?: strnatcmp($a['name'], $b['name']));
         return $list;
+    }
+
+    /**
+     * Kartı etkin/pasif yap (kablo çıkarmadan — kullanıcı isteği 2026-11-10). Gövde: {name, enabled}. Tarayıcının bağlandığı
+     * kartı kapatma onayı arayüzdedir (interfaces[].serving); burada yalnız ad doğrulanır ve root servise iletilir.
+     */
+    public function setInterface(Request $request, array $user): array
+    {
+        $name = trim((string) $request->input('name'));
+        $enabled = (bool) $request->input('enabled');
+        $known = array_column(self::interfaces(), 'name');
+        if (!in_array($name, $known, true)) {
+            throw ApiError::badRequest('Bilinmeyen arabirim.');
+        }
+        NetifControl::setEnabled($name, $enabled);
+        Audit::log($user, $request, 'settings.interface', $name . ($enabled ? ' etkin' : ' pasif'));
+        return ['ok' => true, 'interfaces' => self::interfaces()];
     }
 
     private static function redacted(array $access): array

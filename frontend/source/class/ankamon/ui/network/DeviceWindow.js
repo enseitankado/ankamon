@@ -253,6 +253,11 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
               if (label !== null) {
                 boardValues.label = label; // tek takma ad: tahta kaydına da
               }
+              // Varlık türü "Akıllı tahta" → tahta kaydı da tahta sayılır (eski "Bu bir akıllı tahtadır" işaretinin yerine;
+              // MAC'i ETAP öneklerine uymayan tahtanın IP'si loglarından güncellensin — worker tasks/boards_from_logs).
+              if (typeBox && (typeBox.getValue() || "").trim() === "Akıllı tahta") {
+                boardValues.smart_board = true;
+              }
               await ankamon.io.Api.patch("/boards/" + board.id, boardValues);
             }
             win.close();

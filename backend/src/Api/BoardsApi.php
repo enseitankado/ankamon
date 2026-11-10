@@ -74,11 +74,11 @@ final class BoardsApi
         -- turları arasında net_devices gecikebilir), bu yüzden alive = online OR net_online.
         EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online) AS net_online,
         (b.online OR EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online)) AS alive,
-        -- «Yönetilebilir» = SSH ile OTURUM açılabiliyor (kullanıcı bildirimi 2026-11-10: SSH portu açık ama root parolası
-        -- tutmayan tahta «Evet» görünüyordu): son 3 dakikada başarılı oturum yoklaması (worker tasks/session_probe — 30 sn'de
-        -- bir SSH ile giriş yapar). Yoklanmayan tahtada (sensör toplama kapalı) port durumu (b.online).
-        COALESCE(b.online AND (NOT b.monitor_enabled OR b.session_checked_at > now() - interval '3 minutes'), false) AS manageable,
-        COALESCE((b.ssh_ok AND b.monitor_enabled AND (b.session_checked_at IS NULL OR b.session_checked_at < now() - interval '3 minutes')), false)
+        -- «Yönetilebilir» TEK ölçüt (kullanıcı isteği 2026-11-10): tahtaya SSH ile root girişi BAŞARILI — son 3 dakikada
+        -- başarılı oturum yoklaması (worker tasks/session_probe: SSH portu açık her tahtaya 30 sn'de bir ssh_access
+        -- kullanıcısıyla — root — ve tahtaya özel parola varsa onunla giriş yapar). Port açıklığı, sensör toplama vb. sayılmaz.
+        COALESCE(b.session_checked_at > now() - interval '3 minutes', false) AS manageable,
+        COALESCE((b.ssh_ok AND (b.session_checked_at IS NULL OR b.session_checked_at < now() - interval '3 minutes')), false)
             AS ssh_login_failing";
 
     /**

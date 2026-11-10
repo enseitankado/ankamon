@@ -99,7 +99,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
 
     /** Menüde tek tahtaya uygulanan maddeler: çoklu seçimde her tahta için ayrı açılır (pencere başına tahta). Görev
      * yöneticisi çoklu seçimde tek pencerede bütün tahtaları gösterir (bilgisayar süzgeciyle), burada değil. */
-    PER_BOARD: ["Bilgisayarı yönet", "Sohbet", "Dosya yöneticisi", "Düzenle"],
+    // "Düzenle" yok: çoklu seçimde sağ menünün kendisi toplu düzenleme penceresini açar (ui.network.DeviceBulkEdit).
+    PER_BOARD: ["Bilgisayarı yönet", "Sohbet", "Dosya yöneticisi"],
     PER_BOARD_CONFIRM: 6
   },
 

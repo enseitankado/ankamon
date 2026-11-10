@@ -180,6 +180,7 @@ return [
 
     ['GET',    '/api/settings',          [Api\SettingsApi::class, 'show'],     'admin'],
     ['PUT',    '/api/settings',          [Api\SettingsApi::class, 'update'],   'admin'],
+    ['POST',   '/api/settings/interface', [Api\SettingsApi::class, 'setInterface'], 'admin'],
     // Eklentiler (ext/<ad>): çekirdek adlarını bilmez, EXT_DIR taranır (bkz. Core\Extensions). Ad gövdede
     // taşınır; Router'daki {id} yalnız rakam eşlediğinden yola konmaz.
     ['GET',    '/api/extensions',          [Api\ExtensionsApi::class, 'list'],         'admin'],

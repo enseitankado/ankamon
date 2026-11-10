@@ -64,7 +64,7 @@ qx.Class.define("ankamon.page.Boards", {
     this.__columns = [
       // KALICI KURAL (kullanıcı 2026-11-10): Durum = ağda canlı mı (Varlıklar'la aynı); SSH erişimi ayrı "Yönetilebilir".
       { id: "status", label: "Durum", width: 100, hint: "Çevrimiçi: tahta ağda canlı (Varlıklar'daki durumla aynı — ağ taraması görüyor ya da SSH yanıt veriyor). Kapalı: ağda görülmüyor." },
-      { id: "manageable", label: "Yönetilebilir", width: 120, hint: "Evet: Ankamon tahtaya SSH ile oturum açabiliyor (son 3 dakikada başarılı yoklama) — komut, ekran, web terminali, oturum işlemleri yapılabilir. Hayır (parola): SSH portu açık ama giriş reddediliyor — tahtanın root parolası Ayarlar ▸ SSH erişimi'ndekinden farklı (Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları'ndan tahtanın parolası girilir). Hayır: SSH yanıt vermiyor." },
+      { id: "manageable", label: "Yönetilebilir", width: 120, hint: "Tek ölçüt: tahtaya SSH ile root girişi başarılı mı. Evet: Ankamon son 3 dakikada tahtaya SSH ile root olarak girebildi — komut, ekran, web terminali, oturum işlemleri yapılabilir. Hayır (parola): SSH portu açık ama giriş reddediliyor — tahtanın root parolası Ayarlar ▸ SSH erişimi'ndekinden farklı (Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları'ndan tahtanın parolası girilir). Hayır: SSH yanıt vermiyor." },
       { id: "name", label: "Takma ad / Ad" },
       { id: "hostname", label: "Bilgisayar adı", width: 150 },
       { id: "ip", label: "IP", width: 120 },
@@ -1456,7 +1456,10 @@ qx.Class.define("ankamon.page.Boards", {
       // Bilgisayarı aç (WoL) artık BoardOps.menu'de "Bilgisayarı kapat"ın hemen yanında (kullanıcı
       // isteği: ikisi komşu); çevrimiçi tahtada orada devre dışı görünür.
       if (this._can("boards.manage")) {
-        extra.push(() => add(ICON.edit, "Düzenle", () => this.__edit(board)));
+        // Çoklu seçimde toplu düzenleme (ui.network.DeviceBulkEdit — kullanıcı isteği 2026-11-10).
+        extra.push(() => add(ICON.edit, "Düzenle" + (boards.length > 1 ? ` (${boards.length} tahta)` : ""), () => (boards.length > 1
+          ? ankamon.ui.network.DeviceBulkEdit.open({ boards, user: this._user, onSaved: () => this.refresh() })
+          : this.__edit(board))));
         extra.push(() => add(ICON.delete, "Sil" + (boards.length > 1 ? ` (${boards.length} tahta)` : ""),
           () => this.__delete(boards)));
       }

@@ -54,7 +54,9 @@ def run(conn) -> None:
         return
     _last = now
     boards = conn.execute(
-        "SELECT id AS board_id, host(ip) AS ip FROM boards WHERE online AND ip IS NOT NULL AND monitor_enabled"
+        # Sensör toplaması kapalı tahtalar da (monitor_enabled): başarılı root girişi «Yönetilebilir»in tek ölçütü
+        # (BoardsApi manageable — kullanıcı isteği 2026-11-10); SSH portu kapalı tahtaya girilemez, yoklanmaz.
+        "SELECT id AS board_id, host(ip) AS ip FROM boards WHERE online AND ip IS NOT NULL"
     ).fetchall()
     if not boards:
         return

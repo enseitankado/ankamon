@@ -271,6 +271,9 @@ qx.Class.define("ankamon.ui.Shell", {
     __silentTree: false,
     __justSelected: null,
     __dragItem: null,
+    __dropTarget: null,
+    __dropLine: null,
+    __dragGhost: null,
     __navPath: null,
 
     /**
@@ -357,10 +360,9 @@ qx.Class.define("ankamon.ui.Shell", {
         root.add(node);
         this.__nodes.push(node);
       });
-      this.__nodes.forEach(item => this.__makeReorderable(item));
-      // Ana düğümlerin alt seçenekleri de kendi düğümleri içinde sürüklenerek yer değiştirir (kullanıcı isteği 2026-11-10:
-      // Ağ altındaki seçenekler); kayıtlı sıra uygulanır.
-      this.__nodes.filter(n => n instanceof qx.ui.tree.TreeFolder).forEach(n => {
+      // Sıralanabilen YALNIZ Ağ'ın alt seçenekleri (kullanıcı isteği 2026-11-10): ana düğümler ve diğer alt menüler sabit.
+      // Varlıklar her zaman en üstte, taşınamaz (bkz. __pinnedChild). Kayıtlı sıra uygulanır.
+      this.__nodes.filter(n => n instanceof qx.ui.tree.TreeFolder && n.getUserData("page").id === "boards").forEach(n => {
         n.getChildren().forEach(child => this.__makeChildReorderable(child));
         this.__applyChildOrder(n);
       });
@@ -578,73 +580,65 @@ qx.Class.define("ankamon.ui.Shell", {
       return node;
     },
 
-    /**
-     * Ana düğümü sürüklenebilir/bırakılabilir yapar (bkz. qx.ui.core.Widget draggable/droppable
-     * özellikleri — her Widget'ta yerleşik). Bırakılan düğüm, üzerine bırakıldığı düğümün YERİNE
-     * geçer (öncesine taşınır); yeni sıra kullanıcı adına sunucuda saklanır (bkz. __saveNavOrder).
-     */
-    __makeReorderable(item) {
-      item.set({ draggable: true, droppable: true });
-      item.addListener("dragstart", e => {
-        e.addAction("move");
-        this.__dragItem = item;
-      });
-      item.addListener("dragend", () => {
-        this.__dragItem = null;
-      });
-      item.addListener("dragover", e => {
-        // qx'te dragover'da preventDefault bırakmayı YASAKLAR (HTML5'in tersi — eski kod onu "izin ver" sanıyordu ve
-        // sürükle-bırak hiç çalışmıyordu; 2026-11-10). Yalnız ana düğüm ana düğümün üzerine (alt seçenek kendi düğümünde).
-        if (!this.__dragItem || this.__dragItem === item || !this.__nodes.includes(this.__dragItem)) {
-          e.preventDefault();
-        }
-      });
-      item.addListener("drop", () => {
-        const dragged = this.__dragItem;
-        if (!dragged || dragged === item || !this.__nodes.includes(dragged)) {
-          return;
-        }
-        const order = this.__nodes.filter(n => n !== dragged);
-        order.splice(order.indexOf(item), 0, dragged);
-        this.__nodes = order;
-        this.__tree.getRoot().add(...order); // add() zaten-ebeveynli öğeyi önce oradan söker.
-        this.__saveNavOrder();
-      });
+    /** Ağ ▸ Varlıklar: hep ilk alt seçenek, sürüklenemez ve önüne bir şey bırakılamaz (kullanıcı isteği 2026-11-10). */
+    __pinnedChild(n) {
+      return !!n && !n.getUserData("assetGroup") && !!n.getUserData("page") && n.getUserData("page").id === "network";
     },
 
     /**
-     * Ana düğümün alt seçeneğini (ör. Ağ ▸ Varlıklar, Akıllı Tahtalar, Sensörler, varlık grupları) aynı düğüm içinde
-     * sürüklenebilir yapar: üzerine bırakıldığı kardeşin önüne geçer. Sıra kullanıcı başına ui_prefs'te
-     * ("nav.children.<ana düğüm>" — __childKey listesi) saklanır, ağaç kurulurken ve gruplar değişince uygulanır.
+     * Ağ'ın alt seçeneğini (Akıllı Tahtalar, Sensörler, varlık grupları) aynı düğüm içinde sürüklenebilir yapar. Sürüklerken
+     * (kullanıcı isteği 2026-11-10: bırakmadan yeri görülsün) imleci izleyen bir etiket ve hedef satırın üstünde/altında
+     * nereye yerleşeceğini gösteren kalın bir çizgi çizilir; bırakınca tam oraya (satırın üst yarısı: önüne, alt yarısı:
+     * arkasına) geçer. Sıra kullanıcı başına ui_prefs'te ("nav.children.<ana düğüm>" — __childKey listesi) saklanır.
      */
     __makeChildReorderable(item) {
       if (item.getUserData("childReorder")) {
         return;
       }
       item.setUserData("childReorder", true);
-      item.set({ draggable: true, droppable: true });
-      item.addListener("dragstart", e => {
-        e.addAction("move");
-        this.__dragItem = item;
-      });
-      item.addListener("dragend", () => {
-        this.__dragItem = null;
-      });
+      if (this.__pinnedChild(item)) {
+        item.set({ droppable: true }); // üzerine bırakılınca arkasına geçer (önüne değil — bkz. __dropPlace)
+      } else {
+        item.set({ draggable: true, droppable: true });
+        item.addListener("dragstart", e => {
+          e.addAction("move");
+          this.__dragItem = item;
+          this.__dragFeedback(item.getLabel());
+        });
+        item.addListener("drag", e => {
+          this.__moveDragFeedback(e.getDocumentLeft(), e.getDocumentTop());
+          this.__showDropLine(e.getDocumentTop());
+        });
+        item.addListener("dragend", () => {
+          this.__dragItem = null;
+          this.__dropTarget = null;
+          this.__hideDragVisuals();
+        });
+      }
       item.addListener("dragover", e => {
         // qx: preventDefault = bu hedefe bırakılamaz. Yalnız aynı düğümün kardeşleri arasında.
         const dragged = this.__dragItem;
         if (!dragged || dragged === item || dragged.getParent() !== item.getParent()) {
           e.preventDefault();
+          return;
+        }
+        this.__dropTarget = item;
+      });
+      item.addListener("dragleave", () => {
+        if (this.__dropTarget === item) {
+          this.__dropTarget = null;
+          this.__showDropLine(null);
         }
       });
-      item.addListener("drop", () => {
+      item.addListener("drop", e => {
         const dragged = this.__dragItem;
         const parent = item.getParent();
         if (!dragged || dragged === item || dragged.getParent() !== parent) {
           return;
         }
+        const after = this.__dropPlace(item, e.getDocumentTop()) === "after";
         const order = parent.getChildren().filter(n => n !== dragged);
-        order.splice(order.indexOf(item), 0, dragged);
+        order.splice(order.indexOf(item) + (after ? 1 : 0), 0, dragged);
         parent.add(...order); // add() zaten-ebeveynli öğeyi önce oradan söker (sırayla yeniden ekler).
         const key = "nav.children." + parent.getUserData("page").id;
         const value = order.map(n => this.__childKey(n));
@@ -652,6 +646,59 @@ qx.Class.define("ankamon.ui.Shell", {
         prefs[key] = value;
         ankamon.io.Api.put("/auth/prefs", { key, value }).catch(() => {});
       });
+    },
+
+    /** Bırakma yeri: satırın üst yarısı "before", alt yarısı "after"; sabit Varlıklar'ın önüne bırakılamaz. */
+    __dropPlace(target, pageY) {
+      const el = target.getContentElement().getDomElement();
+      if (!el) {
+        return "after";
+      }
+      const r = el.getBoundingClientRect();
+      const y = pageY - window.scrollY;
+      return this.__pinnedChild(target) || y > r.top + r.height / 2 ? "after" : "before";
+    },
+
+    /** Hedef satırın üst/alt kenarında yerleşme çizgisi (pageY null: gizle). */
+    __showDropLine(pageY) {
+      const target = this.__dropTarget;
+      const el = target && pageY !== null ? target.getContentElement().getDomElement() : null;
+      if (!this.__dropLine) {
+        const line = this.__dropLine = document.createElement("div");
+        line.style.cssText = "position:fixed;height:3px;border-radius:2px;background:#1a73e8;box-shadow:0 0 0 1px #fff;" +
+          "pointer-events:none;z-index:100000;display:none";
+        document.body.appendChild(line);
+      }
+      if (!el) {
+        this.__dropLine.style.display = "none";
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      const label = target.getChildControl("label").getContentElement().getDomElement();
+      const left = label ? label.getBoundingClientRect().left : r.left;
+      const top = this.__dropPlace(target, pageY) === "after" ? r.bottom - 1 : r.top - 2;
+      Object.assign(this.__dropLine.style, { display: "block", left: left + "px", top: top + "px", width: Math.max(40, r.right - left - 8) + "px" });
+    },
+
+    /** İmleci izleyen yarı saydam etiket (sürüklenen seçeneğin adı). */
+    __dragFeedback(text) {
+      if (!this.__dragGhost) {
+        const ghost = this.__dragGhost = document.createElement("div");
+        ghost.style.cssText = "position:fixed;padding:3px 10px;border-radius:6px;background:rgba(26,115,232,.92);color:#fff;" +
+          "font:13px sans-serif;pointer-events:none;z-index:100001;display:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25)";
+        document.body.appendChild(ghost);
+      }
+      this.__dragGhost.textContent = "↕ " + text;
+    },
+
+    __moveDragFeedback(pageX, pageY) {
+      if (this.__dragGhost) {
+        Object.assign(this.__dragGhost.style, { display: "block", left: (pageX - window.scrollX + 14) + "px", top: (pageY - window.scrollY + 8) + "px" });
+      }
+    },
+
+    __hideDragVisuals() {
+      [this.__dropLine, this.__dragGhost].filter(Boolean).forEach(el => { el.style.display = "none"; });
     },
 
     /** Alt seçeneğin kalıcı kimliği (sıra kaydı için): grup, sayfanın kendi seçeneği, sekme ya da alt sayfa. */
@@ -668,10 +715,17 @@ qx.Class.define("ankamon.ui.Shell", {
       return "page:" + (n.getUserData("page") ? n.getUserData("page").id : n.getLabel());
     },
 
-    /** Kayıtlı alt seçenek sırasını uygular: kayıttakiler o sırayla, kayıtta olmayanlar (yeni grup vb.) mevcut yerlerinde. */
+    /**
+     * Kayıtlı alt seçenek sırasını uygular: kayıttakiler o sırayla, kayıtta olmayanlar (yeni grup vb.) mevcut yerlerinde.
+     * Varlıklar (__pinnedChild) her durumda en üstte.
+     */
     __applyChildOrder(folder) {
       const saved = ((this.__user.ui_prefs || {})["nav.children." + folder.getUserData("page").id]) || [];
+      const pinned = folder.getChildren().find(n => this.__pinnedChild(n));
       if (!saved.length) {
+        if (pinned && folder.getChildren()[0] !== pinned) {
+          folder.addAt(pinned, 0);
+        }
         return;
       }
       const kids = folder.getChildren().slice();
@@ -680,13 +734,11 @@ qx.Class.define("ankamon.ui.Shell", {
       // Kayıtlı olanlar kendi aralarında kayıt sırasına girer; kayıtsızlar bulundukları konumu korur.
       let i = 0;
       const order = kids.map(n => (rank.has(this.__childKey(n)) ? known[i++] : n));
+      if (pinned) {
+        order.splice(order.indexOf(pinned), 1);
+        order.unshift(pinned);
+      }
       folder.add(...order);
-    },
-
-    /** Yeni ana düğüm sırasını kullanıcı adına kalıcı olarak kaydeder (oturumdan bağımsız). */
-    __saveNavOrder() {
-      const order = this.__nodes.map(n => n.getUserData("page").id);
-      ankamon.io.Api.put("/auth/nav-order", { order }).catch(() => {});
     },
 
     /**

@@ -59,13 +59,20 @@ qx.Class.define("ankamon.page.Network", {
     const Ops = ankamon.ui.network.Ops;
 
     this._addButton("Yenile", this.refresh);
-    this.__checkAllButton = this._addButton("Tümünü işaretle", () => this._checkAll(this.__table, true));
+    // "Tümünü işaretle" kalktı (kullanıcı isteği 2026-11-10; başlıktaki onay kutusu işaretler) — yerinde "Şimdi tara".
+    if (this._can("network.manage")) {
+      this._addButton("Şimdi tara", async () => {
+        await Ops.scanNow();
+        this.__pollState();
+      }).set({ toolTipText: "Bağlı bütün ağlarda varlık taramasını hemen başlatır (makine çok yoğunsa yine ertelenir)" });
+    }
     this.__uncheckButton = this._addButton("İşaretleri kaldır", () => this._checkAll(this.__table, false));
     this._addButton("Servisleri aç/kapat", () => this.__toggleAll())
       .set({ toolTipText: "Bütün cihazların port/servis alt satırlarını açar ya da kapatır" });
     if (this._can("network.manage")) {
       this._addButton("Ekle", () => this.__edit(null));
-      this.__editButton = this._addButton("Düzenle", () => this.__single(d => this.__edit(d)));
+      // Birden çok varlık işaretliyse toplu düzenleme (ui.network.DeviceBulkEdit — kullanıcı isteği 2026-11-10).
+      this.__editButton = this._addButton("Düzenle", () => this.__withSome(ds => this.__editMany(ds)));
       this.__deleteButton = this._addButton("Sil", () => this.__withSome(ds => this.__remove(ds)));
       this.__groupButton = this._addButton("Grup oluştur", () => this.__withSome(ds => this.__createGroup(ds)))
         .set({ toolTipText: "İşaretli varlıklardan adlı bir grup kurar; grup sol menüde Varlıklar altında görünür" });
@@ -74,10 +81,6 @@ qx.Class.define("ankamon.page.Network", {
         .set({ visibility: "excluded", toolTipText: "Bu grubun işlemleri: işaretlileri gruptan çıkar, yeniden adlandır, grubu sil" });
       this.__servicesButton = this._addButton("Servisleri tara", () => this.__withSome(ds => this.__scanServices(ds)))
         .set({ toolTipText: "İşaretli cihazların açık port ve servislerini sıranın başında tarar" });
-      this._addButton("Şimdi tara", async () => {
-        await Ops.scanNow();
-        this.__pollState();
-      }).set({ toolTipText: "Bağlı bütün ağlarda varlık taramasını hemen başlatır (makine çok yoğunsa yine ertelenir)" });
       // Ağ işlemleri (eskiden sol menüdeki ağ düğümlerinin sağ menüsü): ağ başına alt menü.
       const netsButton = this._addButton("Ağlar ▾", () => this.__openNetworksMenu(netsButton))
         .set({ toolTipText: "Ağ başına işlemler: yeniden adlandır, taramayı durdur/başlat, bağlı olmayan ağı sil" });
@@ -259,7 +262,6 @@ qx.Class.define("ankamon.page.Network", {
     __note: null,
     __timer: null,
     __polling: false,
-    __checkAllButton: null,
     __uncheckButton: null,
     __editButton: null,
     __deleteButton: null,
@@ -476,9 +478,6 @@ qx.Class.define("ankamon.page.Network", {
         }
       });
       this.__model.setData(out, false);
-      if (this.__checkAllButton) {
-        this.__checkAllButton.setLabel(shown.length ? `Tümünü işaretle (${shown.length})` : "Tümünü işaretle");
-      }
     },
 
     __toggle(id) {
@@ -533,10 +532,7 @@ qx.Class.define("ankamon.page.Network", {
 
     __updateActionState() {
       const count = this.__checkedDevices().length;
-      if (this.__editButton) {
-        this.__editButton.setEnabled(count === 1);
-      }
-      [this.__deleteButton, this.__servicesButton, this.__groupButton, this.__uncheckButton].filter(Boolean).forEach(button => {
+      [this.__editButton, this.__deleteButton,this.__servicesButton, this.__groupButton, this.__uncheckButton].filter(Boolean).forEach(button => {
         if (button.getUserData("baseLabel") === null) {
           button.setUserData("baseLabel", button.getLabel());
         }
@@ -612,6 +608,15 @@ qx.Class.define("ankamon.page.Network", {
       if (await ankamon.ui.network.Ops.edit(device, networks, this.__networkId)) {
         this.refresh();
       }
+    },
+
+    /** Tek varlık: Bilgisayar ayrıntıları; birden çok: toplu düzenleme. */
+    __editMany(devices) {
+      if (devices.length === 1) {
+        this.__showDetails(devices[0]);
+        return;
+      }
+      ankamon.ui.network.DeviceBulkEdit.open({ devices, user: this._user, onSaved: () => this.refresh() });
     },
 
     async __remove(devices) {
@@ -803,7 +808,7 @@ qx.Class.define("ankamon.page.Network", {
         if (group) {
           add("⊖", `Gruptan çıkar (${group.name})` + count, () => this.__changeMembers(group, devices, true));
         }
-        add(ICON.edit, "Düzenle", () => this.__showDetails(device));
+        add(ICON.edit, "Düzenle" + count, () => this.__editMany(devices));
         add(ICON.delete, "Sil" + count, () => this.__remove(devices));
       }
       return menu;

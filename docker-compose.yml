@@ -56,6 +56,8 @@ services:
     # değiştirmez, zaten root SSH kimlik bilgilerini tutan tek konteynerin blast radius'unu artırmaz).
     cap_add:
       - SYS_ADMIN
+      # Ayarlar ▸ Ağ arabirimleri'nde kartı etkin/pasif yapmak (ip link set up/down — services/netif-ops.sh).
+      - NET_ADMIN
     devices:
       - /dev/fuse
     security_opt:

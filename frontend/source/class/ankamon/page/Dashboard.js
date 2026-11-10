@@ -102,6 +102,50 @@ qx.Class.define("ankamon.page.Dashboard", {
   },
 
   statics: {
+    /**
+     * Genel bakış'ın disk grafiği (kullanıcı isteği 2026-11-10; Disk kullanımı ▸ Özet'inki AYRI — ui.DiskUsageSummary.html):
+     * yalnız daire grafik — büyük dilimlerin (%8 ve üstü) üzerinde boyutu, altında toplam ve diskin toplam/boş alanı;
+     * sağdaki ayrıntı listesi yok (ad/boyut/pay dilimin ipucunda). Dilime tıklayınca o veri türünün sekmesi açılır (data-mode).
+     */
+    diskPie(items, disk) {
+      const F = ankamon.util.Format;
+      const esc = qx.bom.String.escape;
+      const R = 70, C = R + 4;
+      const total = items.reduce((sum, it) => sum + (it.bytes || 0), 0);
+      const shown = items.filter(it => it.bytes > 0);
+      const tip = it => `<title>${esc(it.label)}: ${F.bytes(it.bytes)} (%${(it.bytes / total * 100).toFixed(1)}) — tıklayınca o sekme açılır</title>`;
+      const text = (x, y, value) => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" ` +
+        `style="font:600 11px sans-serif;fill:#fff;paint-order:stroke;stroke:rgba(0,0,0,.55);stroke-width:2.5px;pointer-events:none">${esc(value)}</text>`;
+      let svg = "";
+      if (!total) {
+        svg = `<circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width="2"/>` +
+          `<text x="${C}" y="${C}" text-anchor="middle" dominant-baseline="middle" fill="currentColor" opacity=".6">Veri yok</text>`;
+      } else if (shown.length === 1) {
+        svg = `<circle data-mode="${shown[0].mode}" cx="${C}" cy="${C}" r="${R}" fill="${shown[0].color}" style="cursor:pointer">${tip(shown[0])}</circle>` +
+          text(C, C, F.bytes(shown[0].bytes));
+      } else {
+        let angle = -Math.PI / 2;
+        const labels = [];
+        svg = shown.map(it => {
+          const share = it.bytes / total;
+          const a0 = angle, a1 = angle + share * 2 * Math.PI;
+          angle = a1;
+          const p = a => `${(C + R * Math.cos(a)).toFixed(2)} ${(C + R * Math.sin(a)).toFixed(2)}`;
+          if (share >= 0.08) {
+            const mid = (a0 + a1) / 2;
+            labels.push(text(C + R * 0.6 * Math.cos(mid), C + R * 0.6 * Math.sin(mid), F.bytes(it.bytes)));
+          }
+          return `<path data-mode="${it.mode}" class="slice" d="M ${C} ${C} L ${p(a0)} A ${R} ${R} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${p(a1)} Z" ` +
+            `fill="${it.color}" stroke="#fff" stroke-width="1.5" style="cursor:pointer">${tip(it)}</path>`;
+        }).join("") + labels.join("");
+      }
+      const free = disk && disk.total != null && disk.free != null
+        ? `<div style="opacity:.75">Disk: toplam ${F.bytes(disk.total)}, boş ${F.bytes(disk.free)}</div>` : "";
+      return `<style>.tm-dpie .slice:hover{opacity:.8}</style><div class="tm-dpie" style="text-align:center;font-size:12px;line-height:1.4">` +
+        `<svg width="${2 * C}" height="${2 * C}" viewBox="0 0 ${2 * C} ${2 * C}" role="img" aria-label="Disk kullanımı">${svg}</svg>` +
+        `<div><b>Toplam ${F.bytes(total)}</b></div>${free}</div>`;
+    },
+
     /** Disk ve acil bulgular satırının yüksekliği (px). */
     HEALTH_ROW_HEIGHT: 210
   },
@@ -133,7 +177,7 @@ qx.Class.define("ankamon.page.Dashboard", {
         this.__diskNote = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true });
         head.add(this.__diskNote);
         box.add(head);
-        this.__diskHtml = new qx.ui.embed.Html("").set({ overflowY: "auto", minWidth: 400 });
+        this.__diskHtml = new qx.ui.embed.Html("").set({ overflowY: "auto", minWidth: 220 });
         this.__diskHtml.addListenerOnce("appear", () => {
           this.__diskHtml.getContentElement().getDomElement().addEventListener("click", e => {
             const hit = e.target.closest && e.target.closest("[data-mode]");
@@ -175,7 +219,7 @@ qx.Class.define("ankamon.page.Dashboard", {
         if (this.isDisposed() || !res) {
           return;
         }
-        this.__diskHtml.setHtml(S.html(res.items, res.disk, { radius: 55, font: 11 }));
+        this.__diskHtml.setHtml(ankamon.page.Dashboard.diskPie(res.items, res.disk));
         this.__diskNote.setValue(`hesaplandı: ${ankamon.util.Format.ago(Math.floor(res.at / 1000))}`);
       };
       const cached = S.cached();

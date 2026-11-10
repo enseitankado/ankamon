@@ -102,7 +102,8 @@ qx.Class.define("ankamon.page.Settings", {
       // ve Ankamon bütün hizmetlerini hepsi üzerinden yürütür (bkz. worker/ankamon/netroles.py, SettingsApi::interfaces).
       const netPage = this.__page("Ağ arabirimleri");
       this.__section(netPage, "Ağ arabirimleri",
-        "Sunucunun işletim sisteminde bulunan ağ kartları. Ankamon'un bütün giriş/çıkış hizmetleri bu kartların " +
+        "Sunucunun işletim sisteminde bulunan ağ kartları; \"Etkin\" kutusuyla bir kart kablo çıkarmadan devre dışı bırakılır ya da " +
+        "yeniden devreye alınır (sunucu yeniden başlasa da korunur). Ankamon'un bütün giriş/çıkış hizmetleri etkin kartların " +
         "<b>hepsi</b> üzerinden çalışır; ağlar arasında rol ayrımı (tahta ağı / idari ağ) yoktur: panel ve web terminal, " +
         `log alımı (port ${settings.syslog_port}), sensör okuma, SSH/Samba ile tahta yönetimi, ağ taraması ve görülen akış ` +
         "gözlemi, servis/paylaşım/etkinlik taramaları, loglardan tahta kaydı, Wake-on-LAN (tahtanın bulunduğu ağa), ekran " +
@@ -110,7 +111,7 @@ qx.Class.define("ankamon.page.Settings", {
         "verir (ETAP tahta önekleri; uymayan tahta Tahtayı düzenle'de \"Bu bir akıllı tahtadır\" ile işaretlenir). Yeni bir " +
         "kart takılınca ya da adresi değişince bir sonraki ağ taramasında kendiliğinden kullanılmaya başlar; ağ başına taramayı " +
         "durdurmak için Ağ ▸ Varlıklar ▸ <i>Ağlar</i> düğmesi. Kartlar arasında IP yönlendirmesi yapılmaz (ağlar birbirine " +
-        "açılmaz).", this.__ifaceTable(settings.interfaces));
+        "açılmaz).", this.__ifaceTable(settings.interfaces), 900);
       tabs.add(netPage);
 
       const lessonsPage = this.__page("Ders saatleri");
@@ -199,20 +200,81 @@ qx.Class.define("ankamon.page.Settings", {
      */
     /** Sunucunun ağ kartları tablosu (SettingsApi::interfaces): ad, tür, durum, MAC, hız, IPv4 adresleri. */
     __ifaceTable(interfaces) {
-      const esc = qx.bom.String.escape;
+      const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(0));
+      this.__fillIfaceTable(box, interfaces || []);
+      return box;
+    },
+
+    /**
+     * Kart tablosu (SettingsApi::interfaces): Etkin (kablo çıkarmadan aç/kapat — kullanıcı isteği 2026-11-10; POST
+     * /settings/interface → root netif-ops servisi), ad, tür, bağlantı, MAC, hız, IPv4. Tarayıcının bağlandığı kart
+     * (serving) kapatılmak istenirse panel bağlantısının kopacağı söylenip onay istenir.
+     */
+    __fillIfaceTable(box, list) {
+      box.removeAll().forEach(w => w.dispose());
+      if (!list.length) {
+        box.add(new qx.ui.basic.Label("Ağ arabirimi bulunamadı."));
+        return;
+      }
       const KIND = { wired: "Kablolu", wireless: "Kablosuz", virtual: "Sanal" };
-      const list = interfaces || [];
-      const cell = "padding:4px 10px 4px 0;vertical-align:top";
-      const rows = list.map(i => `<tr><td style="${cell};font-weight:600">${esc(i.name)}</td>` +
-        `<td style="${cell}">${KIND[i.kind] || ""}</td>` +
-        `<td style="${cell};color:${i.up ? "#1e8e3e" : "#c5221f"}">${i.up ? "Açık" : "Kapalı"}</td>` +
-        `<td style="${cell};font-family:monospace">${esc(i.mac || "—")}</td>` +
-        `<td style="${cell}">${i.speed ? (i.speed >= 1000 ? i.speed / 1000 + " Gbit/sn" : i.speed + " Mbit/sn") : "—"}</td>` +
-        `<td style="${cell}">${i.addresses.length ? i.addresses.map(esc).join("<br>") : "<span style='opacity:.6'>IPv4 adresi yok</span>"}</td></tr>`).join("");
-      const head = ["Arabirim", "Tür", "Durum", "MAC", "Hız", "IPv4 adresi"].map(h => `<th style="${cell};text-align:left;opacity:.7">${h}</th>`).join("");
-      return new qx.ui.basic.Label(list.length
-        ? `<table style="border-collapse:collapse"><tr>${head}</tr>${rows}</table>`
-        : "Ağ arabirimi bulunamadı.").set({ rich: true, selectable: true });
+      const grid = new qx.ui.container.Composite(new qx.ui.layout.Grid(14, 6));
+      ["Etkin", "Arabirim", "Tür", "Bağlantı", "MAC", "Hız", "IPv4 adresi"].forEach((h, col) =>
+        grid.add(new qx.ui.basic.Label(h).set({ textColor: "app-muted", font: "bold" }), { row: 0, column: col }));
+      list.forEach((i, idx) => {
+        const row = idx + 1;
+        const check = new qx.ui.form.CheckBox().set({ value: !!i.enabled, alignY: "top",
+          toolTipText: i.enabled ? "Kartı pasif yap (kablo çıkarmadan devre dışı bırakır)" : "Kartı etkinleştir" });
+        check.addListener("changeValue", async e => {
+          if (check.getUserData("reverting")) {
+            return;
+          }
+          const enabled = e.getData();
+          const revert = () => {
+            check.setUserData("reverting", true);
+            check.setValue(!enabled);
+            check.setUserData("reverting", false);
+          };
+          if (!enabled) {
+            const others = list.filter(o => o !== i && o.enabled && o.kind !== "virtual").length;
+            const warn = i.serving
+              ? `<b style="color:#c5221f">Dikkat:</b> şu an bu panele <b>${qx.bom.String.escape(i.name)}</b> kartı üzerinden ` +
+                "bağlısınız. Kart pasif olunca tarayıcınızın Ankamon bağlantısı KOPAR; yeniden açmak için başka bir karttan " +
+                "bağlanmanız ya da sunucuda kartı elle açmanız gerekir.<br><br>"
+              : "";
+            const last = !others ? "Bu, sunucunun etkin son fiziksel kartı: kapatılınca hiçbir ağa erişilemez.<br><br>" : "";
+            const sure = await ankamon.ui.Dialog.confirm(`${warn}${last}<b>${qx.bom.String.escape(i.name)}</b> kartı pasif ` +
+              "yapılsın mı? Bu karttaki ağlarda tarama, log alımı, tahta yönetimi ve panel erişimi durur; ayar sunucu yeniden " +
+              "başlasa da korunur.", "Pasif yap");
+            if (!sure) {
+              revert();
+              return;
+            }
+          }
+          check.setEnabled(false);
+          try {
+            const res = await ankamon.io.Api.post("/settings/interface", { name: i.name, enabled });
+            this.__fillIfaceTable(box, res.interfaces || list);
+          } catch (err) {
+            revert();
+            check.setEnabled(true);
+            ankamon.ui.Dialog.error(err);
+          }
+        });
+        grid.add(check, { row, column: 0 });
+        grid.add(new qx.ui.basic.Label(i.name + (i.serving ? " ●" : "")).set({ font: "bold",
+          toolTipText: i.serving ? "Tarayıcınız Ankamon'a bu kart üzerinden bağlı" : null }), { row, column: 1 });
+        grid.add(new qx.ui.basic.Label(KIND[i.kind] || ""), { row, column: 2 });
+        const link = !i.enabled ? ["Pasif", "#c5221f"] : i.carrier ? ["Bağlı", "#1e8e3e"] : ["Bağlantı yok", "#e37400"];
+        grid.add(new qx.ui.basic.Label(link[0]).set({ textColor: link[1] }), { row, column: 3 });
+        grid.add(new qx.ui.basic.Label(i.mac || "—").set({ selectable: true, font: "monospace" }), { row, column: 4 });
+        grid.add(new qx.ui.basic.Label(i.speed ? (i.speed >= 1000 ? i.speed / 1000 + " Gbit/sn" : i.speed + " Mbit/sn") : "—"), { row, column: 5 });
+        grid.add(new qx.ui.basic.Label(i.addresses.length ? i.addresses.map(qx.bom.String.escape).join("<br>")
+          : "<span style='opacity:.6'>IPv4 adresi yok</span>").set({ rich: true, selectable: true }), { row, column: 6 });
+      });
+      box.add(grid);
+      if (list.some(i => i.serving)) {
+        box.add(new qx.ui.basic.Label("● Tarayıcınızın Ankamon'a bağlandığı kart.").set({ textColor: "app-muted", marginTop: 6 }));
+      }
     },
 
     /** Sekme sayfası: TabView.Page düz bir qx.ui.core.Widget değildir — VBox düzeni elle kurulur. */
@@ -222,10 +284,10 @@ qx.Class.define("ankamon.page.Settings", {
       return page;
     },
 
-    __section(target, title, hint, form) {
+    __section(target, title, hint, form, maxWidth = 620) {
       const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(10)).set({
         padding: 16,
-        maxWidth: 620,
+        maxWidth,
         backgroundColor: "surface",
         decorator: new qx.ui.decoration.Decorator().set({ radius: 8, width: 1, color: "app-border" })
       });
