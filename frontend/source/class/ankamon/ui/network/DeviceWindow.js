@@ -137,7 +137,11 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         const body = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
         if (can("network.manage")) {
           deviceForm = new ankamon.ui.Form();
-          deviceForm.text("label", "Takma ad", device.label, "ör. Müdür odası yazıcısı");
+          // Tek takma ad (kullanıcı bildirimi 2026-11-10: pencerede düzenlenen ad Akıllı Tahtalar grid'ine yansımıyordu — Genel'deki
+          // ağ envanteri adı, Tahta'daki tahta kaydı adıydı). Tahtaya bağlı cihazda değer grid'deki tahta adıdır; kaydedince
+          // ikisine de yazılır (Varlıklar ve Akıllı Tahtalar aynı adı gösterir).
+          deviceForm.text("label", "Takma ad", board ? (board.label || device.label) : device.label, "ör. Müdür odası yazıcısı")
+            .setToolTipText(board ? "Varlıklar ve Akıllı Tahtalar'da aynı ad (ikisine de kaydedilir)" : null);
           deviceForm.text("ip", "IP adresi", device.ip).setToolTipText(
             "En son keşifte (ağ taraması ya da tahtanın logları) görülen adres; cihaz yeni adreste görülünce kendiliğinden güncellenir.");
           deviceForm.text("hostname", "Bilgisayar adı", device.hostname);
@@ -162,7 +166,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         const page = this.__page("Tahta");
         const body = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
         if (can("boards.manage")) {
-          boardFields = ankamon.ui.BoardOps.boardForm(board);
+          boardFields = ankamon.ui.BoardOps.boardForm(board, { noLabel: !!deviceForm });
           body.add(boardFields.form);
         }
         const F = ankamon.util.Format;
@@ -237,12 +241,17 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
             }
           }
           try {
+            let label = null;
             if (deviceForm) {
               const values = deviceForm.values();
               values.device_type = (typeBox.getValue() || "").trim();
+              label = values.label;
               await ankamon.io.Api.patch("/network/devices/" + device.id, values);
             }
             if (boardValues) {
+              if (label !== null) {
+                boardValues.label = label; // tek takma ad: tahta kaydına da
+              }
               await ankamon.io.Api.patch("/boards/" + board.id, boardValues);
             }
             win.close();

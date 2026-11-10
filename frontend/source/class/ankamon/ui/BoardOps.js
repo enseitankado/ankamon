@@ -77,9 +77,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
      * ve Bilgisayar ayrıntıları ▸ Tahta sekmesi buradan kurulur; tahtaya yeni düzenlenebilir alan eklenince ikisinde de
      * kendiliğinden görünür (kullanıcı isteği 2026-11-09).
      * @param board {Map|null} null: yeni tahta (takma ad ve kablolu MAC zorunlu)
+     * @param opts {Map?} {noLabel: true} — takma ad alanı yok (Bilgisayar ayrıntıları'nda tek takma ad Genel sekmesinde)
      * @return {Map} {form, read()} — read(): doğrulanmış değerler ya da (hata gösterilip) null
      */
-    boardForm(board) {
+    boardForm(board, opts = {}) {
       const form = new ankamon.ui.Form();
       const adding = !board;
       board = board || { monitor_enabled: true, exporter_port: 9100 };
@@ -88,7 +89,9 @@ qx.Class.define("ankamon.ui.BoardOps", {
       // tahta Wi-Fi'ye bağlanınca oturum yoklaması kendiliğinden doldurur. Bilgisayar adı elle girilmez — tahtanın
       // loglarından ve donanım bilgisinden öğrenilir.
       const mark = adding ? " *" : "";
-      form.text("label", "Takma ad" + mark, board.label, "ör. A Blok 2. Derslik");
+      if (!opts.noLabel) {
+        form.text("label", "Takma ad" + mark, board.label, "ör. A Blok 2. Derslik");
+      }
       form.text("location", "Konum", board.location, "ör. B blok, 2. kat");
       form.text("ip", "IP adresi", board.ip).setToolTipText(
         "Tahtanın bilinen adresi. Ağ taraması tahtanın MAC'ini başka adreste görürse ya da tahta yeni adresinden log " +
