@@ -159,6 +159,43 @@ qx.Class.define("ankamon.ui.network.Ops", {
       });
     },
 
+    /**
+     * Web arayüzünü aç (kullanıcı isteği 2026-11-10): sunucu, bu tarayıcının IP'si varlığın ağındaysa doğrudan adresi verir →
+     * yeni sekme; değilse vekil çerezini yazar → arayüzü konteynerdeki ters vekil üzerinden (aynı sunucu, DEVPROXY_PORT)
+     * büyütülebilir bir pencerede gösterir (bkz. backend Api\DeviceWebProxyApi, docker/rootfs/nginx-devproxy.conf).
+     */
+    async openWeb(device, port, scheme) {
+      let res;
+      try {
+        res = await ankamon.io.Api.post(`/network/devices/${device.id}/web`, { port, scheme });
+      } catch (e) {
+        ankamon.ui.Dialog.error(e);
+        return;
+      }
+      if (res.direct) {
+        // Tıklamadan hemen sonra (yanıt kısa sürer): tarayıcının açılır pencere izni içinde kalır.
+        window.open(res.url, "_blank", "noopener");
+        return;
+      }
+      const url = `${window.location.protocol}//${window.location.hostname}:${res.proxy_port}/`;
+      const name = this.deviceName(device) || device.ip;
+      const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
+      const win = ankamon.ui.Dialog.window(`Web arayüzü — ${name} (${res.target}, Ankamon üzerinden)`,
+        Math.min(1200, root.width - 40), { maximizable: true });
+      win.set({ height: Math.min(820, root.height - 40), contentPadding: 0 });
+      const note = new qx.ui.basic.Label(
+        "Bu tarayıcı varlıkla aynı ağda olmadığından sayfa Ankamon sunucusu üzerinden gösteriliyor.").set({
+        textColor: "app-muted", rich: true, wrap: true, padding: [4, 8] });
+      win.add(note);
+      win.add(new qx.ui.embed.Iframe(url).set({ decorator: null }), { flex: 1 });
+      const newTab = new qx.ui.form.Button("Yeni sekmede aç").set({ toolTipText: "Aynı vekil adresini tarayıcı sekmesinde açar" });
+      newTab.addListener("execute", () => window.open(url, "_blank", "noopener"));
+      const close = new qx.ui.form.Button("Kapat");
+      close.addListener("execute", () => win.close());
+      ankamon.ui.Dialog.buttons(win, [newTab, close]);
+      win.open();
+    },
+
     /** @return {Promise<Boolean>} silindiyse true */
     /**
      * Varlıkları Tüm Varlıklar'dan siler. @param groups {Array?} varlık grupları ({id, name, members}) — silinen

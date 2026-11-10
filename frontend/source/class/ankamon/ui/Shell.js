@@ -216,9 +216,11 @@ qx.Class.define("ankamon.ui.Shell", {
       // 2026-11-09); o kullanıcıya kapalıysa kökte.
       // Ağ ▸ Varlıklar (kullanıcı isteği 2026-11-10: eski "Ağ ▸ Liste", simgesiz); first: üst düğümün kendi seçeneğinden
       // (Akıllı Tahtalar) önce. Akıllı Tahtalar listesi buradaki "Akıllı tahta" türlü satırlardan belirlenir (bkz. BoardsApi LISTED).
-      // Varlıklar ▸ Tüm Varlıklar (selfLeaf) + kullanıcının varlık grupları (kullanıcı isteği 2026-11-10; düğümler sunucudan
-      // gelir — bkz. __syncAssetGroups). Grup seçilince AYNI sayfa o grubun üyelerine süzülür (page.Network setGroup).
-      { id: "network", label: "Varlıklar", feature: "network", parent: "boards", first: true, noIcon: true, selfLeaf: "Tüm Varlıklar",
+      // Ağ ▸ Varlıklar = bütün varlıklar (kullanıcı isteği 2026-11-10: "Varlıklar ▸ Tüm Varlıklar" alt düğümü kalktı). Kullanıcının
+      // varlık grupları Ağ'ın DOĞRUDAN altında (bkz. __syncAssetGroups); grup seçilince AYNI sayfa o grubun üyelerine süzülür
+      // (page.Network setGroup — kendi taraması yok, Varlıklar'dan türer). Ağ'ın alt seçeneklerinin sırası sürükle-bırakla
+      // değişir (bkz. __makeChildReorderable).
+      { id: "network", label: "Varlıklar", feature: "network", parent: "boards", first: true, noIcon: true,
         create: u => new ankamon.page.Network(u) },
       // Ankamon'un kendi bakımı (servisler, zamanlanmış işler, veritabanı, yapılandırma) — yalnız yönetici.
       { id: "system", label: "Sistem", admin: true, retap: true, create: u => new ankamon.page.System(u) },
@@ -356,6 +358,21 @@ qx.Class.define("ankamon.ui.Shell", {
         this.__nodes.push(node);
       });
       this.__nodes.forEach(item => this.__makeReorderable(item));
+      // Ana düğümlerin alt seçenekleri de kendi düğümleri içinde sürüklenerek yer değiştirir (kullanıcı isteği 2026-11-10:
+      // Ağ altındaki seçenekler); kayıtlı sıra uygulanır.
+      this.__nodes.filter(n => n instanceof qx.ui.tree.TreeFolder).forEach(n => {
+        n.getChildren().forEach(child => this.__makeChildReorderable(child));
+        this.__applyChildOrder(n);
+      });
+      // Aç/kapa oku (Fluent teması satır içi SVG çizer): satır içi SVG yazı taban çizgisine oturup okun aşağı kaymasına yol
+      // açıyordu (kullanıcı bildirimi 2026-11-10: kapalı düğümün ▸'si yazının alt kenarına yakın) — ağaçta blok çizilir.
+      if (!document.getElementById("ankamon-nav-tree-css")) {
+        const style = document.createElement("style");
+        style.id = "ankamon-nav-tree-css";
+        style.textContent = ".ankamon-nav-tree svg{display:block;width:100%;height:100%}";
+        document.head.appendChild(style);
+      }
+      this.__tree.getContentElement().addClass("ankamon-nav-tree");
 
       this.__tree.addListener("changeSelection", e => {
         const item = e.getData()[0];
@@ -367,7 +384,7 @@ qx.Class.define("ankamon.ui.Shell", {
         if (item.getUserData("page").id === "network") {
           // "Ağ" kökü: bütün ağlar (0); alt düğüm: o ağ. Sayfa gösterilmeden önce (tek yenileme).
           this.__widget(item.getUserData("page")).setNetwork(item.getUserData("network") || 0);
-          // Varlık grubu düğümü: aynı sayfa o grubun üyelerine süzülür; Varlıklar / Tüm Varlıklar: süzgeçsiz.
+          // Varlık grubu düğümü: aynı sayfa o grubun üyelerine süzülür; Varlıklar: süzgeçsiz.
           this.__widget(item.getUserData("page")).setGroup(item.getUserData("assetGroup") || 0);
         }
         const tab = item.getUserData("tab");
@@ -577,14 +594,14 @@ qx.Class.define("ankamon.ui.Shell", {
       });
       item.addListener("dragover", e => {
         // preventDefault burada "bırakmaya izin ver" demek (yerleşik HTML5 DnD terimi) — kendi
-        // üzerine bırakma hariç her zaman izin verilir.
-        if (this.__dragItem && this.__dragItem !== item) {
+        // üzerine bırakma hariç her zaman izin verilir. Yalnız ana düğüm (alt seçenek kendi düğümü içinde taşınır).
+        if (this.__dragItem && this.__dragItem !== item && this.__nodes.includes(this.__dragItem)) {
           e.preventDefault();
         }
       });
       item.addListener("drop", () => {
         const dragged = this.__dragItem;
-        if (!dragged || dragged === item) {
+        if (!dragged || dragged === item || !this.__nodes.includes(dragged)) {
           return;
         }
         const order = this.__nodes.filter(n => n !== dragged);
@@ -593,6 +610,76 @@ qx.Class.define("ankamon.ui.Shell", {
         this.__tree.getRoot().add(...order); // add() zaten-ebeveynli öğeyi önce oradan söker.
         this.__saveNavOrder();
       });
+    },
+
+    /**
+     * Ana düğümün alt seçeneğini (ör. Ağ ▸ Varlıklar, Akıllı Tahtalar, Sensörler, varlık grupları) aynı düğüm içinde
+     * sürüklenebilir yapar: üzerine bırakıldığı kardeşin önüne geçer. Sıra kullanıcı başına ui_prefs'te
+     * ("nav.children.<ana düğüm>" — __childKey listesi) saklanır, ağaç kurulurken ve gruplar değişince uygulanır.
+     */
+    __makeChildReorderable(item) {
+      if (item.getUserData("childReorder")) {
+        return;
+      }
+      item.setUserData("childReorder", true);
+      item.set({ draggable: true, droppable: true });
+      item.addListener("dragstart", e => {
+        e.addAction("move");
+        this.__dragItem = item;
+      });
+      item.addListener("dragend", () => {
+        this.__dragItem = null;
+      });
+      item.addListener("dragover", e => {
+        const dragged = this.__dragItem;
+        if (dragged && dragged !== item && dragged.getParent() === item.getParent()) {
+          e.preventDefault();
+        }
+      });
+      item.addListener("drop", () => {
+        const dragged = this.__dragItem;
+        const parent = item.getParent();
+        if (!dragged || dragged === item || dragged.getParent() !== parent) {
+          return;
+        }
+        const order = parent.getChildren().filter(n => n !== dragged);
+        order.splice(order.indexOf(item), 0, dragged);
+        parent.add(...order); // add() zaten-ebeveynli öğeyi önce oradan söker (sırayla yeniden ekler).
+        const key = "nav.children." + parent.getUserData("page").id;
+        const value = order.map(n => this.__childKey(n));
+        const prefs = this.__user.ui_prefs || (this.__user.ui_prefs = {});
+        prefs[key] = value;
+        ankamon.io.Api.put("/auth/prefs", { key, value }).catch(() => {});
+      });
+    },
+
+    /** Alt seçeneğin kalıcı kimliği (sıra kaydı için): grup, sayfanın kendi seçeneği, sekme ya da alt sayfa. */
+    __childKey(n) {
+      if (n.getUserData("assetGroup")) {
+        return "group:" + n.getUserData("assetGroup");
+      }
+      if (n.getUserData("self")) {
+        return "self";
+      }
+      if (n.getUserData("tab")) {
+        return "tab:" + n.getUserData("page").id + ":" + n.getUserData("tab");
+      }
+      return "page:" + (n.getUserData("page") ? n.getUserData("page").id : n.getLabel());
+    },
+
+    /** Kayıtlı alt seçenek sırasını uygular: kayıttakiler o sırayla, kayıtta olmayanlar (yeni grup vb.) mevcut yerlerinde. */
+    __applyChildOrder(folder) {
+      const saved = ((this.__user.ui_prefs || {})["nav.children." + folder.getUserData("page").id]) || [];
+      if (!saved.length) {
+        return;
+      }
+      const kids = folder.getChildren().slice();
+      const rank = new Map(saved.map((k, i) => [k, i]));
+      const known = kids.filter(n => rank.has(this.__childKey(n))).sort((a, b) => rank.get(this.__childKey(a)) - rank.get(this.__childKey(b)));
+      // Kayıtlı olanlar kendi aralarında kayıt sırasına girer; kayıtsızlar bulundukları konumu korur.
+      let i = 0;
+      const order = kids.map(n => (rank.has(this.__childKey(n)) ? known[i++] : n));
+      folder.add(...order);
     },
 
     /** Yeni ana düğüm sırasını kullanıcı adına kalıcı olarak kaydeder (oturumdan bağımsız). */
@@ -619,18 +706,23 @@ qx.Class.define("ankamon.ui.Shell", {
     },
 
     /**
-     * Varlıklar düğümünün altındaki grup yapraklarını (Tüm Varlıklar'dan sonra, ada göre) sunucudaki gruplarla eşitler.
+     * Varlık gruplarının yapraklarını sunucudaki gruplarla eşitler: Ağ düğümünün DOĞRUDAN altında (kullanıcı isteği
+     * 2026-11-10), varsayılan yeri Varlıklar'ın hemen ardı (ada göre); kullanıcının kayıtlı alt seçenek sırası uygulanır.
      * Yaprak seçilince Varlıklar sayfası o grubun üyelerine süzülür (bkz. changeSelection, page.Network setGroup).
      */
     __syncAssetGroups(groups) {
-      const items = this.__tree.getRoot().getItems(true);
-      const folder = items.find(n => n.getUserData("page") && n.getUserData("page").id === "network" && n.getUserData("selfLeaf"));
+      const network = this.__tree.getRoot().getItems(true).find(n => n.getUserData("page") && n.getUserData("page").id === "network" &&
+        !n.getUserData("assetGroup"));
+      const folder = network && network.getParent() instanceof qx.ui.tree.TreeFolder && network.getParent() !== this.__tree.getRoot()
+        ? network.getParent() : null;
       if (!folder) {
         return;
       }
       const old = folder.getChildren().filter(n => n.getUserData("assetGroup"));
-      const sameList = old.length === groups.length && old.every((n, i) =>
-        n.getUserData("assetGroup") === groups[i].id && n.getLabel() === groups[i].name);
+      // Sıradan bağımsız (kullanıcı grupları sürükleyerek yeniden dizmiş olabilir); ad ve üye sayısı değişince güncellenir.
+      const sig = (id, name, n) => `${id}\u0000${name}\u0000${n}`;
+      const have = new Set(old.map(n => sig(n.getUserData("assetGroup"), n.getLabel(), n.getUserData("memberCount"))));
+      const sameList = old.length === groups.length && groups.every(g => have.has(sig(g.id, g.name, g.members.length)));
       if (sameList) {
         return;
       }
@@ -642,20 +734,24 @@ qx.Class.define("ankamon.ui.Shell", {
           folder.remove(n);
           n.dispose();
         });
+        let at = folder.getChildren().indexOf(network) + 1;
         groups.forEach(group => {
           const leaf = new qx.ui.tree.TreeFile(group.name);
           this.__hideThemeIcon(leaf);
           leaf.setUserData("page", folder.getUserData("page"));
           leaf.setUserData("assetGroup", group.id);
-          leaf.setToolTipText(`${group.name}: ${group.members.length} varlık (Tüm Varlıklar'dan türer)`);
+          leaf.setUserData("memberCount", group.members.length);
+          leaf.setToolTipText(`${group.name}: ${group.members.length} varlık (Varlıklar'dan türer; sürükleyerek yeri değişir)`);
           this.__addRetap(leaf);
-          folder.add(leaf);
+          folder.addAt(leaf, at++);
+          this.__makeChildReorderable(leaf);
           if (group.id === selectedId) {
             this.__tree.setSelection([leaf]);
           }
         });
+        this.__applyChildOrder(folder);
         if (selectedId && !groups.some(g => g.id === selectedId)) {
-          this.__tree.setSelection([folder.getUserData("selfLeaf")]);
+          this.__tree.setSelection([network]);
         }
       } finally {
         this.__silentTree = false;
@@ -817,9 +913,17 @@ qx.Class.define("ankamon.ui.Shell", {
         padding: [8, 14],
         backgroundColor: "app-header"
       });
-      const fold = new qx.ui.form.Button("☰").set({ toolTipText: "Menüyü gizle/göster", width: 36 });
+      // Sol menüyü katlama (kullanıcı isteği 2026-11-10: üst paneli katlayan düğme gibi ok — açıkken sola, katlıyken sağa).
+      const arrow = path => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"` +
+        ` stroke-linecap="round" stroke-linejoin="round" style="display:block;pointer-events:none"><path d="${path}"/></svg>`;
+      const LEFT = "M15 6l-6 6l6 6";
+      const RIGHT = "M9 6l6 6l-6 6";
+      const fold = new qx.ui.form.Button(arrow(LEFT)).set({ rich: true, center: true, toolTipText: "Menüyü gizle", width: 36 });
+      fold.getChildControl("label").set({ minWidth: 18, minHeight: 18 });
       fold.addListener("execute", () => {
-        this.__navPane.setVisibility(this.__navPane.isVisible() ? "excluded" : "visible");
+        const show = !this.__navPane.isVisible();
+        this.__navPane.setVisibility(show ? "visible" : "excluded");
+        fold.set({ label: arrow(show ? LEFT : RIGHT), toolTipText: show ? "Menüyü gizle" : "Menüyü göster" });
       });
       header.add(fold);
       // Logo simgesi: ekran çerçevesi başlık yazısının renginde (temaların koyu/mavi başlık zemininde seçilsin).

@@ -669,7 +669,7 @@ qx.Class.define("ankamon.page.Network", {
 
     async __deleteGroup(group) {
       const sure = await ankamon.ui.Dialog.confirm(`<b>${qx.bom.String.escape(group.name)}</b> grubu silinsin mi?<br>` +
-        `Gruptaki ${group.members.length} varlık Tüm Varlıklar'da kalır; yalnız grup kaldırılır.`, "Grubu sil");
+        `Gruptaki ${group.members.length} varlık Varlıklar'da kalır; yalnız grup kaldırılır.`, "Grubu sil");
       if (!sure) {
         return;
       }
@@ -768,7 +768,8 @@ qx.Class.define("ankamon.page.Network", {
       const web = device.services.find(s => s.proto === "tcp" && [80, 443, 8080, 8443].includes(s.port));
       if (web && device.ip) {
         const scheme = [443, 8443].includes(web.port) ? "https" : "http";
-        add("⇗", `Web arayüzünü aç (${web.port})`, () => window.open(`${scheme}://${device.ip}:${web.port}/`, "_blank", "noopener"));
+        // Aynı ağdaysa yeni sekmede, değilse konteyner vekiliyle pencerede (bkz. ui.network.Ops.openWeb).
+        add("⇗", `Web arayüzünü aç (${web.port})`, () => ankamon.ui.network.Ops.openWeb(device, web.port, scheme));
       }
       if (device.ip) {
         add(ICON.copy, "IP adresini kopyala", () => ankamon.util.Clipboard.copy(device.ip));

@@ -22,4 +22,16 @@ else
     sed -i -e "s/__HTTPS_PORT__/$HTTPS_PORT/" -e "s/__HTTPS_SUFFIX__/$suffix/" "$CONF"
 fi
 
+# Varlıklar ▸ "Web arayüzünü aç" ters vekili (bkz. nginx-devproxy.conf, backend Api\DeviceWebProxyApi). 0: kapalı.
+DEVPROXY_PORT=${DEVPROXY_PORT:-8444}
+if [ "$DEVPROXY_PORT" != 0 ]; then
+    DP=/etc/nginx/http.d/devproxy.conf
+    sed "s/__DEVPROXY_PORT__/$DEVPROXY_PORT/" /etc/nginx/devproxy.conf.in > "$DP"
+    if [ "$HTTPS_PORT" = 0 ]; then
+        sed -i '/#https$/d' "$DP"
+    else
+        sed -i '/#nohttps$/d' "$DP"
+    fi
+fi
+
 exec nginx -g 'daemon off;'

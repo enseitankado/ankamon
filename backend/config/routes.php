@@ -49,6 +49,7 @@ return [
     ['PUT',    '/api/auth/prefs',        [Api\AuthApi::class, 'prefs'],        'user'],
     ['GET',    '/api/auth/grafana',      [Api\AuthApi::class, 'grafana'],      'public'],
     ['GET',    '/api/auth/shell',        [Api\AuthApi::class, 'shell'],        'public'],
+    ['GET',    '/api/auth/devproxy',     [Api\DeviceWebProxyApi::class, 'proxyAuth'], 'public'],
     ['GET',    '/api/auth/screen',       [Api\AuthApi::class, 'screen'],       'public'],
     ['GET',    '/api/auth/cast',         [Api\AuthApi::class, 'cast'],         'public'],
     ['GET',    '/api/auth/taskmgr',      [Api\AuthApi::class, 'taskmgr'],      'public'],
@@ -75,6 +76,8 @@ return [
     ['POST',   '/api/network/devices',       [Api\NetworkApi::class, 'createDevice'],   'network.manage'],
     ['DELETE', '/api/network/devices',       [Api\NetworkApi::class, 'deleteDevices'],  'network.manage'],
     ['PATCH',  '/api/network/devices/{id}',  [Api\NetworkApi::class, 'updateDevice'],   'network.manage'],
+    // Varlıklar ▸ Web arayüzünü aç: aynı ağ → doğrudan adres, değilse konteyner vekili (bkz. Api\DeviceWebProxyApi).
+    ['POST',   '/api/network/devices/{id}/web', [Api\DeviceWebProxyApi::class, 'open'], 'network'],
     ['PATCH',  '/api/network/networks/{id}', [Api\NetworkApi::class, 'updateNetwork'],  'network.manage'],
     ['DELETE', '/api/network/networks/{id}', [Api\NetworkApi::class, 'deleteNetwork'],  'network.manage'],
     // Varlık grupları (Ağ ▸ Varlıklar ▸ <grup>) — bkz. Api\NetDeviceGroupsApi.
