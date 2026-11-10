@@ -156,6 +156,26 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
       return terms;
     },
 
+    /**
+     * "Tespit edilen cihaz" ipucu: rastgele adresli arayan cihazda birleşen adresler ve aynı cihaz sayma ölçütleri
+     * (✓ bu satırda eşleşen, – eşleşmeyen); diğer satırlarda adresin türü.
+     */
+    __deviceHint(row) {
+      const Classify = ankamon.ui.boards.WifimonClassify;
+      const addrs = row.addrs || [];
+      const probing = row.kind === "probe" || (row.also || []).includes("probe");
+      if (!(row.random && probing) && addrs.length <= 1) {
+        return row.random ? "Rastgele (yerel yönetimli) adres" : null;
+      }
+      const why = new Set(row.why || []);
+      const head = addrs.length > 1 ? `Aynı cihaz sayılan ${addrs.length} rastgele adres:\n` + addrs.join("\n")
+        : `Rastgele (yerel yönetimli) adres: ${row.addr} — başka bir adresle aynı cihaz sayılmadı.`;
+      return head + "\n\nAynı cihaz sayma ölçütleri (✓ bu satırda eşleşen):\n" +
+        Classify.MERGE_CRITERIA.map(([code, text]) => (why.has(code) ? "✓ " : "– ") + text).join("\n") +
+        "\n\nAranan ağ listeleri çelişen adresler birleşmez; kalıcı (üretici) adresler birleştirilmez. Kestirimdir: " +
+        "aynı model iki telefon yan yanaysa birleşebilir.";
+    },
+
     __vendorText(row) {
       return row.vendor || (row.random ? "Rastgele" : "—");
     },
@@ -310,8 +330,7 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
           hint: {
             level: lv.tip,
             sensor: feed.watching && feed.ws ? `${feed.name} — sürekli izleniyor` : feed.name,
-            device: (row.addrs || []).length > 1 ? `Aynı cihaz sayılan ${row.addrs.length} rastgele adres:\n` + row.addrs.join("\n")
-              : row.random ? "Rastgele (yerel yönetimli) adres" : null,
+            device: this.__deviceHint(row),
             kind: this.__kindHint(row),
             name: name || null,
             signal: hasSignal ? `Sinyal %${row.signal} — ${Classify.proximity(row.signal)} (kaba yakınlık ipucu)` : null,

@@ -69,6 +69,18 @@ qx.Class.define("ankamon.ui.boards.WifimonClassify", {
     },
 
     /**
+     * Aynı cihaz sayma ölçütlerinin açıklaması (güçlüden zayıfa; eşikler worker screen/wifimon_probe_merge.py ile aynı) —
+     * "Tespit edilen cihaz" hücresinin ipucunda listelenir (kullanıcı isteği 2026-11-10).
+     */
+    MERGE_CRITERIA: [
+      ["wps", "Aynı WPS kimliği (UUID-E): yoklamadaki WPS öğesinin cihaz kimliği, adres değişse de sabit — kesin"],
+      ["ssid", "Aynı ağ listesi: aranan ağlar aynı ya da biri ötekini kapsıyor (tek ortak ağda sinyal farkı da ≤ 12 dB olmalı)"],
+      ["seq", "Sıra numarası sürekliliği: yeni adresin ilk 802.11 sıra numarası eskisinin sonuncusunu sürdürüyor " +
+        "(≤ 48 atlama, ≤ 15 sn ara, sinyal farkı ≤ 12 dB)"],
+      ["fp", "Aynı yetenek parmak izi ve yakın sinyal: desteklenen hız/yetenek öğeleri aynı, sinyal farkı ≤ 12 dB"]
+    ],
+
+    /**
      * Ardışık dinlemelerde rastgele adresli iki yoklama satırı aynı cihaz mı? Gerekçe kodu ya da "". Worker bir dinleme
      * içinde birleştirir (wifimon_probe_merge.same_device); telefon sonraki taramada yine yeni adres alır, burada aynı
      * ölçütler sürer (sıra numarası dinlemeler arasında taşınmaz): WPS kimliği, ağ listesi (biri ötekini kapsar; tek ortak ağda
