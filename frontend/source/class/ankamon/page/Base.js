@@ -45,6 +45,26 @@ qx.Class.define("ankamon.page.Base", {
      * ama yeniden dizmez (ör. Ağ: cihazın altındaki port satırları kendi sırasında kalsın).
      * Yalnız _createTable'ın kendi Simple modeline uygulanır; kendi sıralamasını yöneten modeller (GroupModel) hariç.
      */
+    /**
+     * Sayfa dışında (pencerede) kendi kurduğu qx.ui.table.Table'a da sütun süzgeçleri + hazır değer listeleri (kullanıcı
+     * isteği 2026-11-10: BÜTÜN grid'ler — Ping, SSH etkinliği, Görev yöneticisi, Dosya yöneticisi, Web filtresi, oturum
+     * işlemleri…). Satırlar yine model.setData ile verilir (bkz. _makeFilterable). Satır NUMARASIYLA veri bulan kod
+     * süzmeden sonra kayar — satırın kendi değerlerinden (kimlik sütunu vb.) bulunmalı.
+     * @param table {qx.ui.table.Table} @param opts {Map?} {offset: süzgeçsiz baştaki sütun sayısı (varsayılan 0),
+     *   columns: [{id, label, choices?}] (varsayılan: modelin offset'ten sonraki bütün sütunları),
+     *   choicesFor: [sütun kimliği ya da başlığı] — bu sütunlarda hazır liste HER ZAMAN (az satırda/tek değerde de)}
+     * @return {Map} süzgeç kutuları
+     */
+    filterTable(table, opts = {}) {
+      const model = table.getTableModel();
+      const offset = opts.offset || 0;
+      const columns = opts.columns || Array.from({ length: model.getColumnCount() - offset }, (_, i) =>
+        ({ id: model.getColumnId(i + offset), label: model.getColumnName(i + offset) }));
+      (opts.choicesFor || []).forEach(key => columns.filter(c => c.id === key || c.label === key).forEach(c => { c.choices = true; }));
+      table.setUserData("offset", offset);
+      return Object.create(ankamon.page.Base.prototype)._makeFilterable(table, columns);
+    },
+
     keepSortOnReload(model) {
       const setData = model.setData;
       model.setData = function(rows, clearSorting) {
@@ -841,9 +861,9 @@ qx.Class.define("ankamon.page.Base", {
     _makeFilterable(table, columns) {
       const B = ankamon.page.Base;
       const model = table.getTableModel();
-      const offset = table.getUserData("offset") || 1;
+      const offset = table.getUserData("offset") ?? 1;
       const inner = model.setData;
-      let all = [];
+      let all = (model.getData && model.getData()) || []; // tablo süzgeçlenmeden önce doldurulmuşsa o satırlar
       let fields = null;
       const shown = () => {
         const active = fields ? columns.map((c, i) => ({ i: i + offset, text: (fields[c.id].getValue() || "").trim() })).filter(f => f.text) : [];
@@ -859,7 +879,7 @@ qx.Class.define("ankamon.page.Base", {
 
     _addColumnFilters(table, columns, onChange, opts = {}) {
       const columnModel = table.getTableColumnModel();
-      const offset = table.getUserData("offset") || 1;
+      const offset = table.getUserData("offset") ?? 1;
       const B = ankamon.page.Base;
       const buttons = {};
       const allRows = () => (opts.rows && opts.rows()) || [];

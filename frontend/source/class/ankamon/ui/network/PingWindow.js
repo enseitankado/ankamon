@@ -40,9 +40,12 @@ qx.Class.define("ankamon.ui.network.PingWindow", {
       const model = new qx.ui.table.model.Simple();
       model.setColumns(["Cihaz", "IP adresi", "Sonuç", "Alınan", "Kayıp", "Ortalama"]);
       const table = new qx.ui.table.Table(model).set({
-        height: Math.min(300, 60 + devices.length * 28), statusBarVisible: false, columnVisibilityButtonVisible: false
+        height: Math.min(340, 96 + devices.length * 28), statusBarVisible: false, columnVisibilityButtonVisible: false
       });
       [190, 120, 150, 70, 60, 90].forEach((width, col) => table.getTableColumnModel().setColumnWidth(col, width));
+      // Sütun süzgeçleri + hazır değer listeleri (bütün grid'ler gibi); Sonuç her zaman listeli (az satırda da).
+      ankamon.page.Base.filterTable(table, { columns: ["Cihaz", "IP adresi", "Sonuç", "Alınan", "Kayıp", "Ortalama"]
+        .map((label, i) => ({ id: model.getColumnId(i), label, choices: i === 2 ? true : undefined })) });
       win.add(table, { flex: 1 });
 
       const output = new qx.ui.form.TextArea("").set({ readOnly: true, font: "app-mono", height: 140 });
@@ -51,7 +54,9 @@ qx.Class.define("ankamon.ui.network.PingWindow", {
       let results = new Map();
       const showOutput = () => {
         const row = table.getSelectionModel().getAnchorSelectionIndex();
-        const device = row >= 0 ? devices[row] : null;
+        // Süzgeçten sonra satır numarası kayar: cihaz satırın IP'sinden bulunur.
+        const ip = row >= 0 ? model.getValue(1, row) : null;
+        const device = ip ? devices.find(d => d.ip === ip) : null;
         const result = device ? results.get(device.id) : null;
         output.setValue(result ? result.output : "");
       };

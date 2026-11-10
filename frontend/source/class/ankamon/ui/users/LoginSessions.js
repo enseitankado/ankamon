@@ -226,6 +226,7 @@ qx.Class.define("ankamon.ui.users.LoginSessions", {
       const table = new qx.ui.table.Table(model, {
         tableColumnModel: obj => new qx.ui.table.columnmodel.Resize(obj)
       }).set({ statusBarVisible: false, height: Math.min(520, root.height - 200) });
+      ankamon.page.Base.filterTable(table);
       const behavior = table.getTableColumnModel().getBehavior();
       behavior.setWidth(0, 150);
       behavior.setWidth(1, 160);

@@ -137,6 +137,8 @@ qx.Class.define("ankamon.ui.taskmgr.Tab", {
         cm.setColumnVisible(boardIndex, false);
         ankamon.page.Base.setupColumnLayout(table, columns, 1, `${key}.columns`, this._win.getUser());
       }
+      // Sütun süzgeçleri + hazır değer listeleri (bütün grid'ler gibi; kimlik sütunu 0 hariç, "Bilgisayar" dahil).
+      ankamon.page.Base.filterTable(table, { offset: 1, columns: all });
       return table;
     },
 

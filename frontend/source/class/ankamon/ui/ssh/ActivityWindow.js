@@ -103,6 +103,7 @@ qx.Class.define("ankamon.ui.ssh.ActivityWindow", {
     cm.setColumnVisible(0, false);
     const behavior = cm.getBehavior();
     columns.forEach((c, i) => behavior.setWidth(i + 1, c[2] || "1*"));
+    ankamon.page.Base.filterTable(table, { offset: 1, choicesFor: ["state", "name", "src", "tool"] }); // sütun süzgeçleri + hazır değer listeleri (üstteki arama kutusuyla birlikte)
     table.addListener("cellDbltap", e => this.__showCommand(model.getValue(0, e.getRow())));
     table.setToolTipText("Satıra çift tıklayın: komutun tamamı");
     win.add(table, { flex: 1 });
