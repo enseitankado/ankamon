@@ -608,7 +608,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           await addFixed(items.slice(0, 500));
         }
       });
-      manage.addListener("execute", () => ankamon.ui.boards.WifimonFixedDialog.open(() => fixed, removeFixed));
+      manage.addListener("execute", () => ankamon.ui.boards.WifimonFixedDialog.open(() => fixed, removeFixed, loadFixed));
       help.addListener("execute", () => ankamon.ui.Dialog.alert(this.HELP, "Wi-Fi Monitör — neler görülebilir"));
       fixedBox.addListener("changeValue", render);
       refresh.addListener("execute", () => feeds.forEach(feed => !feed.ws && connect(feed)));
