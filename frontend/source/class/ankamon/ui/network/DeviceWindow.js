@@ -169,7 +169,8 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         const facts = board.facts || {};
         const info = [
           ["Bilgisayar adı", board.hostname || "—"],
-          ["Durum", board.online ? "Çevrim içi" : board.net_online ? "Ağda, ama SSH ve sensör portu yanıt vermiyor (yönetilemiyor)" : "Çevrim dışı"],
+          ["Durum", (board.alive ?? board.online) ? "Çevrim içi" : "Çevrim dışı"],
+          ["Yönetilebilir", board.online ? "Evet (SSH / sensör portu yanıt veriyor)" : "Hayır (SSH yanıt vermiyor)"],
           ["Son log", board.last_log_at ? F.dateTime(board.last_log_at * 1000) : "—"],
           ["Model", facts.product || "—"],
           ["İşlemci", facts.cpu_model || "—"],

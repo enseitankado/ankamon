@@ -62,7 +62,9 @@ qx.Class.define("ankamon.page.Boards", {
     // Başlıklar kısa (kullanıcı isteği; ör. üç ayrı "Disk" sütunu); "hint" tam adı verir — sütun
     // gizleme menüsünde ve süzgeç ipucunda o görünür (bkz. Base _createTable/_addColumnFilters).
     this.__columns = [
-      { id: "status", label: "Durum", width: 120, hint: "Çevrimiçi: SSH ya da sensör portu yanıt veriyor. Ağda (SSH yok): cihaz ağda görülüyor (Varlıklar'da çevrim içi) ama SSH ve sensör portu kapalı — yönetilemiyor. Kapalı: ağda görülmüyor." },
+      // KALICI KURAL (kullanıcı 2026-11-10): Durum = ağda canlı mı (Varlıklar'la aynı); SSH erişimi ayrı "Yönetilebilir".
+      { id: "status", label: "Durum", width: 100, hint: "Çevrimiçi: tahta ağda canlı (Varlıklar'daki durumla aynı — ağ taraması görüyor ya da SSH yanıt veriyor). Kapalı: ağda görülmüyor." },
+      { id: "manageable", label: "Yönetilebilir", width: 100, hint: "Evet: Ankamon tahtaya SSH (ya da sensör portu) ile bağlanabiliyor — komut, ekran, oturum işlemleri yapılabilir. Hayır: tahta ağda olsa da SSH yanıt vermiyor (kapalı / güvenlik duvarı)." },
       { id: "name", label: "Takma ad / Ad" },
       { id: "hostname", label: "Bilgisayar adı", width: 150 },
       { id: "ip", label: "IP", width: 120 },
@@ -241,13 +243,11 @@ qx.Class.define("ankamon.page.Boards", {
      * (CABLE_FRESH_S) logdan kanıt: son 2 dk'da tahtanın IP'sinden log geldi ve o IP'nin MAC'i kablolu kartınki
      * (BoardsApi cable_log) → "Bağlı (log)". Kapalı tahtada boş (bilinmiyor).
      */
-    /** "Durum" sütunu: SSH/sensör portu açık → "Çevrimiçi"; kapalı ama ağ taraması MAC'ini görüyor (BoardsApi
-     * net_online) → "Ağda (SSH yok)" (açık ama yönetilemiyor); hiçbiri → "Kapalı". */
+    /** "Durum" sütunu: ağda canlı (BoardsApi alive — Varlıklar'la aynı ölçü) → "Çevrimiçi", değilse "Kapalı". SSH erişimi
+     * ayrı "Yönetilebilir" sütununda (board.online) — bkz. bellek smart-boards-online-vs-manageable. */
     statusText(board) {
-      return board.online ? "Çevrimiçi" : board.net_online ? ankamon.page.Boards.NET_ONLY : "Kapalı";
+      return (board.alive ?? board.online) ? "Çevrimiçi" : "Kapalı";
     },
-
-    NET_ONLY: "Ağda (SSH yok)",
 
     cableText(board) {
       const wired = ((board.netifs && board.netifs.ifaces) || []).filter(i => i.kind === "ethernet");
@@ -415,6 +415,7 @@ qx.Class.define("ankamon.page.Boards", {
           cells: [
             board.id, wasChecked.has(board.id),
             ankamon.page.Boards.statusText(board),
+            board.online ? "Evet" : "Hayır",
             board.label || board.hostname || board.ip,
             board.hostname, board.ip, board.mac, board.wifi_mac || "", F.etap(board.etap, board.facts.cpu_model),
             ankamon.page.Boards.sessionText(board),
@@ -1003,7 +1004,7 @@ qx.Class.define("ankamon.page.Boards", {
         // sütunlarıyla aynı son ölçümler — yalnız çevrimiçi tahtada (eski ölçüm kapalı tahtada yanıltır).
         const m = b.online ? metrics[b.id] : null;
         return {
-          id: b.id, name: b.label || b.hostname || b.ip || ("#" + b.id), online: !!b.online,
+          id: b.id, name: b.label || b.hostname || b.ip || ("#" + b.id), online: !!b.online, alive: !!(b.alive ?? b.online),
           whoami: whoami.get(b.id) || null,
           // "Oturumu açık kullanıcı yok (23 dk)": oturumsuz durumun başladığı an (epoch sn; bkz. BoardsApi
           // no_session_since) — kutucuk süreyi kendisi sayar.

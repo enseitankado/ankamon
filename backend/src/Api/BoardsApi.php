@@ -68,10 +68,12 @@ final class BoardsApi
             SELECT 1 FROM net_devices d, jsonb_array_elements(b.netifs->'ifaces') i
             WHERE i->>'kind' = 'ethernet' AND d.ip = b.ip AND lower(d.mac::text) = lower(i->>'mac')
         )) AS cable_log,
-        -- Ağda mı (kullanıcı bildirimi 2026-11-10: Varlıklar'da çevrim içi, Akıllı Tahtalar'da kapalı görünüyordu): ağ taraması
-        -- tahtanın kablolu ya da kablosuz MAC'ini şu an görüyor (ARP). online (SSH/sensör portu) false iken arayüz bunu
-        -- 'Ağda (SSH yok)' gösterir — açık ama yönetilemeyen (SSH kapalı / güvenlik duvarı) cihaz.
-        EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online) AS net_online";
+        -- KALICI KURAL (kullanıcı 2026-11-10): Akıllı Tahtalar Varlıklar'ın alt kümesi; «Çevrimiçi» = cihaz ağda canlı
+        -- (Varlıklar'la aynı ölçü: ağ taraması tahtanın kablolu/kablosuz MAC'ini çevrim içi görüyor) — SSH'e bağlı değil.
+        -- SSH/sensör portu erişimi (b.online) ayrı: arayüzde «Yönetilebilir». SSH yanıt veriyorsa cihaz da canlıdır (ARP
+        -- turları arasında net_devices gecikebilir), bu yüzden alive = online OR net_online.
+        EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online) AS net_online,
+        (b.online OR EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online)) AS alive";
 
     /**
      * boards + "şu anda log mu geliyor" (rl) — yalnız last_log_at'i hemen göstermek için (bir tahta

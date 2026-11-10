@@ -442,9 +442,11 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       const all = this.__getAll ? this.__getAll() : null;
       if (all) {
         const chosen = new Set(boards.map(b => b.id));
-        const online = all.filter(b => b.online);
+        // Çevrim içi = ağda canlı (alive — Akıllı Tahtalar Durum sütunuyla aynı; SSH erişimi ayrı "Yönetilebilir").
+        const isOn = b => !!(b.alive ?? b.online);
+        const online = all.filter(isOn);
         this.__totals = { on: online.length, off: all.length - online.length,
-          onSel: online.filter(b => chosen.has(b.id)).length, offSel: all.filter(b => !b.online && chosen.has(b.id)).length };
+          onSel: online.filter(b => chosen.has(b.id)).length, offSel: all.filter(b => !isOn(b) && chosen.has(b.id)).length };
       }
       const key = JSON.stringify([this.__totals, boards.map(b => [b.id, b.online, b.session_username, b.session_locked, b.screen_locked, b.input_locks,
         b.display_state, b.relay_source, b.relay_is_source])]);
