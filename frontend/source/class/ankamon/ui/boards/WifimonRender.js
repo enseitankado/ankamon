@@ -26,10 +26,10 @@
  */
 
 /**
- * Wi-Fi Monitör grid'inin modeli (bkz. ui.boards.WifiMonitor): TEK grid — önce sensör satırları (seçili tahtalar: tarama/izleme
- * durumu, kart, sayılar; kullanıcı isteği 2026-11-06: eski üst şerit grid'e katıldı), sonra bulgular. Hücre değerleri düz metindir
- * (sütun süzgeçleri ve sıralama onu kullanır); renkli/zengin görünüm ve ipuçları satır kimliğine bağlı ek veriden
- * (ui.boards.WifimonCellRenderer). Sıralamada sensör satırları her zaman üstte kalır.
+ * Wi-Fi Monitör grid'lerinin modeli (bkz. ui.boards.WifiMonitor). Pencerede iki sekme (kullanıcı isteği 2026-11-10):
+ * "Tespitler" (varsayılan; bulgular, satır başında onay kutusu) ve "Sensörler" (seçili tahtaların tarama/izleme durumu).
+ * Hücre değerleri düz metindir (sütun süzgeçleri, hazır değer listeleri ve sıralama onu kullanır); renkli/zengin görünüm ve
+ * ipuçları satır kimliğine bağlı ek veriden (ui.boards.WifimonCellRenderer).
  */
 qx.Class.define("ankamon.ui.boards.WifimonRender", {
   type: "static",
@@ -54,37 +54,47 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
       sshwifi: "Tahtaya SSH bağlantısı Wi-Fi kartı üzerinden; erişim kesilmesin diye monitör kipine alınmadı."
     },
 
-    /** Grid sütunları (sırası kullanıcıca değiştirilebilir — "wifimon.columns" tercihi). */
+    /** "Tespitler" grid'inin sütunları (sırası kullanıcıca değiştirilebilir — "wifimon.columns" tercihi). */
     COLUMNS: [
-      { id: "level", label: "Durum", width: 120, hint: "Bulgunun öne çıkma düzeyi; sensör satırında tarama/izleme durumu" },
-      { id: "sensor", label: "Sensör", width: 150, hint: "Vericiyi duyan Ankamon tahtası (Wi-Fi kartıyla dinleyen)" },
+      { id: "level", label: "Durum", width: 110, choices: true, hint: "Bulgunun öne çıkma düzeyi" },
+      { id: "sensor", label: "Sensör", width: 150, choices: true, hint: "Vericiyi duyan Ankamon tahtası (Wi-Fi kartıyla dinleyen)" },
       { id: "device", label: "Tespit edilen cihaz", width: 150, hint: "Duyulan vericinin MAC adresi" },
-      { id: "kind", label: "Tür", width: 170 },
+      { id: "kind", label: "Tür", width: 170, choices: true },
       { id: "name", label: "Ad", width: 170, hint: "Ağ adı (SSID); bağlı cihazda bağlı olduğu ağ" },
-      { id: "signal", label: "Sinyal", width: 150, choices: false },
+      { id: "signal", label: "Sinyal", width: 175, hint: "Sinyal gücü ve kaba yakınlık" },
       { id: "evidence", label: "Kanıt", width: 300 },
-      { id: "vendor", label: "Üretici", width: 140, hint: "MAC adresinin üretici kodundan (OUI) bulunan üretici" },
+      { id: "vendor", label: "Üretici", width: 140, choices: true, hint: "MAC adresinin üretici kodundan (OUI) bulunan üretici" },
       { id: "seen", label: "Son görülme", width: 130, choices: false }
     ],
 
-    /** Sütun kimliğinden tablo sütun numarası (kimlik sütunu 0). */
-    col(id) {
-      return this.COLUMNS.findIndex(c => c.id === id) + 1;
-    },
+    /** "Sensörler" grid'inin sütunları ("wifimon.sensors.columns" tercihi). */
+    SENSOR_COLUMNS: [
+      { id: "state", label: "Durum", width: 130, choices: true, hint: "Tarama/izleme durumu" },
+      { id: "sensor", label: "Sensör", width: 160, choices: true, hint: "Wi-Fi kartıyla çevreyi dinleyen Ankamon tahtası" },
+      { id: "mode", label: "Kip", width: 150, choices: true, hint: "Monitör kipi: Wi-Fi trafiği dinleniyor; Ağ taraması: yalnız çevredeki Wi-Fi ağları listeleniyor" },
+      { id: "card", label: "Wi-Fi kartı", width: 190, choices: true, hint: "Kart adı ve bağlı olduğu ağ" },
+      { id: "findings", label: "Bulgular", width: 260, hint: "Bu sensörün tespitlerinin düzeylere göre sayısı" },
+      { id: "probes", label: "Arayan", width: 80, hint: "Son dinlemede ağ arayan cihaz kestirimi" },
+      { id: "clients", label: "Bağlı", width: 80, hint: "Son dinlemede bir ağa bağlı ve veri gönderen cihaz sayısı" },
+      { id: "notes", label: "Notlar", width: 300 },
+      { id: "seen", label: "Son tarama", width: 110, choices: false }
+    ],
 
     chip(text, color, tip) {
       return `<span title="${qx.bom.String.escape(tip || "")}" style="display:inline-block;padding:0 7px;border-radius:9px;font-size:12px;` +
         `line-height:18px;font-weight:600;color:${color};border:1px solid ${color}66;white-space:nowrap">${qx.bom.String.escape(text)}</span>`;
     },
 
+    /** Sinyal göstergesi: çubuk, yüzde (sabit genişlikte — çubuklar alt alta hizalı kalsın) ve yakınlık. Hücrede sola yaslı. */
     bar(signal) {
       if (signal === null || signal === undefined || signal === "") {
         return "";
       }
       const color = signal >= 60 ? "#2fa84a" : signal >= 35 ? "#e8a200" : "#d93025";
       return `<span style="display:inline-block;width:50px;height:8px;background:rgba(127,127,127,.25);border-radius:4px;vertical-align:middle">` +
-        `<span style="display:block;width:${signal}%;height:100%;background:${color};border-radius:4px"></span></span> ` +
-        `${signal}% <span style="opacity:.7">${ankamon.ui.boards.WifimonClassify.proximity(signal)}</span>`;
+        `<span style="display:block;width:${signal}%;height:100%;background:${color};border-radius:4px"></span></span>` +
+        `<span style="display:inline-block;width:40px;text-align:right;margin-right:6px">${signal}%</span>` +
+        `<span style="opacity:.7">${ankamon.ui.boards.WifimonClassify.proximity(signal)}</span>`;
     },
 
     __ago(ms, now) {
@@ -94,7 +104,7 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
 
     /**
      * Kanıt terimleri [{text, tip}]: kısa terim hücrede, açıklaması hücre ipucunda. "x sensörde": aynı MAC adresini duyan
-     * sensörler (ağ adına göre değil — kullanıcı isteği); ipucunda adres ve duyan sensörler.
+     * sensörler (ağ adına göre değil); ipucunda adres ve duyan sensörler.
      */
     __evidence(item) {
       const row = item.row;
@@ -164,67 +174,72 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
     },
 
     /**
-     * Sensör satırı. feed: WifiMonitor'deki sensör durumu {board, name, watching, phase, error, statusText, notes, data,
-     * probeInfo, sniffing, forced, at}; view: Classify.board().
+     * "Sensörler" grid'inin satırları. entries: [{feed, view}] — feed: WifiMonitor'deki sensör durumu {board, name, watching,
+     * ws, error, statusText, notes, data, probeInfo, sniffing, forced, at}; view: Classify.board().
+     * @return {Map} {rows: Array, meta: Map}
      */
-    __sensorRow(feed, view, now) {
+    sensorModel(entries) {
+      const esc = qx.bom.String.escape;
       const L = this.LEVELS;
-      const c = view.counts;
-      let state;
-      let stateHtml;
-      const spinner = ankamon.ui.JobSpinner.html();
-      if (feed.error) {
-        state = feed.statusText || "Hata";
-        stateHtml = `<span style="color:#d93025">${qx.bom.String.escape(state)}</span>`;
-      } else if (feed.watching && feed.ws) {
-        state = "İzleniyor";
-        stateHtml = `${spinner} <span style="color:#1e8e3e">İzleniyor</span>`;
-      } else if (feed.ws) {
-        state = feed.statusText || "Taranıyor…";
-        stateHtml = `${spinner} ${qx.bom.String.escape(state)}`;
-      } else {
-        state = feed.statusText || "Bitti";
-        stateHtml = `<span style="opacity:.75">${qx.bom.String.escape(state)}</span>`;
-      }
-      const d = feed.data;
-      let card = d ? (d.device ? d.device + " · " + (d.connection ? "bağlı: " + d.connection : "bağlı değil") : "Wi-Fi kartı yok") : "";
-      if (feed.sniffing) {
-        card += " · monitör kipi";
-      }
-      if (feed.forced) {
-        card += " · Wi-Fi bağlantısı kesildi (onaylı)";
-      }
-      const parts = [];
-      const counted = [["phone", c.phone], ["maybe", c.maybe], ["foreign", c.foreign], ["common", c.common], ["fixed", c.fixed]];
-      counted.forEach(([lv, n]) => n && parts.push({ text: `${L[lv].label} ${n}`, color: L[lv].color, tip: L[lv].tip }));
-      const pi = feed.probeInfo;
-      if (pi && !pi.note) {
-        parts.push({ text: `Arayan ≈${pi.devices}`, color: "#1a73e8", tip: `Son ${pi.secs || "?"} sn dinlemede ağ arayan cihaz kestirimi.` });
-        parts.push({ text: `Bağlı ${pi.clients || 0}`, color: "#1a73e8", tip: `Son ${pi.secs || "?"} sn dinlemede bir ağa bağlı ve veri gönderen cihaz sayısı.` });
-      }
-      const notes = (feed.notes || []).filter(Boolean);
-      return {
-        cells: [`s|${feed.board.id}`, state, feed.name, "", "Sensör", card, "", parts.map(p => p.text).join(" · "), "",
-          feed.at ? new Date(feed.at).toLocaleTimeString("tr-TR") : ""],
-        meta: {
+      const rows = [];
+      const meta = new Map();
+      entries.forEach(({ feed, view }) => {
+        const c = view.counts;
+        let state;
+        let stateHtml;
+        const spinner = ankamon.ui.JobSpinner.html();
+        if (feed.error) {
+          state = feed.statusText || "Hata";
+          stateHtml = `<span style="color:#d93025">${esc(state)}</span>`;
+        } else if (feed.watching && feed.ws) {
+          state = "İzleniyor";
+          stateHtml = `${spinner} <span style="color:#1e8e3e">İzleniyor</span>`;
+        } else if (feed.ws) {
+          state = feed.statusText || "Taranıyor…";
+          stateHtml = `${spinner} ${esc(state)}`;
+        } else {
+          state = feed.statusText || "Bitti";
+          stateHtml = `<span style="opacity:.75">${esc(state)}</span>`;
+        }
+        const d = feed.data;
+        let card = d ? (d.device ? d.device + " · " + (d.connection ? "bağlı: " + d.connection : "bağlı değil") : "Wi-Fi kartı yok") : "";
+        if (feed.forced) {
+          card += " · bağlantı kesildi (onaylı)";
+        }
+        const mode = feed.sniffing ? "Monitör kipi" : d ? "Ağ taraması" : "";
+        const parts = [];
+        const counted = [["phone", c.phone], ["maybe", c.maybe], ["foreign", c.foreign], ["common", c.common], ["fixed", c.fixed]];
+        counted.forEach(([lv, n]) => n && parts.push({ text: `${L[lv].label} ${n}`, color: L[lv].color, tip: L[lv].tip }));
+        const pi = feed.probeInfo && !feed.probeInfo.note ? feed.probeInfo : null;
+        const notes = (feed.notes || []).filter(Boolean);
+        const id = `s|${feed.board.id}`;
+        rows.push([id, state, feed.name, mode, card, parts.map(p => p.text).join(" · "), pi ? pi.devices ?? "" : "",
+          pi ? pi.clients || 0 : "", notes.join(" "), feed.at ? new Date(feed.at).toLocaleTimeString("tr-TR") : ""]);
+        meta.set(id, {
           sensor: true, feed, lastAt: feed.at || 0,
           html: {
-            level: stateHtml,
-            sensor: `${feed.watching && feed.ws ? '<span style="color:#1e8e3e" title="Sürekli izleniyor">●</span> ' : ""}${qx.bom.String.escape(feed.name)}`,
-            evidence: parts.map(p => this.chip(p.text, p.color, p.tip)).join(" ")
+            state: stateHtml,
+            mode: feed.sniffing ? `<span style="color:#e8710a">● Monitör kipi</span>` : null,
+            findings: parts.map(p => this.chip(p.text, p.color, p.tip)).join(" ")
           },
           hint: {
-            level: [feed.watching ? "Sürekli izleniyor (liste kendiliğinden tazelenir)." : "Tek tarama."].concat(notes).join("\n"),
-            kind: "Bu satır sensörün durumu: Wi-Fi kartıyla çevreyi dinleyen Ankamon tahtası.",
-            name: card,
-            evidence: notes.join("\n") || null
+            state: [feed.watching ? "Sürekli izleniyor (liste kendiliğinden tazelenir)." : "Tek tarama."].concat(notes).join("\n"),
+            mode: feed.sniffing ? "Wi-Fi kartı dinleme süresince monitör kipinde (Tahtalar listesinin Wi-Fi sütununda 'Monitör modu')."
+              : "Kart monitör kipinde değil: yalnız çevredeki Wi-Fi ağları listeleniyor.",
+            card: card || null,
+            findings: parts.length ? parts.map(p => `${p.text}: ${p.tip}`).join("\n") : null,
+            probes: pi ? `Son ${pi.secs || "?"} sn dinlemede ağ arayan cihaz kestirimi.` : null,
+            clients: pi ? `Son ${pi.secs || "?"} sn dinlemede bir ağa bağlı ve veri gönderen cihaz sayısı.` : null,
+            notes: notes.join("\n") || null
           }
-        }
-      };
+        });
+      });
+      return { rows, meta };
     },
 
     /**
-     * Grid satırları ve satır kimliği → ek veri. entries: [{feed, view}].
+     * "Tespitler" grid'inin satırları (onay kutusu sütunu dahil — işaret `checked` kümesinden). entries: [{feed, view}].
+     * @param opts {Map} {showFixed, now, checked: Set}
      * @return {Map} {rows: Array, meta: Map}
      */
     model(entries, opts) {
@@ -232,11 +247,6 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
       const rows = [];
       const meta = new Map();
       const now = opts.now;
-      entries.forEach(({ feed, view }) => {
-        const s = this.__sensorRow(feed, view, now);
-        rows.push(s.cells);
-        meta.set(s.cells[0], s.meta);
-      });
       const findings = [];
       entries.forEach(({ feed, view }) => view.rows.forEach(item => {
         if (opts.showFixed || item.level !== "fixed") {
@@ -262,11 +272,12 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
         }
         const id = `${feed.board.id}|${item.key}`;
         const name = this.__nameText(row);
-        rows.push([id, lv.label, feed.name, row.addr || "", this.__kindText(row), name,
-          row.signal === null || row.signal === undefined ? "" : row.signal, terms.map(t => t.text).join(" · "),
+        const hasSignal = !(row.signal === null || row.signal === undefined);
+        rows.push([id, opts.checked.has(id), lv.label, feed.name, row.addr || "", this.__kindText(row), name,
+          hasSignal ? `${row.signal}% ${Classify.proximity(row.signal)}` : "", terms.map(t => t.text).join(" · "),
           this.__vendorText(row), seen.join(" · ")]);
         meta.set(id, {
-          sensor: false, feed, item, lastAt: item.lastAt || 0, level: item.level,
+          sensor: false, feed, item, lastAt: item.lastAt || 0, level: item.level, signal: hasSignal ? row.signal : -1,
           html: {
             level: this.chip(lv.label, lv.color, lv.tip),
             sensor: `${feed.watching && feed.ws ? '<span style="color:#1e8e3e">●</span> ' : ""}${esc(feed.name)}`,
@@ -283,6 +294,7 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
             device: row.random ? "Rastgele (yerel yönetimli) adres" : null,
             kind: this.__kindHint(row),
             name: name || null,
+            signal: hasSignal ? `Sinyal %${row.signal} — ${Classify.proximity(row.signal)} (kaba yakınlık ipucu)` : null,
             evidence: terms.length ? terms.map(t => t.tip === t.text ? t.text : `${t.text}: ${t.tip}`).join("\n") : null,
             vendor: row.vendor || (row.random ? "Rastgele (yerel yönetimli) adres: üretici kodu (OUI) taşımaz, üretici belirlenemez."
               : "Adresin üretici kodu (OUI) listede bulunamadı."),
@@ -294,22 +306,25 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
     },
 
     /**
-     * Sütunlara hücre çizicisi ve sıralama kuralı bağlar. Sıralama: sensör satırları her zaman üstte; Durum öne çıkma
-     * sırasıyla, Sinyal sayıyla, Son görülme zamanla, ötekiler Türkçe metin sırasıyla.
+     * Sütunlara hücre çizicisi ve sıralama kuralı bağlar. Sıralama: Durum öne çıkma sırasıyla, Sinyal sayıyla, zaman
+     * sütunları zamanla, Arayan/Bağlı sayıyla, ötekiler Türkçe metin sırasıyla.
+     * @param table {qx.ui.table.Table} page.Base._createTable'ın tablosu (offset: kimlik [+ onay kutusu] sütunları)
+     * @param columns {Array} COLUMNS ya da SENSOR_COLUMNS
      * @param getMeta {Function} (satır kimliği) → ek veri
      */
-    attach(table, getMeta) {
+    attach(table, columns, getMeta) {
       const cm = table.getTableColumnModel();
       const model = table.getTableModel();
+      const offset = table.getUserData("offset") || 1;
       const Classify = ankamon.ui.boards.WifimonClassify;
-      const isSensor = ankamon.ui.boards.WifimonCellRenderer.isSensorRow;
-      this.COLUMNS.forEach((column, i) => {
-        const index = i + 1;
+      columns.forEach((column, i) => {
+        const index = i + offset;
         const metaOf = cellInfo => getMeta(cellInfo.rowData && cellInfo.rowData[0]) || null;
         cm.setDataCellRenderer(index, new ankamon.ui.boards.WifimonCellRenderer(
           cellInfo => {
             const m = metaOf(cellInfo);
-            return m && m.html && m.html[column.id] !== undefined ? m.html[column.id] : null;
+            const html = m && m.html ? m.html[column.id] : undefined;
+            return html === undefined ? null : html;
           },
           cellInfo => {
             const m = metaOf(cellInfo);
@@ -323,22 +338,20 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
         const key = row => {
           const m = getMeta(row[0]) || {};
           if (column.id === "level") {
-            return m.sensor ? 0 : Classify.LEVEL_ORDER[m.level] ?? 9;
+            return Classify.LEVEL_ORDER[m.level] ?? 9;
           }
           if (column.id === "signal") {
-            return row[index] === "" ? -1 : Number(row[index]);
+            return m.signal ?? -1;
           }
           if (column.id === "seen") {
             return m.lastAt || 0;
           }
+          if (column.id === "probes" || column.id === "clients") {
+            return row[index] === "" ? -1 : Number(row[index]);
+          }
           return String(row[index] ?? "");
         };
         const compare = asc => (a, b) => {
-          const sa = isSensor(a);
-          const sb = isSensor(b);
-          if (sa !== sb) {
-            return sa ? -1 : 1; // sensör satırları yönden bağımsız üstte
-          }
           const ka = key(a);
           const kb = key(b);
           const r = typeof ka === "number" && typeof kb === "number" ? ka - kb : String(ka).localeCompare(String(kb), "tr", { numeric: true });

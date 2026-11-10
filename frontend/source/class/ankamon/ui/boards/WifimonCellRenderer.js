@@ -28,8 +28,8 @@
 /**
  * Wi-Fi Monitör grid'inin hücre çizicisi (bkz. ui.boards.WifimonRender): hücrenin HTML'i ve ipucu (title — fare kayınca kapanır,
  * bkz. ui.ToolTipPolicy) satır kimliğine bağlı ek veriden gelir; hücre değeri düz metindir (süzgeç ve sıralama onu kullanır).
- * Sensör satırları ("s|<tahta>") hafif renkli zemin ve kalın yazıyla bulgulardan ayrılır; uzun metin hücre içinde üç noktayla
- * kırpılır, tamamı ipucundadır.
+ * Hücreler sola yaslıdır (sayılar dahil — qx'in sayıyı sağa yaslaması kapalı: sinyal göstergeleri alt alta hizalı); uzun metin
+ * hücre içinde üç noktayla kırpılır, tamamı ipucundadır.
  */
 qx.Class.define("ankamon.ui.boards.WifimonCellRenderer", {
   extend: qx.ui.table.cellrenderer.Default,
@@ -40,15 +40,9 @@ qx.Class.define("ankamon.ui.boards.WifimonCellRenderer", {
    */
   construct(html, hint) {
     super();
+    this.setUseAutoAlign(false);
     this.__wifimonHtml = html || null;
     this.__wifimonHint = hint || null;
-  },
-
-  statics: {
-    /** Grid satır kimliği sensör satırına mı ait? */
-    isSensorRow(rowData) {
-      return String((rowData && rowData[0]) || "").startsWith("s|");
-    }
   },
 
   members: {
@@ -57,11 +51,7 @@ qx.Class.define("ankamon.ui.boards.WifimonCellRenderer", {
 
     // overridden
     _getCellStyle(cellInfo) {
-      let style = super._getCellStyle(cellInfo) + "text-overflow:ellipsis;";
-      if (ankamon.ui.boards.WifimonCellRenderer.isSensorRow(cellInfo.rowData)) {
-        style += "font-weight:600;background-color:rgba(26,115,232,.10);";
-      }
-      return style;
+      return super._getCellStyle(cellInfo) + "text-overflow:ellipsis;text-align:left;";
     },
 
     // overridden

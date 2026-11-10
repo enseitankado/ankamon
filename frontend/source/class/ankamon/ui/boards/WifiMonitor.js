@@ -26,9 +26,10 @@
  */
 
 /**
- * Sağ menü / araç çubuğu "Wi-Fi Monitör": seçili bütün tahtalar (sensörler) TEK pencerede, TEK grid'de — önce sensör satırları
- * (tarama/izleme durumu, kart, sayılar), altında bütün sensörlerin bulguları (kullanıcı isteği 2026-11-06: üst şerit grid'e
- * katıldı; sütunlar süzülür, sıralanır, sırası değiştirilir). Amaç sınıfa getirilmiş telefonları bulmak: sensörlerin duyduğu
+ * Sağ menü / araç çubuğu "Wi-Fi Monitör": seçili bütün tahtalar (sensörler) TEK pencerede, iki sekmede (kullanıcı isteği
+ * 2026-11-10): "Tespitler" (varsayılan) bütün sensörlerin bulguları — satır başındaki onay kutusuyla işaretlenen satırlara güven
+ * işlemleri uygulanır; "Sensörler" her sensörün tarama/izleme durumu, kipi, kartı ve sayıları. İki grid'de de sütunlar süzülür
+ * (hazır değer listesiyle), sıralanır, sırası değiştirilir. Amaç sınıfa getirilmiş telefonları bulmak: sensörlerin duyduğu
  * Wi-Fi ağları, Wi-Fi arayan ve Wi-Fi'ye bağlı cihazlar "güvenilir" listesine (MAC adresiyle, sunucuda — /api/wifimon/fixed)
  * göre ayrılır; güvenilir olmayanlar telefon kanıtına göre öne çıkarılır (bkz. ui.boards.WifimonClassify, ui.boards.WifimonRender).
  * Bluetooth kullanılmaz. Pencere zaten açıksa yeni tahtalar ona eklenir.
@@ -48,10 +49,10 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
     /** Sürekli izlemede yoklama ve bağlı cihaz satırı son duyuluşundan bu kadar sonra listeden düşer. */
     PROBE_KEEP_MS: 5 * 60 * 1000,
 
-    HELP: "Bu pencere seçili tahtaların (<b>sensörlerin</b>) çevresindeki Wi-Fi vericilerini tek tabloda gösterir: en üstte her " +
-      "sensörün durumu (mavi zeminli satırlar; <i>İzleniyor</i> = sürekli izleme sürüyor), altında bulgular. Sınıfın/okulun olağan " +
-      "erişim noktalarını ve cihazlarını <b>güvenilir</b> işaretleyin — satırları seçip <i>Bu sınıfta güvenilir</i> / <i>Okul " +
-      "genelinde güvenilir</i> (araç çubuğu ya da sağ tık) ya da toptan (sınıflar boşken) <i>Görünenleri güvenilir yap</i>; güven " +
+    HELP: "Bu pencere seçili tahtaların (<b>sensörlerin</b>) çevresindeki Wi-Fi vericilerini gösterir: <b>Tespitler</b> sekmesinde bulgular, " +
+      "<b>Sensörler</b> sekmesinde her sensörün durumu (<i>İzleniyor</i> = sürekli izleme sürüyor; çift tık: o sensörün " +
+      "tespitleri). Sınıfın/okulun olağan erişim noktalarını ve cihazlarını <b>güvenilir</b> işaretleyin — satır başındaki kutuyla " +
+      "işaretleyip <i>Bu sınıfta güvenilir</i> / <i>Okul genelinde güvenilir</i> (Tespitler sekmesindeki düğmeler ya da sağ tık) ya da toptan (sınıflar boşken) <i>Görünenleri güvenilir yap</i>; güven " +
       "<b>MAC adresiyle</b> kurulur (aynı adı taşıyan bir telefon paylaşım noktası okulun ağı sayılmaz). Sonra gerisi " +
       "<b>yabancı</b> olarak öne çıkar. <b>Neler görülebilir:</b> telefonun paylaşım noktası (hotspot) açıksa Wi-Fi ağı olarak; " +
       "Wi-Fi'si açık ama bağlı değilse ara ara gönderdiği <b>yoklamalarla</b> (Wi-Fi arayan cihaz; Tür sütununda aradığı ağ " +
@@ -136,12 +137,12 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       const Render = ankamon.ui.boards.WifimonRender;
       const Base = ankamon.page.Base;
 
-      // Üst satır: tarama denetimleri; ikinci satır: güven işlemleri (seçili satırlara — sağ tık menüsüyle aynı).
+      // Üst satır (iki sekmede ortak): tarama denetimleri.
       const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" }));
       const refresh = new qx.ui.form.Button("Yenile");
       const watchBox = new qx.ui.form.CheckBox("Sürekli izle").set({
         value: true,
-        toolTipText: "Açıkken liste sürekli tazelenir (sensör satırında 'İzleniyor'); tahtada geçici açılan radyo izleme bitene kadar açık kalır."
+        toolTipText: "Açıkken liste sürekli tazelenir (Sensörler sekmesinde 'İzleniyor'); tahtada geçici açılan radyo izleme bitene kadar açık kalır."
       });
       const probeBox = new qx.ui.form.CheckBox("Wi-Fi trafiğini dinle").set({
         value: true,
@@ -154,28 +155,47 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       bar.add(new qx.ui.core.Spacer(), { flex: 1 });
       bar.add(help);
       win.add(bar);
+
+      // Sekmeler (kullanıcı isteği 2026-11-10): Tespitler (varsayılan) ve Sensörler, her biri kendi grid'iyle.
+      const tabs = new qx.ui.tabview.TabView().set({ contentPadding: 6 });
+      const findingsPage = new qx.ui.tabview.Page("Tespitler");
+      findingsPage.setLayout(new qx.ui.layout.VBox(6));
+      const sensorsPage = new qx.ui.tabview.Page("Sensörler");
+      sensorsPage.setLayout(new qx.ui.layout.VBox(6));
+      tabs.add(findingsPage);
+      tabs.add(sensorsPage);
+      win.add(tabs, { flex: 1 });
+
+      // Tespitler: güven işlemleri satır başındaki onay kutusuyla işaretlenen satırlara uygulanır.
       const trustBar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
       const trustClass = new qx.ui.form.Button("Bu sınıfta güvenilir AP").set({ enabled: false });
       const trustSchool = new qx.ui.form.Button("Okul genelinde güvenilir AP").set({ enabled: false });
-      const untrust = new qx.ui.form.Button("Güvenilirden çıkar").set({ enabled: false });
+      const untrust = new qx.ui.form.Button("Güvenilirlikten çıkar").set({ enabled: false });
+      const checkedInfo = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
       const baseline = new qx.ui.form.Button("Görünenleri güvenilir yap…").set({
         toolTipText: "Şu an görünen bütün kalıcı adresli vericileri kendi sınıflarına güvenilir işaretler (sınıflar boşken yapın)."
       });
       const manage = new qx.ui.form.Button("Güvenilir listesi…");
-      [trustClass, trustSchool, untrust].forEach(w => trustBar.add(w));
+      [trustClass, trustSchool, untrust, checkedInfo].forEach(w => trustBar.add(w));
       trustBar.add(new qx.ui.core.Spacer(), { flex: 1 });
       [baseline, manage].forEach(w => trustBar.add(w));
-      win.add(trustBar);
+      findingsPage.add(trustBar);
 
-      // Grid: page.Base yardımcılarıyla (süzgeç kutuları + hazır değer listesi, sütun sırası/gizleme tercihi "wifimon.columns").
+      // Grid'ler: page.Base yardımcılarıyla (süzgeç kutuları + hazır değer listesi, sütun sırası/gizleme tercihi).
       const host = new ankamon.ui.boards.WifimonGridHost(user);
       const columns = Render.COLUMNS;
-      const table = host._createTable(columns, { prefsKey: "wifimon.columns" });
-      table.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.MULTIPLE_INTERVAL_SELECTION);
+      const table = host._createTable(columns, { prefsKey: "wifimon.columns", checkable: true });
+      const sensorColumns = Render.SENSOR_COLUMNS;
+      const sensorTable = host._createTable(sensorColumns, { prefsKey: "wifimon.sensors.columns" });
       let meta = new Map();
+      let sensorMeta = new Map();
       let allRows = [];
-      Render.attach(table, id => meta.get(id));
-      win.add(table, { flex: 1 });
+      let sensorRows = [];
+      const checked = new Set(); // işaretli tespit satırları (kimlik) — tablo her tazelemede yeniden kurulduğu için burada
+      Render.attach(table, columns, id => meta.get(id));
+      Render.attach(sensorTable, sensorColumns, id => sensorMeta.get(id));
+      findingsPage.add(table, { flex: 1 });
+      sensorsPage.add(sensorTable, { flex: 1 });
 
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       const feeds = new Map();
@@ -184,20 +204,17 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       let closed = false;
       let renderQueued = false;
 
-      // Süzgeç: sensör satırları yalnız "Sensör" süzgecine uyar (bulguları süzerken sensörlerin durumu görünür kalsın).
-      const apply = () => {
-        const active = columns.map((c, i) => ({ i, id: c.id, text: (filters[c.id].getValue() || "").trim() })).filter(f => f.text);
-        const shown = allRows.filter(cells => {
-          const sensor = String(cells[0]).startsWith("s|");
-          return active.every(f => (sensor && f.id !== "sensor") || Base.filterMatch(cells[1 + f.i], f.text));
-        });
-        const tm = table.getTableModel();
-        const sel = table.getSelectionModel();
+      // Süzgeci uygular; seçim (ışıklı satırlar) ve kaydırma yeri korunur, sıralama Base.keepSortOnReload ile.
+      const applyTo = (tbl, cols, fields, rows, offset) => {
+        const active = cols.map((c, i) => ({ i, text: (fields[c.id].getValue() || "").trim() })).filter(f => f.text);
+        const shown = rows.filter(cells => active.every(f => Base.filterMatch(cells[offset + f.i], f.text)));
+        const tm = tbl.getTableModel();
+        const sel = tbl.getSelectionModel();
         const ids = new Set();
         sel.iterateSelection(r => ids.add(tm.getValue(0, r)));
-        const scroller = table.getPaneScroller(0);
+        const scroller = tbl.getPaneScroller(0);
         const top = scroller.getScrollY();
-        tm.setData(shown); // sıralama korunur ve yeniden dizilir (Base.keepSortOnReload)
+        tm.setData(shown);
         if (ids.size) {
           sel.setBatchMode(true);
           sel.resetSelection();
@@ -209,9 +226,24 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           sel.setBatchMode(false);
         }
         scroller.setScrollY(top);
+        return shown.length;
+      };
+      const syncTabs = shown => {
+        const total = allRows.length;
+        findingsPage.setLabel(`Tespitler (${shown === total ? total : shown + "/" + total})`);
+        const watching = sensorRows.filter(r => r[1] === "İzleniyor").length;
+        sensorsPage.setLabel(`Sensörler (${sensorRows.length}${watching ? ", " + watching + " izleniyor" : ""})`);
+      };
+      const apply = () => {
+        syncTabs(applyTo(table, columns, filters, allRows, 2));
         syncTrust();
       };
+      const applySensors = () => {
+        applyTo(sensorTable, sensorColumns, sensorFilters, sensorRows, 1);
+        syncTabs(table.getTableModel().getRowCount());
+      };
       const filters = host._addColumnFilters(table, columns, apply, { rows: () => allRows });
+      const sensorFilters = host._addColumnFilters(sensorTable, sensorColumns, applySensors, { rows: () => sensorRows });
 
       const render = () => {
         if (renderQueued || closed) {
@@ -228,27 +260,43 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           const hearers = Classify.hearers(list);
           const sensorCount = list.filter(f => f.data).length;
           const entries = list.map(feed => ({ feed, view: Classify.board(feed, fixedIndex, hearers, sensorCount, now) }));
-          const built = Render.model(entries, { showFixed: fixedBox.getValue(), now });
+          const built = Render.model(entries, { showFixed: fixedBox.getValue(), now, checked });
           meta = built.meta;
           allRows = built.rows;
+          checked.forEach(id => !meta.has(id) && checked.delete(id)); // listeden düşen satırın işareti de düşer
+          const sensors = Render.sensorModel(entries);
+          sensorMeta = sensors.meta;
+          sensorRows = sensors.rows;
+          applySensors();
           apply();
           const watching = list.some(f => f.watching && f.ws);
           win.setCaption(`Wi-Fi Monitör — ${list.length === 1 ? list[0].name : list.length + " sensör"}${watching ? " · sürekli izleniyor" : ""}`);
         }, null, 120);
       };
 
-      // Seçili bulgular (sensör satırları hariç) ve güven işlemleri.
-      const selectedFindings = () => {
+      // Onay kutusu değişince işaretli küme güncellenir (görünmeyen — süzülmüş — satırların işareti korunur).
+      table.getTableModel().addListener("dataChanged", () => {
         const tm = table.getTableModel();
-        const out = [];
-        table.getSelectionModel().iterateSelection(r => {
-          const m = meta.get(tm.getValue(0, r));
-          if (m && !m.sensor) {
-            out.push(m);
+        let changed = false;
+        for (let r = 0; r < tm.getRowCount(); r++) {
+          const id = tm.getValue(0, r);
+          const on = !!tm.getValue(1, r);
+          if (on !== checked.has(id)) {
+            changed = true;
+            if (on) {
+              checked.add(id);
+            } else {
+              checked.delete(id);
+            }
           }
-        });
-        return out;
-      };
+        }
+        if (changed) {
+          syncTrust();
+        }
+      });
+
+      // İşaretli tespitler ve güven işlemleri.
+      const checkedFindings = () => [...checked].map(id => meta.get(id)).filter(m => m && !m.sensor);
       const trustable = m => {
         const row = m.item.row;
         return !m.item.fixed && !row.active && !row.board_name && row.addr && !(row.kind === "probe" && row.random);
@@ -262,15 +310,19 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         return kinds.size === 0 ? "AP" : kinds.size === 1 ? [...kinds][0] : "AP/cihaz";
       };
       const syncTrust = () => {
-        const list = selectedFindings();
-        const can = list.some(trustable);
-        trustClass.set({ enabled: can, label: `Bu sınıfta güvenilir ${what(list)}`,
-          toolTipText: "Seçili vericiler yalnız duyulduğu sensörün sınıfında güvenilir sayılır (MAC adresiyle)." });
-        trustSchool.set({ enabled: can, label: `Okul genelinde güvenilir ${what(list)}`,
-          toolTipText: "Seçili vericiler bütün sensörlerde güvenilir sayılır — yalnız bu MAC adresi (aynı adı taşıyan başka verici değil)." });
-        untrust.setEnabled(list.some(m => m.item.fixed));
+        const list = checkedFindings();
+        const can = list.filter(trustable).length;
+        const out = list.filter(m => m.item.fixed).length;
+        trustClass.set({ enabled: can > 0, label: `Bu sınıfta güvenilir ${what(list)}${can ? " (" + can + ")" : ""}`,
+          toolTipText: "İşaretli vericiler yalnız duyulduğu sensörün sınıfında güvenilir sayılır (MAC adresiyle)." });
+        trustSchool.set({ enabled: can > 0, label: `Okul genelinde güvenilir ${what(list)}${can ? " (" + can + ")" : ""}`,
+          toolTipText: "İşaretli vericiler bütün sensörlerde güvenilir sayılır — yalnız bu MAC adresi (aynı adı taşıyan başka verici değil)." });
+        untrust.set({ enabled: out > 0, label: `Güvenilirlikten çıkar${out ? " (" + out + ")" : ""}`,
+          toolTipText: "İşaretli güvenilir satırları güvenilir listesinden çıkarır (güvenilirler 'Güvenilirleri göster' açıkken listelenir)." });
+        const skipped = list.length - can - out;
+        checkedInfo.setValue(!list.length ? "Satır başındaki kutuyla işaretleyin."
+          : `${list.length} işaretli` + (skipped > 0 ? ` · ${skipped} işaretlenemez (rastgele adresli arayan cihaz, tahta ya da sensörün ağı)` : ""));
       };
-      table.getSelectionModel().addListener("changeSelection", syncTrust);
 
       const loadFixed = async () => {
         try {
@@ -301,46 +353,80 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         }
         await loadFixed();
       };
-      const doTrust = school => addFixed(trustItems(selectedFindings(), school));
-      const doUntrust = () => removeFixed([...new Set(selectedFindings().filter(m => m.item.fixed).map(m => m.item.fixed.id))]);
+      // İşlem sonrası işaretler kalkar (satırların düzeyi değişir; yeni seçim temiz başlasın).
+      const clearChecks = () => {
+        checked.clear();
+        render();
+      };
+      const doTrust = async (school, list) => {
+        await addFixed(trustItems(list || checkedFindings(), school));
+        clearChecks();
+      };
+      const doUntrust = async list => {
+        await removeFixed([...new Set((list || checkedFindings()).filter(m => m.item.fixed).map(m => m.item.fixed.id))]);
+        clearChecks();
+      };
       trustClass.addListener("execute", () => doTrust(false));
       trustSchool.addListener("execute", () => doTrust(true));
-      untrust.addListener("execute", doUntrust);
+      untrust.addListener("execute", () => doUntrust());
 
-      // Sağ tık: tıklanan satır seçilir; güven işlemleri (araç çubuğuyla aynı) ve sensör süzgeci.
-      table.addListener("cellContextmenu", e => {
-        const row = e.getRow();
-        if (row === null || row === undefined) {
-          return;
-        }
-        if (!table.getSelectionModel().isSelectedIndex(row)) {
-          table.getSelectionModel().setSelectionInterval(row, row);
-        }
-        const m = meta.get(table.getTableModel().getValue(0, row));
-        if (!m) {
-          return;
-        }
+      const popup = (e, tbl, build) => {
         const menu = new qx.ui.menu.Menu();
         const item = (label, fn, enabled = true) => {
           const b = new qx.ui.menu.Button(label).set({ enabled });
           b.addListener("execute", fn);
           menu.add(b);
         };
-        const list = selectedFindings();
-        if (list.length) {
-          item(trustClass.getLabel(), () => doTrust(false), list.some(trustable));
-          item(trustSchool.getLabel(), () => doTrust(true), list.some(trustable));
-          item("Güvenilirden çıkar", doUntrust, list.some(x => x.item.fixed));
-          menu.add(new qx.ui.menu.Separator());
-        }
-        item(`Yalnız bu sensörü göster (${m.feed.name})`, () => filters.sensor.setValue(`"${m.feed.name}"`));
-        item("Bütün sensörleri göster", () => filters.sensor.setValue(""), !!filters.sensor.getValue());
-        if (!m.feed.ws) {
-          item(`Bu sensörü yeniden tara (${m.feed.name})`, () => connect(m.feed));
-        }
-        menu.setOpener(table);
+        build(item, menu);
+        menu.setOpener(tbl);
         menu.openAtPointer(e);
         menu.addListenerOnce("disappear", () => qx.event.Timer.once(() => menu.dispose(), null, 0));
+      };
+      const showSensorFindings = feed => {
+        filters.sensor.setValue(`"${feed.name}"`);
+        tabs.setSelection([findingsPage]);
+      };
+
+      // Tespitler sağ tık: tıklanan satır işaretliyse bütün işaretlilere, değilse yalnız ona uygulanır.
+      table.addListener("cellContextmenu", e => {
+        const row = e.getRow();
+        if (row === null || row === undefined) {
+          return;
+        }
+        const id = table.getTableModel().getValue(0, row);
+        const m = meta.get(id);
+        if (!m) {
+          return;
+        }
+        const list = checked.has(id) ? checkedFindings() : [m];
+        const n = list.length > 1 ? ` (${list.length} işaretli)` : "";
+        popup(e, table, (item, menu) => {
+          item(`Bu sınıfta güvenilir ${what(list)}${n}`, () => doTrust(false, list), list.some(trustable));
+          item(`Okul genelinde güvenilir ${what(list)}${n}`, () => doTrust(true, list), list.some(trustable));
+          item(`Güvenilirlikten çıkar${n}`, () => doUntrust(list), list.some(x => x.item.fixed));
+          menu.add(new qx.ui.menu.Separator());
+          item(`Yalnız bu sensörü göster (${m.feed.name})`, () => filters.sensor.setValue(`"${m.feed.name}"`));
+          item("Bütün sensörleri göster", () => filters.sensor.setValue(""), !!filters.sensor.getValue());
+        });
+      });
+      // Sensörler sağ tık: sensörün tespitleri, yeniden tarama.
+      sensorTable.addListener("cellContextmenu", e => {
+        const row = e.getRow();
+        const m = row === null || row === undefined ? null : sensorMeta.get(sensorTable.getTableModel().getValue(0, row));
+        if (!m) {
+          return;
+        }
+        sensorTable.getSelectionModel().setSelectionInterval(row, row);
+        popup(e, sensorTable, item => {
+          item(`Bu sensörün tespitlerini göster (${m.feed.name})`, () => showSensorFindings(m.feed));
+          item(`Bu sensörü yeniden tara (${m.feed.name})`, () => connect(m.feed), !m.feed.ws);
+        });
+      });
+      sensorTable.addListener("cellDbltap", e => {
+        const m = sensorMeta.get(sensorTable.getTableModel().getValue(0, e.getRow()));
+        if (m) {
+          showSensorFindings(m.feed);
+        }
       });
 
       const wifiNote = (info, watching) => {
