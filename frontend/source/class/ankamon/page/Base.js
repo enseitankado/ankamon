@@ -945,21 +945,31 @@ qx.Class.define("ankamon.page.Base", {
     /**
      * Süzgeç kutusunun hazır değer listesi (bkz. _addColumnFilters): onay kutulu değerler (sayılarıyla),
      * "Tümü" (üç durumlu) ve "Temizle". Seçim her değişiklikte hemen uygulanır (onSelect).
+     * Kullanıcı isteği 2026-11-10: liste geniş ve yüksek (pencerenin yüksekliğine göre, en çok ~%60'ı) ve üstündeki
+     * arama kutusuyla listenin kendisi süzülür (Excel'deki gibi): aramaya uymayan değerler gizlenir, "Tümü" yalnız
+     * görünenleri seçer/kaldırır; gizlenen bir değerin seçimi korunur.
      * @param items {Array} [{key, label, n}] @param chosen {Set} seçili anahtarlar @param onSelect {Function} (keys)
      */
     __choicePopup(button, items, chosen, onSelect) {
-      const popup = new qx.ui.popup.Popup(new qx.ui.layout.VBox(4)).set({ padding: 6, minWidth: 180, maxWidth: 360 });
+      const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
+      const popup = new qx.ui.popup.Popup(new qx.ui.layout.VBox(6)).set({
+        padding: 8, minWidth: Math.min(360, root.width - 20), maxWidth: Math.min(640, root.width - 20)
+      });
       const checks = [];
       const all = new qx.ui.form.CheckBox("Tümü").set({ triState: true, font: "bold" });
       const apply = () => onSelect(checks.filter(c => c.getValue()).map(c => c.getUserData("key")));
+      const visible = () => checks.filter(c => c.isVisible());
       const syncAll = () => {
-        const n = checks.filter(c => c.getValue()).length;
-        all.setValue(n === 0 ? false : (n === checks.length ? true : null));
+        const shown = visible();
+        const n = shown.filter(c => c.getValue()).length;
+        all.setValue(n === 0 ? false : (n === shown.length ? true : null));
+        all.setEnabled(shown.length > 0);
       };
-      const list = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
+      const list = new qx.ui.container.Composite(new qx.ui.layout.VBox(3));
       items.forEach(item => {
-        const check = new qx.ui.form.CheckBox(`${item.label}  (${item.n})`).set({ value: chosen.has(item.key) });
+        const check = new qx.ui.form.CheckBox(`${item.label}  (${item.n})`).set({ value: chosen.has(item.key), toolTipText: item.label });
         check.setUserData("key", item.key);
+        check.setUserData("text", ankamon.page.Base.filterText(item.label));
         check.addListener("changeValue", () => {
           syncAll();
           apply();
@@ -968,18 +978,40 @@ qx.Class.define("ankamon.page.Base", {
         list.add(check);
       });
       all.addListener("execute", () => {
-        // Üç durumluda tıklama sırası null → true: kısmi seçimden "hepsi"; hepsi seçiliyken "hiçbiri".
-        const on = checks.some(c => !c.getValue());
-        checks.forEach(c => c.setValue(on));
+        // Üç durumluda tıklama sırası null → true: kısmi seçimden "hepsi"; hepsi seçiliyken "hiçbiri". Yalnız görünenler.
+        const shown = visible();
+        const on = shown.some(c => !c.getValue());
+        shown.forEach(c => c.setValue(on));
       });
-      syncAll();
+      let search = null;
+      const count = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
+      const updateCount = () => {
+        const shown = visible().length;
+        count.setValue(shown === checks.length ? `${checks.length} değer` : `${shown} / ${checks.length} değer`);
+      };
       if (!items.length) {
         popup.add(new qx.ui.basic.Label("Öteki süzgeçlere uyan satır yok.").set({ textColor: "app-muted" }));
       } else {
-        popup.add(all);
-        const scroll = new qx.ui.container.Scroll(list).set({ maxHeight: 280 });
+        // Listenin kendi süzgeci: yazdıkça uymayan değerler gizlenir (büyük/küçük harf ve Türkçe harf duyarsız — filterText).
+        search = new qx.ui.form.TextField().set({ placeholder: "Listede ara…", liveUpdate: true });
+        search.addListener("changeValue", e => {
+          const text = ankamon.page.Base.filterText(e.getData() || "").trim();
+          checks.forEach(c => c.setVisibility(!text || c.getUserData("text").includes(text) ? "visible" : "excluded"));
+          syncAll();
+          updateCount();
+        });
+        popup.add(search);
+        const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
+        head.add(all, { flex: 1 });
+        head.add(count);
+        popup.add(head);
+        // Scroll içeriğine göre büyümez: yükseklik değer sayısından (satır ~26 px), en çok pencerenin ~%60'ı.
+        const maxH = Math.max(200, Math.round(root.height * 0.6) - 110);
+        const scroll = new qx.ui.container.Scroll(list).set({ height: Math.min(items.length * 26 + 6, maxH), maxHeight: maxH });
         popup.add(scroll, { flex: 1 });
+        updateCount();
       }
+      syncAll();
       const clear = new qx.ui.form.Button("Temizle").set({ allowGrowX: false, alignX: "right" });
       clear.addListener("execute", () => {
         checks.forEach(c => c.setValue(false));
@@ -990,6 +1022,9 @@ qx.Class.define("ankamon.page.Base", {
       popup.addListener("disappear", () => qx.event.Timer.once(() => popup.dispose(), this, 0));
       popup.placeToWidget(button, true);
       popup.show();
+      if (search) {
+        qx.event.Timer.once(() => !search.isDisposed() && search.focus(), this, 50);
+      }
     },
 
     /** Tabloda seçili satırların kimlik sütunu değerleri (tek seçimli, satır vurgusuna dayalı). */
