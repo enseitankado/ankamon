@@ -1,0 +1,5960 @@
+{
+ "_aciklama": "ETAP ulusal envanterinin OUI (MAC'in ilk 3 baytı) özeti — scripts/build-etap-vendors.py üretir. ayrik: OUI MEB akıllı tahtalarına ayrılmış (bütün MAC'leri tahta sayılır). Ayrık olmayan OUI'de tahta kararı ve faz için etap_prefixes.tsv bloğu gerekir. kirli: kayıt < 50 ya da bilinen tahta modeli yok (envanterdeki az sayıdaki farklı türde cihaz). Tam MAC / okul bilgisi içermez.",
+ "kayit": 537368,
+ "oui_sayisi": 387,
+ "ouis": [
+  {
+   "oui": "00:09:df",
+   "uretici": "Vestel Elektronik San ve Tic. A.S.",
+   "kayit": 340711,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 204641,
+    "vestel-14mb24a": 57654,
+    "vestel-14mb37c1": 53574,
+    "vestel-14mb37a1": 24570,
+    "vestel-18ops10": 196,
+    "vestel-17ops24": 36,
+    "vestel-17ops19": 29,
+    "vestel-17ops30": 6
+   },
+   "fazlar": {
+    "2": 282785,
+    "1": 57657,
+    "?": 267,
+    "3": 1,
+    "tahta değil": 1
+   },
+   "ayrik": true,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "a4:17:91",
+   "uretici": "Shenzhen Decnta Technology Co.,LTD.",
+   "kayit": 46120,
+   "tahta_payi": 0.9995,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 21301,
+    "decenta-s22-tglu-opsc22": 12635,
+    "decenta-s21-rkls-opsc12": 12162,
+    "intel-corporation-skybay": 14,
+    "decenta-s23-adls-box25": 8
+   },
+   "fazlar": {
+    "3": 46098,
+    "tahta değil": 22
+   },
+   "ayrik": true,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "d8:5e:d3",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 41662,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 25176,
+    "gigabyte-mh410ap-r6": 16486
+   },
+   "fazlar": {
+    "3": 41662
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": false
+  },
+  {
+   "oui": "18:c0:4d",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 22100,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 22097,
+    "gigabyte-mh410ap-r6": 2,
+    "gigabyte-mdh11bp-r6": 1
+   },
+   "fazlar": {
+    "3": 22099,
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": false
+  },
+  {
+   "oui": "e8:51:9e",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 16557,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops62a-shb": 8390,
+    "mainbrd-ops72a-shb": 8167
+   },
+   "fazlar": {
+    "3": 16557
+   },
+   "ayrik": true,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "90:e4:68",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 16327,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops62a-shb": 16327
+   },
+   "fazlar": {
+    "3": 16327
+   },
+   "ayrik": true,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "b4:2e:99",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 14922,
+   "tahta_payi": 0.9972,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 14880,
+    "gigabyte-mdh11bp-r6": 42
+   },
+   "fazlar": {
+    "3": 14880,
+    "tahta değil": 42
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": false
+  },
+  {
+   "oui": "74:56:3c",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 14371,
+   "tahta_payi": 0.9999,
+   "modeller": {
+    "gigabyte-mh410ap-r6": 14161,
+    "gigabyte-mh310bp-r6": 208,
+    "gigabyte-technology-co-ltd-a520m-k-v2": 1,
+    "gigabyte-mh410bp-r6": 1
+   },
+   "fazlar": {
+    "3": 14370,
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": false
+  },
+  {
+   "oui": "1c:2f:a2",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 5663,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops72a-shb": 5559,
+    "mainbrd-ops62a-shb": 104
+   },
+   "fazlar": {
+    "3": 5663
+   },
+   "ayrik": true,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "8c:35:92",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 5647,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops63a-sha": 5647
+   },
+   "fazlar": {
+    "3": 5647
+   },
+   "ayrik": true,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "84:47:09",
+   "uretici": "Shenzhen IP3 Century Intelligent Technology CO.,Ltd",
+   "kayit": 4005,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "default-string-default-string": 4005
+   },
+   "fazlar": {
+    "3": 4005
+   },
+   "ayrik": true,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "a8:2c:3e",
+   "uretici": "Shenzhen Cultraview Digital Technology Co., Ltd",
+   "kayit": 2506,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 2506
+   },
+   "fazlar": {
+    "3": 2506
+   },
+   "ayrik": true,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "00:e0:4c",
+   "uretici": "Realtek Semiconductor Corp.",
+   "kayit": 1937,
+   "tahta_payi": 0.9344,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1765,
+    "oem-a86-mops": 94,
+    "aidata-th510-d4-v2-4": 21,
+    "vestel-14mb57": 16,
+    "vestel-14mb37c1": 7,
+    "gigabyte-mh310bp-r6": 6,
+    "vestel-14mb24a": 5,
+    "gigabyte-mh410ap-r6": 3
+   },
+   "fazlar": {
+    "3": 1782,
+    "tahta değil": 127,
+    "2": 23,
+    "1": 5
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": false
+  },
+  {
+   "oui": "f4:4d:30",
+   "uretici": "Elitegroup Computer Systems Co.,Ltd.",
+   "kayit": 1809,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1353,
+    "vestel-14mb57": 391,
+    "vestel-14mb37a1": 65
+   },
+   "fazlar": {
+    "1": 1353,
+    "2": 456
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": false
+  },
+  {
+   "oui": "b8:ae:ed",
+   "uretici": "Elitegroup Computer Systems Co.,Ltd.",
+   "kayit": 713,
+   "tahta_payi": 0.9986,
+   "modeller": {
+    "vestel-14mb24a": 684,
+    "vestel-14mb37a1": 21,
+    "vestel-14mb57": 7,
+    "acer-veriton-x4630g": 1
+   },
+   "fazlar": {
+    "1": 684,
+    "2": 28,
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": false
+  },
+  {
+   "oui": "c0:3f:d5",
+   "uretici": "Elitegroup Computer Systems Co.,Ltd.",
+   "kayit": 417,
+   "tahta_payi": 0.9976,
+   "modeller": {
+    "vestel-14mb24a": 413,
+    "vestel-14mb37a1": 3,
+    "acer-veriton-x2632g": 1
+   },
+   "fazlar": {
+    "1": 413,
+    "2": 3,
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": false
+  },
+  {
+   "oui": "ec:d6:8a",
+   "uretici": "Shenzhen JMicron Intelligent Technology Developmen",
+   "kayit": 293,
+   "tahta_payi": 0.0102,
+   "modeller": {
+    "to-be-filled-by-o-e-m-s084c": 278,
+    "to-be-filled-by-o-e-m-to-be-filled-by-o-e-m": 10,
+    "default-string-default-string": 2,
+    "j-w-s044p621": 1,
+    "vestel-17ops24": 1,
+    "viewsonic-vpc12-wpo": 1
+   },
+   "fazlar": {
+    "tahta değil": 290,
+    "3": 2,
+    "?": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "58:41:46",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 156,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops72a-shb": 156
+   },
+   "fazlar": {
+    "3": 156
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "08:00:27",
+   "uretici": "PCS Systemtechnik GmbH",
+   "kayit": 86,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "oracle-corporation-virtualbox": 86
+   },
+   "fazlar": {
+    "tahta değil": 86
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:f1:f5",
+   "uretici": "",
+   "kayit": 79,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "o-e-m-yyd-hm75": 79
+   },
+   "fazlar": {
+    "tahta değil": 79
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "38:54:39",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 78,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops62a-shb": 78
+   },
+   "fazlar": {
+    "3": 78
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "02:51:7e",
+   "uretici": "",
+   "kayit": 63,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 31,
+    "vestel-14mb37a1": 19,
+    "vestel-14mb37c1": 13
+   },
+   "fazlar": {
+    "2": 63
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": false
+  },
+  {
+   "oui": "d0:46:0c",
+   "uretici": "Dell Inc.",
+   "kayit": 56,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-03vwd3": 52,
+    "dell-inc-0kywh7": 4
+   },
+   "fazlar": {
+    "tahta değil": 56
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "e0:d5:5e",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 52,
+   "tahta_payi": 0.4615,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 24,
+    "gigabyte-mdh11bp-r6": 23,
+    "gigabyte-mz973op-r6": 4,
+    "gigabyte-technology-co-ltd-h110m-s2v-cf": 1
+   },
+   "fazlar": {
+    "tahta değil": 28,
+    "3": 24
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": false
+  },
+  {
+   "oui": "bc:6b:ff",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 48,
+   "tahta_payi": 0.7708,
+   "modeller": {
+    "mainbrd-ops63a-sha": 37,
+    "mainbrd-ops42a-sha": 11
+   },
+   "fazlar": {
+    "3": 37,
+    "tahta değil": 11
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "02:41:da",
+   "uretici": "",
+   "kayit": 41,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "aidata-s24-rplp-opsc28-c": 41
+   },
+   "fazlar": {
+    "3": 41
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "8c:32:23",
+   "uretici": "JWIPC Technology Co.,Ltd.",
+   "kayit": 38,
+   "tahta_payi": 0.0526,
+   "modeller": {
+    "to-be-filled-by-o-e-m-to-be-filled-by-o-e-m": 36,
+    "default-string-default-string": 2
+   },
+   "fazlar": {
+    "tahta değil": 36,
+    "3": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "de:ad:be",
+   "uretici": "",
+   "kayit": 33,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "x-x": 33
+   },
+   "fazlar": {
+    "tahta değil": 33
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:01:80",
+   "uretici": "AOpen, Inc.",
+   "kayit": 32,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "aopen-inc-i76hmt-wbop-r1-02hv": 27,
+    "newline-hm76": 4,
+    "aopen-inc-ibdwmt-wbop-r1-00": 1
+   },
+   "fazlar": {
+    "tahta değil": 32
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c4:ef:bb",
+   "uretici": "LCFC(Hefei) Electronics Technology co., ltd",
+   "kayit": 29,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-334f": 29
+   },
+   "fazlar": {
+    "tahta değil": 29
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "d8:74:ef",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 28,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops72a-shb": 22,
+    "mainbrd-ops72a-shc": 6
+   },
+   "fazlar": {
+    "3": 28
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "d0:50:99",
+   "uretici": "ASRock Incorporation",
+   "kayit": 27,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 27
+   },
+   "fazlar": {
+    "2": 27
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "fc:aa:14",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 25,
+   "tahta_payi": 0.96,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 24,
+    "gigabyte-technology-co-ltd-h81m-s1": 1
+   },
+   "fazlar": {
+    "3": 24,
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "70:85:c2",
+   "uretici": "ASRock Incorporation",
+   "kayit": 22,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 22
+   },
+   "fazlar": {
+    "2": 22
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "e0:27:6c",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 22,
+   "tahta_payi": 0.6364,
+   "modeller": {
+    "mainbrd-ops63a-sha": 14,
+    "mainbrd-ops42a-sha": 8
+   },
+   "fazlar": {
+    "3": 14,
+    "tahta değil": 8
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "18:84:c1",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 21,
+   "tahta_payi": 0.6667,
+   "modeller": {
+    "mainbrd-ops62a-sha": 14,
+    "mainbrd-ops42a-sha": 7
+   },
+   "fazlar": {
+    "3": 14,
+    "tahta değil": 7
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c0:fb:f9",
+   "uretici": "",
+   "kayit": 21,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "elsky-ops-450se": 18,
+    "elsky-ops10h": 2,
+    "elsky-qm9000h-6c": 1
+   },
+   "fazlar": {
+    "tahta değil": 21
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "24:d1:a1",
+   "uretici": "Shenzhen Cultraview Digital Technology Co., Ltd",
+   "kayit": 19,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 19
+   },
+   "fazlar": {
+    "3": 19
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:0c:29",
+   "uretici": "VMware, Inc.",
+   "kayit": 18,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "intel-corporation-440bx-desktop-reference-platform": 18
+   },
+   "fazlar": {
+    "tahta değil": 18
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "f4:b5:20",
+   "uretici": "Biostar Microtech international corp.",
+   "kayit": 18,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "technopc-h510-tp": 16,
+    "biostar-group-h410mh-s2": 2
+   },
+   "fazlar": {
+    "tahta değil": 18
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "60:49:66",
+   "uretici": "Shenzhen Dingsheng Technology Co., Ltd.",
+   "kayit": 18,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "default-ops-hm86": 18
+   },
+   "fazlar": {
+    "tahta değil": 18
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "44:37:0b",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 16,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops72a-shb": 16
+   },
+   "fazlar": {
+    "3": 16
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:e0:70",
+   "uretici": "Dh Technology",
+   "kayit": 15,
+   "tahta_payi": 0.6667,
+   "modeller": {
+    "default-string-default-string": 10,
+    "default-string-h310": 5
+   },
+   "fazlar": {
+    "3": 10,
+    "tahta değil": 5
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "4c:4b:f9",
+   "uretici": "",
+   "kayit": 13,
+   "tahta_payi": 0.0769,
+   "modeller": {
+    "dingsheng-ops-hm86": 12,
+    "default-string-default-string": 1
+   },
+   "fazlar": {
+    "tahta değil": 12,
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "52:54:00",
+   "uretici": "",
+   "kayit": 13,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "unknown-unknown": 13
+   },
+   "fazlar": {
+    "tahta değil": 13
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c8:9c:dc",
+   "uretici": "Elitegroup Computer Systems Co.,Ltd.",
+   "kayit": 11,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 10,
+    "ecs-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 11
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:19:99",
+   "uretici": "Fujitsu Technology Solutions GmbH",
+   "kayit": 10,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "fujitsu-d3011-a1": 3,
+    "fujitsu-siemens-d2750-a2": 2,
+    "fujitsu-siemens-d2312-a3": 2,
+    "fujitsu-siemens-d2598-a1": 1,
+    "fujitsu-siemens-d2581-a1": 1,
+    "fujitsu-siemens-d2581-a5": 1
+   },
+   "fazlar": {
+    "tahta değil": 10
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "e8:cf:83",
+   "uretici": "Dell Inc.",
+   "kayit": 10,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-04jyw6": 10
+   },
+   "fazlar": {
+    "tahta değil": 10
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "98:ee:cb",
+   "uretici": "Wistron Infocomm (Zhongshan) Corporation",
+   "kayit": 9,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "acer-veriton-x4110g": 7,
+    "acer-aspire-c22-860": 1,
+    "lenovo-30bb": 1
+   },
+   "fazlar": {
+    "tahta değil": 9
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "94:de:80",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 8,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "gigabyte-technology-co-ltd-b75m-d3v": 6,
+    "gigabyte-technology-co-ltd-b75m-d3h": 1,
+    "gigabyte-technology-co-ltd-b75m-hd3": 1
+   },
+   "fazlar": {
+    "tahta değil": 8
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "a4:bb:6d",
+   "uretici": "Dell Inc.",
+   "kayit": 8,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-0m3f6c": 8
+   },
+   "fazlar": {
+    "tahta değil": 8
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "02:ac:e1",
+   "uretici": "",
+   "kayit": 8,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "ar-eli-k-ar-eli-k-mainboard": 8
+   },
+   "fazlar": {
+    "tahta değil": 8
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:0e:c6",
+   "uretici": "Asix Electronics Corp.",
+   "kayit": 7,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 4,
+    "vestel-14mb57": 2,
+    "decenta-s22-tglu-opsc22": 1
+   },
+   "fazlar": {
+    "2": 6,
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "02:00:00",
+   "uretici": "",
+   "kayit": 7,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "poc-poc-board": 4,
+    "poc-poc-test-board": 3
+   },
+   "fazlar": {
+    "tahta değil": 7
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "08:2e:5f",
+   "uretici": "Hewlett Packard",
+   "kayit": 6,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-1497": 6
+   },
+   "fazlar": {
+    "tahta değil": 6
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "10:e7:c6",
+   "uretici": "Hewlett Packard",
+   "kayit": 6,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hp-829a": 5,
+    "hp-8329": 1
+   },
+   "fazlar": {
+    "tahta değil": 6
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "ac:e2:d3",
+   "uretici": "Hewlett Packard",
+   "kayit": 6,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hp-829a": 5,
+    "hp-829e": 1
+   },
+   "fazlar": {
+    "tahta değil": 6
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "18:60:24",
+   "uretici": "Hewlett Packard",
+   "kayit": 6,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hp-829a": 6
+   },
+   "fazlar": {
+    "tahta değil": 6
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "6c:0b:5e",
+   "uretici": "HP Inc.",
+   "kayit": 6,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hp-8959": 6
+   },
+   "fazlar": {
+    "tahta değil": 6
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "e0:d3:62",
+   "uretici": "TP-Link Systems Inc.",
+   "kayit": 6,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 5,
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "2": 5,
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "20:23:4c",
+   "uretici": "",
+   "kayit": 6,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hjs-hjs-opsh110d4": 5,
+    "hjs-ops-nm-hm7x-a03-no-sio": 1
+   },
+   "fazlar": {
+    "tahta değil": 6
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "74:27:ea",
+   "uretici": "Elitegroup Computer Systems Co.,Ltd.",
+   "kayit": 5,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-mahobay": 3,
+    "casper-bilgisayar-sistemleri-a-s-casper-nirvana-notebook": 1,
+    "casper-bilgisayar-sistemleri-a-s-casper-nirvana-desktop": 1
+   },
+   "fazlar": {
+    "tahta değil": 5
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:e0:99",
+   "uretici": "Samson Ag",
+   "kayit": 5,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 3,
+    "vestel-14mb37c1": 1,
+    "vestel-14mb37a1": 1
+   },
+   "fazlar": {
+    "2": 5
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "dc:fe:07",
+   "uretici": "Pegatron Corporation",
+   "kayit": 5,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hp-2b3c": 3,
+    "casper-bilgisayar-sistemleri-a-s-casper-nirvana-notebook": 2
+   },
+   "fazlar": {
+    "tahta değil": 5
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "24:1c:04",
+   "uretici": "Shenzhen Jehe Technology Development Co., Ltd.",
+   "kayit": 4,
+   "tahta_payi": 0.75,
+   "modeller": {
+    "vestel-18ops10": 2,
+    "oracle-corporation-virtualbox": 1,
+    "vestel-17ops19": 1
+   },
+   "fazlar": {
+    "?": 3,
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c8:4d:44",
+   "uretici": "Shenzhen Jiapeng Huaxiang Technology Co.,Ltd",
+   "kayit": 4,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 2,
+    "vestel-14mb37c1": 1,
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "3": 2,
+    "2": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "10:62:e5",
+   "uretici": "Hewlett Packard",
+   "kayit": 4,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hp-829a": 4
+   },
+   "fazlar": {
+    "tahta değil": 4
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "bc:ee:7b",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 4,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-h61m-d": 4
+   },
+   "fazlar": {
+    "tahta değil": 4
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "74:d4:35",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 4,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "gigabyte-technology-co-ltd-h81m-ds2": 3,
+    "gigabyte-mmlp3ap-00": 1
+   },
+   "fazlar": {
+    "tahta değil": 4
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:26:9e",
+   "uretici": "Quanta Computer Inc.",
+   "kayit": 3,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "intel-corp-base-board-product-name": 2,
+    "quanta-tw8-sw8-dw8": 1
+   },
+   "fazlar": {
+    "tahta değil": 3
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "20:88:10",
+   "uretici": "Dell Inc.",
+   "kayit": 3,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-03vwd3": 2,
+    "dell-inc-0kywh7": 1
+   },
+   "fazlar": {
+    "tahta değil": 3
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "2c:d4:44",
+   "uretici": "Fujitsu Limited",
+   "kayit": 3,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "fujitsu-fjnb23e": 3
+   },
+   "fazlar": {
+    "tahta değil": 3
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:0f:fe",
+   "uretici": "G-Pro Computer",
+   "kayit": 3,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-3048h": 3
+   },
+   "fazlar": {
+    "tahta değil": 3
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "2c:27:d7",
+   "uretici": "Hewlett Packard",
+   "kayit": 3,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-1495": 3
+   },
+   "fazlar": {
+    "tahta değil": 3
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "f8:e4:3b",
+   "uretici": "ASIX Electronics Corporation",
+   "kayit": 3,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 2,
+    "decenta-s22-tglu-opsc22": 1
+   },
+   "fazlar": {
+    "2": 2,
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "14:da:e9",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 3,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-p8h61-m-lx": 3
+   },
+   "fazlar": {
+    "tahta değil": 3
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "e2:01:50",
+   "uretici": "",
+   "kayit": 3,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1,
+    "gigabyte-mh410ap-r6": 1,
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "2": 1,
+    "3": 1,
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c8:a3:62",
+   "uretici": "ASIX Electronics Corporation",
+   "kayit": 3,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1,
+    "gigabyte-mh410ap-r6": 1,
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "3": 2,
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "68:e4:3b",
+   "uretici": "",
+   "kayit": 3,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh410ap-r6": 2,
+    "decenta-s22-tglu-opsc22": 1
+   },
+   "fazlar": {
+    "3": 3
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "6c:f0:49",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 3,
+   "tahta_payi": 0.3333,
+   "modeller": {
+    "gigabyte-technology-co-ltd-g41m-es2l": 2,
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "tahta değil": 2,
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "d0:27:88",
+   "uretici": "Hon Hai Precision Ind. Co.,Ltd.",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "foxconn-h61mxl-h61mxl-k": 1,
+    "foxconn-g41md": 1
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "9c:eb:e8",
+   "uretici": "BizLink (Kunshan) Co.,Ltd",
+   "kayit": 2,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 2
+   },
+   "fazlar": {
+    "2": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c8:60:00",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-p8h61-m-lx3": 1,
+    "asustek-computer-inc-p8h67-m2-si": 1
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:15:5d",
+   "uretici": "Microsoft Corporation",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "microsoft-corporation-virtual-machine": 2
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "44:8a:5b",
+   "uretici": "Micro-Star INT'L CO., LTD.",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "msi-h81m-p33-ms-7817": 1,
+    "msi-h61m-p32-w8-ms-7788": 1
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "50:eb:f6",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-prime-h410m-a": 1,
+    "asustek-computer-inc-prime-h410m-d": 1
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "e4:54:e8",
+   "uretici": "Dell Inc.",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-01w26n": 2
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "10:60:4b",
+   "uretici": "Hewlett Packard",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-339a": 2
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "16:09:01",
+   "uretici": "",
+   "kayit": 2,
+   "tahta_payi": 0.5,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1,
+    "technopc-a-s-tb15nb1": 1
+   },
+   "fazlar": {
+    "3": 1,
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "20:89:84",
+   "uretici": "Compal Information (Kunshan) Co., Ltd.",
+   "kayit": 2,
+   "tahta_payi": 0.5,
+   "modeller": {
+    "lenovo-invalid": 1,
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "tahta değil": 1,
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "20:cf:30",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-m4a88td-m-evo": 1,
+    "asustek-computer-inc-p5g41c-m-lx": 1
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "ec:c1:ab",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "mainbrd-ops43a-sha": 2
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:1c:c4",
+   "uretici": "Hewlett Packard",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-0a54h": 1,
+    "hewlett-packard-0a60h": 1
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "68:f7:28",
+   "uretici": "LCFC(Hefei) Electronics Technology co., ltd",
+   "kayit": 2,
+   "tahta_payi": 0.5,
+   "modeller": {
+    "lenovo-lenovo-g50-80": 1,
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "tahta değil": 1,
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c4:c6:e6",
+   "uretici": "LCFC(Hefei) Electronics Technology co., ltd",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-334f": 2
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "54:14:a7",
+   "uretici": "Nanjing Qinheng Microelectronics Co., Ltd.",
+   "kayit": 2,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1,
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c8:5b:76",
+   "uretici": "LCFC(Hefei) Electronics Technology co., ltd",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-allsparks-5a": 1,
+    "lenovo-torronto-5c1": 1
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "a0:d3:c1",
+   "uretici": "Hewlett Packard",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-198e": 2
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "90:2b:34",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "gigabyte-technology-co-ltd-h61m-ds2h": 1,
+    "gigabyte-technology-co-ltd-h61n-usb3": 1
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "78:24:af",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-h81-plus": 1,
+    "asustek-computer-inc-x555ln": 1
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:0e:c8",
+   "uretici": "Zoran Corporation",
+   "kayit": 2,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1,
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "2": 1,
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "b8:ca:3a",
+   "uretici": "Dell Inc.",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-0wr7py": 2
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "a4:4c:c8",
+   "uretici": "Dell Inc.",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-0r75nx": 2
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:1f:d8",
+   "uretici": "A-Trust Computer Corporation",
+   "kayit": 2,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s22-tglu-opsc22": 2
+   },
+   "fazlar": {
+    "3": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ff:ff:ff",
+   "uretici": "",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "intel-corporation-440bx-desktop-reference-platform": 2
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "aa:bb:cc",
+   "uretici": "",
+   "kayit": 2,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "test-test": 1,
+    "intel-corporation-440bx-desktop-reference-platform": 1
+   },
+   "fazlar": {
+    "tahta değil": 2
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "f0:1f:af",
+   "uretici": "Dell Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-05grxt": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "92:33:32",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-prime-z370-a": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "9a:8b:a2",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-prime-z370-a": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:25:ab",
+   "uretici": "Aio Lcd Pc Bu / Tpv",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-skybay": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ea:d6:cb",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "06:6c:7b",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:00:00",
+   "uretici": "Officially Xerox, but 0:0:0:0:0:0 is more common",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ae:49:db",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "30:9c:23",
+   "uretici": "Micro-Star INTL CO., LTD.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "msi-h81m-p33-ms-7817": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "c8:d9:d2",
+   "uretici": "Hewlett Packard",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hp-84de": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "dc:0e:a1",
+   "uretici": "Compal Information (Kunshan) Co., Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "toshiba-pwwha": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "50:3e:aa",
+   "uretici": "Tp-Link Technologies Co.,Ltd.",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "6a:2d:4a",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "6c:02:e0",
+   "uretici": "HP Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hp-86c1": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "e0:cb:4e",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-n61vg": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "ae:b9:f4",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "0e:b3:22",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "36:d2:3f",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "e6:64:26",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "8e:78:fe",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "8a:7b:96",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37a1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "b6:16:45",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "8e:4c:0f",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "92:c4:77",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "02:b1:c1",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "82:b4:48",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ea:94:8c",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "b2:f2:1d",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "62:55:84",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "de:26:ac",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "06:5f:43",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ec:9a:74",
+   "uretici": "Hewlett Packard",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-1670": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:1b:24",
+   "uretici": "Quanta Computer Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "quanta-30bd": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "80:6d:97",
+   "uretici": "Private",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "90:1b:0e",
+   "uretici": "Fujitsu Technology Solutions GmbH",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "fujitsu-d3220-a1": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "98:4f:ee",
+   "uretici": "Intel Corporate",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "d8:bb:c1",
+   "uretici": "Micro-Star INTL CO., LTD.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "micro-star-international-co-ltd-ms-17l2": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "8c:16:45",
+   "uretici": "LCFC(Hefei) Electronics Technology co., ltd",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-20ks005btx": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "f4:6d:04",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-k53sv": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "44:37:e6",
+   "uretici": "Hon Hai Precision Ind. Co.,Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-to-be-filled-by-o-e-m": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "62:ac:8c",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "19:c0:4d",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "15:c0:4d",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "12:c0:4d",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "b4:b5:2f",
+   "uretici": "Hewlett Packard",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-339a": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:19:d1",
+   "uretici": "Intel Corporate",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "intel-corporation-d945gccr": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "f6:79:21",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops62a-shb": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "f6:21:ca",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:01:6c",
+   "uretici": "Foxconn",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "grantsdale": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:e0:21",
+   "uretici": "Freegate Corp.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "koloe-h610m4-plus": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:e0:1e",
+   "uretici": "Cisco Systems, Inc",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "intel-corporation-h61": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "60:45:cb",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-a4321a6421-h110": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "7a:cd:9f",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "40:b0:34",
+   "uretici": "Hewlett Packard",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hp-8350": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "ee:0d:51",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "a6:55:8e",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "22:7f:f0",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c2:45:43",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c6:d3:cb",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "12:89:dc",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "22:22:27",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "7e:16:1d",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "8e:38:ef",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "98:28:a6",
+   "uretici": "Compal Information (Kunshan) Co., Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "kbl-metapod-kl": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "b2:5a:da",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "34:4b:50",
+   "uretici": "zte corporation",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "fa:fa:f4",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "18:03:73",
+   "uretici": "Dell Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-0yjpt1": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "44:39:c4",
+   "uretici": "Universal Global Scientific Industrial., Ltd",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-sharkbay": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "f0:76:1c",
+   "uretici": "Compal Information (Kunshan) Co., Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-invalid": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "64:00:6a",
+   "uretici": "Dell Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-0f96c8": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "0a:09:09",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "f2:79:60",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "d2:36:db",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "5c:f9:dd",
+   "uretici": "Dell Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-0crwcr": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "d0:37:45",
+   "uretici": "Tp-Link Technologies Co.,Ltd.",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "32:08:37",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "70:4d:7b",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-h110m-d": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "38:60:77",
+   "uretici": "Pegatron Corporation",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "pegatron-ipxsb-h61": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "92:da:df",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "36:3c:1a",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "32:52:d3",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "12:df:7b",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "42:1a:9a",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37a1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "5e:94:52",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37a1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ce:e1:6c",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "koloe-x58": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:e0:4f",
+   "uretici": "Cisco Systems, Inc",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "intel-corporation-sharkbay": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "5a:6e:f2",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "9c:5c:8e",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-d520mt-d520sf-d320mt": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "68:5b:35",
+   "uretici": "Apple, Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "apple-inc-mac-6f01561e16c75d06": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "20:7b:d2",
+   "uretici": "ASIX Electronics Corporation",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "8a:39:70",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "74:46:a0",
+   "uretici": "Hewlett Packard",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-339a": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "5c:26:0a",
+   "uretici": "Dell Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-0k0dnp": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "06:99:bb",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s22-tglu-opsc22": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "34:97:f6",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-d520mt-d520sf-d320mt": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "9c:5a:44",
+   "uretici": "Compal Information (Kunshan) Co., Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-313d": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "96:b0:1f",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "56:06:11",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "4e:15:12",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "98:fa:9b",
+   "uretici": "LCFC(Hefei) Electronics Technology co., ltd",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-lnvnb161216": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:1f:c6",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-p5gc-mx-1333": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "02:b3:62",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh410ap-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "bc:fa:b8",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "mainbrd-ops43a-sha": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "98:29:a6",
+   "uretici": "Compal Information (Kunshan) Co., Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "skl-charmander-kl": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "9a:2c:d3",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c6:29:9f",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "12:ec:08",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "54:04:a6",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-p8q67-m-do-tpm": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "88:d7:f6",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-h110m-k": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:24:1d",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "gigabyte-technology-co-ltd-eq45m-s2": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "50:9a:4c",
+   "uretici": "Dell Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-0w0chx": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:a0:c6",
+   "uretici": "Qualcomm Inc.",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37a1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "22:aa:32",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:09:d2",
+   "uretici": "Mai Logic Inc.",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "22:44:55",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "4a:44:dd",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "02:09:b7",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:09:d4",
+   "uretici": "Transtech Networks",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "34:64:a9",
+   "uretici": "Hewlett Packard",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-198e": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "6c:6e:07",
+   "uretici": "Ce Link Limited",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "74:e6:e2",
+   "uretici": "Dell Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-0926j6": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "4c:cc:6a",
+   "uretici": "Micro-Star INTL CO., LTD.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "msi-b350m-mortar-arctic-ms-7a37": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "02:29:70",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "casper-bilgisayar-sistemleri-tn1-001": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "bc:ae:c5",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-p5g41c-m-lx": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "be:e3:56",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "10:bf:48",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-p8h61-m-lx3-plus": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "50:46:5d",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-p8h61-m-lx-r2-0": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "30:85:a9",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-p8h61-m-lx-r2-0": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "d8:50:e6",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-h61m-d": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "44:87:fc",
+   "uretici": "Elitegroup Computer Systems Co.,Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-lenovo": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "80:fa:5b",
+   "uretici": "Clevo Co.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "arcelik-a-s-gnb-1550-a1-b2": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "46:b5:c8",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ca:7c:c1",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "b2:89:71",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "8a:fa:73",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:90:9e",
+   "uretici": "Critical IO, LLC",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "6c:3c:8c",
+   "uretici": "Dell Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-09ckt0": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "0e:15:63",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "a2:78:a7",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "74:5d:22",
+   "uretici": "LCFC(Hefei) Electronics Technology co., ltd",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-lnvnb161216": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:e0:0c",
+   "uretici": "Motorola",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "intel-intel-hm65": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "d8:cb:8a",
+   "uretici": "Micro-Star INTL CO., LTD.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "msi-h81m-p33-ms-7817": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "6e:e8:76",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s22-tglu-opsc22": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "2c:58:b9",
+   "uretici": "HP Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hp-8b4d": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "de:9e:8f",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops62a-shb": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:e0:19",
+   "uretici": "Ing. Giordano Elettronica",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "b2:6e:d0",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "16:bd:b6",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ba:2f:17",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "3e:04:ea",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "06:b4:04",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "7e:31:f8",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "7e:7a:bb",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "72:d1:53",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "56:6f:c4",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ec:9a:0c",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "6a:1a:9b",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ce:1d:a3",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "52:8e:d8",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c6:2c:0d",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "3e:0a:fa",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "40:16:7e",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-x551cap": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "28:d2:44",
+   "uretici": "LCFC(Hefei) Electronics Technology co., ltd",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-lancer-5a2": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ec:f4:bb",
+   "uretici": "Dell Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-0ttrnr": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "c6:e3:40",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "32:04:fb",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "02:35:ce",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "34:1a:4c",
+   "uretici": "Shenzhen Weibu Electronics Co.,Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "wibtek-h61-mx2-0-888": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "76:1e:0b",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "84:c2:e4",
+   "uretici": "Jiangsu Qinheng Co., Ltd.",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "de:fb:7c",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "4e:79:75",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "46:d8:d5",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:21:cc",
+   "uretici": "Flextronics International",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-4180r24": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ee:4f:f7",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "40:8d:5c",
+   "uretici": "Giga-Byte Technology Co.,Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "gigabyte-technology-co-ltd-h81m-s1": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "12:d7:6a",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "9a:52:c2",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "22:69:80",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ba:da:db",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "88:00:66",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s22-tglu-opsc22": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "3c:7c:3f",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-prime-b450m-k-ii": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "02:9a:22",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37a1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "e2:fb:e0",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "84:00:2d",
+   "uretici": "Pegatron Corporation",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "arcelik-a-s-gnb-1574-v1-i5": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "c4:d6:d3",
+   "uretici": "Dell Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-0wr1mk": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "e8:03:9a",
+   "uretici": "Samsung Electronics Co.,Ltd",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "samsung-electronics-co-ltd-300e4a-300e5a-300e7a-3430ea-3530ea": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "e0:4e:7a",
+   "uretici": "Nanjing Qinheng Microelectronics Co., Ltd.",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops62a-shb": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:e0:4d",
+   "uretici": "Internet Initiative Japan, Inc",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "intel-h55": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "a8:42:a1",
+   "uretici": "TP-Link Systems Inc",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh410ap-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "c6:a2:5d",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "3c:97:0e",
+   "uretici": "Wistron InfoComm(Kunshan)Co.,Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-20aas00100": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "ae:26:9f",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s22-tglu-opsc22": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "02:2e:7f",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:e0:0b",
+   "uretici": "Rooftop Communications Corp.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "intel-corporation-h61": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "40:2c:f4",
+   "uretici": "Universal Global Scientific Industrial., Ltd",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-mahobay": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "58:11:22",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-prime-h510m-k": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "a2:3d:2a",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "02:ad:24",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "02:2c:69",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "3e:6e:9b",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "5e:07:5a",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "d4:93:90",
+   "uretici": "Clevo Co.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "monster-abra-a5-v17-4": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "a2:b2:44",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "a6:f1:58",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "12:b2:c0",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "6a:d3:93",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "8a:25:24",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:1e:68",
+   "uretici": "Quanta Computer Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "quanta-30d2": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:24:be",
+   "uretici": "Sony Corporation",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "sony-corporation-vaio": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "34:17:eb",
+   "uretici": "Dell Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "dell-inc-06x5cy": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "a0:8c:fd",
+   "uretici": "Hewlett Packard",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hp-816b": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:8c:fa",
+   "uretici": "Inventec Corporation",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "toshiba-portable-pc": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "06:8c:aa",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c6:17:41",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "e6:99:6d",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "5a:3c:45",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c6:20:b3",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "d6:d4:fd",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ca:35:e8",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "16:e0:dc",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "36:56:b5",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "f6:49:cc",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "20:9b:e6",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops63a-sha": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "b8:88:e3",
+   "uretici": "Compal Information (Kunshan) Co., Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "acer-mimic": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "58:20:b1",
+   "uretici": "Hewlett Packard",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-1993": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:1e:33",
+   "uretici": "Inventec Corporation",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "toshiba-portable-pc": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "10:7b:44",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-x541uvk": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "0a:c7:b5",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "30:65:ec",
+   "uretici": "Wistron (ChongQing)",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "packard-bell-easynote-entg81ba": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "52:ae:b4",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s21-rkls-opsc12": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "f0:2f:74",
+   "uretici": "ASUSTek COMPUTER INC.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "asustek-computer-inc-prime-h310m-r-r2-0": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "ba:61:d9",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "80:ee:73",
+   "uretici": "Shuttle Inc.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "casper-bilgisayar-sistemleri-a-s-nab": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c4:34:6b",
+   "uretici": "Hewlett Packard",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "hewlett-packard-18e4": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "9e:04:15",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "f2:42:47",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s24-rplp-opsc28-c": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "1c:75:08",
+   "uretici": "Compal Information (Kunshan) Co., Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "acer-travelmate-5742g": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "6c:62:6d",
+   "uretici": "Micro-Star INT'L CO., LTD",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "msi-h67ma-e35-ms-7680": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "00:11:22",
+   "uretici": "CIMSYS Inc",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "46:28:2f",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:90:9f",
+   "uretici": "Digi-Data Corporation",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "72:ae:d5",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh410ap-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "1a:a8:1e",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh310bp-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "12:34:56",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "a6:11:7e",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "a6:04:74",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "88:47:09",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "default-string-default-string": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "2a:50:55",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "4e:04:07",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37a1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "5c:e9:31",
+   "uretici": "TP-Link Systems Inc",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "66:7e:f6",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "f6:8d:40",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ee:c6:a6",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "88:88:88",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops62a-shb": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "1a:58:a1",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:60:e0",
+   "uretici": "Axiom Technology Co., Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "intel-corporation-skybay": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:23:81",
+   "uretici": "Lengda Technology(Xiamen) Co.,Ltd.",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "default-string-default-string": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ca:3d:42",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "decenta-s21-rkls-opsc12": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ce:77:b0",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "54:ee:75",
+   "uretici": "Wistron InfoComm(Kunshan)Co.,Ltd.",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "lenovo-20ass3e800": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": true,
+   "kirli": true
+  },
+  {
+   "oui": "82:f8:fa",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37a1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "e6:5c:d7",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37a1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "76:a9:b3",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37a1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "b6:db:aa",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "6a:cc:88",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37a1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "02:11:22",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 0.0,
+   "modeller": {
+    "intel-corporation-440bx-desktop-reference-platform": 1
+   },
+   "fazlar": {
+    "tahta değil": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ea:47:ec",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "84:39:be",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "b4:04:29",
+   "uretici": "Guangzhou Shiyuan Electronic Technology Company Limited",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "mainbrd-ops72a-shc": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c2:51:0a",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "gigabyte-mh410ap-r6": 1
+   },
+   "fazlar": {
+    "3": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "9a:5c:75",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb37c1": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "f2:af:cc",
+   "uretici": "",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb24a": 1
+   },
+   "fazlar": {
+    "1": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:17:dc",
+   "uretici": "Daemyung Zero1",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:90:ab",
+   "uretici": "Cisco Systems, Inc",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:1b:fb",
+   "uretici": "Alpsalpine Co,.Ltd",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "c8:02:10",
+   "uretici": "LG Innotek",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "ac:50:36",
+   "uretici": "Pi-Coral Inc",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:1c:03",
+   "uretici": "Betty TV Technology AG",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  },
+  {
+   "oui": "00:0d:1b",
+   "uretici": "Kyoto Electronics Manufacturing Co., Ltd.",
+   "kayit": 1,
+   "tahta_payi": 1.0,
+   "modeller": {
+    "vestel-14mb57": 1
+   },
+   "fazlar": {
+    "2": 1
+   },
+   "ayrik": false,
+   "genel_uretici": false,
+   "kirli": true
+  }
+ ]
+}

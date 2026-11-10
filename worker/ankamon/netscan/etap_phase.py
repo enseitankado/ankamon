@@ -48,6 +48,8 @@ import re
 _DIR = os.path.dirname(__file__)
 _prefixes: dict[str, tuple[str, int]] | None = None
 _models: dict[str, dict] | None = None
+# etap_vendors.json (scripts/build-etap-vendors.py — ulusal envanterin OUI özeti): "aa:bb:cc" → kayıt.
+_vendors: dict[str, dict] | None = None
 _MIN, _MAX = 6, 10
 
 
@@ -64,7 +66,12 @@ def _load() -> None:
                 prefixes[prefix] = (model, int(count))
     models_path = os.path.join(_DIR, "etap_models.json")
     models = json.load(open(models_path, encoding="utf-8"))["modeller"] if os.path.exists(models_path) else {}
-    _prefixes, _models = prefixes, models
+    vendors_path = os.path.join(_DIR, "etap_vendors.json")
+    vendors = {}
+    if os.path.exists(vendors_path):
+        vendors = {o["oui"]: o for o in json.load(open(vendors_path, encoding="utf-8"))["ouis"]}
+    global _vendors
+    _prefixes, _models, _vendors = prefixes, models, vendors
 
 
 def lookup(mac: str) -> dict | None:
@@ -79,7 +86,37 @@ def lookup(mac: str) -> dict | None:
         if hit:
             model, count = hit
             return _record(model, "mac", onek=hexs[:depth], onek_tahta=count)
+    # Önek tablosunda yok: MEB tahtalarına AYRILMIŞ bir OUI'de (etap_vendors.json "ayrik") ve o OUI'nin kayıtlarının
+    # ≥ %99'u tek modeldeyse o model (faz) — envanterde henüz görülmemiş blok (ör. yeni teslimat).
+    oui = ":".join(hexs[i:i + 2] for i in range(0, 6, 2)).lower()
+    vend = _vendors.get(oui)
+    if vend and vend.get("ayrik") and vend.get("modeller"):
+        model, n = max(vend["modeller"].items(), key=lambda kv: kv[1])
+        if n / vend["kayit"] >= 0.99:
+            return _record(model, "oui", onek=hexs[:6], onek_tahta=vend["kayit"])
+        # Model tek değil ama faz tek (ör. Decenta: S21/S22/S24, hepsi Faz 3): üretici adıyla, fazı OUI'den.
+        faz, fn = max(vend.get("fazlar", {}).items(), key=lambda kv: kv[1], default=(None, 0))
+        if faz and faz.isdigit() and fn / vend["kayit"] >= 0.99:
+            rec = _record(model, "oui", onek=hexs[:6], onek_tahta=vend["kayit"])
+            rec.update(model=None, ad=f"{vend['uretici']} (model belirsiz)", faz=int(faz), islemci=None)
+            return rec
+        # Ayrık OUI ama faz karışık (ör. Vestel 00:09:DF: Faz 1 + Faz 2) ve blok envanterde yok: tahta, faz bilinmiyor.
+        rec = _record(model, "oui", onek=hexs[:6], onek_tahta=vend["kayit"])
+        rec.update(model=None, ad=f"{vend['uretici']} (model belirsiz)", faz=None, islemci=None, guven=None)
+        return rec
     return None
+
+
+def dedicated_oui(mac: str | None) -> bool:
+    """MAC, MEB akıllı tahtalarına ayrılmış bir OUI'de mi (ulusal envanter özeti — etap_vendors.json "ayrik": Vestel 00:09:DF,
+    Decenta / Shiyuan(MAINBRD) / Cultraview OPS blokları …). Genel PC üreticisi OUI'leri (GIGABYTE, Elitegroup…) ayrık değil."""
+    if not mac:
+        return False
+    if _prefixes is None:
+        _load()
+    hexs = mac.replace(":", "").replace("-", "").lower()
+    vend = _vendors.get(":".join(hexs[i:i + 2] for i in range(0, 6, 2))) if len(hexs) == 12 else None
+    return bool(vend and vend.get("ayrik"))
 
 
 def model_key(text: str) -> str:

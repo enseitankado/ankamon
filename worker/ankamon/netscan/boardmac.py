@@ -28,7 +28,9 @@ tahtalar sunucunun BÜTÜN ağ bağdaştırıcılarından algılanır; tahta olu
 
 Tahta MAC'i:
   - ETAP faz veritabanında bir akıllı tahta modeline düşen önek (bkz. etap_phase — "tahta" alanı), ya da
-  - üreticisi Vestel olan MAC (MEB ETAP tahtalarının ana kartı; bkz. classify _VENDOR_RULES).
+  - MEB tahtalarına AYRILMIŞ bir OUI'deki MAC (ulusal ETAP envanterinin üretici özeti — etap_vendors.json "ayrik",
+    scripts/build-etap-vendors.py: Vestel 00:09:DF, Decenta / Shiyuan(MAINBRD) / Cultraview OPS blokları …; kullanıcı
+    isteği 2026-11-10). Genel PC üreticisi OUI'lerinde (GIGABYTE OPS vb.) yalnız önek bloğu karar verir.
 Bunlara uymayan bir cihaz, Tahtalar'da "Bu bir akıllı tahtadır" işaretiyle (boards.smart_board, göç 046) tahta sayılır.
 
 IP → MAC: sunucunun ARP tablosu (/proc/net/arp — konteyner ana makinenin ağını kullanır; gerçek L2 bilgisi)
@@ -37,7 +39,7 @@ IP → MAC: sunucunun ARP tablosu (/proc/net/arp — konteyner ana makinenin ağ
 
 from __future__ import annotations
 
-from . import etap_phase, oui
+from . import etap_phase
 
 _ZERO = "00:00:00:00:00:00"
 
@@ -48,7 +50,7 @@ def is_board_mac(mac: str | None) -> bool:
     info = etap_phase.lookup(mac)
     if info and info.get("tahta"):
         return True
-    return "vestel" in (oui.vendor(mac) or "").lower()
+    return etap_phase.dedicated_oui(mac)
 
 
 def arp_table() -> dict[str, str]:
