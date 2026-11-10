@@ -80,9 +80,9 @@ qx.Class.define("ankamon.ui.health.Status", {
       { id: "last", label: "Son denetim / bulgu", width: 300, hint: "Son SSH denetimi ya da sürekli izlemenin en yeni bulgusu" },
       { id: "count", label: "Bulgu", width: 70 }
     ];
-    this.__boardTable = page._createTable(this.__boardColumns, { prefsKey: "health.status.boards.columns" });
+    this.__boardTable = page._createTable(this.__boardColumns, { prefsKey: "health.status.boards.columns", persistSort: true });
     this.__boardFilters = page._addColumnFilters(this.__boardTable, this.__boardColumns, () => this.__applyBoards(),
-      { rows: () => (this.__boardRows || []).map(r => r.cells) });
+      { rows: () => (this.__boardRows || []).map(r => r.cells), persist: true });
     this.__levelRenderer(this.__boardTable, 3);
     this.__boardTable.getSelectionModel().addListener("changeSelection", () => this.__applyFindings());
     this.__boardTable.setToolTipText("Bir tahtayı seçin: aşağıda yalnız onun bulguları görünür");

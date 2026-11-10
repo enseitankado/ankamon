@@ -269,6 +269,63 @@ qx.Class.define("ankamon.page.Base", {
       });
     },
 
+    /**
+     * Süzgeç kutularının değerlerini kullanıcı başına saklar/geri yükler (users.ui_prefs["<anahtar>.filters"] =
+     * {sütun id: metin}; boşsa kayıt silinir). Kayıt, yazım bitince (600 ms) bir kez gider.
+     * @param fields {Map} {columnId: TextField} — _addColumnFilters'ın (yedek kutular gerçeğiyle yer değiştirir)
+     * @param keyOf {Function} o anki anahtar (null/boş: saklanmaz)
+     * @return {Map} {restore(), save()}
+     */
+    filterPersistence(fields, keyOf, user) {
+      const B = ankamon.page.Base;
+      let restoring = false;
+      let timer = null;
+      const name = () => {
+        const key = keyOf();
+        return key ? key + ".filters" : null;
+      };
+      return {
+        restore() {
+          const key = name();
+          const saved = (key && (user.ui_prefs || {})[key]) || {};
+          restoring = true;
+          try {
+            Object.keys(fields).forEach(id => {
+              const value = typeof saved[id] === "string" ? saved[id] : "";
+              if ((fields[id].getValue() || "") !== value) {
+                fields[id].setValue(value);
+              }
+            });
+          } finally {
+            restoring = false;
+          }
+        },
+        save() {
+          if (restoring) {
+            return;
+          }
+          const key = name();
+          clearTimeout(timer);
+          timer = setTimeout(() => {
+            if (!key || key !== name()) {
+              return; // bu arada görünüm değişti: eski görünümün değeri yeni anahtara yazılmaz
+            }
+            const value = {};
+            Object.keys(fields).forEach(id => {
+              const text = (fields[id].getValue() || "").trim();
+              if (text) {
+                value[id] = text;
+              }
+            });
+            const next = Object.keys(value).length ? value : null;
+            if (JSON.stringify(next) !== JSON.stringify((user.ui_prefs || {})[key] || null)) {
+              B.savePref(user, key, next);
+            }
+          }, 600);
+        }
+      };
+    },
+
     /** Tek bir arayüz tercihini sunucuya yazar (bkz. AuthApi::prefs); null anahtarı siler. */
     savePref(user, name, value) {
       const prefs = user.ui_prefs || (user.ui_prefs = {});
@@ -386,6 +443,8 @@ qx.Class.define("ankamon.page.Base", {
      *   yerleşik sütun menüsü (sağ üstte) açılır — bkz. __setupColumnPrefs.
      *   {prefsKey: "ör. logs.columns"}: genişlikler OLDUĞU gibi (width/esnek) kalır; yalnız sütun sırası
      *   (başlığı sürükleyerek) ve gizlenen sütunlar kullanıcı başına sunucuda saklanır (storageKey de bunları yapar).
+     *   {persistSort: true} (storageKey/prefsKey ile): sütun başlığıyla yapılan sıralama da kullanıcı başına saklanır
+     *   (bkz. rememberSort — "<anahtar>.sort").
      */
     _createTable(columns, opts = {}) {
       const prefsKey = opts.storageKey || opts.prefsKey;
@@ -542,6 +601,11 @@ qx.Class.define("ankamon.page.Base", {
       }
       if (prefsKey) {
         ankamon.page.Base.setupColumnLayout(table, columns, offset, prefsKey, this._user, !!opts.storageKey);
+        table.setUserData("prefsKey", prefsKey);
+        // Cihaz grid'leri (kullanıcı isteği 2026-11-10): başlıkla yapılan sıralama oturum sahibinde saklanır, geri yüklenir.
+        if (opts.persistSort) {
+          ankamon.page.Base.rememberSort(table, columns, offset, prefsKey, this._user);
+        }
       }
       return table;
     },
@@ -758,6 +822,9 @@ qx.Class.define("ankamon.page.Base", {
      * @param onChange {Function} her değişiklikte çağrılır (parametresiz)
      * @param opts {Map?} {rows: Function} — süzülmemiş BÜTÜN satırlar (tablo modeli satırı biçiminde: kimlik
      *   [+ onay] + sütunlar). Verilmezse hazır liste çıkmaz (yalnız elle yazım).
+     *   {persist: true | "anahtar" | Function} — süzgeç değerleri oturum sahibinde saklanır ve grid kurulurken geri
+     *   yüklenir (kullanıcı isteği 2026-11-10: cihaz grid'leri). true: tablonun prefsKey'i; Function: o anki görünümün
+     *   anahtarı (ör. Ağ ▸ varlık grupları — görünüm değişince fields.restoreSaved() çağrılır). Kayıt "<anahtar>.filters".
      * @return {Map} {columnId: TextField} — değerlerini okumak için (bkz. çağıranların __apply'ı)
      */
     _addColumnFilters(table, columns, onChange, opts = {}) {
@@ -822,6 +889,22 @@ qx.Class.define("ankamon.page.Base", {
       columns.forEach(column => {
         fields[column.id] = new qx.ui.form.TextField();
       });
+      // Kalıcı süzgeçler: kayıtlı değerler yedek kutulara yazılır (gerçek kutu çizilince devralır ve süzer).
+      let persist = null;
+      if (opts.persist) {
+        const prefsKey = table.getUserData("prefsKey");
+        const keyOf = typeof opts.persist === "function" ? opts.persist
+          : () => (typeof opts.persist === "string" ? opts.persist : prefsKey);
+        persist = B.filterPersistence(fields, keyOf, this._user);
+        persist.restore();
+        Object.defineProperty(fields, "restoreSaved", { value: () => persist.restore(), enumerable: false });
+      }
+      const changed = e => {
+        onChange.call(this, e);
+        if (persist) {
+          persist.save();
+        }
+      };
       const renderer = new ankamon.ui.table.FilterHeaderRenderer((col, field, button) => {
         const column = columns[col - offset];
         if (!column) {
@@ -836,7 +919,7 @@ qx.Class.define("ankamon.page.Base", {
           cell.getChildControl("label").setToolTipText(column.hint);
         }
         const previous = fields[column.id];
-        field.addListener("changeValue", onChange, this);
+        field.addListener("changeValue", changed, this);
         fields[column.id] = field;
         // Liste yalnız tam satırları veren (ve eşleşmeyi filterMatch ile yapan) grid'de: tırnaklı seçim düz
         // `includes` ile hiçbir satırla eşleşmezdi (henüz güncellenmemiş eklenti grid'i yanlış süzmesin).

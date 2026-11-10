@@ -86,20 +86,8 @@ qx.Class.define("ankamon.page.Network", {
         .set({ toolTipText: "Ağ başına işlemler: yeniden adlandır, taramayı durdur/başlat, bağlı olmayan ağı sil" });
     }
 
-    // Tarayıcı durumu: metin + tarama sürerken ilerleme çubukları (varlık taraması, servis kuyruğu).
-    const statusRow = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-    const bar = () => new qx.ui.indicator.ProgressBar(0, 100).set({ width: 160, height: 12, allowGrowY: false, visibility: "excluded" });
-    this.__status = new qx.ui.basic.Label("").set({ rich: true, textColor: "app-muted" });
-    this.__sweepBar = bar();
-    this.__serviceStatus = new qx.ui.basic.Label("").set({ rich: true, textColor: "app-muted" });
-    this.__serviceBar = bar();
-    statusRow.add(this.__status);
-    statusRow.add(this.__sweepBar);
-    this.__statusSep = new qx.ui.basic.Label("·").set({ textColor: "app-muted" });
-    statusRow.add(this.__statusSep);
-    statusRow.add(this.__serviceStatus);
-    statusRow.add(this.__serviceBar);
-    this.add(statusRow);
+    // Tarayıcı durumu (varlık/servis/paylaşım taraması) grid'in başında değil, alt çubukta "Ağ taraması" mini
+    // panelinde (kullanıcı isteği 2026-11-10 — bütün ekranlardan görünür; bkz. ui.statusbar.ScanPanel).
 
     this.__columns = [
       { id: "exp", label: "", width: 30 },
@@ -133,7 +121,7 @@ qx.Class.define("ankamon.page.Network", {
       // MAC ↔ takma ad kaydı "Takma ad / Ad"ın kendisini besler — bkz. ui.network.Ops.deviceName (known_alias).
     ];
     this.__model = new ankamon.ui.table.GroupModel(() => this.__apply());
-    this.__table = this._createTable(this.__columns, { checkable: true, storageKey: "network.columns", model: this.__model });
+    this.__table = this._createTable(this.__columns, { checkable: true, storageKey: "network.columns", model: this.__model, persistSort: true });
     // Yalnız cihaz satırları işaretlenir (başlıktaki onay kutusu ve Tümünü işaretle alt satırları saymaz).
     this.__table.setUserData("checkableRow", id => typeof id === "number");
     // Servis/paylaşım (alt) satırları temaya uyumlu farklı zeminle (bkz. ui.table.GroupRowRenderer).
@@ -146,8 +134,10 @@ qx.Class.define("ankamon.page.Network", {
     // "Varlık türü" hücresine türe özgü minik ikon (bkz. ui.table.DeviceTypeRenderer).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "type"),
       new ankamon.ui.table.DeviceTypeRenderer());
+    // Süzgeçler görünüm başına saklanır: Varlıklar ve her varlık grubu kendi süzgeciyle açılır (bkz. setGroup).
     this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply,
-      { rows: () => (this.__rows || []).map(r => r.cells) });
+      { rows: () => (this.__rows || []).map(r => r.cells),
+        persist: () => "network.columns" + (this.__groupId ? ".group." + this.__groupId : "") });
     this.__model.addListener("dataChanged", this.__onDataChanged, this);
 
     // ▸ sütunu alt satırları açar/kapar; alt (servis) satırları işaretlenemez (Base'in işaretlemesinden sonra geri alınır).
@@ -256,11 +246,6 @@ qx.Class.define("ankamon.page.Network", {
     __networks: null,
     __version: null,
     __loadedAt: 0,
-    __status: null,
-    __serviceStatus: null,
-    __statusSep: null,
-    __sweepBar: null,
-    __serviceBar: null,
     __note: null,
     __timer: null,
     __polling: false,
@@ -296,6 +281,8 @@ qx.Class.define("ankamon.page.Network", {
       if (this.__groupId !== id) {
         this.__groupId = id;
         this._checkAll(this.__table, false);
+        // Bu görünümün (Varlıklar ya da grup) kayıtlı süzgeçleri (kullanıcı isteği 2026-11-10).
+        this.__filterFields.restoreSaved();
         this.__apply();
         this.__updateNote();
       }
@@ -565,14 +552,8 @@ qx.Class.define("ankamon.page.Network", {
     },
 
     __showState(st) {
+      // Durum metni alt çubuktaki panelde; burada yalnız yoklama hızı (tarama sürerken liste daha sık tazelenir).
       const s = ankamon.ui.network.Ops.status(st.state, st.now || Date.now() / 1000);
-      this.__status.setValue(s.sweep);
-      this.__serviceStatus.setValue(s.service);
-      this.__statusSep.setVisibility(s.service ? "visible" : "excluded");
-      this.__sweepBar.setVisibility(s.sweepPct === null ? "excluded" : "visible");
-      this.__sweepBar.setValue(s.sweepPct || 0);
-      this.__serviceBar.setVisibility(s.servicePct === null ? "excluded" : "visible");
-      this.__serviceBar.setValue(s.servicePct || 0);
       const ms = s.sweepPct === null ? ankamon.page.Network.STATE_MS : ankamon.page.Network.STATE_FAST_MS;
       if (this.__timer && this.__timer.getInterval() !== ms) {
         this.__timer.setInterval(ms);

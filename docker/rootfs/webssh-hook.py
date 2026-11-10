@@ -34,8 +34,10 @@ döngüsünde eşzamanlı yapılır — yerel soket, tek satırlık sorgu, oturu
 iş parçacığına değmez.
 """
 
+import json
 import logging
 import os
+import time
 
 try:
     import psycopg
@@ -61,8 +63,39 @@ def _exec(sql, params=()):
         logging.warning("ankamon webshell kancası: %s", exc)
 
 
+_SSH_LOG_DIR = "/run/ankamon/ssh-activity"
+_ssh_started = {}
+
+
+def _ssh_log(entry):
+    """SSH etkinlik kaydı (alt çubuk ▸ SSH; biçim: worker/ankamon/sshactivity.py) — webssh paramiko ile bağlanır,
+    sshpass sarmalayıcısından geçmez. Hata yutulur."""
+    try:
+        os.makedirs(_SSH_LOG_DIR, exist_ok=True)
+        fd = os.open(os.path.join(_SSH_LOG_DIR, "log"), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(fd, (json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8"))
+        finally:
+            os.close(fd)
+    except Exception as exc:  # noqa: BLE001
+        logging.warning("ankamon ssh kaydı: %s", exc)
+
+
 def opened(worker):
     """Bu IP için henüz eşleşmemiş en eski isteği (son 2 dk) bu worker'a bağlar."""
+    try:
+        user = worker.ssh.get_transport().get_username() or ""
+    except Exception:  # noqa: BLE001
+        user = ""
+    try:
+        host, port = worker.dst_addr[0], worker.dst_addr[1]
+        ts = int(time.time())
+        _ssh_started[worker.id] = ts
+        _ssh_log({"ev": "start", "ts": ts, "pid": "webssh:" + str(worker.id), "src": "webssh", "tool": "ssh",
+                  "target": (user + "@" if user else "") + str(host), "port": "" if str(port) == "22" else str(port),
+                  "tunnel": "", "cmd": "(web terminal — etkileşimli kabuk)"})
+    except Exception as exc:  # noqa: BLE001
+        logging.warning("ankamon ssh kaydı: %s", exc)
     _exec(
         """UPDATE webshell_sessions SET worker_id = %s, started_at = now()
            WHERE id = (SELECT id FROM webshell_sessions
@@ -75,6 +108,9 @@ def opened(worker):
 
 
 def closed(worker):
+    if worker.id in _ssh_started:
+        _ssh_log({"ev": "end", "ts": int(time.time()), "pid": "webssh:" + str(worker.id),
+                  "start": _ssh_started.pop(worker.id)})
     _exec(
         "UPDATE webshell_sessions SET ended_at = now(), end_reason = 'closed' WHERE worker_id = %s AND ended_at IS NULL",
         (worker.id,),

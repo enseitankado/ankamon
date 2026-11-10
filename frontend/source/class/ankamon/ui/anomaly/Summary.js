@@ -53,7 +53,7 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
       { id: "last", label: "Son başlangıç", width: 150, hint: "Bu bulgunun bu tahtada en son başladığı an" },
       { id: "now", label: "Şu an", hint: "Bulgu şu an sürüyor mu (Sürüyor = henüz bitmedi)" }
     ];
-    this.__table = page._createTable(this.__columns, { prefsKey: "anomalies.summary.columns" });
+    this.__table = page._createTable(this.__columns, { prefsKey: "anomalies.summary.columns", persistSort: true });
     // Hücre ipuçları: değerin ne anlama geldiği, satırın kendi sayılarıyla.
     const F = ankamon.util.Format;
     const hints = {
@@ -84,7 +84,7 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
     });
     this.__table.setToolTipText("Bir satır seçin: aşağıda yalnız o tahtanın o bulgusunun kayıtları görünür");
     this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this),
-      { rows: () => this.__rows || [] });
+      { rows: () => this.__rows || [], persist: true });
     this.add(this.__table, { flex: 1 });
     this.__count = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
     this.add(this.__count);

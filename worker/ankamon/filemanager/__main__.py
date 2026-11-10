@@ -49,7 +49,7 @@ import time
 
 import tornado.web
 
-from .. import activity, db
+from .. import activity, db, sshactivity
 from ..executor.jobs import _board_access
 from . import writes
 from .ownership import Fixer
@@ -76,6 +76,8 @@ _SSHFS_OPTS = (
 # başlarsa önceki bağlar açılışta temizlenir (bkz. _cleanup_stale).
 _last_used: dict[int, float] = {}
 _mount_paths: dict[int, str] = {}
+# SSH etkinlik kaydı (alt çubuk ▸ SSH): sshfs kendi ssh sürecini başlatır, sshpass sarmalayıcısından geçmez.
+_ssh_started: dict[int, int] = {}
 _mount_lock = asyncio.Lock()
 
 # Dizin adında sorun çıkaracak karakterler (yol ayırıcı, URL'de özel anlamlı olanlar, denetim karakterleri).
@@ -157,6 +159,8 @@ async def _mount(board_id: int, username: str) -> tuple[bool, str]:
             return False, f"Bağlanılamadı: {hint[0][:200]}"
 
         _mount_paths[board_id] = path
+        _ssh_started[board_id] = sshactivity.start(f"sshfs:{board_id}", "filemanager", "sshfs",
+                                                   f"{ssh_user}@{board['ip']}", f"sshfs bağla :/ → {path} (dosya yöneticisi)")
         _last_used[board_id] = time.monotonic()
         await asyncio.to_thread(_record, board_id, board["name"], username)
         return True, path
@@ -175,6 +179,8 @@ def _record(board_id: int, name: str, username: str) -> None:
 async def _unmount(board_id: int) -> None:
     path = _mount_paths.pop(board_id, None)
     _last_used.pop(board_id, None)
+    if board_id in _ssh_started:
+        sshactivity.end(f"sshfs:{board_id}", _ssh_started.pop(board_id))
     if not path:
         return
     if _is_mounted(path):

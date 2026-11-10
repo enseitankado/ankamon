@@ -84,7 +84,7 @@ qx.Class.define("ankamon.ui.Shell", {
     });
     this.add(split, { edge: "center" });
 
-    this.add(new ankamon.ui.StatusBar(), { edge: "south" });
+    this.add(new ankamon.ui.StatusBar(user), { edge: "south" });
 
     // Bilerek yapılan yeniden yüklemeden (ör. Ayarlar'da tema değişimi) sonra aynı sayfaya dönülür
     // (kullanıcı isteği) — tek seferlik kayıt, okununca silinir; yoksa/izinsizse ağaçtaki ilk sayfa.

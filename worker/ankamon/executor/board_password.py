@@ -85,9 +85,12 @@ def _run(board: dict, user: str, password: str, request: dict, direct: bool = Fa
     """direct: süzgeci atlayarak tam bu parolayla bağlan (bkz. ankamon-sshpass.sh)."""
     if not board.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
-    cmd = ["/usr/bin/sshpass" if direct else "sshpass", "-e", "ssh", *_SSH_OPTS, "-o", "ConnectTimeout=8",
+    cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", "ConnectTimeout=8",
            f"{user}@{board['ip']}", "python3 -c " + shlex.quote(_REMOTE)]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
+    if direct:
+        # Sarmalayıcı yine çalışır (SSH etkinlik kaydı) ama tahtaya özel parolayla değiştirmez.
+        env["ANKAMON_SSHPASS_DIRECT"] = "1"
     try:
         proc = subprocess.run(cmd, input=(json.dumps(request) + "\n").encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               env=env, timeout=timeout)

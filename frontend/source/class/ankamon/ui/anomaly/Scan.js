@@ -128,7 +128,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         { id: "status", label: "Durum", width: 100 },
         { id: "ip", label: "IP" }
       ];
-      this.__boardTable = this.__page._createTable(columns, { checkable: true, prefsKey: "anomalies.scan.boards.columns" });
+      this.__boardTable = this.__page._createTable(columns, { checkable: true, prefsKey: "anomalies.scan.boards.columns", persistSort: true });
       this.__boardTable.getTableColumnModel().setDataCellRenderer(4, new ankamon.ui.table.StatusRenderer());
       // Liste her zaman Durum sütununa göre (çevrim içi önce, sonra ada göre) sıralı (kullanıcı isteği): öteki sütunlar
       // sıralanmaz, Durum başlığına tıklamak da sırayı bozmaz (iki yön aynı). keepSortOnReload her setData'da yeniden dizer.

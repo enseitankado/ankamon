@@ -171,6 +171,13 @@ def _run_job(job) -> None:
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
             body, env, timeout = _job_text(job)
+            # SSH etkinlik kaydında (alt çubuk ▸ SSH) "password" türü parametrelerin değerleri görünmesin: komut satırında
+            # export AD='değer' olarak gider; sshpass sarmalayıcısı bunları kayda yazmadan önce *** yapar.
+            try:
+                secret_keys = [p["key"] for p in _action_def(job).get("params", []) if p.get("type") == "password"]
+            except (OSError, ValueError, KeyError):
+                secret_keys = []
+            secrets = [env[k] for k in secret_keys if env and env.get(k)]
             # Tahtaya taşınacak dış araçlar (action.json "tools", ör. eta-112): sunucu kopyası bir kez
             # hazırlanır (günün ilk kullanımında sürüm denetimi), her tahtaya gerekirse SFTP ile gider.
             try:
@@ -206,7 +213,8 @@ def _run_job(job) -> None:
                                     result = {"status": "unreachable", "rc": None, "output": f"Araç kopyalanamadı: {e}"}
                                     break
                             if result is None:
-                                result = stream.run(t, user, password, body=body, env=env, timeout=timeout, events=ev)
+                                result = stream.run(t, user, password, body=body, env=env, timeout=timeout, events=ev,
+                                                    secrets=secrets)
                                 # İşlem bitiş kancaları (eklenti-farkında): bir eklenti worker'ı bir action id
                                 # için callback kaydettiyse 'ok' bitişte çalıştırılır (ör. rapor okuyup tabloya
                                 # yazma). Çekirdek hiçbir eklentiyi adıyla bilmez (bkz. _JOB_DONE_HOOKS).

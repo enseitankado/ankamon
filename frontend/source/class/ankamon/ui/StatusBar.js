@@ -36,8 +36,11 @@
  * üstteki tutamaç sürüklenerek yüksekliği ayarlanabilir; yükseklik tarayıcının localStorage'ında
  * tutulur (yalnız bu tarayıcıya özgüdür, sunucuya gitmez).
  *
- * /api/activity ucunu artımlı (last_id) yoklar; en yeni satırlar altta birikir. Üst bar sağda,
- * sunucunun anlık kaynak kullanımını gösterir (/api/system/stats, 1 sn'de bir). Satırlar tek tek ya da
+ * /api/activity ucunu artımlı (last_id) yoklar; en yeni satırlar altta birikir. Üst bar sağda MİNİ PANELLER
+ * (kullanıcı isteği 2026-11-10; ui.statusbar.MiniPanel): CPU, RAM, Disk, Ağ trafiği (/api/system/stats, 1 sn'de bir),
+ * Ağ taraması (/network/state — eskiden Ağ grid'lerinin başındaydı) ve SSH (Ankamon'un dışarıya açtığı bağlantılar —
+ * tıklayınca ui.ssh.ActivityWindow). Sağ menüden hangilerinin görüneceği seçilir; panel fareyle sürüklenerek yeri
+ * (canlı), sağ kenarından genişliği değiştirilir; düzen kullanıcı başına (ui_prefs "statusbar.panels"). Satırlar tek tek ya da
  * çoklu (Ctrl/Shift) seçilip panoya kopyalanır (sağ menü Kopyala ya da Ctrl+C); sağ menüde Tümünü seç ve
  * Temizle (eskiden başlıktaki ayrı düğmeydi) de var.
  */
@@ -55,11 +58,28 @@ qx.Class.define("ankamon.ui.StatusBar", {
     VIEW_CHECK_MS: 3000,
     // CPU/RAM bu yüzdeyi bu kadar (ms) sürekli AŞARSA kırmızı + ⚠ ile vurgulanır (kullanıcı isteği).
     WARN_PERCENT: 85,
-    WARN_SUSTAIN_MS: 10000
+    WARN_SUSTAIN_MS: 10000,
+    SCAN_MS: 3000,
+    SCAN_FAST_MS: 1000,
+    /**
+     * Mini paneller: [id, menü adı, varsayılan genişlik, gereken yetki (null: herkes; "admin": yönetici)].
+     * Varsayılan sıra bu dizinin sırasıdır.
+     */
+    PANELS: [
+      ["scan", "Ağ taraması", 190, "network"],
+      ["ssh", "SSH bağlantıları", 120, "admin"],
+      ["cpu", "CPU", 64, null],
+      ["ram", "RAM", 150, null],
+      ["disk", "Disk", 150, null],
+      ["net", "Ağ trafiği", 165, null]
+    ],
+    PREFS_KEY: "statusbar.panels"
   },
 
-  construct() {
+  /** @param user {Map?} oturum sahibi (panel düzeni ui_prefs'te; yetkiye göre paneller) */
+  construct(user) {
     super(new qx.ui.layout.VBox());
+    this.__user = user || { ui_prefs: {}, features: [], is_admin: false };
     this.set({
       backgroundColor: "app-nav",
       decorator: new qx.ui.decoration.Decorator().set({ widthTop: 1, color: "app-border" })
@@ -97,15 +117,19 @@ qx.Class.define("ankamon.ui.StatusBar", {
     head.add(this.__usersLabel);
     this.__updateUsersVisibility();
     qx.event.message.Bus.subscribe(ankamon.ext.Extensions.CHANGED, this.__updateUsersVisibility, this);
-    // Sunucu durumu: CPU/RAM/disk/ağ, sağa hizalı, 1 sn'de bir güncellenir (bkz. __pollStats).
-    this.__stats = new qx.ui.basic.Label("").set({ font: "app-mono", textColor: "app-muted", rich: true });
-    head.add(this.__stats);
+    // Mini paneller (CPU/RAM/Disk/Ağ trafiği, Ağ taraması, SSH), sağa hizalı — bkz. __buildPanels.
+    this.__panelBox = new qx.ui.container.Composite(new qx.ui.layout.HBox(4).set({ alignY: "middle" }));
+    head.add(this.__panelBox);
+    this.__buildPanels();
     this.add(head);
+    // Sağ menü (başlık çubuğunun her yerinde): hangi paneller görünsün, düzeni sıfırla.
+    head.setContextMenu(this.__buildPanelMenu());
     // Çubuğun herhangi bir yerine tıklamak da aç/kapat yapar; ok düğmesinin kendi execute'ü zaten
-    // çalışır, burada yalnız onun DIŞINDAKİ alana tıklanınca tetiklenir.
+    // çalışır, burada yalnız onun DIŞINDAKİ alana tıklanınca tetiklenir (paneller kendi tıklamasını kullanır).
     head.addListener("tap", e => {
       if (e.getTarget() !== this.__foldButton && e.getTarget() !== this.__usersLabel &&
-          !qx.ui.core.Widget.contains(this.__dock, e.getTarget())) {
+          !qx.ui.core.Widget.contains(this.__dock, e.getTarget()) &&
+          !qx.ui.core.Widget.contains(this.__panelBox, e.getTarget())) {
         this.__setFolded(!this.__folded);
       }
     });
@@ -153,6 +177,10 @@ qx.Class.define("ankamon.ui.StatusBar", {
     this.__pollUsers();
     this.__usersTimer.start();
 
+    this.__scanTimer = new qx.event.Timer(ankamon.ui.StatusBar.SCAN_MS);
+    this.__scanTimer.addListener("interval", this.__pollScan, this);
+    this.__updatePanelFeeds();
+
     this.__viewTimer = new qx.event.Timer(ankamon.ui.StatusBar.VIEW_CHECK_MS);
     this.__viewTimer.addListener("interval", () => {
       if (this.__currentView() !== this.__sentView) {
@@ -192,6 +220,15 @@ qx.Class.define("ankamon.ui.StatusBar", {
       this.__viewTimer.stop();
       this.__viewTimer.dispose();
     }
+    if (this.__scanTimer) {
+      this.__scanTimer.stop();
+      this.__scanTimer.dispose();
+    }
+    const store = ankamon.ui.ssh.ActivityStore.getInstance();
+    store.unsubscribe(this);
+    if (this.__onSshChanged) {
+      store.removeListener("changed", this.__onSshChanged);
+    }
     if (this.__onFocusChange) {
       window.removeEventListener("focus", this.__onFocusChange);
       window.removeEventListener("blur", this.__onFocusChange);
@@ -201,7 +238,288 @@ qx.Class.define("ankamon.ui.StatusBar", {
 
   members: {
     __list: null,
-    __stats: null,
+    __user: null,
+    __panelBox: null,
+    __panels: null,
+    __menuChecks: null,
+    __dragPanel: null,
+    __dragX: null,
+    __dragMoved: false,
+    __scanTimer: null,
+    __scanBusy: false,
+    __onSshChanged: null,
+
+    /** Panel bu kullanıcıya açık mı (yetki). */
+    __panelAllowed(perm) {
+      const u = this.__user;
+      if (!perm) {
+        return true;
+      }
+      if (perm === "admin") {
+        return !!u.is_admin;
+      }
+      return !!u.is_admin || (u.features || []).includes(perm);
+    },
+
+    /** Kayıtlı düzen: [{id, on, w}] (sıralı); yoksa/eksikse varsayılanlar. */
+    __layout() {
+      const saved = ((this.__user.ui_prefs || {})[ankamon.ui.StatusBar.PREFS_KEY]) || [];
+      const out = [];
+      const ids = ankamon.ui.StatusBar.PANELS.map(p => p[0]);
+      (Array.isArray(saved) ? saved : []).forEach(entry => {
+        if (entry && ids.includes(entry.id) && !out.some(o => o.id === entry.id)) {
+          out.push({ id: entry.id, on: entry.on !== false, w: Number(entry.w) || null });
+        }
+      });
+      // Kayıtta olmayan (yeni) panel varsayılan sıradaki önceki panelin arkasına, açık olarak girer.
+      ids.forEach((id, i) => {
+        if (!out.some(o => o.id === id)) {
+          const prev = i > 0 ? out.findIndex(o => o.id === ids[i - 1]) : -1;
+          out.splice(prev + 1, 0, { id, on: true, w: null });
+        }
+      });
+      return out;
+    },
+
+    __buildPanels() {
+      const SB = ankamon.ui.StatusBar;
+      this.__panels = {};
+      const defs = new Map(SB.PANELS.map(p => [p[0], p]));
+      this.__layout().forEach(entry => {
+        const [id, title, width, perm] = defs.get(entry.id);
+        if (!this.__panelAllowed(perm)) {
+          return;
+        }
+        const panel = new ankamon.ui.statusbar.MiniPanel(id, title, width);
+        if (entry.w) {
+          panel.setWidth(entry.w);
+        }
+        panel.setVisibility(entry.on ? "visible" : "excluded");
+        panel.addListener("dragStart", e => this.__onPanelDragStart(panel, e.getData()));
+        panel.addListener("resized", () => this.__savePanels());
+        panel.addListener("activate", () => this.__onPanelActivate(id));
+        this.__panels[id] = panel;
+        this.__panelBox.add(panel);
+      });
+      if (this.__panels.ssh) {
+        this.__panels.ssh.setToolTipText("Ankamon'un dışarıya açtığı SSH bağlantıları (açık / son 1 dk'da başlayan). Tıklayın: canlı liste");
+      }
+      if (this.__panels.scan) {
+        this.__panels.scan.setText("Ağ taraması …");
+      }
+      this.__panelBox.addListener("pointermove", this.__onPanelDragMove, this);
+      this.__panelBox.addListener("pointerup", this.__onPanelDragEnd, this);
+      this.__panelBox.addListener("losecapture", this.__onPanelDragEnd, this);
+    },
+
+    __buildPanelMenu() {
+      const menu = new qx.ui.menu.Menu();
+      this.__menuChecks = {};
+      menu.add(new qx.ui.menu.Button("Alt çubukta gösterilecek paneller").set({ enabled: false }));
+      Object.values(this.__panels).forEach(panel => {
+        const check = new qx.ui.menu.CheckBox(panel.getTitle());
+        check.setValue(panel.getVisibility() === "visible");
+        check.addListener("changeValue", e => {
+          panel.setVisibility(e.getData() ? "visible" : "excluded");
+          this.__savePanels();
+          this.__updatePanelFeeds();
+        });
+        this.__menuChecks[panel.getPanelId()] = check;
+        menu.add(check);
+      });
+      menu.add(new qx.ui.menu.Separator());
+      const reset = new qx.ui.menu.Button("Panel sırasını ve boyutlarını sıfırla").set({
+        toolTipText: "Paneller fareyle sürüklenerek taşınır, sağ kenarından sürüklenerek genişletilir/daraltılır"
+      });
+      reset.addListener("execute", () => {
+        ankamon.ui.StatusBar.PANELS.forEach(def => {
+          const id = def[0];
+          const width = def[2];
+          const panel = this.__panels[id];
+          if (panel) {
+            this.__panelBox.remove(panel);
+            this.__panelBox.add(panel);
+            panel.setWidth(width);
+            panel.setVisibility("visible");
+            this.__menuChecks[id].setValue(true);
+          }
+        });
+        ankamon.page.Base.savePref(this.__user, ankamon.ui.StatusBar.PREFS_KEY, null);
+        this.__updatePanelFeeds();
+      });
+      menu.add(reset);
+      return menu;
+    },
+
+    __savePanels() {
+      const value = this.__panelBox.getChildren().map(panel => ({
+        id: panel.getPanelId(),
+        on: panel.getVisibility() === "visible",
+        w: panel.getWidth() !== panel.getDefaultWidth() ? panel.getWidth() : null
+      }));
+      // Yetkisiz olduğu için kurulmamış panellerin kaydı korunur (yetki gelince yeri bilinsin).
+      ((this.__user.ui_prefs || {})[ankamon.ui.StatusBar.PREFS_KEY] || []).forEach(entry => {
+        if (entry && !this.__panels[entry.id]) {
+          value.push(entry);
+        }
+      });
+      ankamon.page.Base.savePref(this.__user, ankamon.ui.StatusBar.PREFS_KEY, value);
+    },
+
+    /** Panel sürükleme: işaretçi panel KUTUSUNA yakalanır (panel yer değiştirirken yakalama kopmasın). */
+    __onPanelDragStart(panel, e) {
+      this.__dragPanel = panel;
+      this.__dragX = e.getDocumentLeft();
+      this.__dragMoved = false;
+      this.__panelBox.capture();
+    },
+
+    __onPanelDragMove(e) {
+      const panel = this.__dragPanel;
+      if (!panel) {
+        return;
+      }
+      const x = e.getDocumentLeft();
+      if (!this.__dragMoved && Math.abs(x - this.__dragX) < 4) {
+        return;
+      }
+      if (!this.__dragMoved) {
+        this.__dragMoved = true;
+        panel.setCursor("grabbing");
+        panel.setOpacity(0.7);
+      }
+      // Canlı yer değiştirme: işaretçinin solundaki son görünür panelin arkasına.
+      const children = this.__panelBox.getChildren().filter(c => c !== panel && c.getVisibility() === "visible");
+      let before = null;
+      for (const child of children) {
+        const loc = child.getContentLocation("box");
+        if (loc && x < (loc.left + loc.right) / 2) {
+          before = child;
+          break;
+        }
+      }
+      const all = this.__panelBox.getChildren();
+      const current = all.indexOf(panel);
+      let target = before ? all.indexOf(before) : all.length;
+      if (target > current) {
+        target--; // panel çıkınca sıradakiler bir sola kayar
+      }
+      if (target !== current) {
+        this.__panelBox.addAt(panel, target);
+      }
+    },
+
+    __onPanelDragEnd() {
+      const panel = this.__dragPanel;
+      if (!panel) {
+        return;
+      }
+      this.__dragPanel = null;
+      this.__panelBox.releaseCapture();
+      panel.setCursor("grab");
+      panel.setOpacity(1);
+      if (this.__dragMoved) {
+        this.__savePanels();
+      } else {
+        panel.fireEvent("activate");
+      }
+    },
+
+    __onPanelActivate(id) {
+      if (id === "ssh") {
+        ankamon.ui.ssh.ActivityWindow.open();
+      } else if (id === "scan") {
+        qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "network" });
+      }
+    },
+
+    __panelOn(id) {
+      const panel = this.__panels && this.__panels[id];
+      return !!panel && panel.getVisibility() === "visible";
+    },
+
+    /** Görünen panellere göre yoklamalar: Ağ taraması (/network/state) ve SSH deposu yalnız panel açıkken. */
+    __updatePanelFeeds() {
+      if (!this.__scanTimer) {
+        return;
+      }
+      if (this.__panelOn("scan")) {
+        if (!this.__scanTimer.getEnabled()) {
+          this.__scanTimer.start();
+          this.__pollScan();
+        }
+      } else {
+        this.__scanTimer.stop();
+      }
+      const store = ankamon.ui.ssh.ActivityStore.getInstance();
+      if (this.__panelOn("ssh")) {
+        if (!this.__onSshChanged) {
+          this.__onSshChanged = () => this.__showSsh();
+          store.addListener("changed", this.__onSshChanged);
+        }
+        store.subscribe(this, 3000);
+        this.__showSsh();
+      } else {
+        store.unsubscribe(this);
+      }
+    },
+
+    /** SSH paneli: açık bağlantı sayısı + son 1 dakikada başlayanlar. */
+    __showSsh() {
+      const panel = this.__panels.ssh;
+      if (!panel) {
+        return;
+      }
+      const store = ankamon.ui.ssh.ActivityStore.getInstance();
+      const now = Math.floor(Date.now() / 1000);
+      const conns = store.getConnections();
+      const open = conns.filter(c => !c.end).length;
+      const recent = conns.filter(c => c.start > now - 60).length;
+      panel.setText(store.hasFailed() ? "SSH —" : `SSH ${open} açık · ${recent}/dk`);
+    },
+
+    /** Ağ taraması paneli: kısa durum; ipucu tarayıcının tam durumu (bkz. ui.network.Ops.status). */
+    async __pollScan() {
+      if (this.__scanBusy || !this.__panelOn("scan")) {
+        return;
+      }
+      this.__scanBusy = true;
+      let st;
+      try {
+        st = await ankamon.io.Api.get("/network/state");
+      } catch (e) {
+        return;
+      } finally {
+        this.__scanBusy = false;
+      }
+      const SB = ankamon.ui.StatusBar;
+      const state = st.state || {};
+      const now = st.now || Date.now() / 1000;
+      const s = ankamon.ui.network.Ops.status(state, now);
+      let text;
+      if (!state.phase) {
+        text = "Tarama: başlamadı";
+      } else if (state.phase === "sweeping") {
+        text = `${ankamon.ui.JobSpinner.html()} Taranıyor %${(state.progress || {}).pct || 0}`;
+      } else if (state.phase === "deferred") {
+        text = "⏸ Tarama ertelendi";
+      } else {
+        text = `✓ Tarama ${state.last_at ? ankamon.util.Format.ago(Math.round(state.last_at)) : "—"}`;
+      }
+      const svc = state.service || {};
+      if (svc.phase === "scanning" && svc.total) {
+        text += ` · servis ${svc.total - svc.pending}/${svc.total}`;
+      }
+      this.__panels.scan.setText(text);
+      this.__panels.scan.setToolTip(this.__scanTip || (this.__scanTip = new qx.ui.tooltip.ToolTip("").set({ rich: true })));
+      this.__scanTip.setLabel(`<b>Ağ taraması</b><br>${s.sweep}` + (s.service ? `<br>${s.service}` : "") +
+        "<br><i>Tıklayın: Ağ ▸ Varlıklar</i>");
+      const ms = state.phase === "sweeping" ? SB.SCAN_FAST_MS : SB.SCAN_MS;
+      if (this.__scanTimer.getInterval() !== ms) {
+        this.__scanTimer.setInterval(ms);
+      }
+    },
+    __scanTip: null,
     __timer: null,
     __statsTimer: null,
     __usersTimer: null,
@@ -484,9 +802,11 @@ qx.Class.define("ankamon.ui.StatusBar", {
       const part = (warn, label, value) => warn
         ? `⚠ <span style="color:#e74c3c;font-weight:bold">${label} ${value}</span>`
         : `${label} ${value}`;
-      this.__stats.setValue(
-        `${part(cpuWarn, "CPU", cpuText)}   ${part(memWarn, "RAM", memText)}   Disk ${disk}   Ağ ${net}`
-      );
+      const P = this.__panels;
+      P.cpu.setText(part(cpuWarn, "CPU", cpuText));
+      P.ram.setText(part(memWarn, "RAM", memText));
+      P.disk.setText(`Disk ${disk}`);
+      P.net.setText(`Ağ ${net}`);
 
       const warnings = [];
       if (cpuWarn) {
@@ -495,7 +815,14 @@ qx.Class.define("ankamon.ui.StatusBar", {
       if (memWarn) {
         warnings.push(`RAM %${Math.round(s.mem_percent)} — ${SUSTAIN / 1000} sn'den uzun süredir %${THRESHOLD} üzerinde`);
       }
-      this.__stats.setToolTipText(warnings.length ? warnings.join("\n") : null);
+      P.cpu.setToolTipText(cpuWarn ? warnings[0] : "Sunucunun (Ankamon konteyneri) CPU kullanımı");
+      P.ram.setToolTipText(memWarn ? warnings[warnings.length - 1] : "Sunucunun bellek kullanımı (kullanılan / toplam)");
+      P.disk.setToolTipText("Disk okuma (↓) / yazma (↑) hızı");
+      P.net.setToolTipText("Ağ alma (↓) / gönderme (↑) hızı");
+      // SSH panelinin "son 1 dk" sayısı yeni olay gelmese de azalsın.
+      if (this.__panelOn("ssh")) {
+        this.__showSsh();
+      }
     },
 
     async __poll() {

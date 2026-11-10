@@ -98,14 +98,17 @@ def _reader(pipe, kind: str, out: queue.Queue) -> None:
 
 
 def run(board: dict, user: str, password: str, *, body: str, env: dict | None, timeout: int,
-        events: Events) -> dict:
+        events: Events, secrets: list | tuple = ()) -> dict:
     """Betiği çalıştırır; olayları `events`'e yazar. Döner: {"status", "rc", "output"} (job_targets için)."""
     target = f"{user}@{board['ip']}"
     events.add("info", f"Bağlanılıyor: {target} …")
     started = time.monotonic()
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, target, "bash -c " + shlex.quote(_wrapper(body, env))]
-    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password})
+    penv = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
+    if secrets:
+        # SSH etkinlik kaydı bu değerleri (düz ve kabuk tırnaklı yazımlarıyla) *** yapar (bkz. ankamon-sshpass.sh).
+        penv["ANKAMON_SSHLOG_MASK"] = "\n".join(v for s in secrets for v in (str(s), shlex.quote(str(s))) if v)
+    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=penv)
     q: queue.Queue = queue.Queue()
     for pipe, kind in ((proc.stdout, "out"), (proc.stderr, "err")):
         threading.Thread(target=_reader, args=(pipe, kind, q), daemon=True).start()

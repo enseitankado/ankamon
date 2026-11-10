@@ -104,8 +104,8 @@ qx.Class.define("ankamon.page.Diagnose", {
       { id: "at", label: "Denetim zamanı", width: 150, choices: false },
       { id: "by", label: "Başlatan", width: 140 }
     ];
-    this.__table = this._createTable(this.__columns, { prefsKey: "diagnose.report.columns" });
-    this.__filters = this._addColumnFilters(this.__table, this.__columns, () => this.__apply(), { rows: () => this.__allRows || [] });
+    this.__table = this._createTable(this.__columns, { prefsKey: "diagnose.report.columns", persistSort: true });
+    this.__filters = this._addColumnFilters(this.__table, this.__columns, () => this.__apply(), { rows: () => this.__allRows || [], persist: true });
     const C = ankamon.page.Diagnose.COL;
     this.__table.getTableColumnModel().setDataCellRenderer(C.state, new ankamon.ui.table.DiagnoseStateRenderer());
     // Sıralama: Genel durum en kötüden, sayılar sayı olarak, zaman ham zamanla (satır sonundaki gizli değerler).

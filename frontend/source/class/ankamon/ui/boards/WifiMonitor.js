@@ -186,9 +186,9 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       // Grid'ler: page.Base yardımcılarıyla (süzgeç kutuları + hazır değer listesi, sütun sırası/gizleme tercihi).
       const host = new ankamon.ui.boards.WifimonGridHost(user);
       const columns = Render.COLUMNS;
-      const table = host._createTable(columns, { prefsKey: "wifimon.columns", checkable: true });
+      const table = host._createTable(columns, { prefsKey: "wifimon.columns", checkable: true, persistSort: true });
       const sensorColumns = Render.SENSOR_COLUMNS;
-      const sensorTable = host._createTable(sensorColumns, { prefsKey: "wifimon.sensors.columns" });
+      const sensorTable = host._createTable(sensorColumns, { prefsKey: "wifimon.sensors.columns", persistSort: true });
       let meta = new Map();
       let sensorMeta = new Map();
       let allRows = [];
@@ -244,8 +244,8 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         applyTo(sensorTable, sensorColumns, sensorFilters, sensorRows, 1);
         syncTabs(table.getTableModel().getRowCount());
       };
-      const filters = host._addColumnFilters(table, columns, apply, { rows: () => allRows });
-      const sensorFilters = host._addColumnFilters(sensorTable, sensorColumns, applySensors, { rows: () => sensorRows });
+      const filters = host._addColumnFilters(table, columns, apply, { rows: () => allRows, persist: true });
+      const sensorFilters = host._addColumnFilters(sensorTable, sensorColumns, applySensors, { rows: () => sensorRows, persist: true });
 
       const render = () => {
         if (renderQueued || closed) {

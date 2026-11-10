@@ -165,7 +165,7 @@ qx.Class.define("ankamon.page.Boards", {
     // Süzgeç kutuları artık her sütunun kendi başlık hücresinin içinde (bkz. Base.js
     // _addColumnFilters) — ayrı bir satır/widget olarak sayfaya eklenmesi gerekmez.
     this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply,
-      { rows: () => (this.__rows || []).map(r => r.cells) });
+      { rows: () => (this.__rows || []).map(r => r.cells), persist: true });
 
     // Tek ekran, iki görünüm (sekme yok, kullanıcı isteği): grid'deki tahtaların canlı ekran önizlemeleri (varsayılan) ya da
     // "Liste" seçiliyken grid (araç çubuğunun başındaki görünüm bölümü). Sağ menü işlemleri işaretli tahtalara ikisinden de uygulanır. "screen" yetkisi yoksa yalnız grid.
