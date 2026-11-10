@@ -108,7 +108,7 @@ qx.Class.define("ankamon.page.Settings", {
         `log alımı (port ${settings.syslog_port}), sensör okuma, SSH/Samba ile tahta yönetimi, ağ taraması ve görülen akış ` +
         "gözlemi, servis/paylaşım/etkinlik taramaları, loglardan tahta kaydı, Wake-on-LAN (tahtanın bulunduğu ağa), ekran " +
         "yansıtma ve yerel ad duyurusu (Avahi). Bir cihazın tahta olup olmadığına hangi ağda görüldüğü değil MAC adresi karar " +
-        "verir (ETAP tahta önekleri; uymayan tahta Tahtayı düzenle'de \"Bu bir akıllı tahtadır\" ile işaretlenir). Yeni bir " +
+        "verir (ETAP tahta önekleri; uymayan tahtanın Bilgisayar ayrıntıları'nda varlık türü \"Akıllı tahta\" seçilir). Yeni bir " +
         "kart takılınca ya da adresi değişince bir sonraki ağ taramasında kendiliğinden kullanılmaya başlar; ağ başına taramayı " +
         "durdurmak için Ağ ▸ Varlıklar ▸ <i>Ağlar</i> düğmesi. Kartlar arasında IP yönlendirmesi yapılmaz (ağlar birbirine " +
         "açılmaz).", this.__ifaceTable(settings.interfaces), 900);
