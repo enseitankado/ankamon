@@ -328,7 +328,8 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
               esc(seen.filter(x => x !== "yeni").join(" · "))
           },
           hint: {
-            level: lv.tip,
+            // Durum ipucunda satırın Son görülme değeri (kullanıcı isteği 2026-11-10: bütün grid'lerde Durum ipucu = Son görülme).
+            level: lv.tip + (seen.length ? `\nSon görülme: ${seen.join(" · ")}` : ""),
             sensor: feed.watching && feed.ws ? `${feed.name} — sürekli izleniyor` : feed.name,
             device: this.__deviceHint(row),
             kind: this.__kindHint(row),
