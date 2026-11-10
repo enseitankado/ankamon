@@ -100,6 +100,52 @@ final class WifimonFixedEmittersApi
         return ['ok' => true, 'deleted' => count($removed)];
     }
 
+    /**
+     * Toplu kapsam değişikliği (kullanıcı isteği 2026-11-10): ids [..], board_id null = okul geneli, sayı = o tahtanın sınıfı.
+     * Hedef kapsamda aynı verici zaten kayıtlıysa taşınan kayıt fazlalıktır, silinir (UNIQUE kind+value+kapsam).
+     */
+    public function rescope(Request $request, array $user): array
+    {
+        $ids = array_values(array_unique(array_map('intval', (array) $request->input('ids', []))));
+        if (!$ids) {
+            throw ApiError::badRequest('Kapsamı değişecek kayıt seçilmedi.');
+        }
+        if (count($ids) > self::MAX_ITEMS) {
+            throw ApiError::badRequest('Tek seferde en fazla ' . self::MAX_ITEMS . ' kayıt değiştirilebilir.');
+        }
+        $raw = $request->input('board_id');
+        $boardId = $raw === null || $raw === '' ? null : (int) $raw;
+        if ($boardId !== null && !Db::value('SELECT 1 FROM boards WHERE id = ?', [$boardId])) {
+            throw ApiError::badRequest('Tahta bulunamadı.');
+        }
+        [$moved, $merged] = Db::transaction(static function () use ($ids, $boardId): array {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            // Hedefte zaten olanlar (ya da seçilenlerin kendi aralarında aynı vericinin birden çok kaydı): biri kalır.
+            $merged = Db::exec(
+                "DELETE FROM wifimon_fixed_emitters f WHERE f.id IN ($placeholders)
+                   AND coalesce(f.board_id, 0) <> coalesce(?::int, 0)
+                   AND EXISTS (SELECT 1 FROM wifimon_fixed_emitters g
+                               WHERE g.kind = f.kind AND g.value = f.value AND coalesce(g.board_id, 0) = coalesce(?::int, 0))",
+                [...$ids, $boardId, $boardId]
+            );
+            $merged += Db::exec(
+                "DELETE FROM wifimon_fixed_emitters f WHERE f.id IN ($placeholders)
+                   AND EXISTS (SELECT 1 FROM wifimon_fixed_emitters g
+                               WHERE g.id IN ($placeholders) AND g.kind = f.kind AND g.value = f.value AND g.id < f.id)",
+                [...$ids, ...$ids]
+            );
+            $moved = Db::exec(
+                "UPDATE wifimon_fixed_emitters SET board_id = ?
+                 WHERE id IN ($placeholders) AND coalesce(board_id, 0) <> coalesce(?::int, 0)",
+                [$boardId, ...$ids, $boardId]
+            );
+            return [$moved, $merged];
+        });
+        Audit::log($user, $request, 'wifimon.fixed.rescope', '', ['count' => count($ids), 'board_id' => $boardId,
+            'moved' => $moved, 'merged' => $merged, 'ids' => array_slice($ids, 0, 50)]);
+        return ['ok' => true, 'moved' => $moved, 'merged' => $merged];
+    }
+
     /** @return array{0:string,1:string,2:?int,3:string} */
     private static function validatedFixedEmitter(mixed $item): array
     {

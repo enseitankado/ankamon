@@ -39,6 +39,10 @@
  * Düzen (kullanıcı isteği 2026-11-10: daha kompakt, basit; "Son görevler" altta kırpılıyordu): üstte küçük kartlar (geniş
  * ekranda tek satır), ortada disk + acil bulgular (sabit, alçak), altta "Son hatalar" ve "Son görevler" YAN YANA —
  * ikisi de kalan yüksekliğin tamamını alır, biri ötekini aşağı itmez.
+ *
+ * Paneller (kullanıcı isteği 2026-11-10): her bölge kenarlıklı kutuda (__panel); disk | acil bulgular, üst | alt satır ve
+ * hatalar | görevler arasındaki ayırıcılar fareyle sürüklenir, boyutlar oturumu açık kullanıcının hesabında saklanıp
+ * yüklenir (ui_prefs "dashboard.disk.width", "dashboard.health.height", "dashboard.errors.width" — bkz. __remember).
  */
 qx.Class.define("ankamon.page.Dashboard", {
   extend: ankamon.page.Base,
@@ -60,16 +64,13 @@ qx.Class.define("ankamon.page.Dashboard", {
       }
     });
 
-    this.__createHealthRow();
+    // Paneller (disk, acil bulgular, son hatalar, son görevler) kenarlıklı kutularda; aralarındaki ayırıcılar
+    // fareyle sürüklenir, boyutlar kullanıcı başına sunucuda saklanır (bkz. __remember, PANE_PREFS).
+    const health = this.__createHealthRow();
 
     // Son hatalar | Son görevler: yan yana, kalan yüksekliğin tamamı (bkz. sınıf açıklaması).
-    const bottom = new qx.ui.container.Composite(new qx.ui.layout.HBox(16)).set({ minHeight: 180 });
-    const panel = title => {
-      const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
-      box.add(new qx.ui.basic.Label(title).set({ font: "bold" }));
-      return box;
-    };
-    const errorsBox = panel("Son 24 saatte hata düzeyindeki kayıtlar");
+    const bottom = this.__split("horizontal").set({ minHeight: 160 });
+    const errorsBox = this.__panel("Son 24 saatte hata düzeyindeki kayıtlar");
     this.__errors = this._createTable([
       { id: "time", label: "Zaman", width: 160 },
       { id: "label", label: "Takma ad", width: 150 },
@@ -79,13 +80,14 @@ qx.Class.define("ankamon.page.Dashboard", {
       { id: "message", label: "Mesaj" }
     ], { prefsKey: "dashboard.errors.columns" });
     errorsBox.add(this.__errors, { flex: 1 });
-    bottom.add(errorsBox, { flex: 3 });
+    this.__remember(errorsBox, "dashboard.errors.width", "width", () => Math.round(bottom.getBounds().width * 0.6));
+    bottom.add(errorsBox, 0);
     this.__addLogsMenu(this.__errors, id => {
       const row = this.__errorRows && this.__errorRows[id];
       return row && row.board_id ? [{ id: row.board_id, name: row.board_label || row.host }] : [];
     });
 
-    const jobsBox = panel("Son görevler");
+    const jobsBox = this.__panel("Son görevler");
     this.__jobs = this._createTable([
       { id: "time", label: "Zaman", width: 140 },
       { id: "title", label: "Görev", width: 200 },
@@ -93,12 +95,22 @@ qx.Class.define("ankamon.page.Dashboard", {
       { id: "summary", label: "Özet" }
     ], { prefsKey: "dashboard.jobs.columns" });
     jobsBox.add(this.__jobs, { flex: 1 });
-    bottom.add(jobsBox, { flex: 2 });
-    this.add(bottom, { flex: 1 });
+    bottom.add(jobsBox, 1);
     this.__addLogsMenu(this.__jobs, id => {
       const job = (this.__jobRows || []).find(j => j.id === id);
       return job ? job.targets || [] : [];
     });
+
+    if (health) {
+      // Üst (disk + acil bulgular) | alt (hatalar + görevler): dikey ayırıcıyla.
+      const main = this.__split("vertical");
+      this.__remember(health, "dashboard.health.height", "height", () => ankamon.page.Dashboard.HEALTH_ROW_HEIGHT);
+      main.add(health, 0);
+      main.add(bottom, 1);
+      this.add(main, { flex: 1 });
+    } else {
+      this.add(bottom, { flex: 1 });
+    }
   },
 
   statics: {
@@ -146,8 +158,12 @@ qx.Class.define("ankamon.page.Dashboard", {
         `<div><b>Toplam ${F.bytes(total)}</b></div>${free}</div>`;
     },
 
-    /** Disk ve acil bulgular satırının yüksekliği (px). */
-    HEALTH_ROW_HEIGHT: 210
+    /** Disk ve acil bulgular satırının varsayılan yüksekliği (px; kullanıcı sürükleyince "dashboard.health.height"). */
+    HEALTH_ROW_HEIGHT: 250,
+    /** Disk panelinin varsayılan genişliği (px; "dashboard.disk.width"). */
+    DISK_WIDTH: 280,
+    /** Paneller arası ayırıcının kalınlığı (px). */
+    SPLITTER: 10
   },
 
   members: {
@@ -169,14 +185,13 @@ qx.Class.define("ankamon.page.Dashboard", {
       if (!disk && !health) {
         return;
       }
-      const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(16)).set({ height: ankamon.page.Dashboard.HEALTH_ROW_HEIGHT });
+      // Tek panel varsa ayırıcı yok; ikisi varsa disk | acil bulgular yatay ayırıcıyla.
+      const row = disk && health ? this.__split("horizontal") : new qx.ui.container.Composite(new qx.ui.layout.Grow());
+      row.set({ minHeight: 120 });
       if (disk) {
-        const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
-        const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "bottom" }));
-        head.add(new qx.ui.basic.Label("Toplam disk kullanımı").set({ font: "bold" }));
+        const box = this.__panel("Toplam disk kullanımı");
         this.__diskNote = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true });
-        head.add(this.__diskNote);
-        box.add(head);
+        box.getChildren()[0].add(this.__diskNote);
         this.__diskHtml = new qx.ui.embed.Html("").set({ overflowY: "auto", minWidth: 220 });
         this.__diskHtml.addListenerOnce("appear", () => {
           this.__diskHtml.getContentElement().getDomElement().addEventListener("click", e => {
@@ -187,12 +202,16 @@ qx.Class.define("ankamon.page.Dashboard", {
           });
         });
         box.add(this.__diskHtml, { flex: 1 });
-        row.add(box);
+        if (health) {
+          this.__remember(box, "dashboard.disk.width", "width", () => ankamon.page.Dashboard.DISK_WIDTH);
+          row.add(box, 0);
+        } else {
+          row.add(box);
+        }
       }
       if (health) {
-        const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
-        this.__urgentTitle = new qx.ui.basic.Label("Sağlık — acil bulgular").set({ font: "bold" });
-        box.add(this.__urgentTitle);
+        const box = this.__panel("Sağlık — acil bulgular");
+        this.__urgentTitle = box.getChildren()[0].getChildren()[0];
         this.__urgent = this._createTable([
           { id: "board", label: "Tahta", width: 150 },
           { id: "check", label: "Bulgu", width: 220 },
@@ -204,9 +223,76 @@ qx.Class.define("ankamon.page.Dashboard", {
         this.__urgent.addListener("cellDbltap", () =>
           qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "anomalies", tab: "status" }));
         box.add(this.__urgent, { flex: 1 });
-        row.add(box, { flex: 1 });
+        if (disk) {
+          row.add(box, 1);
+        } else {
+          row.add(box);
+        }
       }
-      this.add(row);
+      return row;
+    },
+
+    /**
+     * Kenarlıklı panel kutusu (kullanıcı isteği 2026-11-10: bölgelerin sınırları belli olsun): ilk çocuğu başlık
+     * satırı (HBox; ilk öğesi kalın başlık etiketi), içerik add(widget, {flex: 1}) ile eklenir.
+     */
+    __panel(title) {
+      const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(6)).set({
+        padding: [8, 10],
+        backgroundColor: "surface",
+        decorator: new qx.ui.decoration.Decorator().set({ radius: 8, width: 1, color: "app-border" })
+      });
+      const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "bottom" }));
+      head.add(new qx.ui.basic.Label(title).set({ font: "bold" }));
+      box.add(head);
+      return box;
+    },
+
+    /** Paneller arası ayırıcı: fareyle tutulacak kadar kalın, kendisi boş (panellerin kenarlığı sınırı gösterir). */
+    __split(orientation) {
+      const split = new qx.ui.splitpane.Pane(orientation);
+      const thick = ankamon.page.Dashboard.SPLITTER;
+      const splitter = split.getChildControl("splitter");
+      if (orientation === "vertical") {
+        splitter.set({ height: thick, minHeight: thick, maxHeight: thick });
+      } else {
+        splitter.set({ width: thick, minWidth: thick, maxWidth: thick });
+      }
+      splitter.set({ decorator: null, backgroundColor: null });
+      return split;
+    },
+
+    /**
+     * Ayırıcının İLK bölmesinin boyutu (flex 0) kullanıcının hesabında saklanır ve oradan yüklenir
+     * (users.ui_prefs[key], bkz. Base.savePref). Ayırıcı bırakılınca qx SplitPane._finalizeSizes ilk bölmeye
+     * setWidth/setHeight uygular → change olayı → kayıt (Shell'deki "nav.width" ile aynı yol). Kayıt yoksa
+     * varsayılan boyut ilk yerleşimde verilir (o atama kaydedilmez).
+     * @param prop {String} "width" | "height"
+     * @param fallback {Function} kayıt yokken boyut (px); ilk yerleşimden sonra çağrılır
+     */
+    __remember(widget, key, prop, fallback) {
+      const prefs = this._user.ui_prefs || {};
+      const saved = Number(prefs[key]);
+      let loading = true;
+      if (saved > 0) {
+        widget.set(prop, saved);
+        loading = false;
+      } else {
+        // Yerleşim boyutu ilk "appear"dan sonra belli olur (yüzdelik varsayılan için).
+        widget.addListenerOnce("appear", () => qx.event.Timer.once(() => {
+          if (!widget.isDisposed()) {
+            widget.set(prop, Math.max(80, fallback() || 0));
+          }
+          loading = false;
+        }, null, 0));
+      }
+      const event = prop === "width" ? "changeWidth" : "changeHeight";
+      widget.addListener(event, e => {
+        const value = e.getData();
+        if (!loading && value && value !== prefs[key]) {
+          ankamon.page.Base.savePref(this._user, key, value);
+        }
+      });
     },
 
     /** Toplam disk kullanımı: tampondan hemen; tampon yok ya da eskiyse arkada yeniden hesaplanıp çizilir. */

@@ -140,7 +140,9 @@ qx.Class.define("ankamon.page.Network", {
     this.__table.setDataRowRenderer(new ankamon.ui.table.GroupRowRenderer(row => typeof row[0] !== "number"));
     // "Durum" sütunu: çevrim içi yeşil, çevrim dışı kırmızı (bkz. ui.table.StatusRenderer).
     // Sütun indeksi: id + onay kutusu (2) + "exp" (0) + "status" (1) = 3.
-    this.__table.getTableColumnModel().setDataCellRenderer(3, new ankamon.ui.table.StatusRenderer());
+    // İpucu: satırın "Son görülme" hücresi (kullanıcı isteği 2026-11-10; varlık grupları da bu grid).
+    this.__table.getTableColumnModel().setDataCellRenderer(3,
+      new ankamon.ui.table.StatusRenderer(2 + this.__columns.findIndex(c => c.id === "seen")));
     // "Varlık türü" hücresine türe özgü minik ikon (bkz. ui.table.DeviceTypeRenderer).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "type"),
       new ankamon.ui.table.DeviceTypeRenderer());

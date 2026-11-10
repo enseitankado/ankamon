@@ -190,6 +190,7 @@ return [
     ['GET',    '/api/wifimon/fixed',     [Api\WifimonFixedEmittersApi::class, 'index'],  'screen'],
     ['POST',   '/api/wifimon/fixed',     [Api\WifimonFixedEmittersApi::class, 'create'], 'screen'],
     ['DELETE', '/api/wifimon/fixed',     [Api\WifimonFixedEmittersApi::class, 'delete'], 'screen'],
+    ['PUT',    '/api/wifimon/fixed',     [Api\WifimonFixedEmittersApi::class, 'rescope'], 'screen'],
     ['GET',    '/api/lesson-times',      [Api\LessonTimesApi::class, 'show'],   'user'],
     ['PUT',    '/api/lesson-times',      [Api\LessonTimesApi::class, 'update'], 'admin'],
     ['GET',    '/api/audit',             [Api\AuditApi::class, 'index'],       'admin'],

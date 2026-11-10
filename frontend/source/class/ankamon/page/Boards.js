@@ -119,8 +119,9 @@ qx.Class.define("ankamon.page.Boards", {
     // Sütun başlığıyla sıralama kullanıcı adına sunucuda saklanır, sayfa açılınca geri yüklenir (kullanıcı isteği).
     ankamon.page.Base.rememberSort(this.__table, this.__columns, this.__table.getUserData("offset"), "boards.columns", this._user);
     // "Durum" sütunu: Çevrimiçi yeşil, Kapalı kırmızı (bkz. ui.table.StatusRenderer).
+    // İpucu: satırın "Son görülme" hücresi (kullanıcı isteği 2026-11-10).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "status"),
-      new ankamon.ui.table.StatusRenderer());
+      new ankamon.ui.table.StatusRenderer(2 + this.__columns.findIndex(c => c.id === "seen")));
     // "Oturum" sütunu: ekran kilitliyse "(kilitli)" ifadesi kırmızı+kalın (bkz. ui.table.SessionRenderer).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "session"),
       new ankamon.ui.table.SessionRenderer());

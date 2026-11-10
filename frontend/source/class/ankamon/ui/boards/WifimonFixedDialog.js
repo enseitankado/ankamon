@@ -27,7 +27,8 @@
 
 /**
  * Wi-Fi Monitör "Güvenilir listesi…": güvenilir (sabit) işaretlenmiş vericiler — erişim noktası ya da Wi-Fi cihazı, MAC adresiyle —,
- * kapsamı (okul geneli / sınıf) ve işaretleyen; seçilenler listeden çıkarılır. Eski "ağ adı" ve "Bluetooth" kayıtları artık
+ * kapsamı (okul geneli / sınıf) ve işaretleyen; seçilenler listeden çıkarılır ya da kapsamları topluca değiştirilir (okul geneli ya da
+ * seçilen tahtanın sınıfı — kullanıcı isteği 2026-11-10; PUT /api/wifimon/fixed). Eski "ağ adı" ve "Bluetooth" kayıtları artık
  * uygulanmaz (güven yalnız MAC ile — kullanıcı isteği 2026-11-06), silinebilsinler diye listelenir (bkz. ui.boards.WifiMonitor, backend
  * WifimonFixedEmittersApi).
  */
@@ -41,8 +42,9 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
     /**
      * @param getFixed {Function} () → güncel güvenilir listesi
      * @param remove {Function} (ids) → Promise; siler ve listeyi tazeler
+     * @param reload {Function?} () → Promise; güvenilir listesini sunucudan yeniden okur (kapsam değişikliğinden sonra)
      */
-    open(getFixed, remove) {
+    open(getFixed, remove, reload) {
       const esc = qx.bom.String.escape;
       // Satırlar kırılmasın (kullanıcı isteği): geniş pencere (ekrana sığdığı kadar), hücreler tek satır; sığmazsa yatay kaydırma.
       const bounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280 };
@@ -54,9 +56,25 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
       const del = new qx.ui.form.Button("Seçilenleri listeden çıkar");
       const close = new qx.ui.form.Button("Kapat");
       close.addListener("execute", () => win.close());
-      const row = ankamon.ui.Dialog.buttons(win, [del, close]);
+      // Toplu kapsam: hedef (okul geneli ya da bir tahtanın sınıfı) + uygula.
+      const scope = new qx.ui.form.SelectBox().set({ width: 240, toolTipText: "Seçilen kayıtların yeni kapsamı" });
+      scope.add(new qx.ui.form.ListItem("Okul geneli", null, ""));
+      const apply = new qx.ui.form.Button("Seçilenlerin kapsamını değiştir");
+      const row = ankamon.ui.Dialog.buttons(win, [apply, del, close]);
       row.addAt(all, 0);
       row.addAt(new qx.ui.core.Spacer(), 1, { flex: 1 });
+      row.addAt(new qx.ui.basic.Label("Kapsam:").set({ alignY: "middle" }), 2);
+      row.addAt(scope, 3);
+      ankamon.io.Api.get("/boards").then(res => {
+        if (scope.isDisposed()) {
+          return;
+        }
+        const name = b => b.label || b.hostname || b.ip || "#" + b.id;
+        (res.boards || []).slice().sort((a, b) => name(a).localeCompare(name(b), "tr")).forEach(b =>
+          scope.add(new qx.ui.form.ListItem(`Sınıf: ${name(b)}`, null, String(b.id))));
+      }).catch(() => {
+        // Tahta listesi alınamazsa yalnız "Okul geneli" seçilebilir.
+      });
 
       const draw = () => {
         const list = getFixed();
@@ -83,6 +101,31 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
           await remove(ids);
           draw();
         }
+      });
+      apply.addListener("execute", async () => {
+        const ids = boxes().filter(b => b.checked).map(b => Number(b.dataset.id));
+        if (!ids.length) {
+          ankamon.ui.Dialog.alert("Önce listeden kayıt işaretleyin.", "Wi-Fi Monitör");
+          return;
+        }
+        const item = scope.getSelection()[0];
+        const boardId = item.getModel() ? Number(item.getModel()) : null;
+        if (!await ankamon.ui.Dialog.confirm(`${ids.length} kaydın kapsamı <b>${esc(item.getLabel())}</b> olacak.` +
+          (boardId === null ? "" : "<br>Bu vericiler yalnız o tahtanın sensöründe güvenilir sayılır."), "Değiştir")) {
+          return;
+        }
+        try {
+          const res = await ankamon.io.Api.put("/wifimon/fixed", { ids, board_id: boardId });
+          if (res.merged) {
+            ankamon.ui.Dialog.alert(`${res.merged} kayıt hedef kapsamda zaten vardı; birleştirildi.`, "Wi-Fi Monitör");
+          }
+        } catch (err) {
+          ankamon.ui.Dialog.error(err);
+        }
+        if (reload) {
+          await reload();
+        }
+        draw();
       });
       win.open();
       draw();

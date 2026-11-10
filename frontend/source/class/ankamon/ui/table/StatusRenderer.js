@@ -30,9 +30,18 @@
  * dışı metni kırmızı çizilir — renkler etkin temadan (app-ok / app-error; koyu temalarda da okunur).
  * Alt satırlar (port/paylaşım — "açık"/"paylaşım") renk almaz, metni olduğu gibi gösterilir. Değere
  * göre karar verir: Ağ "Çevrim içi"/"Çevrim dışı", Tahtalar "Çevrimiçi"/"Kapalı".
+ *
+ * İpucu (kullanıcı isteği 2026-11-10: Varlıklar, Akıllı Tahtalar ve varlık gruplarında Durum hücresinin ipucu = o satırın
+ * "Son görülme" hücresi): seenColumn verilirse satırın o model sütunundaki değer title olarak yazılır (ui.ToolTipPolicy gösterir).
  */
 qx.Class.define("ankamon.ui.table.StatusRenderer", {
   extend: qx.ui.table.cellrenderer.Default,
+
+  /** @param seenColumn {Integer?} "Son görülme" değerinin tablo modelindeki sütun indeksi */
+  construct(seenColumn) {
+    super();
+    this.__seenColumn = seenColumn ?? null;
+  },
 
   statics: {
     ONLINE: ["Çevrim içi", "Çevrimiçi"],
@@ -66,6 +75,14 @@ qx.Class.define("ankamon.ui.table.StatusRenderer", {
   },
 
   members: {
+    __seenColumn: null,
+
+    // overridden
+    _getCellAttributes(cellInfo) {
+      const seen = this.__seenColumn === null || !cellInfo.rowData ? null : cellInfo.rowData[this.__seenColumn];
+      return seen ? `title="${qx.bom.String.escape(`Son görülme: ${seen}`).replace(/"/g, "&quot;")}"` : "";
+    },
+
     // overridden
     _getContentHtml(cellInfo) {
       const S = ankamon.ui.table.StatusRenderer;
