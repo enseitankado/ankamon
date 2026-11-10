@@ -255,6 +255,19 @@ qx.Class.define("ankamon.page.Settings", {
             const res = await ankamon.io.Api.post("/settings/interface", { name: i.name, enabled });
             this.__fillIfaceTable(box, res.interfaces || list);
           } catch (err) {
+            // Kart değişince tarayıcı süren isteği düşürebilir (ör. Chromium "ağ değişti" — tarayıcı sunucuyla aynı makinedeyse)
+            // ya da yanıt kopabilir: işlem yine de yapılmış olabilir. Gerçek durum sunucudan yeniden okunur; hata yalnız istenen
+            // değişiklik olmadıysa gösterilir.
+            let fresh = null;
+            for (let i = 0; i < 4 && !fresh; i++) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              fresh = await ankamon.io.Api.get("/settings").then(st => st.interfaces).catch(() => null);
+            }
+            const now = fresh && fresh.find(o => o.name === i.name);
+            if (now && !!now.enabled === enabled) {
+              this.__fillIfaceTable(box, fresh);
+              return;
+            }
             revert();
             check.setEnabled(true);
             ankamon.ui.Dialog.error(err);
