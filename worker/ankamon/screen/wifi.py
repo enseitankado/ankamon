@@ -41,7 +41,8 @@ Sunucu iletileri, `phase` alanıyla:
   scanning {info}: tarama başladı.
   data {radio, device, state, connection, rows: [{kind: wifi, name, addr, signal, chan, freq, rate, security, active,
         random, vendor, hints, phone: yes|maybe|"", first_seen, seen_days}], info, at}.
-  probes {rows: [{kind: probe, addr, signal, rssi, count, fp, ssids, random, vendor, hints, phone, first_seen, seen_days}
+  probes {rows: [{kind: probe, addr, signal, rssi, count, fp, fps, ssids, wps, random, vendor, hints, phone, first_seen, seen_days;
+                   rastgele adresliyse addrs (aynı cihaz sayılan adresler), why (gerekçe kodları), dev (cihaz anahtarı)}
         | {kind: client (Wi-Fi'ye bağlı cihaz), addr, bssid, name (bağlı olduğu ağ adı), chan, signal, rssi, count, random,
            vendor, board_name (adres bir tahtanın kablolu/kablosuz MAC'iyse), hints, phone, first_seen, seen_days}],
         devices (yoklama yapan kestirilen cihaz sayısı), clients (bağlı cihaz sayısı),
@@ -65,7 +66,7 @@ import tornado.websocket
 
 from .. import db
 from ..executor.hwfacts import mark_wifi_radio
-from . import wifimon_phone_hints, wifimon_sightings
+from . import wifimon_phone_hints, wifimon_probe_merge, wifimon_sightings
 from .wifi_remote_scan import wifimon_remote_command
 
 log = logging.getLogger("ankamon.screen.wifi")
@@ -114,7 +115,8 @@ def parse(sections: dict) -> dict:
 
 def parse_probes(sections: dict) -> dict:
     """@@PROBE (dinleyicinin JSON satırları) → probes iletisi. Yoklama cihaz kestirimi: kalıcı adres başına bir cihaz, rastgele
-    adresler parmak izine (fp) göre birleşir (aynı cihazın değişen adresleri çoğunlukla aynı fp'yi taşır). Bağlı cihazlar
+    adresler aynı cihaz kestirimiyle (WPS kimliği, ağ listesi, sıra numarası sürekliliği, parmak izi + yakın sinyal — bkz.
+    wifimon_probe_merge.py) tek satırda birleşir (addrs, why, dev alanları). Bağlı cihazlar
     (t: "c") ayrı satırlar: telefonun ağ başına rastgele adresi o ağda sabit kaldığından adres başına bir cihaz sayılır."""
     rows, clients = [], []
     for line in sections.get("PROBE", []):
@@ -131,13 +133,22 @@ def parse_probes(sections: dict) -> dict:
             continue
         rows.append({"kind": "probe", "addr": str(e.get("addr", "")).upper(), "name": ", ".join(e.get("ssids") or []),
                      "ssids": e.get("ssids") or [], "rssi": rssi, "signal": rssi_to_percent(rssi) if isinstance(rssi, int) else None,
-                     "count": int(e.get("count") or 0), "fp": str(e.get("fp") or ""), "chan": "", "freq": "", "rate": "",
-                     "security": "", "active": False})
+                     "count": int(e.get("count") or 0), "fp": str(e.get("fp") or ""),
+                     "fps": [str(f) for f in e.get("fps") or []][:4], "seq": e.get("seq"), "ts": e.get("ts"),
+                     "wps": {str(k): str(v)[:40] for k, v in e["wps"].items()} if isinstance(e.get("wps"), dict) else None,
+                     "chan": "", "freq": "", "rate": "", "security": "", "active": False})
     for row in rows:
         wifimon_phone_hints.annotate_probe(row)
     for row in clients:
         wifimon_phone_hints.annotate_client(row)
-    devices = len({r["addr"] for r in rows if not r["random"]}) + len({r["fp"] for r in rows if r["random"]})
+    merged = wifimon_probe_merge.merge_random([r for r in rows if r["random"]])
+    for row in merged:
+        wifimon_phone_hints.annotate_probe(row)  # birleşen adreslerden gelen WPS bilgisiyle ipuçları yeniden
+    rows = [r for r in rows if not r["random"]] + merged
+    for row in rows:
+        row.pop("seq", None)
+        row.pop("ts", None)
+    devices = len({r["addr"] for r in rows})
     info = _keyvals(sections.get("PROBEINFO", []))
     rows += clients
     rows.sort(key=lambda r: -(r["signal"] if r["signal"] is not None else -1))

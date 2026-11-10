@@ -41,9 +41,14 @@ listesi, 3. argüman) yakın AP'lerin bulunduğu en kalabalık 4 kanal (5 GHz da
 Kartın ayarlayamadığı kanal (desteklemiyor/yasaklı) turdan düşer. Her kanalda 1 sn.
 
 Çıktı (JSON satırları):
-  {t: "p", addr, rssi (en güçlü, dBm), count, fp, ssids} — yoklama yapan adres başına. `fp`, çerçevedeki bilgi öğelerinin
-    (desteklenen hızlar, HT/VHT/genişletilmiş yetenekler, üretici öğelerinin OUI'si) özetidir: rastgele adres kullanan aynı
-    cihazın yoklamaları çoğunlukla aynı `fp`yi taşır, cihaz sayısı kestirimi buna dayanır (bkz. wifi.py).
+  {t: "p", addr, rssi (en güçlü, dBm), count, fp, fps, ssids, seq, ts, wps} — yoklama yapan adres başına. Rastgele adres
+    kullanan aynı cihazın adresleri bu alanlarla birleştirilir (bkz. wifimon_probe_merge.py):
+    - `fp` ilk çerçevenin, `fps` duyulan bütün çerçevelerin (en çok 4) parmak izi: bilgi öğelerinin (desteklenen hızlar,
+      HT/VHT/genişletilmiş yetenekler, üretici öğelerinin OUI'si) özeti. Aynı cihaz 2,4 / 5 GHz'de farklı iz verebilir.
+    - `seq` [ilk, son] 802.11 sıra numarası (12 bit), `ts` [ilk, son] dinleme başından saniye: çoğu cihaz adres değişince
+      sayacı sıfırlamaz, yeni adresin ilk numarası eskisinin sonuncusunun hemen ardından gelir.
+    - `wps` {uuid, name, model, maker, number}: yoklamadaki WPS öğesi (varsa). UUID-E cihaza özgüdür, rastgele adreste de
+      değişmez; cihaz/model adı telefonu adıyla gösterir.
   {t: "c", addr, bssid, ssid, chan, rssi, count} — bağlı cihaz başına. Bozuk çerçeveden doğan hayalet adresleri elemek için
     AP'si bilinen (taramada/beacon'da görülen) ya da en az 2 çerçevesi duyulan cihazlar yazılır; AP adresleri cihaz sayılmaz.
 """
@@ -100,6 +105,36 @@ def fingerprint(ies):
     return hashlib.sha1("|".join(parts).encode()).hexdigest()[:10]
 
 
+WPS_ATTRS = {0x1047: "uuid", 0x1011: "name", 0x1023: "model", 0x1021: "maker", 0x1024: "number"}
+
+
+def wps_info(ies):
+    """Üretici öğesi 00:50:f2/04 (WPS) → {uuid, name, model, maker, number} (TLV: 2 bayt tür, 2 bayt uzunluk)."""
+    i, out = 0, {}
+    while i + 2 <= len(ies):
+        eid, ln = ies[i], ies[i + 1]
+        body = ies[i + 2:i + 2 + ln]
+        i += 2 + ln
+        if eid != 221 or body[:4] != b"\x00\x50\xf2\x04":
+            continue
+        j = 4
+        while j + 4 <= len(body):
+            typ, n = struct.unpack_from(">HH", body, j)
+            val = body[j + 4:j + 4 + n]
+            j += 4 + n
+            key = WPS_ATTRS.get(typ)
+            if not key or not val:
+                continue
+            if key == "uuid":
+                if len(val) == 16 and val.strip(b"\x00"):
+                    out[key] = val.hex()
+            else:
+                text = val.decode("utf-8", "replace").strip("\x00 ").strip()
+                if text:
+                    out[key] = text[:40]
+    return out
+
+
 def ssid(ies):
     if len(ies) >= 2 and ies[0] == 0:
         return ies[2:2 + ies[1]].decode("utf-8", "replace").strip("\x00")
@@ -129,7 +164,8 @@ s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3))
 s.bind((MON, 0))
 s.settimeout(0.3)
 probes, clients = {}, {}
-end = time.time() + SECS
+start = time.time()
+end = start + SECS
 hop, ci, chan = 0.0, 0, None
 while time.time() < end:
     now = time.time()
@@ -175,10 +211,21 @@ while time.time() < end:
         continue
     addr = f[10:16].hex(":")
     ies = f[24:]
+    seq = struct.unpack_from("<H", f, 22)[0] >> 4
+    at = round(now - start, 1)
+    fp = fingerprint(ies)
     e = probes.get(addr)
     if e is None:
-        e = probes[addr] = {"t": "p", "addr": addr, "rssi": sig, "count": 0, "fp": fingerprint(ies), "ssids": []}
+        e = probes[addr] = {"t": "p", "addr": addr, "rssi": sig, "count": 0, "fp": fp, "fps": [], "ssids": [],
+                            "seq": [seq, seq], "ts": [at, at]}
     e["count"] += 1
+    e["seq"][1], e["ts"][1] = seq, at
+    if fp not in e["fps"] and len(e["fps"]) < 4:
+        e["fps"].append(fp)
+    if "wps" not in e:
+        w = wps_info(ies)
+        if w:
+            e["wps"] = w
     if sig is not None and (e["rssi"] is None or sig > e["rssi"]):
         e["rssi"] = sig
     name = ssid(ies)

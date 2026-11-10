@@ -49,12 +49,77 @@ qx.Class.define("ankamon.ui.boards.WifimonClassify", {
       return map;
     },
 
-    /** Satırın değişmeyen anahtarı ("yeni" takibi ve grid satır kimliği): rastgele adresli yoklamada adres değil parmak izi. */
+    /**
+     * Satırın değişmeyen anahtarı ("yeni" takibi ve grid satır kimliği): rastgele adresli yoklamada adres değil cihaz
+     * anahtarı (worker'ın dev'i: WPS kimliği > ağ listesi > parmak izi; eski worker'da parmak izi).
+     */
     rowKey(row) {
-      if (row.kind === "probe" && row.random && row.fp) {
-        return "probe-fp|" + row.fp;
+      if (row.kind === "probe" && row.random && (row.dev || row.fp)) {
+        return row.dev ? "probe-dev|" + row.dev : "probe-fp|" + row.fp;
       }
       return row.kind + "|" + row.addr;
+    },
+
+    /** Birleştirme gerekçeleri (worker screen/wifimon_probe_merge.py REASON_TEXT ile aynı kodlar). */
+    MERGE_REASON: {
+      wps: "aynı WPS kimliği (UUID-E)",
+      ssid: "aynı ağ listesi",
+      seq: "sıra numarası sürekliliği",
+      fp: "aynı yetenek parmak izi ve yakın sinyal"
+    },
+
+    /**
+     * Ardışık dinlemelerde rastgele adresli iki yoklama satırı aynı cihaz mı? Gerekçe kodu ya da "". Worker bir dinleme
+     * içinde birleştirir (wifimon_probe_merge.same_device); telefon sonraki taramada yine yeni adres alır, burada aynı
+     * ölçütler sürer (sıra numarası dinlemeler arasında taşınmaz): WPS kimliği, ağ listesi (biri ötekini kapsar; tek ortak ağda
+     * yakın sinyal şartı), ortak parmak izi + yakın sinyal (ağ listeleri çelişmiyorsa).
+     */
+    sameProbeDevice(a, b) {
+      if (!(a.kind === "probe" && a.random && b.kind === "probe" && b.random)) {
+        return "";
+      }
+      const wa = (a.wps || {}).uuid;
+      const wb = (b.wps || {}).uuid;
+      if (wa && wb) {
+        return wa === wb ? "wps" : "";
+      }
+      if (a.dev && a.dev === b.dev) {
+        return a.dev.startsWith("f:") ? (this.__near(a, b) ? "fp" : "") : a.dev.startsWith("w:") ? "wps" : "ssid";
+      }
+      const sa = new Set(a.ssids || []);
+      const sb = new Set(b.ssids || []);
+      if (sa.size && sb.size) {
+        const common = [...sa].filter(x => sb.has(x)).length;
+        if (common !== Math.min(sa.size, sb.size)) {
+          return ""; // listeler çelişiyor: farklı kayıtlı ağlar, farklı cihaz
+        }
+        return common >= 2 || this.__near(a, b) ? "ssid" : "";
+      }
+      const fa = a.fps && a.fps.length ? a.fps : [a.fp];
+      const fb = new Set(b.fps && b.fps.length ? b.fps : [b.fp]);
+      return fa.some(f => f && fb.has(f)) && this.__near(a, b) ? "fp" : "";
+    },
+
+    /** En güçlü sinyaller yakın mı (≤ 12 dB — worker SIGNAL_NEAR_DB). */
+    __near(a, b) {
+      return typeof a.rssi === "number" && typeof b.rssi === "number" && Math.abs(a.rssi - b.rssi) <= 12;
+    },
+
+    /**
+     * Yeni dinlemenin rastgele adresli yoklama satırını önceki dinlemelerden aynı cihaz sayılan satırla birleştirir:
+     * adresler, ağlar, parmak izleri ve gerekçeler birikir; sinyal ve diğer alanlar yeni satırdan. Yeni nesne döner.
+     */
+    mergeProbeRows(old, row, why) {
+      const union = (x, y, max) => Array.from(new Set((x || []).concat(y || []))).slice(0, max);
+      const merged = Object.assign({}, row, {
+        addrs: union(old.addrs || [old.addr], row.addrs || [row.addr], 32),
+        ssids: union(old.ssids, row.ssids, 12),
+        fps: union(old.fps || [old.fp], row.fps || [row.fp], 8).filter(Boolean),
+        why: union(old.why, (row.why || []).concat(why ? [why] : []), 4),
+        wps: row.wps || old.wps
+      });
+      merged.dev = old.dev || row.dev;
+      return merged;
     },
 
     /**
@@ -116,11 +181,60 @@ qx.Class.define("ankamon.ui.boards.WifimonClassify", {
         rows.push(Object.assign({ key, level, fixed, heard, isNew: level !== "fixed" && !!(firstSeenRecently || appeared) },
           extra || {}, { row }));
       };
-      ((feed.data && feed.data.rows) || []).filter(row => row.kind === "wifi").forEach(row => add(row, { lastAt: feed.data.at * 1000 }));
-      (feed.probes || new Map()).forEach(p => add(p.row, { lastAt: p.at }));
+      // Aynı sensörde aynı cihaz tek satır (kullanıcı isteği 2026-11-10): adresleri kesişen satırlar (ör. hem arayan hem bağlı
+      // görülen MAC, birleşmiş rastgele adreslerden biri) birleşir; farklı sensörlerde ayrı satır kalır.
+      const items = [];
+      const byAddr = new Map();
+      const push = (row, lastAt) => {
+        const addrs = ((row.addrs && row.addrs.length ? row.addrs : [row.addr]) || []).filter(Boolean);
+        const hit = addrs.map(a => byAddr.get(a)).find(i => i !== undefined);
+        if (hit === undefined) {
+          const i = items.push({ row, lastAt }) - 1;
+          addrs.forEach(a => byAddr.set(a, i));
+          return;
+        }
+        items[hit] = this.__mergeSameDevice(items[hit], { row, lastAt });
+        addrs.forEach(a => byAddr.set(a, hit));
+      };
+      ((feed.data && feed.data.rows) || []).filter(row => row.kind === "wifi").forEach(row => push(row, feed.data.at * 1000));
+      (feed.probes || new Map()).forEach(p => push(p.row, p.at));
+      items.forEach(it => add(it.row, { lastAt: it.lastAt }));
       const counts = { phone: 0, maybe: 0, foreign: 0, common: 0, fixed: 0 };
       rows.forEach(r => counts[r.level]++);
       return { rows, counts };
+    },
+
+    /**
+     * Aynı sensörde aynı cihazın iki satırı ({row, lastAt}) → tek satır. Taban satır türü önceliğe göre (Wi-Fi ağı > bağlı
+     * cihaz > arayan cihaz); öteki türün bilgisi eklenir: also (diğer türler), ssids/addrs/hints birleşimi, probeCount
+     * (bağlı satırda yoklama sayısı), en güçlü telefon kanıtı ve sinyal, en son görülme.
+     */
+    __mergeSameDevice(a, b) {
+      const rank = { wifi: 0, client: 1, probe: 2 };
+      const [base, other] = (rank[a.row.kind] ?? 3) <= (rank[b.row.kind] ?? 3) ? [a, b] : [b, a];
+      const x = base.row;
+      const y = other.row;
+      const union = (p, q, max) => Array.from(new Set((p || []).concat(q || []))).slice(0, max || 32);
+      const sameKind = x.kind === y.kind;
+      const row = Object.assign({}, x, {
+        also: union(x.also, sameKind ? y.also : [y.kind].concat(y.also || [])).filter(k => k !== x.kind),
+        ssids: union(x.ssids, y.ssids, 12),
+        hints: union(x.hints, y.hints, 12),
+        phone: x.phone === "yes" || y.phone === "yes" ? "yes" : x.phone || y.phone,
+        signal: Math.max(x.signal ?? -1, y.signal ?? -1) >= 0 ? Math.max(x.signal ?? -1, y.signal ?? -1) : x.signal,
+        vendor: x.vendor || y.vendor,
+        wps: x.wps || y.wps
+      });
+      if (x.addrs || y.addrs) {
+        row.addrs = union(x.addrs || [x.addr], y.addrs || [y.addr]);
+        row.why = union(x.why, y.why, 4);
+      }
+      if (sameKind) {
+        row.count = (x.count || 0) + (y.count || 0);
+      } else if (y.kind === "probe") {
+        row.probeCount = (x.probeCount || 0) + (y.count || 0);
+      }
+      return { row, lastAt: Math.max(base.lastAt || 0, other.lastAt || 0) };
     },
 
     /** Sinyal yüzdesinden kaba yakınlık (duvar, gövde ve anten yönü ölçümü saptırır; yalnız ipucu). */

@@ -56,7 +56,9 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       "<b>MAC adresiyle</b> kurulur (aynı adı taşıyan bir telefon paylaşım noktası okulun ağı sayılmaz). Sonra gerisi " +
       "<b>yabancı</b> olarak öne çıkar. <b>Neler görülebilir:</b> telefonun paylaşım noktası (hotspot) açıksa Wi-Fi ağı olarak; " +
       "Wi-Fi'si açık ama bağlı değilse ara ara gönderdiği <b>yoklamalarla</b> (Wi-Fi arayan cihaz; Tür sütununda aradığı ağ " +
-      "sayısı, ipucunda adları); bir Wi-Fi ağına bağlıysa gönderdiği veri çerçeveleriyle <b>Wi-Fi'ye bağlı cihaz</b> olarak " +
+      "sayısı, ipucunda adları). Telefonlar ağ ararken her taramada yeni bir <b>rastgele adres</b> kullanır; aynı cihaz " +
+      "sayılan adresler tek satırda toplanır (Kanıt sütununda <i>N adres</i>; ölçütler: aynı WPS kimliği, aynı aranan ağ listesi, " +
+      "802.11 sıra numarası sürekliliği, aynı yetenek parmak izi ve yakın sinyal — kestirimdir); bir Wi-Fi ağına bağlıysa gönderdiği veri çerçeveleriyle <b>Wi-Fi'ye bağlı cihaz</b> olarak " +
       "(içerik şifreli, yalnız adresler görülür). Bu ikisi Wi-Fi trafiği dinlenerek bulunur: sensörün Wi-Fi kartı dinleme " +
       "süresince monitör kipine alınır (Tahtalar listesinin Wi-Fi sütununda <i>Monitör modu</i>). Ağa yalnız Wi-Fi ile bağlı " +
       "tahta monitör kipine alınmaz (SSH erişimi kopardı); hem kablo hem Wi-Fi ile bağlı tahtalar onayınızla dinlenir (Wi-Fi " +
@@ -479,7 +481,22 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           if (!watching) {
             feed.probes = new Map();
           }
-          d.rows.forEach(row => feed.probes.set(Classify.rowKey(row), { row, at: now }));
+          d.rows.forEach(row => {
+            // Rastgele adresli arayan: önceki dinlemelerde aynı cihaz sayılan satıra eklenir (telefon her taramada yeni
+            // adres alır; worker yalnız bir dinleme içinde birleştirir — bkz. Classify.sameProbeDevice).
+            let key = Classify.rowKey(row);
+            if (row.kind === "probe" && row.random) {
+              for (const [k, p] of feed.probes) {
+                const why = k === key ? "" : p.at < now ? Classify.sameProbeDevice(p.row, row) : "";
+                if (k === key || why) {
+                  row = Classify.mergeProbeRows(p.row, row, why);
+                  key = k;
+                  break;
+                }
+              }
+            }
+            feed.probes.set(key, { row, at: now });
+          });
           feed.probes.forEach((p, key) => now - p.at > this.PROBE_KEEP_MS && feed.probes.delete(key));
           feed.probeInfo = d;
           feed.at = now;

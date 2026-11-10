@@ -109,4 +109,12 @@ def annotate_probe(row: dict) -> None:
     if row["vendor"] and _PHONE_VENDOR_RE.search(row["vendor"]):
         hints.append("telefon üreticisi")
         phone = "yes"
+    wps = row.get("wps") or {}
+    model = " ".join(dict.fromkeys(v for v in (wps.get("name"), wps.get("model"), wps.get("number")) if v))
+    if wps.get("maker") and not row["vendor"]:
+        row["vendor"] = wps["maker"]  # rastgele adreste OUI yok; WPS öğesi üreticiyi söylüyor
+    if model or wps.get("maker"):
+        hints.append("WPS cihaz adı (" + " · ".join(v for v in (wps.get("maker"), model) if v) + ")")
+        if _PHONE_VENDOR_RE.search(" ".join((wps.get("maker") or "", model))):
+            phone = "yes"
     row["hints"], row["phone"] = hints, phone

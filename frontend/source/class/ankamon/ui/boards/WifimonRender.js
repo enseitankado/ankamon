@@ -58,7 +58,8 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
     COLUMNS: [
       { id: "level", label: "Durum", width: 110, choices: true, hint: "Bulgunun öne çıkma düzeyi" },
       { id: "sensor", label: "Sensör", width: 150, choices: true, hint: "Vericiyi duyan Ankamon tahtası (Wi-Fi kartıyla dinleyen)" },
-      { id: "device", label: "Tespit edilen cihaz", width: 150, hint: "Duyulan vericinin MAC adresi" },
+      { id: "device", label: "Tespit edilen cihaz", width: 170,
+        hint: "Duyulan vericinin MAC adresi (N× = aynı cihaz sayılan N rastgele adres; ipucunda hepsi)" },
       { id: "kind", label: "Tür", width: 170, choices: true },
       { id: "name", label: "Ad", width: 170, hint: "Ağ adı (SSID); bağlı cihazda bağlı olduğu ağ" },
       { id: "signal", label: "Sinyal", width: 175, hint: "Sinyal gücü ve kaba yakınlık" },
@@ -113,13 +114,26 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
       if (item.fixed) {
         add("güvenilir", "Güvenilir listesinde: MAC " + item.fixed.value + (item.fixed.board_id ? " (bu sınıf)" : " (okul geneli)"));
       }
-      if (row.kind === "probe") {
-        add("ağ arıyor", "Bağlanacak ağ araştırıyor (Wi-Fi yoklaması).");
-      } else if (row.kind === "client") {
+      const probing = row.kind === "probe" || (row.also || []).includes("probe");
+      if (row.kind === "client") {
         add("ağa bağlı", "Bir erişim noktasına bağlı ve veri gönderiyor (içerik şifreli; yalnız adresler görülür). " +
           `Ağ: ${row.name || "(adı bilinmiyor)"} · erişim noktası ${row.bssid || "?"}` + (row.chan ? ` · kanal ${row.chan}` : ""));
       }
+      if (probing) {
+        const ssids = row.ssids || [];
+        add("Cihaz ağ arıyor", "Bağlanacak ağ araştırıyor (Wi-Fi yoklaması)." +
+          (row.kind !== "probe" && ssids.length ? `\nAradığı ağlar (${ssids.length}):\n` + ssids.join("\n") : ""));
+      }
+      const addrs = row.addrs || [];
+      if (addrs.length > 1) {
+        const why = (row.why || []).map(w => ankamon.ui.boards.WifimonClassify.MERGE_REASON[w] || w);
+        add(`${addrs.length} adres`, `Aynı cihaz sayılan ${addrs.length} rastgele adres (telefon her taramada yeni adres alır)` +
+          (why.length ? " — gerekçe: " + why.join(", ") : "") + ". Kestirimdir.\n" + addrs.join("\n"));
+      }
       (row.hints || []).forEach(h => {
+        if (/^rastgele adres/.test(h)) {
+          return; // Üretici sütunu "Rastgele" gösteriyor (kullanıcı isteği 2026-11-10)
+        }
         if (/paylaşım noktasına benziyor/.test(h)) {
           add("hotspot adı", h);
           return;
@@ -127,9 +141,12 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
         const m = /^(.*?)\s*\((.+)\)$/.exec(h); // "rastgele adres (telefon/tablet olağan)" → "rastgele adres" + açıklama
         add(m ? m[1] : h, h);
       });
-      if ((row.kind === "probe" || row.kind === "client") && row.count) {
-        add(`${row.count} ${row.kind === "probe" ? "yoklama" : "çerçeve"}`,
-          row.kind === "probe" ? "Dinleme süresince duyulan yoklama sayısı." : "Dinleme süresince bu cihazdan duyulan veri çerçevesi sayısı.");
+      if (row.kind === "client" && row.count) {
+        add(`${row.count} çerçeve`, "Dinleme süresince bu cihazdan duyulan veri çerçevesi sayısı.");
+      }
+      const probes = row.kind === "probe" ? row.count : row.probeCount;
+      if (probing && probes) {
+        add(`${probes} yoklama`, "Dinleme süresince duyulan yoklama sayısı.");
       }
       const heard = item.heard || [];
       if (heard.length >= 2) {
@@ -165,7 +182,8 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
 
     __nameText(row) {
       if (row.kind === "probe") {
-        return "";
+        const w = row.wps || {};
+        return Array.from(new Set([w.name, w.model, w.number].filter(Boolean))).join(" "); // WPS öğesindeki cihaz adı
       }
       if (row.kind === "client") {
         return (row.board_name ? row.board_name + " " : "") + "→ " + (row.name || "(ağ adı bilinmiyor)");
@@ -281,7 +299,8 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
           html: {
             level: this.chip(lv.label, lv.color, lv.tip),
             sensor: `${feed.watching && feed.ws ? '<span style="color:#1e8e3e">●</span> ' : ""}${esc(feed.name)}`,
-            device: `<span style="font-family:monospace;font-size:12px">${esc(row.addr || "")}</span>`,
+            device: ((row.addrs || []).length > 1 ? `<span style="color:#1a73e8;font-weight:600">${row.addrs.length}×</span> ` : "") +
+              `<span style="font-family:monospace;font-size:12px">${esc(row.addr || "")}</span>`,
             signal: this.bar(row.signal),
             evidence: terms.map(t => esc(t.text)).join(" · "),
             vendor: row.vendor ? `<b>${esc(row.vendor)}</b>` : `<span style="opacity:.6">${esc(this.__vendorText(row))}</span>`,
@@ -291,7 +310,8 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
           hint: {
             level: lv.tip,
             sensor: feed.watching && feed.ws ? `${feed.name} — sürekli izleniyor` : feed.name,
-            device: row.random ? "Rastgele (yerel yönetimli) adres" : null,
+            device: (row.addrs || []).length > 1 ? `Aynı cihaz sayılan ${row.addrs.length} rastgele adres:\n` + row.addrs.join("\n")
+              : row.random ? "Rastgele (yerel yönetimli) adres" : null,
             kind: this.__kindHint(row),
             name: name || null,
             signal: hasSignal ? `Sinyal %${row.signal} — ${Classify.proximity(row.signal)} (kaba yakınlık ipucu)` : null,
