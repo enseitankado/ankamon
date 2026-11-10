@@ -445,6 +445,7 @@ qx.Class.define("ankamon.page.Base", {
      *   (başlığı sürükleyerek) ve gizlenen sütunlar kullanıcı başına sunucuda saklanır (storageKey de bunları yapar).
      *   {persistSort: true} (storageKey/prefsKey ile): sütun başlığıyla yapılan sıralama da kullanıcı başına saklanır
      *   (bkz. rememberSort — "<anahtar>.sort").
+     *   {filterable: true}: kendi süzgeç mantığı olmayan grid'e sütun süzgeçleri ve hazır değer listeleri (bkz. _makeFilterable).
      */
     _createTable(columns, opts = {}) {
       const prefsKey = opts.storageKey || opts.prefsKey;
@@ -606,6 +607,9 @@ qx.Class.define("ankamon.page.Base", {
         if (opts.persistSort) {
           ankamon.page.Base.rememberSort(table, columns, offset, prefsKey, this._user);
         }
+      }
+      if (opts.filterable) {
+        this._makeFilterable(table, columns);
       }
       return table;
     },
@@ -827,6 +831,32 @@ qx.Class.define("ankamon.page.Base", {
      *   anahtarı (ör. Ağ ▸ varlık grupları — görünüm değişince fields.restoreSaved() çağrılır). Kayıt "<anahtar>.filters".
      * @return {Map} {columnId: TextField} — değerlerini okumak için (bkz. çağıranların __apply'ı)
      */
+    /**
+     * Kendi süzgeç mantığı olmayan grid'e sütun süzgeçleri + hazır değer listeleri (kullanıcı isteği 2026-11-10: BÜTÜN grid'ler
+     * — Loglar, Genel bakış, Sağlık ▸ Tara/Bildirimler, Yazılımlar, Hesaplar…). Modelin setData'sı sarılır: çağıran yine BÜTÜN
+     * satırları verir; burada saklanır ve yalnız süzgeçlere uyanlar tabloya yazılır (satır dizileri ortak — onay kutusu
+     * değerleri süzme sırasında korunur). Eşleşme filterMatch ile (hazır listedeki "A" | "B" seçimleri dahil).
+     * @return {Map} süzgeç kutuları (bkz. _addColumnFilters)
+     */
+    _makeFilterable(table, columns) {
+      const B = ankamon.page.Base;
+      const model = table.getTableModel();
+      const offset = table.getUserData("offset") || 1;
+      const inner = model.setData;
+      let all = [];
+      let fields = null;
+      const shown = () => {
+        const active = fields ? columns.map((c, i) => ({ i: i + offset, text: (fields[c.id].getValue() || "").trim() })).filter(f => f.text) : [];
+        return active.length ? all.filter(row => active.every(f => B.filterMatch(row[f.i], f.text))) : all;
+      };
+      model.setData = function(rows, clearSorting) {
+        all = rows || [];
+        return inner.call(this, shown(), clearSorting);
+      };
+      fields = this._addColumnFilters(table, columns, () => inner.call(model, shown()), { rows: () => all });
+      return fields;
+    },
+
     _addColumnFilters(table, columns, onChange, opts = {}) {
       const columnModel = table.getTableColumnModel();
       const offset = table.getUserData("offset") || 1;

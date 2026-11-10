@@ -86,7 +86,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
 
     __scopeColumns(countLabel) {
       return [
-        { id: "name", label: "Tahta" },
+        { id: "name", label: "Tahta", choices: true },
         { id: "n", label: countLabel, width: 120 },
         { id: "first", label: "İlk kayıt", width: 160 },
         { id: "last", label: "Son kayıt", width: 160 },
@@ -134,7 +134,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
       const spec = this.__withDisk({
         mode: "metrics", size: this.__sizer("/storage/metrics"), label: "Sensör verileri", noun: "sensör ölçümü (ham + özet)",
         columns: [
-          { id: "name", label: "Tahta" },
+          { id: "name", label: "Tahta", choices: true },
           { id: "series", label: "Seri", width: 70 },
           { id: "n", label: "Ham ölçüm", width: 110 },
           { id: "agg", label: "Özet (5 dk/1 sa)", width: 130 },
@@ -197,7 +197,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
       const F = ankamon.util.Format;
       const spec = this.__withDisk({
         mode, size: this.__sizer(url), label, noun,
-        columns: this.__scopeColumns(countLabel).map(c => (c.id === "name" && nameLabel ? { id: "name", label: nameLabel } : c)),
+        columns: this.__scopeColumns(countLabel).map(c => (c.id === "name" && nameLabel ? { id: "name", label: nameLabel, choices: true } : c)),
         load: async () => {
           const data = await ankamon.io.Api.get(url);
           const rows = [{ all: true, scope: { all: "1" }, ...data.total, name: "— Tümü —", estimated: false }];
@@ -401,7 +401,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
       const spec = this.__withDisk({
         mode: "queue", size: this.__sizer("/storage/logqueue"), label: "Log kuyruğu", noun: "kuyruk dosyası (içindeki, veritabanına henüz yazılmamış loglar kaybolur)",
         columns: [
-          { id: "name", label: "Ad" },
+          { id: "name", label: "Ad", choices: true },
           { id: "kind", label: "Tür", width: 330 },
           { id: "files", label: "Dosya", width: 70 },
           { id: "time", label: "Son değişiklik", width: 160 },

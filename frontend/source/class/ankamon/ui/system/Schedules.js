@@ -48,7 +48,7 @@ qx.Class.define("ankamon.ui.system.Schedules", {
       { id: "status", label: "Durum", width: 110 },
       { id: "next", label: "Sonraki", width: 150 },
       { id: "runs", label: "Çalışma / hata", width: 110 }
-    ], { prefsKey: "system.schedules.columns" });
+    ], { prefsKey: "system.schedules.columns", filterable: true });
     this.__table.getSelectionModel().addListener("changeSelection", () => {
       const p = this.__selected();
       this.__run.setEnabled(!!p && p.runnable);

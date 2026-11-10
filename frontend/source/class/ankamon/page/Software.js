@@ -54,7 +54,7 @@ qx.Class.define("ankamon.page.Software", {
       { id: "role", label: "Ankamon'daki işlevi" },
       { id: "service", label: "Servis", width: 140 },
       { id: "category", label: "Grup", width: 120 }
-    ], { prefsKey: "software.columns" });
+    ], { prefsKey: "software.columns", filterable: true });
     this.__table.addListener("cellDbltap", e => {
       const row = this.__rows && this.__rows[this.__table.getTableModel().getValue(0, e.getRow())];
       if (row && row.url) {

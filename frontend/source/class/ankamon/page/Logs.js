@@ -282,7 +282,7 @@ qx.Class.define("ankamon.page.Logs", {
       }
       this.__body.add(bar);
 
-      this.__table = this._createTable(columns, { prefsKey: "logs.columns" });
+      this.__table = this._createTable(columns, { prefsKey: "logs.columns", filterable: true });
       this.__setupCopy(this.__table);
       this.__body.add(this.__table, { flex: 1 });
       this.__body.add(this.__createPager());
@@ -645,7 +645,7 @@ qx.Class.define("ankamon.page.Logs", {
         { id: "hits", label: "Son 24 saat", width: 100 },
         { id: "by", label: "Ekleyen", width: 110 },
         { id: "at", label: "Eklenme", width: 150 }
-      ], { prefsKey: "log-exclusions.columns" }).set({ height: 320 });
+      ], { prefsKey: "log-exclusions.columns", filterable: true }).set({ height: 320 });
       table.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.MULTIPLE_INTERVAL_SELECTION);
       win.add(table, { flex: 1 });
       const status = new qx.ui.basic.Label("Yükleniyor…").set({ textColor: "app-muted" });

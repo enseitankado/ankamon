@@ -89,7 +89,7 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       { id: "interval", label: "Sıklık / sınır", width: 190 },
       { id: "max", label: "Saatte en çok", width: 100 },
       { id: "on", label: "Durum", width: 70 }
-    ], { prefsKey: "ntfy.rules.columns" });
+    ], { prefsKey: "ntfy.rules.columns", filterable: true });
     this.__ruleTable.getSelectionModel().addListener("changeSelection", () => {
       const has = !!this.__selectedRule() && canEdit;
       this.__editBtn.setEnabled(has);
@@ -113,7 +113,7 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       { id: "title", label: "Başlık", width: 240 },
       { id: "body", label: "Metin" },
       { id: "status", label: "Durum", width: 150 }
-    ], { prefsKey: "ntfy.messages.columns" });
+    ], { prefsKey: "ntfy.messages.columns", filterable: true });
     this.__msgTable.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.MULTIPLE_INTERVAL_SELECTION);
     this.__msgTable.getSelectionModel().addListener("changeSelection", () =>
       this.__delMsg.setEnabled(canEdit && !this.__msgTable.getSelectionModel().isSelectionEmpty()));

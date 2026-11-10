@@ -88,11 +88,11 @@ qx.Class.define("ankamon.page.Users", {
       this.__table = this._createTable([
         { id: "username", label: "Kullanıcı adı", width: 160 },
         { id: "full_name", label: "Ad soyad", width: 200 },
-        { id: "role", label: "Rol", width: 100 },
-        { id: "active", label: "Durum", width: 90 },
+        { id: "role", label: "Rol", width: 100, choices: true },
+        { id: "active", label: "Durum", width: 90, choices: true },
         { id: "features", label: "Yetkiler" },
         { id: "login", label: "Son giriş", width: 130 }
-      ], { prefsKey: "users.columns" });
+      ], { prefsKey: "users.columns", filterable: true });
       // Satıra çift tıklama = Düzenle (Tahtalar'daki gibi).
       this.__table.addListener("cellDbltap", e => {
         const row = e.getRow();

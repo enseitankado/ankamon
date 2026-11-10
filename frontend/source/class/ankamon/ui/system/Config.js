@@ -40,7 +40,7 @@ qx.Class.define("ankamon.ui.system.Config", {
       { id: "key", label: "Ayar", width: 210 },
       { id: "value", label: "Değer", width: 150 },
       { id: "description", label: "Açıklama" }
-    ], { prefsKey: "system.config.columns" });
+    ], { prefsKey: "system.config.columns", filterable: true });
     this.add(this.__table, { flex: 1 });
     const { label, scroll } = ankamon.ui.system.Html.box();
     this.__info = label;

@@ -75,8 +75,9 @@ qx.Class.define("ankamon.ui.taskmgr.TaskBoardPicker", {
       let batch = false;
       const apply = () => batch || win.setBoardFilter(checks.filter(c => c.getValue()).map(c => c.getUserData("id")));
       const syncAll = () => {
-        const n = checks.filter(c => c.getValue()).length;
-        all.setValue(n === 0 ? false : (n === checks.length ? true : null));
+        const visible = checks.filter(c => !c.getUserData("row") || c.getUserData("row").isVisible());
+        const n = visible.filter(c => c.getValue()).length;
+        all.setValue(n === 0 ? false : (n === visible.length ? true : null));
       };
       const list = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
       win.getLinks().forEach(link => {
@@ -89,6 +90,8 @@ qx.Class.define("ankamon.ui.taskmgr.TaskBoardPicker", {
         const check = new qx.ui.form.CheckBox(`<span style="white-space:nowrap">${state === "closed" ? "⚠ " : ""}` +
           `${F.esc(link.getDisplay())}  <span style="opacity:.6">(${F.esc(info)})</span></span>`).set({ value: win.hasBoardFilter() && win.isBoardChosen(link.getId()), rich: true });
         check.setUserData("id", link.getId());
+        check.setUserData("row", row);
+        check.setUserData("text", ankamon.page.Base.filterText(link.getDisplay()));
         if (state === "closed" && link.getError()) {
           check.setToolTipText(link.getError());
         }
@@ -109,11 +112,22 @@ qx.Class.define("ankamon.ui.taskmgr.TaskBoardPicker", {
         }
         list.add(row);
       });
+      // Listede ara (kullanıcı isteği 2026-11-10 — bütün hazır seçenek listeleri gibi, bkz. page.Base __choicePopup): uymayan
+      // bilgisayarlar gizlenir, "Tümü" yalnız görünenlere uygulanır.
+      const shown = () => checks.filter(c => c.getUserData("row").isVisible());
+      const search = new qx.ui.form.TextField().set({ placeholder: "Listede ara…", liveUpdate: true });
+      search.addListener("changeValue", e => {
+        const text = ankamon.page.Base.filterText(e.getData() || "").trim();
+        checks.forEach(c => c.getUserData("row").setVisibility(!text || c.getUserData("text").includes(text) ? "visible" : "excluded"));
+        syncAll();
+      });
+      popup.add(search);
       all.addListener("execute", () => {
-        // Üç durumluda tıklama sırası null → true: kısmi seçimden "hepsi"; hepsi seçiliyken "hiçbiri".
-        const on = checks.some(c => !c.getValue());
+        // Üç durumluda tıklama sırası null → true: kısmi seçimden "hepsi"; hepsi seçiliyken "hiçbiri". Yalnız görünenler.
+        const visible = shown();
+        const on = visible.some(c => !c.getValue());
         batch = true;
-        checks.forEach(c => c.setValue(on));
+        visible.forEach(c => c.setValue(on));
         batch = false;
         syncAll();
         apply();
@@ -146,6 +160,7 @@ qx.Class.define("ankamon.ui.taskmgr.TaskBoardPicker", {
       popup.placeToWidget(this, false);
       this.__popup = popup;
       popup.show();
+      qx.event.Timer.once(() => !search.isDisposed() && search.focus(), null, 50);
     }
   },
 

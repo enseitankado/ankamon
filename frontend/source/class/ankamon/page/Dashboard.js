@@ -78,7 +78,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       { id: "severity", label: "Önem", width: 90 },
       { id: "program", label: "Program", width: 140 },
       { id: "message", label: "Mesaj" }
-    ], { prefsKey: "dashboard.errors.columns" });
+    ], { prefsKey: "dashboard.errors.columns", filterable: true });
     errorsBox.add(this.__errors, { flex: 1 });
     this.__remember(errorsBox, "dashboard.errors.width", "width", () => Math.round(bottom.getBounds().width * 0.6));
     bottom.add(errorsBox, 0);
@@ -93,7 +93,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       { id: "title", label: "Görev", width: 200 },
       { id: "status", label: "Durum", width: 100 },
       { id: "summary", label: "Özet" }
-    ], { prefsKey: "dashboard.jobs.columns" });
+    ], { prefsKey: "dashboard.jobs.columns", filterable: true });
     jobsBox.add(this.__jobs, { flex: 1 });
     bottom.add(jobsBox, 1);
     this.__addLogsMenu(this.__jobs, id => {
@@ -218,7 +218,7 @@ qx.Class.define("ankamon.page.Dashboard", {
           { id: "path", label: "Yol", width: 110 },
           { id: "at", label: "Zaman", width: 140 },
           { id: "text", label: "Ayrıntı" }
-        ], { prefsKey: "dashboard.urgent.columns" });
+        ], { prefsKey: "dashboard.urgent.columns", filterable: true });
         this.__urgent.setToolTipText("Çift tıklayın: Sağlık ▸ Durum");
         this.__urgent.addListener("cellDbltap", () =>
           qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "anomalies", tab: "status" }));
