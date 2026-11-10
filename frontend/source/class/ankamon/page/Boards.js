@@ -62,7 +62,7 @@ qx.Class.define("ankamon.page.Boards", {
     // Başlıklar kısa (kullanıcı isteği; ör. üç ayrı "Disk" sütunu); "hint" tam adı verir — sütun
     // gizleme menüsünde ve süzgeç ipucunda o görünür (bkz. Base _createTable/_addColumnFilters).
     this.__columns = [
-      { id: "status", label: "Durum", width: 100 },
+      { id: "status", label: "Durum", width: 120, hint: "Çevrimiçi: SSH ya da sensör portu yanıt veriyor. Ağda (SSH yok): cihaz ağda görülüyor (Varlıklar'da çevrim içi) ama SSH ve sensör portu kapalı — yönetilemiyor. Kapalı: ağda görülmüyor." },
       { id: "name", label: "Takma ad / Ad" },
       { id: "hostname", label: "Bilgisayar adı", width: 150 },
       { id: "ip", label: "IP", width: 120 },
@@ -241,6 +241,14 @@ qx.Class.define("ankamon.page.Boards", {
      * (CABLE_FRESH_S) logdan kanıt: son 2 dk'da tahtanın IP'sinden log geldi ve o IP'nin MAC'i kablolu kartınki
      * (BoardsApi cable_log) → "Bağlı (log)". Kapalı tahtada boş (bilinmiyor).
      */
+    /** "Durum" sütunu: SSH/sensör portu açık → "Çevrimiçi"; kapalı ama ağ taraması MAC'ini görüyor (BoardsApi
+     * net_online) → "Ağda (SSH yok)" (açık ama yönetilemiyor); hiçbiri → "Kapalı". */
+    statusText(board) {
+      return board.online ? "Çevrimiçi" : board.net_online ? ankamon.page.Boards.NET_ONLY : "Kapalı";
+    },
+
+    NET_ONLY: "Ağda (SSH yok)",
+
     cableText(board) {
       const wired = ((board.netifs && board.netifs.ifaces) || []).filter(i => i.kind === "ethernet");
       if (!board.online) {
@@ -406,7 +414,7 @@ qx.Class.define("ankamon.page.Boards", {
           board,
           cells: [
             board.id, wasChecked.has(board.id),
-            board.online ? "Çevrimiçi" : "Kapalı",
+            ankamon.page.Boards.statusText(board),
             board.label || board.hostname || board.ip,
             board.hostname, board.ip, board.mac, board.wifi_mac || "", F.etap(board.etap, board.facts.cpu_model),
             ankamon.page.Boards.sessionText(board),

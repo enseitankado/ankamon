@@ -37,6 +37,8 @@ qx.Class.define("ankamon.ui.table.StatusRenderer", {
   statics: {
     ONLINE: ["Çevrim içi", "Çevrimiçi"],
     OFFLINE: ["Çevrim dışı", "Kapalı"],
+    // Ara durum (turuncu): Akıllı Tahtalar'da ağda görülen ama SSH/sensör portu kapalı tahta (bkz. page.Boards.statusText).
+    PARTIAL: ["Ağda (SSH yok)"],
 
     /** Temadaki ilk tanımlı rengi döner (temalar hata rengini farklı adlarla tanımlar). */
     __themeColor(names, fallback) {
@@ -50,6 +52,9 @@ qx.Class.define("ankamon.ui.table.StatusRenderer", {
       const S = ankamon.ui.table.StatusRenderer;
       if (S.ONLINE.includes(value)) {
         return S.__themeColor(["app-ok"], "#2fa84a");
+      }
+      if (S.PARTIAL.includes(value)) {
+        return S.__themeColor(["app-warning", "warning"], "#e08a00");
       }
       if (S.OFFLINE.includes(value)) {
         return S.__themeColor(["app-error", "error", "invalid"], "#d93025");
