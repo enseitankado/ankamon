@@ -593,9 +593,9 @@ qx.Class.define("ankamon.ui.Shell", {
         this.__dragItem = null;
       });
       item.addListener("dragover", e => {
-        // preventDefault burada "bırakmaya izin ver" demek (yerleşik HTML5 DnD terimi) — kendi
-        // üzerine bırakma hariç her zaman izin verilir. Yalnız ana düğüm (alt seçenek kendi düğümü içinde taşınır).
-        if (this.__dragItem && this.__dragItem !== item && this.__nodes.includes(this.__dragItem)) {
+        // qx'te dragover'da preventDefault bırakmayı YASAKLAR (HTML5'in tersi — eski kod onu "izin ver" sanıyordu ve
+        // sürükle-bırak hiç çalışmıyordu; 2026-11-10). Yalnız ana düğüm ana düğümün üzerine (alt seçenek kendi düğümünde).
+        if (!this.__dragItem || this.__dragItem === item || !this.__nodes.includes(this.__dragItem)) {
           e.preventDefault();
         }
       });
@@ -631,8 +631,9 @@ qx.Class.define("ankamon.ui.Shell", {
         this.__dragItem = null;
       });
       item.addListener("dragover", e => {
+        // qx: preventDefault = bu hedefe bırakılamaz. Yalnız aynı düğümün kardeşleri arasında.
         const dragged = this.__dragItem;
-        if (dragged && dragged !== item && dragged.getParent() === item.getParent()) {
+        if (!dragged || dragged === item || dragged.getParent() !== item.getParent()) {
           e.preventDefault();
         }
       });
