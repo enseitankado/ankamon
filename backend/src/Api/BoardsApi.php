@@ -72,12 +72,19 @@ final class BoardsApi
         -- (Varlıklar'la aynı ölçü: ağ taraması tahtanın kablolu/kablosuz MAC'ini çevrim içi görüyor) — SSH'e bağlı değil.
         -- SSH/sensör portu erişimi (b.online) ayrı: arayüzde «Yönetilebilir». SSH yanıt veriyorsa cihaz da canlıdır (ARP
         -- turları arasında net_devices gecikebilir), bu yüzden alive = online OR net_online.
-        EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online) AS net_online,
-        (b.online OR EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online)) AS alive,
+        -- Bayat ağ kaydı sayılmaz (kullanıcı bildirimi 2026-11-10, 192.168.23.181): tahta kapanınca SSH yoklaması hemen
+        -- düşer ama ağ taraması ancak 2 tur sonra çevrim dışı yazar; o arada tahta «açık» görünüyordu. SSH'in son
+        -- yanıtından (b.last_seen_at) sonra ağ taraması tahtayı yeniden görmediyse ağ kaydı canlılık kanıtı değildir.
+        EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
+                AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at)) AS net_online,
+        (b.online OR EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
+                AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at))) AS alive,
         -- «Yönetilebilir» TEK ölçüt (kullanıcı isteği 2026-11-10): tahtaya SSH ile root girişi BAŞARILI — son 3 dakikada
         -- başarılı oturum yoklaması (worker tasks/session_probe: SSH portu açık her tahtaya 30 sn'de bir ssh_access
         -- kullanıcısıyla — root — ve tahtaya özel parola varsa onunla giriş yapar). Port açıklığı, sensör toplama vb. sayılmaz.
-        COALESCE(b.session_checked_at > now() - interval '3 minutes', false) AS manageable,
+        -- Yoklama başarısı SSH portu şu an yanıt verirken geçerlidir (ssh_ok, board_status): tahta kapanınca 3 dk boyunca
+        -- «Evet» kalıyor, ekran kutucuğu ise «yönetilemiyor» diyordu (kullanıcı bildirimi 2026-11-10).
+        COALESCE(b.ssh_ok AND b.session_checked_at > now() - interval '3 minutes', false) AS manageable,
         COALESCE((b.ssh_ok AND (b.session_checked_at IS NULL OR b.session_checked_at < now() - interval '3 minutes')), false)
             AS ssh_login_failing";
 
