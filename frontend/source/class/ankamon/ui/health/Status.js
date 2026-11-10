@@ -26,7 +26,7 @@
  */
 
 /**
- * Tahta sağlığı ▸ Durum: her tahtanın şu anki sağlığı tek yerde (bkz. backend BoardHealthApi, GET /api/board-health).
+ * Sağlık ▸ Durum: her tahtanın şu anki sağlığı tek yerde (bkz. backend BoardHealthApi, GET /api/board-health).
  *
  * Bulgular iki yoldan gelir ve her satırda hangisinden geldiği yazar:
  *   - Sürekli izleme: Ankamon tahtaya BAĞLANMADAN, tahtanın gönderdiği loglardan, kendi okuduğu ölçümlerden ve daha önce
@@ -71,7 +71,10 @@ qx.Class.define("ankamon.ui.health.Status", {
       { id: "board", label: "Tahta", width: 200 },
       { id: "online", label: "Açık mı", width: 90 },
       { id: "level", label: "Durum", width: 90 },
-      { id: "watch", label: "Sürekli izleme (şu an)", width: 300 },
+      // Durum = iki yolun EN KÖTÜSÜ; her yolun kendi sütunu düzeyiyle yazılır (kullanıcı isteği 2026-11-10: Durum "Acil"
+      // iken sürekli izleme "Sorun yok" diyordu — acil bulgu SSH denetimindendi ve hiçbir sütunda görünmüyordu).
+      { id: "watch", label: "Sürekli izleme (şu an)", width: 260 },
+      { id: "ssh", label: "SSH denetimi (son)", width: 260, hint: "Tahtanın en son SSH denetiminin Acil/Dikkat bulguları" },
       // İki yolun en yeni bakışı (SSH denetimi zamanı ya da sürekli izlemenin en yeni bulgusu) ve toplam bulgu sayıları;
       // 10 saatten yeniyse geçen süre ("2 saat 23 dk önce" — kullanıcı isteği).
       { id: "last", label: "Son denetim / bulgu", width: 300, hint: "Son SSH denetimi ya da sürekli izlemenin en yeni bulgusu" },
@@ -218,12 +221,20 @@ qx.Class.define("ankamon.ui.health.Status", {
       this.__boardRows = (data.boards || []).map(b => {
         boardIds.add(b.id);
         const list = byBoard.get(b.id) || [];
-        const watch = list.filter(f => f.path === "watch");
         const worst = list.reduce((w, f) => (order[f.level] > order[w] ? f.level : w), "ok");
-        const last = this.__lastText(list, paths.includes("ssh") ? b.ssh || false : null, when);
-        const watchText = !paths.includes("watch") ? "—"
-          : watch.length ? [...new Set(watch.map(f => f.check))].join(", ") : "Sorun yok";
-        return { id: b.id, name: b.name, cells: [b.id, b.name, b.online ? "Açık" : "Kapalı", text(worst), watchText, last, list.length] };
+        const ssh = paths.includes("ssh") ? b.ssh || false : null;
+        const last = this.__lastText(list, ssh, when);
+        const watchText = paths.includes("watch") ? this.__pathText(list.filter(f => f.path === "watch")) : "—";
+        let sshText = "—";
+        if (ssh === false) {
+          sshText = "Hiç denetlenmedi";
+        } else if (ssh) {
+          // Denetlenemeyen tahtada "Denetlenemedi" bilgi bulgusu ayrıca sayılmaz (nedeni ipucunda/alt tabloda).
+          const sshFindings = list.filter(f => f.path === "ssh" && f.check !== "Denetlenemedi");
+          sshText = ssh.status === "ok" ? this.__pathText(sshFindings)
+            : ["Denetlenemedi"].concat(sshFindings.length ? [this.__pathText(sshFindings)] : []).join(" · ");
+        }
+        return { id: b.id, name: b.name, cells: [b.id, b.name, b.online ? "Açık" : "Kapalı", text(worst), watchText, sshText, last, list.length] };
       });
       // Kaydı silinmiş tahtanın süren bulguları da görünsün.
       byBoard.forEach((list, key) => {
@@ -232,7 +243,8 @@ qx.Class.define("ankamon.ui.health.Status", {
         }
         const worst = list.reduce((w, f) => (order[f.level] > order[w] ? f.level : w), "ok");
         this.__boardRows.push({ id: key, name: list[0].board, cells: [key, list[0].board || "?", "—", text(worst),
-          [...new Set(list.map(f => f.check))].join(", "), this.__lastText(list, null, when), list.length] });
+          this.__pathText(list.filter(f => f.path === "watch")), this.__pathText(list.filter(f => f.path === "ssh")),
+          this.__lastText(list, null, when), list.length] });
       });
       this.__boardRows.sort((a, b) => (order[this.__levelKey(b.cells[3])] - order[this.__levelKey(a.cells[3])]) ||
         String(a.name).localeCompare(String(b.name), "tr", { numeric: true }));
@@ -275,6 +287,19 @@ qx.Class.define("ankamon.ui.health.Status", {
         parts.push("SSH: denetlenemedi");
       }
       return parts.filter(Boolean).join(" · ");
+    },
+
+    /**
+     * Bir yolun bulguları düzeyiyle: "Acil: SMART hatası · Dikkat: Disk doluluğu"; bulgu yoksa "Sorun yok". Durum
+     * sütunuyla aynı düzey adları (bkz. levelText) — iki sütun Durum'u açıklar, çelişmez.
+     */
+    __pathText(findings) {
+      const text = ankamon.ui.health.Status.levelText;
+      const parts = ["bad", "warn", "info"].map(level => {
+        const checks = [...new Set(findings.filter(f => f.level === level).map(f => f.check))];
+        return checks.length ? `${text(level)}: ${checks.join(", ")}` : "";
+      }).filter(Boolean);
+      return parts.length ? parts.join(" · ") : "Sorun yok";
     },
 
     __levelKey(label) {

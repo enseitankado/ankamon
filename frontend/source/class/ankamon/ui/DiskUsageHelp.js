@@ -280,7 +280,7 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
         case "ntfy":
           return {
             rows: [
-              ["Ne?", "Tahta sağlığı ▸ Bildirimler'in gönderdiği (ya da gönderemediği) ntfy bildirimlerinin kaydı; kural başına listelenir."],
+              ["Ne?", "Sağlık ▸ Bildirimler'in gönderdiği (ya da gönderemediği) ntfy bildirimlerinin kaydı; kural başına listelenir."],
               ["Nerede?", `${pg}, <code>ntfy_messages</code> tablosu.`],
               ["Saklama", "<b>Süresiz</b> — otomatik silme yok; kayıt sayısı kuralların saatlik sınırıyla kısıtlıdır."]
             ],

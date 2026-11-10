@@ -44,7 +44,6 @@ final class SettingsApi
             'ssh_access' => self::redacted(Settings::get('ssh_access')),
             'samba_access' => self::redacted(Settings::get('samba_access')),
             'screen_vnc_autoinstall' => (bool) Settings::get('screen_vnc_autoinstall'),
-            'network_roles' => Settings::get('network_roles'),
             'organization' => Settings::get('organization'),
             'interfaces' => self::interfaces(),
             'syslog_port' => (int) (getenv('SYSLOG_PORT') ?: 514),
@@ -64,10 +63,6 @@ final class SettingsApi
         if ($request->input('screen_vnc_autoinstall') !== null) {
             Settings::set('screen_vnc_autoinstall', (bool) $request->input('screen_vnc_autoinstall'));
             $changed[] = 'screen_vnc_autoinstall';
-        }
-        if (is_array($roles = $request->input('network_roles'))) {
-            Settings::set('network_roles', self::roles($roles));
-            $changed[] = 'network_roles';
         }
         if (is_array($org = $request->input('organization'))) {
             Settings::set('organization', [
@@ -96,16 +91,23 @@ final class SettingsApi
     }
 
     /**
-     * Sunucunun fiziksel ağ arabirimleri (konteyner host ağında: gerçek kartlar). Docker köprüleri,
-     * sanal eşler ve döngü atlanır. [{name, up, addresses: ["192.168.1.5/24", …]}]
+     * Sunucunun işletim sistemindeki ağ arabirimleri (konteyner host ağında: host'un kartları — Ayarlar ▸ Ağ arabirimleri).
+     * Ankamon bütün hizmetlerini bunların HEPSİ üzerinden yürütür; tahta ağı / idari ağ ayrımı yok (kullanıcı isteği
+     * 2026-11-10). Yalnız döngü (lo) ve Docker'ın kendi iç arabirimleri (docker0, br-*, veth*) atlanır.
+     * [{name, up, kind: "wired"|"wireless"|"virtual", mac, speed (Mbit/sn ya da null), addresses: ["192.168.1.5/24", …]}]
      */
     private static function interfaces(): array
     {
         $list = [];
         foreach (net_get_interfaces() ?: [] as $name => $info) {
-            if ($name === 'lo' || preg_match('/^(docker|br-|veth|virbr|tun|tap|wg)/', (string) $name)) {
+            $name = (string) $name;
+            if ($name === 'lo' || preg_match('/^(docker|br-|veth)/', $name) || !preg_match('/^[A-Za-z0-9_.:@-]{1,32}$/', $name)) {
                 continue;
             }
+            $sys = "/sys/class/net/$name";
+            $kind = is_dir("$sys/wireless") || is_link("$sys/phy80211") ? 'wireless' : (file_exists("$sys/device") ? 'wired' : 'virtual');
+            $mac = is_readable("$sys/address") ? trim((string) @file_get_contents("$sys/address")) : '';
+            $speed = is_readable("$sys/speed") ? (int) trim((string) @file_get_contents("$sys/speed")) : 0;
             $addresses = [];
             foreach ($info['unicast'] ?? [] as $u) {
                 if (($u['family'] ?? 0) === 2 /* AF_INET; sockets eklentisi yok */ && isset($u['address'], $u['netmask'])) {
@@ -113,27 +115,15 @@ final class SettingsApi
                     $addresses[] = $u['address'] . '/' . $bits;
                 }
             }
-            $list[] = ['name' => (string) $name, 'up' => (bool) ($info['up'] ?? false), 'addresses' => $addresses];
+            $list[] = [
+                'name' => $name, 'up' => (bool) ($info['up'] ?? false), 'kind' => $kind,
+                'mac' => $mac !== '00:00:00:00:00:00' ? $mac : '', 'speed' => $speed > 0 ? $speed : null, 'addresses' => $addresses,
+            ];
         }
-        usort($list, fn ($a, $b) => strnatcmp($a['name'], $b['name']));
+        // Önce fiziksel kartlar (kablolu, kablosuz), sonra sanal arabirimler; her grupta ada göre.
+        $rank = ['wired' => 0, 'wireless' => 1, 'virtual' => 2];
+        usort($list, fn ($a, $b) => ($rank[$a['kind']] <=> $rank[$b['kind']]) ?: strnatcmp($a['name'], $b['name']));
         return $list;
-    }
-
-    /** Ağ rolleri girdisi: arabirim adı ya da boş (otomatik). İki rol aynı arabirim olamaz. */
-    private static function roles(array $input): array
-    {
-        $roles = [];
-        foreach (['board_iface', 'admin_iface'] as $key) {
-            $name = trim((string) ($input[$key] ?? ''));
-            if ($name !== '' && !preg_match('/^[A-Za-z0-9_.:-]{1,15}$/', $name)) {
-                throw ApiError::badRequest('Geçersiz arabirim adı.');
-            }
-            $roles[$key] = $name;
-        }
-        if ($roles['board_iface'] !== '' && $roles['board_iface'] === $roles['admin_iface']) {
-            throw ApiError::badRequest('Tahta ağı ve idari ağ için farklı arabirimler seçin.');
-        }
-        return $roles;
     }
 
     private static function redacted(array $access): array

@@ -26,7 +26,7 @@
  */
 
 /**
- * Tahta sağlığı ▸ Yardım ▸ Denetim türleri: satıra çift tıklayınca açılan pencere. Grid'de sığmayan uzun metinler (nasıl
+ * Sağlık ▸ Yardım ▸ Denetim türleri: satıra çift tıklayınca açılan pencere. Grid'de sığmayan uzun metinler (nasıl
  * bakılır, ne arar) burada tam okunur; yönetici denetimin ayarlarını değiştirebilir (kullanıcı isteği):
  *   - Sürekli izleme türü: sıklık, bulgu düzeyi, anlık taranır (yalnız anlık yoklaması olan türde) —
  *     PUT /api/anomaly-kinds (bkz. backend AnomaliesApi::updateKind; worker anomaly._due sıklığı uygular).

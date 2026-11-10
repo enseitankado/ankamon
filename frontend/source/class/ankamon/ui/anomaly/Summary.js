@@ -26,26 +26,26 @@
  */
 
 /**
- * Anomaliler ▸ Özet: seçili dönemde tahta (ve tür) başına anomali sayısı, toplam/en uzun süre,
- * son başlangıç, şu an sürüyor mu. Süreler döneme kırpılır (dönem başından önce başlayan kaydın yalnız
- * dönem içindeki kısmı sayılır). Sütun süzgeçli (bkz. page.Base _addColumnFilters). Çift tık → Geçmiş
- * sekmesi o tahtaya süzülür. Her sütun başlığının ve hücrenin açıklayıcı ipucu var (kullanıcı isteği; bkz. HINTS ve
- * ui.table.HintRenderer).
+ * Sağlık ▸ Geçmiş'in üst bölmesi (eski "Özet" sekmesi — bkz. ui.anomaly.Records): seçili dönemde tahta (ve tür) başına
+ * anomali sayısı, toplam/en uzun süre, son başlangıç, şu an sürüyor mu. Süreler döneme kırpılır (dönem başından önce
+ * başlayan kaydın yalnız dönem içindeki kısmı sayılır). Sütun süzgeçli (bkz. page.Base _addColumnFilters). Satır seçilince
+ * alttaki kayıtlar o tahtanın o bulgusuna süzülür (onSelect). Her sütun başlığının ve hücrenin açıklayıcı ipucu var
+ * (kullanıcı isteği; bkz. HINTS ve ui.table.HintRenderer).
  */
 qx.Class.define("ankamon.ui.anomaly.Summary", {
-  extend: qx.ui.tabview.Page,
+  extend: qx.ui.container.Composite,
 
-  /** @param page {ankamon.page.Anomalies} */
-  construct(page) {
-    super("Özet");
-    this.setUserData("key", "summary"); // sekme kimliği etiketten bağımsız (sol menü yaprağı, hatırlanan sekme)
-    this.setLayout(new qx.ui.layout.VBox(8));
-    this.setPadding(8);
+  /**
+   * @param page {ankamon.page.Anomalies}
+   * @param onSelect {Function} (tahta, bulgu) — seçim kalkınca (null, null)
+   */
+  construct(page, onSelect) {
+    super(new qx.ui.layout.VBox(4));
 
     // Tahta ve Anomali her zaman hazır listeli (kullanıcı isteği): satır azken (her tahtanın birkaç türü)
     // otomatik karar "değer sayısı satır sayısına yakın" diye listeyi gizliyordu (bkz. Base.choicesSuitable).
     this.__columns = [
-      { id: "board", label: "Tahta", width: 200, choices: true, hint: "Bulgunun görüldüğü tahta. Çift tık: o tahtanın kayıtları (Geçmiş)" },
+      { id: "board", label: "Tahta", width: 200, choices: true, hint: "Bulgunun görüldüğü tahta. Satırı seçin: aşağıda yalnız onun kayıtları" },
       { id: "kind", label: "Anomali", width: 140, choices: true, hint: "Bulgu türü (sürekli izleme denetimi); ayrıntısı Yardım ▸ Denetim türleri'nde" },
       { id: "count", label: "Sayı", width: 70, hint: "Seçili rapor döneminde bu bulgunun kaç kez başladığı" },
       { id: "total", label: "Toplam süre", width: 130, hint: "Dönem içinde toplam sürdüğü zaman (dönem başından önce başlayan kaydın yalnız dönem içindeki kısmı sayılır)" },
@@ -57,7 +57,7 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
     // Hücre ipuçları: değerin ne anlama geldiği, satırın kendi sayılarıyla.
     const F = ankamon.util.Format;
     const hints = {
-      board: g => `${g.board}: bu dönemde ${g.count} kez "${g.kind}". Çift tık: bu tahtanın kayıtları (Geçmiş)`,
+      board: g => `${g.board}: bu dönemde ${g.count} kez "${g.kind}". Seçin: aşağıda yalnız bu kayıtlar`,
       kind: g => `${g.kind}${g.desc ? ": " + g.desc : ""}`,
       count: g => `Seçili dönemde ${g.count} kez başladı`,
       total: g => `Dönem içinde toplam ${F.span(g.total)} sürdü (dönem başından önce başlayan kaydın yalnız dönem içi kısmı sayılır)`,
@@ -77,13 +77,12 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
       const cmp = (a, b) => this.__rawOf(a)[key] - this.__rawOf(b)[key];
       model.setSortMethods(col, { ascending: cmp, descending: (a, b) => cmp(b, a) });
     });
-    this.__table.addListener("cellDbltap", e => {
-      const board = model.getValue(1, e.getRow());
-      if (board) {
-        page.showBoard(board);
-      }
+    const sm = this.__table.getSelectionModel();
+    sm.addListener("changeSelection", () => {
+      const row = sm.isSelectionEmpty() ? null : model.getRowData(sm.getLeadSelectionIndex());
+      onSelect(row ? row[1] : null, row ? row[2] : null);
     });
-    this.__table.setToolTipText("Çift tıklayın: o tahtanın kayıtları (Geçmiş)");
+    this.__table.setToolTipText("Bir satır seçin: aşağıda yalnız o tahtanın o bulgusunun kayıtları görünür");
     this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this),
       { rows: () => this.__rows || [] });
     this.add(this.__table, { flex: 1 });
@@ -126,6 +125,13 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
           return [key, g.board, g.kind, g.count, F.span(g.total), F.span(g.longest),
             F.dateTime(g.lastAt * 1000), g.open ? "Sürüyor" : ""];
         });
+      this.__apply();
+    },
+
+    /** Tahta süzgecini verilen adla doldurur (Durum'dan çift tık). */
+    filterBoard(board) {
+      this.__table.getSelectionModel().resetSelection();
+      this.__filterFields.board.setValue(board || "");
       this.__apply();
     },
 

@@ -26,7 +26,7 @@
  */
 
 /**
- * Tahta sağlığı (sol menüde; eski "Bakım ▸ Bakım" sorun tespiti raporu ile "Anomaliler" tek bölümde): tahtaların donanım,
+ * Sağlık (sol menüde; eski "Bakım ▸ Bakım" sorun tespiti raporu ile "Anomaliler" tek bölümde): tahtaların donanım,
  * yazılım ve ağ sorunlarını önden görmek, aksiyon gereken durumları bulmak. Sayfa kimliği "anomalies" kalır (yetki,
  * nav_order, hatırlanan sekme kayıtları).
  *
@@ -39,8 +39,8 @@
  *  - "Durum" (ui.health.Status): her tahtanın şu anki sağlığı, iki yolun bulguları tek tabloda (GET /api/board-health).
  *  - "Denetle" (page.Diagnose; kimlik "reports", eski adı "Denetim raporları"): SSH denetimlerinin raporları (eski Bakım
  *    sekmesi). Durum'un hemen sağında (kullanıcı isteği).
- *  - "Geçmiş" / "Özet" (ui.anomaly.History / Summary): sürekli izleme kayıtları, seçili dönem. "Rapor dönemi" seçicisi
- *    sayfanın tepesinde değil bu iki sekmenin içinde (kullanıcı isteği); ikisi aynı dönemi gösterir (seçiciler eşzamanlı).
+ *  - "Geçmiş" (ui.anomaly.Records): sürekli izleme kayıtları, seçili dönem — üstte tahta × bulgu özeti, altta kayıtlar
+ *    (eski "Geçmiş" ve "Özet" sekmeleri birleşti — kullanıcı isteği 2026-11-10). "Rapor dönemi" seçicisi sekmenin içinde.
  *  - "Tara" (ui.anomaly.Scan): seçilen tahtalarda o an yoklama — sürekli izleme denetimleri ve tam SSH denetimi.
  *  - "Bildirimler" (ui.anomaly.Notifications).
  *  - "Yardım": iç sekmeler "Kılavuz" (page.MaintenanceHelp) ve "Denetim türleri" (ui.health.Catalog — eski ayrı
@@ -65,12 +65,8 @@ qx.Class.define("ankamon.page.Anomalies", {
       this.__reports = this.__hosted("reports", "Denetle", this.__reportsPage);
     }
     if (watch) {
-      this.__history = new ankamon.ui.anomaly.History(this);
-      this.__summary = new ankamon.ui.anomaly.Summary(this);
-      this.__history.addAt(this.__periodRow(), 0);
-      this.__summary.addAt(this.__periodRow(), 0);
+      this.__history = new ankamon.ui.anomaly.Records(this, this.__periodRow());
       this.__tabs.add(this.__history);
-      this.__tabs.add(this.__summary);
     }
     if (watch || ssh) {
       this.__scan = new ankamon.ui.anomaly.Scan(this);
@@ -113,7 +109,7 @@ qx.Class.define("ankamon.page.Anomalies", {
     /** [gün (0 = tümü), etiket] */
     PERIODS: [[1, "Son 24 saat"], [7, "Son 7 gün"], [30, "Son 30 gün"], [90, "Son 90 gün"], [365, "Son 1 yıl"], [0, "Tümü"]],
     /** Eski sekme kimlikleri (sol menü, hatırlanan sekme, bağlantılar) → yenisi. */
-    OLD_TABS: { "Anlık": "status", "diagnose": "reports", "catalog": "help" },
+    OLD_TABS: { "Anlık": "status", "diagnose": "reports", "catalog": "help", "summary": "Geçmiş" },
 
     /** Kaydın ayrıntı metni (türe göre). */
     describe(a) {
@@ -151,7 +147,6 @@ qx.Class.define("ankamon.page.Anomalies", {
     __tabs: null,
     __status: null,
     __history: null,
-    __summary: null,
     __reports: null,
     __reportsPage: null,
     __scan: null,
@@ -229,8 +224,7 @@ qx.Class.define("ankamon.page.Anomalies", {
           kindDesc: (data.kinds[a.kind] || {}).description || "",
           text: ankamon.page.Anomalies.describe(a)
         }));
-        this.__history.setData(rows);
-        this.__summary.setData(rows, from);
+        this.__history.setData(rows, from);
         this.__scan.setKinds(data.kinds, data.last_scan_job);
       } else if (this.__scan) {
         this.__scan.setKinds({}, null);
@@ -266,10 +260,10 @@ qx.Class.define("ankamon.page.Anomalies", {
       }
     },
 
-    /** Özet → o tahtanın Geçmiş'i (çift tık). */
+    /** Durum'dan → o tahtanın Geçmiş'i (çift tık). */
     showBoard(board) {
       this.__tabs.setSelection([this.__history]);
-      this.__history.filterBoard(board);
+      this.__history.showBoard(board);
     },
 
     /** Tara'da başlatılan SSH denetimi bitince raporuna geçmek için. */

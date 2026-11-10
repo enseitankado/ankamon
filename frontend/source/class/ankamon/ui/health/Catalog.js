@@ -26,7 +26,7 @@
  */
 
 /**
- * Tahta sağlığı ▸ Yardım ▸ Denetim türleri (eski ayrı "Denetimler" sekmesi; kullanıcı isteğiyle Yardım'ın içinde): Ankamon'un
+ * Sağlık ▸ Yardım ▸ Denetim türleri (eski ayrı "Denetimler" sekmesi; kullanıcı isteğiyle Yardım'ın içinde): Ankamon'un
  * tahtalara baktığı BÜTÜN denetimler tek tabloda — hangi yoldan (sürekli izleme / SSH denetimi), hangi kaynaktan, nasıl ve
  * ne sıklıkla bakıldığı, bulgu düzeyi ve anlık taranıp taranamadığı. Metinler uzun: satıra çift tıklayınca hepsi bir
  * pencerede okunur ve yönetici sıklık / bulgu düzeyi / anlık taranır ayarlarını değiştirir (bkz. ui.health.CheckTypeWindow).

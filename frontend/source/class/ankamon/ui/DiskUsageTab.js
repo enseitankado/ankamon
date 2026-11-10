@@ -259,6 +259,9 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
         (hadError ? "<br><span style='color:#c0392b'>Bazı kapsamlarda hata oluştu (yukarıya bakın).</span>" : "")
       );
       closeBtn.setEnabled(true);
+      if (deletedTotal || freed) {
+        ankamon.ui.DiskUsageSummary.invalidate(); // Özet göstergesi ve Genel bakış yeniden hesaplar
+      }
       if (this.__spec.onDeleted) {
         this.__spec.onDeleted();
       }

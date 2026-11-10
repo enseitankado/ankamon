@@ -26,7 +26,7 @@
  */
 
 /**
- * Tahta sağlığı ▸ Denetle (kimlik "reports"; eski "Denetim raporları", "Bakım ▸ Bakım", "Sorun tespiti"; bkz. page.Anomalies): SSH denetimi
+ * Sağlık ▸ Denetle (kimlik "reports"; eski "Denetim raporları", "Bakım ▸ Bakım", "Sorun tespiti"; bkz. page.Anomalies): SSH denetimi
  * raporları. YALNIZ tespit raporu (kullanıcı isteği — Tahtalar grid'i, Ekranlar vb. yok).
  *
  * Taramalar "diagnose" görevleridir (bkz. worker/ankamon/executor/diagnose.py): "Şimdi tara" o an
@@ -38,7 +38,7 @@
  * zamanlayıcı yalnız vadesi gelen tahtaları taradığından tek bir otomatik tarama çoğu kez 1-2 tahtalıktır; açılışta
  * en son taramayı göstermek "yalnız bu tahta mı taranıyor?" karışıklığı yaratıyordu (kullanıcı geri bildirimi).
  * Tek tek taramalar seçicide kalır. Sayfanın ne yaptığı ve otomatik tarama takvimi "Bakım" sekme kulakçığının
- * ipucunda (bindTabButton), ayrıntısı Tahta sağlığı ▸ Yardım sekmesinde (bkz. page.MaintenanceHelp).
+ * ipucunda (bindTabButton), ayrıntısı Sağlık ▸ Yardım sekmesinde (bkz. page.MaintenanceHelp).
  *
  * Rapor bir grid'dir: her tahta bir satır (Tahta, IP, Genel durum, Acil, Dikkat, Bilgi, Başlıca bulgu, Denetim zamanı,
  * Başlatan). Sütunlar sıralanabilir ve başlıktaki kutuyla süzülür (serbest yazım + hazır değer listesi; Tahta, Genel durum,

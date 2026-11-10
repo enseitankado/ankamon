@@ -27,7 +27,7 @@
 
 /**
  * Ayarlar: herkese açık "Görünüm" (tema) sekmesi + yalnız yöneticiye görünen "Tahta erişimi"
- * (SSH + Samba + ekran istemcisinin otomatik kurulumu), "Ağ arabirimleri" (tahta/idari ağ rolleri) ve
+ * (SSH + Samba + ekran istemcisinin otomatik kurulumu), "Ağ arabirimleri" (sunucunun kartları — yalnız liste) ve
  * "Ders saatleri" (ui.LessonTimesEditor, /api/lesson-times)
  * sekmeleri. Sayfa herkese açıktır (bkz. ui.Shell.PAGES); admin
  * olmayan kullanıcı yalnız kendi tema tercihini görür (sekme yok, tek bölüm doğrudan), `/settings`
@@ -37,24 +37,6 @@
  */
 qx.Class.define("ankamon.page.Settings", {
   extend: ankamon.page.Base,
-
-  statics: {
-    /**
-     * Ağ rolleri değiştiyse kayıt onayına eklenir: ayar yeniden başlatmasız geçerlidir ama her iş onu kendi
-     * sonraki çalışmasında okur (bkz. worker/ankamon/netroles.py ve netscan döngüleri).
-     */
-    NET_ROLES_NOTICE:
-      "<br><br><b>Ağ arabirimi seçimi</b> yeniden başlatma gerekmeden geçerli; işler yeni seçimi kendi " +
-      "sonraki çalışmalarında kullanır:" +
-      "<ul style='margin:6px 0 8px;padding-left:18px'>" +
-      "<li>Servis, paylaşım, etkinlik ve ad taramaları: hemen (o an taranan cihaz eski seçimle biter)</li>" +
-      "<li>Görülen akış gözlemi: en geç ~35 sn</li>" +
-      "<li>Loglardan tahta kaydı ve IP güncellemesi: en geç 1 dk</li>" +
-      "<li>Ağ taraması: bir sonraki taramada (yüke göre 30 sn – 5 dk); hemen başlatmak için " +
-      "Ağ ▸ <i>Şimdi tara</i></li>" +
-      "</ul>" +
-      "Artık tahta ağı sayılmayan ağlarda önceden bulunan cihazlar Ağ listesinde kalır, yalnız taranmaz."
-  },
 
   construct(user) {
     super(user, "Ayarlar");
@@ -86,7 +68,7 @@ qx.Class.define("ankamon.page.Settings", {
       org.text("name", "Kuruluş adı", (settings.organization || {}).name || "");
       org.text("code", "Kuruluş kodu", (settings.organization || {}).code || "");
       this.__section(orgPage, "Kuruluş",
-        "Okul ya da kurumun adı ve kodu (ör. MEB kurum kodu). Bildirim başlıklarında görünür; Tahta sağlığı ▸ Bildirimler'deki ntfy konu önerisi bunlardan türetilir.", org);
+        "Okul ya da kurumun adı ve kodu (ör. MEB kurum kodu). Bildirim başlıklarında görünür; Sağlık ▸ Bildirimler'deki ntfy konu önerisi bunlardan türetilir.", org);
       tabs.add(orgPage);
 
       const access = this.__page("Tahta erişimi");
@@ -116,29 +98,19 @@ qx.Class.define("ankamon.page.Settings", {
       ).set({ rich: true, wrap: true, textColor: "app-muted" }));
       tabs.add(access);
 
-      // Ağ rolleri (bkz. worker/ankamon/netroles.py): tahtalar her ağda MAC'iyle algılanır (2026-11-09); akış gözlemi
-      // ve sıradan cihazların ayrıntılı taramaları yalnız tahta ağında.
+      // Ağ arabirimleri (kullanıcı isteği 2026-11-10): tahta ağı / idari ağ ayrımı YOK — sunucunun bütün kartları listelenir
+      // ve Ankamon bütün hizmetlerini hepsi üzerinden yürütür (bkz. worker/ankamon/netroles.py, SettingsApi::interfaces).
       const netPage = this.__page("Ağ arabirimleri");
-      const roles = settings.network_roles || {};
-      const boardIface = this.__ifaceBox(settings.interfaces, roles.board_iface, "Otomatik (bağlı her ağ)");
-      const adminIface = this.__ifaceBox(settings.interfaces, roles.admin_iface, "Seçilmedi");
-      const netForm = new qx.ui.container.Composite(new qx.ui.layout.Grid(10, 8));
-      netForm.getLayout().setColumnFlex(1, 1);
-      netForm.add(new qx.ui.basic.Label("Tahta ağı"), { row: 0, column: 0 });
-      netForm.add(boardIface, { row: 0, column: 1 });
-      netForm.add(new qx.ui.basic.Label("İdari ağ"), { row: 1, column: 0 });
-      netForm.add(adminIface, { row: 1, column: 1 });
       this.__section(netPage, "Ağ arabirimleri",
-        "Sunucu tahta ağına ve idari ağa ayrı kartlarla bağlıysa hangisinin hangisi olduğunu seçin. " +
-        "<b>Tahtalar bütün ağ kartlarından algılanır</b>: cihaz keşfi her bağlı ağda yapılır ve bir cihazın tahta olup " +
-        "olmadığına MAC adresi karar verir (ETAP tahta önekleri; uymayan tahta Tahtayı düzenle'de \"Bu bir akıllı " +
-        "tahtadır\" ile işaretlenir). Loglardan tahta kaydı ve IP güncellemesi de MAC'e bakar (gönderenin MAC'i " +
-        "tahtanınkiyle eşleşmezse IP değişmez). <b>Yalnız tahta ağında</b> yapılanlar: görülen akış gözlemi ve " +
-        "sıradan cihazların servis/paylaşım/etkinlik taramaları (tahtalar her ağda taranır); tahtaların Samba parolası " +
-        "yalnız kayıtlı tahtalarda denenir. <b>İki ağda da</b> çalışanlar: panel, web terminal, log alımı " +
-        `(port ${settings.syslog_port}), Wake-on-LAN (tahtanın ağına, o arabirimin maskesiyle), ekran yansıtma ` +
-        "ve yerel ad duyurusu (Avahi). Yalnız idari ağ seçilirse, yalnız o karta bağlı ağlar dışındaki her ağ " +
-        "tahta ağı sayılır. İki kart aynı ağdaysa o ağ ikisi birden sayılır.", netForm);
+        "Sunucunun işletim sisteminde bulunan ağ kartları. Ankamon'un bütün giriş/çıkış hizmetleri bu kartların " +
+        "<b>hepsi</b> üzerinden çalışır; ağlar arasında rol ayrımı (tahta ağı / idari ağ) yoktur: panel ve web terminal, " +
+        `log alımı (port ${settings.syslog_port}), sensör okuma, SSH/Samba ile tahta yönetimi, ağ taraması ve görülen akış ` +
+        "gözlemi, servis/paylaşım/etkinlik taramaları, loglardan tahta kaydı, Wake-on-LAN (tahtanın bulunduğu ağa), ekran " +
+        "yansıtma ve yerel ad duyurusu (Avahi). Bir cihazın tahta olup olmadığına hangi ağda görüldüğü değil MAC adresi karar " +
+        "verir (ETAP tahta önekleri; uymayan tahta Tahtayı düzenle'de \"Bu bir akıllı tahtadır\" ile işaretlenir). Yeni bir " +
+        "kart takılınca ya da adresi değişince bir sonraki ağ taramasında kendiliğinden kullanılmaya başlar; ağ başına taramayı " +
+        "durdurmak için Ağ ▸ Varlıklar ▸ <i>Ağlar</i> düğmesi. Kartlar arasında IP yönlendirmesi yapılmaz (ağlar birbirine " +
+        "açılmaz).", this.__ifaceTable(settings.interfaces));
       tabs.add(netPage);
 
       const lessonsPage = this.__page("Ders saatleri");
@@ -162,21 +134,14 @@ qx.Class.define("ankamon.page.Settings", {
       const save = new qx.ui.form.Button("Kaydet").set({ allowGrowX: false, marginTop: 12 });
       save.addListener("execute", async () => {
         try {
-          const newRoles = {
-            board_iface: boardIface.getSelection()[0].getModel(),
-            admin_iface: adminIface.getSelection()[0].getModel()
-          };
           await ankamon.io.Api.put("/settings", {
             ssh_access: ssh.values(),
             samba_access: samba.values(),
             screen_vnc_autoinstall: vncAuto.getValue(),
-            network_roles: newRoles,
             organization: org.values()
           });
           await ankamon.io.Api.put("/lesson-times", lessons.getValue());
-          const rolesChanged = newRoles.board_iface !== (roles.board_iface || "") ||
-            newRoles.admin_iface !== (roles.admin_iface || "");
-          ankamon.ui.Dialog.alert("Ayarlar kaydedildi." + (rolesChanged ? ankamon.page.Settings.NET_ROLES_NOTICE : ""));
+          ankamon.ui.Dialog.alert("Ayarlar kaydedildi.");
           this.refresh();
         } catch (e) {
           ankamon.ui.Dialog.error(e);
@@ -232,23 +197,22 @@ qx.Class.define("ankamon.page.Settings", {
      * Arabirim seçimi: ilk seçenek boş değer (otomatik/seçilmedi), sonra sunucunun kartları ("eth1 —
      * 10.0.0.5/16"). Kayıtlı arabirim artık yoksa (kart söküldü) yine listede tutulur ki seçim kaybolmasın.
      */
-    __ifaceBox(interfaces, current, emptyLabel) {
-      const box = new qx.ui.form.SelectBox();
-      const items = [{ name: "", label: emptyLabel }].concat((interfaces || []).map(i => ({
-        name: i.name,
-        label: `${i.name} — ${i.addresses.length ? i.addresses.join(", ") : "IPv4 adresi yok"}${i.up ? "" : " (kapalı)"}`
-      })));
-      if (current && !items.some(i => i.name === current)) {
-        items.push({ name: current, label: `${current} — şu an bulunamadı` });
-      }
-      items.forEach(i => {
-        const item = new qx.ui.form.ListItem(i.label, null, i.name);
-        box.add(item);
-        if (i.name === (current || "")) {
-          box.setSelection([item]);
-        }
-      });
-      return box;
+    /** Sunucunun ağ kartları tablosu (SettingsApi::interfaces): ad, tür, durum, MAC, hız, IPv4 adresleri. */
+    __ifaceTable(interfaces) {
+      const esc = qx.bom.String.escape;
+      const KIND = { wired: "Kablolu", wireless: "Kablosuz", virtual: "Sanal" };
+      const list = interfaces || [];
+      const cell = "padding:4px 10px 4px 0;vertical-align:top";
+      const rows = list.map(i => `<tr><td style="${cell};font-weight:600">${esc(i.name)}</td>` +
+        `<td style="${cell}">${KIND[i.kind] || ""}</td>` +
+        `<td style="${cell};color:${i.up ? "#1e8e3e" : "#c5221f"}">${i.up ? "Açık" : "Kapalı"}</td>` +
+        `<td style="${cell};font-family:monospace">${esc(i.mac || "—")}</td>` +
+        `<td style="${cell}">${i.speed ? (i.speed >= 1000 ? i.speed / 1000 + " Gbit/sn" : i.speed + " Mbit/sn") : "—"}</td>` +
+        `<td style="${cell}">${i.addresses.length ? i.addresses.map(esc).join("<br>") : "<span style='opacity:.6'>IPv4 adresi yok</span>"}</td></tr>`).join("");
+      const head = ["Arabirim", "Tür", "Durum", "MAC", "Hız", "IPv4 adresi"].map(h => `<th style="${cell};text-align:left;opacity:.7">${h}</th>`).join("");
+      return new qx.ui.basic.Label(list.length
+        ? `<table style="border-collapse:collapse"><tr>${head}</tr>${rows}</table>`
+        : "Ağ arabirimi bulunamadı.").set({ rich: true, selectable: true });
     },
 
     /** Sekme sayfası: TabView.Page düz bir qx.ui.core.Widget değildir — VBox düzeni elle kurulur. */

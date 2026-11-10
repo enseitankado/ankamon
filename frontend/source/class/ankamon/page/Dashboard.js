@@ -33,8 +33,12 @@
  *  - "Toplam disk kullanımı" (yetki "logs.manage"): Disk kullanımı ▸ Özet'in daire grafiği, küçük. Hesabı yavaş
  *    olduğundan tampondan çizilir; tampon CACHE_MS'ten eskiyse arkada yeniden hesaplanır (bkz. ui.DiskUsageSummary).
  *    Dilime/satıra tıklama o veri türünün sekmesini açar.
- *  - "Tahta sağlığı — acil bulgular" (yetki "anomalies" ya da "diagnose"): Tahta sağlığı ▸ Durum'daki Acil bulgular
- *    (GET /api/board-health). Çift tık: Tahta sağlığı ▸ Durum.
+ *  - "Sağlık — acil bulgular" (yetki "anomalies" ya da "diagnose"): Sağlık ▸ Durum'daki Acil bulgular
+ *    (GET /api/board-health). Çift tık: Sağlık ▸ Durum.
+ *
+ * Düzen (kullanıcı isteği 2026-11-10: daha kompakt, basit; "Son görevler" altta kırpılıyordu): üstte küçük kartlar (geniş
+ * ekranda tek satır), ortada disk + acil bulgular (sabit, alçak), altta "Son hatalar" ve "Son görevler" YAN YANA —
+ * ikisi de kalan yüksekliğin tamamını alır, biri ötekini aşağı itmez.
  */
 qx.Class.define("ankamon.page.Dashboard", {
   extend: ankamon.page.Base,
@@ -47,7 +51,7 @@ qx.Class.define("ankamon.page.Dashboard", {
 
     // Kartlar sarılır (dar pencerede alt satıra geçer, değerler "…" ile kesilmez). Flow'un VBox içinde
     // sarması için genişliği sayfanınkine kilitlenir — bkz. Base.js'teki _actions için aynı not.
-    this.__stats = new qx.ui.container.Composite(new qx.ui.layout.Flow(12, 12));
+    this.__stats = new qx.ui.container.Composite(new qx.ui.layout.Flow(8, 8));
     this.add(this.__stats);
     this.addListener("resize", e => {
       const width = e.getData().width;
@@ -58,7 +62,14 @@ qx.Class.define("ankamon.page.Dashboard", {
 
     this.__createHealthRow();
 
-    this.add(new qx.ui.basic.Label("Son 24 saatte hata düzeyindeki kayıtlar").set({ font: "bold" }));
+    // Son hatalar | Son görevler: yan yana, kalan yüksekliğin tamamı (bkz. sınıf açıklaması).
+    const bottom = new qx.ui.container.Composite(new qx.ui.layout.HBox(16)).set({ minHeight: 180 });
+    const panel = title => {
+      const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
+      box.add(new qx.ui.basic.Label(title).set({ font: "bold" }));
+      return box;
+    };
+    const errorsBox = panel("Son 24 saatte hata düzeyindeki kayıtlar");
     this.__errors = this._createTable([
       { id: "time", label: "Zaman", width: 160 },
       { id: "label", label: "Takma ad", width: 150 },
@@ -67,20 +78,23 @@ qx.Class.define("ankamon.page.Dashboard", {
       { id: "program", label: "Program", width: 140 },
       { id: "message", label: "Mesaj" }
     ], { prefsKey: "dashboard.errors.columns" });
-    this.add(this.__errors, { flex: 2 });
+    errorsBox.add(this.__errors, { flex: 1 });
+    bottom.add(errorsBox, { flex: 3 });
     this.__addLogsMenu(this.__errors, id => {
       const row = this.__errorRows && this.__errorRows[id];
       return row && row.board_id ? [{ id: row.board_id, name: row.board_label || row.host }] : [];
     });
 
-    this.add(new qx.ui.basic.Label("Son görevler").set({ font: "bold" }));
+    const jobsBox = panel("Son görevler");
     this.__jobs = this._createTable([
-      { id: "time", label: "Zaman", width: 160 },
-      { id: "title", label: "Görev" },
-      { id: "status", label: "Durum", width: 120 },
+      { id: "time", label: "Zaman", width: 140 },
+      { id: "title", label: "Görev", width: 200 },
+      { id: "status", label: "Durum", width: 100 },
       { id: "summary", label: "Özet" }
     ], { prefsKey: "dashboard.jobs.columns" });
-    this.add(this.__jobs, { flex: 1 });
+    jobsBox.add(this.__jobs, { flex: 1 });
+    bottom.add(jobsBox, { flex: 2 });
+    this.add(bottom, { flex: 1 });
     this.__addLogsMenu(this.__jobs, id => {
       const job = (this.__jobRows || []).find(j => j.id === id);
       return job ? job.targets || [] : [];
@@ -89,7 +103,7 @@ qx.Class.define("ankamon.page.Dashboard", {
 
   statics: {
     /** Disk ve acil bulgular satırının yüksekliği (px). */
-    HEALTH_ROW_HEIGHT: 300
+    HEALTH_ROW_HEIGHT: 210
   },
 
   members: {
@@ -104,7 +118,7 @@ qx.Class.define("ankamon.page.Dashboard", {
     __errorRows: null,
     __jobRows: null,
 
-    /** Kartların altındaki satır: toplam disk kullanımı + Tahta sağlığı acil bulguları (yetkiye göre). */
+    /** Kartların altındaki satır: toplam disk kullanımı + Sağlık acil bulguları (yetkiye göre). */
     __createHealthRow() {
       const disk = this._can("logs.manage");
       const health = this._can("anomalies") || this._can("diagnose");
@@ -119,7 +133,7 @@ qx.Class.define("ankamon.page.Dashboard", {
         this.__diskNote = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true });
         head.add(this.__diskNote);
         box.add(head);
-        this.__diskHtml = new qx.ui.embed.Html("").set({ overflowY: "auto", minWidth: 470 });
+        this.__diskHtml = new qx.ui.embed.Html("").set({ overflowY: "auto", minWidth: 400 });
         this.__diskHtml.addListenerOnce("appear", () => {
           this.__diskHtml.getContentElement().getDomElement().addEventListener("click", e => {
             const hit = e.target.closest && e.target.closest("[data-mode]");
@@ -133,7 +147,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       }
       if (health) {
         const box = new qx.ui.container.Composite(new qx.ui.layout.VBox(4));
-        this.__urgentTitle = new qx.ui.basic.Label("Tahta sağlığı — acil bulgular").set({ font: "bold" });
+        this.__urgentTitle = new qx.ui.basic.Label("Sağlık — acil bulgular").set({ font: "bold" });
         box.add(this.__urgentTitle);
         this.__urgent = this._createTable([
           { id: "board", label: "Tahta", width: 150 },
@@ -142,7 +156,7 @@ qx.Class.define("ankamon.page.Dashboard", {
           { id: "at", label: "Zaman", width: 140 },
           { id: "text", label: "Ayrıntı" }
         ], { prefsKey: "dashboard.urgent.columns" });
-        this.__urgent.setToolTipText("Çift tıklayın: Tahta sağlığı ▸ Durum");
+        this.__urgent.setToolTipText("Çift tıklayın: Sağlık ▸ Durum");
         this.__urgent.addListener("cellDbltap", () =>
           qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "anomalies", tab: "status" }));
         box.add(this.__urgent, { flex: 1 });
@@ -161,7 +175,7 @@ qx.Class.define("ankamon.page.Dashboard", {
         if (this.isDisposed() || !res) {
           return;
         }
-        this.__diskHtml.setHtml(S.html(res.items, res.disk, { radius: 75, font: 12 }));
+        this.__diskHtml.setHtml(S.html(res.items, res.disk, { radius: 55, font: 11 }));
         this.__diskNote.setValue(`hesaplandı: ${ankamon.util.Format.ago(Math.floor(res.at / 1000))}`);
       };
       const cached = S.cached();
@@ -178,7 +192,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       }
     },
 
-    /** Tahta sağlığı ▸ Durum'daki Acil bulgular. */
+    /** Sağlık ▸ Durum'daki Acil bulgular. */
     async __refreshUrgent() {
       if (!this.__urgent) {
         return;
@@ -196,8 +210,8 @@ qx.Class.define("ankamon.page.Dashboard", {
       }
       const bad = (data.findings || []).filter(f => f.level === "bad");
       const boards = new Set(bad.map(f => f.board_id ?? f.board));
-      this.__urgentTitle.setValue(bad.length ? `Tahta sağlığı — acil bulgular (${boards.size} tahtada ${bad.length})`
-        : "Tahta sağlığı — acil bulgu yok");
+      this.__urgentTitle.setValue(bad.length ? `Sağlık — acil bulgular (${boards.size} tahtada ${bad.length})`
+        : "Sağlık — acil bulgu yok");
       this.__urgent.getTableModel().setData(bad.map((f, i) => [i, f.board || "?", f.check, P[f.path] ? P[f.path].text : f.path,
         f.since ? ankamon.ui.health.Status.when(f.since) : "", (f.text || "") + (f.advice ? ` — Öneri: ${f.advice}` : "")]));
     },
@@ -471,9 +485,10 @@ qx.Class.define("ankamon.page.Dashboard", {
      */
     __card(label, value, color, sub, richTip, target) {
       const border = new qx.ui.decoration.Decorator().set({ radius: 8, width: 1, color: "app-border" });
-      const card = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({
-        padding: 14,
-        minWidth: 150,
+      // Kompakt (kullanıcı isteği 2026-11-10: göstergeler küçük): az dolgu, küçük yazı.
+      const card = new qx.ui.container.Composite(new qx.ui.layout.VBox(1)).set({
+        padding: [6, 10],
+        minWidth: 112,
         backgroundColor: "surface",
         decorator: border
       });
@@ -492,9 +507,11 @@ qx.Class.define("ankamon.page.Dashboard", {
         card.setToolTip(toolTip);
         qx.util.DisposeUtil.disposeTriggeredBy(toolTip, card); // kartlar her yenilemede atılıyor
       }
-      card.add(new qx.ui.basic.Label(label).set({ textColor: "app-muted", font: "bold" }));
-      card.add(new qx.ui.basic.Label(String(value)).set({ font: "app-stat", textColor: color || "primary" }));
-      card.add(new qx.ui.basic.Label(sub || " ").set({ textColor: "app-muted" }));
+      card.add(new qx.ui.basic.Label(label).set({ textColor: "app-muted", font: "small" }));
+      // Değer: temanın yazı ailesiyle, sabit (küçültülmüş) boyutta.
+      card.add(new qx.ui.basic.Label(`<span style="font-size:20px;font-weight:600;line-height:1.15">${qx.bom.String.escape(String(value))}</span>`)
+        .set({ rich: true, textColor: color || "primary" }));
+      card.add(new qx.ui.basic.Label(sub || " ").set({ textColor: "app-muted", font: "small" }));
       return card;
     }
   }

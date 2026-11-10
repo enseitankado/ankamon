@@ -113,6 +113,12 @@ qx.Class.define("ankamon.ui.Shell", {
     qx.event.message.Bus.subscribe(ankamon.ui.Shell.OPEN_LOGS_MODE, msg => this.__openLogsMode(msg.getData()));
     // Genel bakış kartları (bkz. page.Dashboard __target) buradan sayfa/pencere açar.
     qx.event.message.Bus.subscribe(ankamon.ui.Shell.OPEN_PAGE, msg => this.__openPage(msg.getData()));
+    // Varlık grupları: Varlıklar ▸ <grup> düğümleri sunucudaki gruplarla eşitlenir (açılışta ve grup değişince).
+    qx.event.message.Bus.subscribe(ankamon.ui.network.Ops.GROUPS_CHANGED, msg => this.__syncAssetGroups(msg.getData().groups));
+    const networkPage = ankamon.ui.Shell.PAGES.find(p => p.id === "network");
+    if (this.__allowed(networkPage)) {
+      ankamon.io.Api.get("/network/groups").then(data => this.__syncAssetGroups(data.groups || [])).catch(() => {});
+    }
     // Sekmeli sayfa sekmesini kendisi değiştirince (ör. Disk kullanımı ▸ Özet'te dilime tıklama) ağaçtaki
     // vurgu da o sekmenin yaprağına geçer.
     qx.event.message.Bus.subscribe(ankamon.page.Base.TAB_CHANGED, msg => {
@@ -173,18 +179,20 @@ qx.Class.define("ankamon.ui.Shell", {
       // Bilgisayarlar'ın altında (kullanıcı isteği 2026-11-09); simge tek renkli metin karakteri (♛ — 🏆 emoji sarı çiziliyordu).
       // Simgesiz (kullanıcı isteği 2026-11-10: noIcon). "Ders arası sıralaması" → "Teneffüsler"; sayfadaki "Kullanıcılar /
       // Tahtalar" seçimi kalktı, her sıralamanın altında Kullanıcılar ve Bilgisayarlar yaprağı (group — bkz. __buildNode).
-      { id: "leagues", label: "Ligler", feature: "logs", parent: "boards", collapsed: true, noIcon: true, create: u => new ankamon.page.Leagues(u),
+      // Akıllı Tahtalar'ın altında (kullanıcı isteği 2026-11-10: underSelf — üst düğümün kendi seçeneğinin altında).
+      { id: "leagues", label: "Ligler", feature: "logs", parent: "boards", underSelf: true, collapsed: true, noIcon: true, create: u => new ankamon.page.Leagues(u),
         tabs: () => ankamon.page.Leagues.TABS.map(tab => ({ key: tab.key, label: tab.label, group: tab.group })) },
-      // Tahta sağlığı: sorun tespiti (SSH denetimi) ile anomaliler (sürekli izleme) tek bölümde — bkz. page.Anomalies,
+      // Sağlık: sorun tespiti (SSH denetimi) ile anomaliler (sürekli izleme) tek bölümde — bkz. page.Anomalies,
       // ui.health.Status. Kimlik "anomalies" kalır (nav_order, hatırlanan sekme); features: ikisinden biri yeterli, sekme
       // başına yetki sayfanın içinde. Eski "Bakım ▸ Bakım/Yardım" bağlantıları __openPage'de buraya yönlenir.
-      { id: "anomalies", label: "Tahta sağlığı", features: ["anomalies", "diagnose"], collapsed: true, create: u => new ankamon.page.Anomalies(u),
+      // Etiket "Sağlık" (kullanıcı isteği 2026-11-10).
+      { id: "anomalies", label: "Sağlık", features: ["anomalies", "diagnose"], collapsed: true, create: u => new ankamon.page.Anomalies(u),
         tabs: [{ key: "status", label: "Durum" }, { key: "reports", label: "Denetle", feature: "diagnose" },
-          { key: "Geçmiş", label: "Geçmiş", feature: "anomalies" }, { key: "summary", label: "Özet", feature: "anomalies" },
+          { key: "Geçmiş", label: "Geçmiş", feature: "anomalies" },
           { key: "Tarama", label: "Tara" },
           { key: "notifications", label: "Bildirimler", feature: "anomalies" }, { key: "help", label: "Yardım" }] },
       // Bakım: "Sensörler" (Grafana) ve eklenti sekmeleri (ör. Ahenk) — bkz. page.Maintenance. Sorun tespiti raporu
-      // "Tahta sağlığı"na taşındı. features: herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı
+      // "Sağlık"a taşındı. features: herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı
       // isteği); eski {page: "metrics"} bağlantıları __openPage'de buraya yönlenir. id "diagnose" kalır
       // (nav_order / nav.open kayıtları). Oturumlar'ın altında (kullanıcı isteği).
       // tabs: sayfanın sekmeleri ağaçta düğümün ALT seçenekleri de (kullanıcı isteği); sayfadaki sekme çubuğu
@@ -197,8 +205,9 @@ qx.Class.define("ankamon.ui.Shell", {
       // doğrudan Tahtalar'ın altında. Tahtalar kullanıcıya kapalıysa kökte kendi düğümüyle ("Sensörler") durur.
       { id: "diagnose", label: "Sensörler", parent: "boards", inline: true, features: ["metrics", "diagnose"], collapsed: true,
         create: u => new ankamon.page.Maintenance(u),
+        // Eklenti sekmeleri (Ahenk) Akıllı Tahtalar'ın altında (underSelf — kullanıcı isteği 2026-11-10); Sensörler Ağ'ın altında.
         tabs: () => [{ key: "metrics", label: "Sensörler", feature: "metrics" }]
-          .concat(ankamon.ext.Extensions.maintenanceTabs().map(t => ({ key: t.key, label: t.label, feature: t.feature }))) },
+          .concat(ankamon.ext.Extensions.maintenanceTabs().map(t => ({ key: t.key, label: t.label, feature: t.feature, underSelf: true }))) },
       // Loglar Sistem'in altında (kullanıcı isteği 2026-11-06); Sistem'e yetkisi olmayanlarda kökte (bkz. __createTree).
       { id: "logs", label: "Loglar", feature: "logs", parent: "system", collapsed: true, noIcon: true, create: u => new ankamon.page.Logs(u),
         tabs: () => ankamon.ui.Shell.LOG_KINDS.map(kind => ({ key: kind.mode, label: kind.label })) },
@@ -207,7 +216,10 @@ qx.Class.define("ankamon.ui.Shell", {
       // 2026-11-09); o kullanıcıya kapalıysa kökte.
       // Ağ ▸ Varlıklar (kullanıcı isteği 2026-11-10: eski "Ağ ▸ Liste", simgesiz); first: üst düğümün kendi seçeneğinden
       // (Akıllı Tahtalar) önce. Akıllı Tahtalar listesi buradaki "Akıllı tahta" türlü satırlardan belirlenir (bkz. BoardsApi LISTED).
-      { id: "network", label: "Varlıklar", feature: "network", parent: "boards", first: true, noIcon: true, create: u => new ankamon.page.Network(u) },
+      // Varlıklar ▸ Tüm Varlıklar (selfLeaf) + kullanıcının varlık grupları (kullanıcı isteği 2026-11-10; düğümler sunucudan
+      // gelir — bkz. __syncAssetGroups). Grup seçilince AYNI sayfa o grubun üyelerine süzülür (page.Network setGroup).
+      { id: "network", label: "Varlıklar", feature: "network", parent: "boards", first: true, noIcon: true, selfLeaf: "Tüm Varlıklar",
+        create: u => new ankamon.page.Network(u) },
       // Ankamon'un kendi bakımı (servisler, zamanlanmış işler, veritabanı, yapılandırma) — yalnız yönetici.
       { id: "system", label: "Sistem", admin: true, retap: true, create: u => new ankamon.page.System(u) },
       // Kullanıcılar ve Ayarlar "Sistem"in altında (kullanıcı isteği).
@@ -355,6 +367,8 @@ qx.Class.define("ankamon.ui.Shell", {
         if (item.getUserData("page").id === "network") {
           // "Ağ" kökü: bütün ağlar (0); alt düğüm: o ağ. Sayfa gösterilmeden önce (tek yenileme).
           this.__widget(item.getUserData("page")).setNetwork(item.getUserData("network") || 0);
+          // Varlık grubu düğümü: aynı sayfa o grubun üyelerine süzülür; Varlıklar / Tüm Varlıklar: süzgeçsiz.
+          this.__widget(item.getUserData("page")).setGroup(item.getUserData("assetGroup") || 0);
         }
         const tab = item.getUserData("tab");
         if (tab) {
@@ -493,15 +507,24 @@ qx.Class.define("ankamon.ui.Shell", {
       }
       // first: true alt sayfalar üst düğümün kendi seçeneğinden (selfLeaf) ÖNCE (ör. Ağ ▸ Liste, Akıllı Tahtalar).
       children.filter(child => child.first).forEach(child => node.add(this.__buildNode(child, childrenOf)));
+      // underSelf: alt sayfa / satır içi sekme üst düğümün kendi seçeneğinin (selfLeaf) ALTINDA (ör. Ağ ▸ Akıllı Tahtalar ▸
+      // Ahenk, Ligler); o zaman kendi seçeneği de klasör olur (kendisine tıklamak yine sayfayı açar).
+      const underSelf = page.selfLeaf ? children.filter(child => child.underSelf && !child.first) : [];
+      const underSelfTabs = page.selfLeaf && inlineTabs.some(({ tab }) => tab.underSelf);
+      let selfNode = null;
       if (page.selfLeaf) {
         // Sayfanın kendisi ilk alt seçenek (ör. Tahtalar ▸ Liste): üst düğüme tıklamak bunu seçer (bkz. changeSelection).
-        const self = new qx.ui.tree.TreeFile(page.selfLeaf);
+        const self = underSelf.length || underSelfTabs ? new qx.ui.tree.TreeFolder(page.selfLeaf) : new qx.ui.tree.TreeFile(page.selfLeaf);
+        selfNode = self;
         this.__hideThemeIcon(self);
         self.setUserData("page", page);
         self.setUserData("self", true);
         this.__addRetap(self);
         node.add(self);
         node.setUserData("selfLeaf", self);
+        if (self instanceof qx.ui.tree.TreeFolder) {
+          this.__rememberOpen(self, `${page.id}.self`);
+        }
       }
       // Sekmeler alt seçenek: seçilince sayfa o sekmede açılır; seçiliyken yeniden tıklamak sayfayı yeniler.
       // tab.group: aynı gruptaki sekmeler o adlı bir ara düğümün altında (ör. Ligler ▸ Teneffüsler ▸ Kullanıcılar); ara
@@ -514,7 +537,7 @@ qx.Class.define("ankamon.ui.Shell", {
         leaf.setUserData("tab", tab.key);
         this.__addRetap(leaf);
         if (!tab.group) {
-          node.add(leaf);
+          (tab.underSelf && selfNode ? selfNode : node).add(leaf);
           return;
         }
         let group = groups[tab.group];
@@ -530,9 +553,8 @@ qx.Class.define("ankamon.ui.Shell", {
         }
         group.add(leaf);
       });
-      if (children.length) {
-        children.filter(child => !child.first).forEach(child => node.add(this.__buildNode(child, childrenOf)));
-      }
+      underSelf.forEach(child => selfNode.add(this.__buildNode(child, childrenOf)));
+      children.filter(child => !child.first && !underSelf.includes(child)).forEach(child => node.add(this.__buildNode(child, childrenOf)));
       if (branch) {
         this.__rememberOpen(node, page.id);
       }
@@ -596,6 +618,51 @@ qx.Class.define("ankamon.ui.Shell", {
       });
     },
 
+    /**
+     * Varlıklar düğümünün altındaki grup yapraklarını (Tüm Varlıklar'dan sonra, ada göre) sunucudaki gruplarla eşitler.
+     * Yaprak seçilince Varlıklar sayfası o grubun üyelerine süzülür (bkz. changeSelection, page.Network setGroup).
+     */
+    __syncAssetGroups(groups) {
+      const items = this.__tree.getRoot().getItems(true);
+      const folder = items.find(n => n.getUserData("page") && n.getUserData("page").id === "network" && n.getUserData("selfLeaf"));
+      if (!folder) {
+        return;
+      }
+      const old = folder.getChildren().filter(n => n.getUserData("assetGroup"));
+      const sameList = old.length === groups.length && old.every((n, i) =>
+        n.getUserData("assetGroup") === groups[i].id && n.getLabel() === groups[i].name);
+      if (sameList) {
+        return;
+      }
+      const selected = this.__tree.getSelection()[0];
+      const selectedId = selected && selected.getUserData("assetGroup");
+      this.__silentTree = true;
+      try {
+        old.forEach(n => {
+          folder.remove(n);
+          n.dispose();
+        });
+        groups.forEach(group => {
+          const leaf = new qx.ui.tree.TreeFile(group.name);
+          this.__hideThemeIcon(leaf);
+          leaf.setUserData("page", folder.getUserData("page"));
+          leaf.setUserData("assetGroup", group.id);
+          leaf.setToolTipText(`${group.name}: ${group.members.length} varlık (Tüm Varlıklar'dan türer)`);
+          this.__addRetap(leaf);
+          folder.add(leaf);
+          if (group.id === selectedId) {
+            this.__tree.setSelection([leaf]);
+          }
+        });
+        if (selectedId && !groups.some(g => g.id === selectedId)) {
+          this.__tree.setSelection([folder.getUserData("selfLeaf")]);
+        }
+      } finally {
+        this.__silentTree = false;
+      }
+      this.__styleNavLevels();
+    },
+
     /** Bkz. OPEN_PAGE. Ağaçtaki vurgu da açılan sayfaya taşınır (sessizce — çift yenileme olmasın). */
     __openPage(data) {
       if (data.diskUsage) {
@@ -608,7 +675,7 @@ qx.Class.define("ankamon.ui.Shell", {
         data = { ...data, page: "leagues" }; // sıralamalar Ligler sayfasında
       }
       if (data.page === "diagnose" && (!data.tab || data.tab === "diagnose" || data.tab === "help")) {
-        data = { ...data, page: "anomalies", tab: data.tab === "help" ? "help" : "reports" }; // sorun tespiti Tahta sağlığı'nda
+        data = { ...data, page: "anomalies", tab: data.tab === "help" ? "help" : "reports" }; // sorun tespiti Sağlık'ta
       }
       const page = ankamon.ui.Shell.PAGES.find(p => p.id === data.page);
       if (!page || !this.__allowed(page)) {
@@ -617,7 +684,8 @@ qx.Class.define("ankamon.ui.Shell", {
       // Alt düğümler de aranır (ör. "Bakım" altındaki "Anomaliler"); kip yaprakları hariç. İstenen
       // sekmenin yaprağı varsa o (ör. Genel bakış ▸ Sensörler → Bakım ▸ Sensörler), yoksa sayfanın düğümü.
       const items = this.__tree.getRoot().getItems(true);
-      const leaf = (data.tab && items.find(n => n.getUserData("page") === page && n.getUserData("tab") === data.tab && !n.getUserData("group"))) ||
+      const leaf = (data.group && items.find(n => n.getUserData("page") === page && n.getUserData("assetGroup") === data.group)) ||
+        (data.tab && items.find(n => n.getUserData("page") === page && n.getUserData("tab") === data.tab && !n.getUserData("group"))) ||
         items.find(n => n.getUserData("page") === page && n.getUserData("self")) ||
         items.find(n => n.getUserData("page") === page && !n.getUserData("tab"));
       if (leaf) {
@@ -625,6 +693,9 @@ qx.Class.define("ankamon.ui.Shell", {
         this.__silentTree = true;
         this.__tree.setSelection([leaf]);
         this.__silentTree = false;
+      }
+      if (page.id === "network") {
+        this.__widget(page).setGroup(data.group || 0); // {page: "network", group: id} — bkz. page.Network setGroup
       }
       const widget = this.__open(page);
       if (widget.openWith) {

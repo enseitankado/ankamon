@@ -77,7 +77,12 @@ return [
     ['PATCH',  '/api/network/devices/{id}',  [Api\NetworkApi::class, 'updateDevice'],   'network.manage'],
     ['PATCH',  '/api/network/networks/{id}', [Api\NetworkApi::class, 'updateNetwork'],  'network.manage'],
     ['DELETE', '/api/network/networks/{id}', [Api\NetworkApi::class, 'deleteNetwork'],  'network.manage'],
-    ['POST',   '/api/network/scan',          [Api\NetworkApi::class, 'scan'],           'network.manage'],
+    // Varlık grupları (Ağ ▸ Varlıklar ▸ <grup>) — bkz. Api\NetDeviceGroupsApi.
+    ['GET',    '/api/network/groups',        [Api\NetDeviceGroupsApi::class, 'deviceGroups'],      'network'],
+    ['POST',   '/api/network/groups',        [Api\NetDeviceGroupsApi::class, 'createDeviceGroup'], 'network.manage'],
+    ['PATCH',  '/api/network/groups/{id}',   [Api\NetDeviceGroupsApi::class, 'updateDeviceGroup'], 'network.manage'],
+    ['DELETE', '/api/network/groups/{id}',   [Api\NetDeviceGroupsApi::class, 'deleteDeviceGroup'], 'network.manage'],
+    ['POST',   '/api/network/scan',         [Api\NetworkApi::class, 'scan'],           'network.manage'],
     ['POST',   '/api/network/ping',          [Api\NetworkApi::class, 'ping'],           'network.manage'],
 
     ['GET',    '/api/logs',              [Api\LogsApi::class, 'index'],        'logs'],

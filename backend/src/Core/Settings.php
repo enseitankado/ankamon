@@ -49,10 +49,6 @@ final class Settings
         // Ekranlar: tahtada x11vnc yoksa "Ekran istemcisini kur" (actions/vnc-install) arka planda
         // kendiliğinden çalıştırılsın mı (bkz. worker/ankamon/screen/__main__.py). Varsayılan: evet.
         'screen_vnc_autoinstall' => true,
-        // Ağ rolleri (Ayarlar ▸ Ağ arabirimleri; bkz. worker/ankamon/netroles.py): tahta ağı ve idari ağın
-        // arabirim adları. Boş = otomatik (bağlı her ağ tahta ağı sayılır). Tahta işleri (ağ taraması,
-        // syslog'dan tahta kaydı, Samba paylaşım taraması) yalnız tahta ağında yapılır.
-        'network_roles' => ['board_iface' => '', 'admin_iface' => ''],
         // Kuruluş (Ayarlar ▸ Kuruluş): bildirim başlıklarında görünür, ntfy konu önerisi bundan türer.
         'organization' => ['name' => '', 'code' => ''],
         // ntfy bildirimleri (Anomaliler ▸ Bildirimler; bkz. worker executor/ntfy.py).

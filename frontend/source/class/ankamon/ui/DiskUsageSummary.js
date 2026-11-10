@@ -68,6 +68,17 @@ qx.Class.define("ankamon.ui.DiskUsageSummary", {
       });
     });
     this.addListener("appear", () => this.load());
+    // Başka sekmede "Kalıcı olarak sil" bitince (bkz. ui.DiskUsageTab) gösterge kendiliğinden yeniden hesaplanır;
+    // Özet o an görünmüyorsa açılınca (appear) zaten taze hesaplar.
+    qx.event.message.Bus.subscribe(ankamon.ui.DiskUsageSummary.CHANGED, () => {
+      if (this.isSeeable()) {
+        this.load();
+      }
+    }, this);
+  },
+
+  destruct() {
+    qx.event.message.Bus.unsubscribe(ankamon.ui.DiskUsageSummary.CHANGED, null, this);
   },
 
   statics: {
@@ -75,9 +86,29 @@ qx.Class.define("ankamon.ui.DiskUsageSummary", {
     COLORS: ["#1f77b4", "#ff7f0e", "#9467bd", "#2ca02c", "#8c564b", "#d62728", "#17becf", "#bcbd22"],
     /** Tampon ömrü: bundan eskiyse Genel bakış arkada yeniden hesaplatır. */
     CACHE_MS: 15 * 60 * 1000,
+    /** Bus mesajı: veri silindi, boyutlar değişti (bkz. invalidate). */
+    CHANGED: "ankamon.diskUsageChanged",
     __STORE: "ankamon.diskusage.summary",
     __cache: null,
     __pending: null,
+    __generation: 0,
+
+    /**
+     * Kalıcı silmeden sonra: tampon ve sürmekte olan (silmeden ÖNCE başlamış) hesap geçersiz; Özet ve Genel bakış
+     * yeniden hesaplar. CHANGED mesajını da yayar.
+     */
+    invalidate() {
+      const S = ankamon.ui.DiskUsageSummary;
+      S.__generation++;
+      S.__cache = null;
+      S.__pending = null;
+      try {
+        localStorage.removeItem(S.__STORE);
+      } catch (e) {
+        // depolama kapalı: yalnız bellekteki tampon vardı
+      }
+      qx.event.message.Bus.dispatchByName(S.CHANGED, {});
+    },
 
     /** Bütün veri türlerinin boyutları (yavaş). Sonuç tampona yazılır. @return {Promise<Map>} {items, disk, at} */
     compute(specs) {
@@ -85,7 +116,8 @@ qx.Class.define("ankamon.ui.DiskUsageSummary", {
       if (S.__pending) {
         return S.__pending;
       }
-      S.__pending = (async () => {
+      const generation = S.__generation;
+      const pending = S.__pending = (async () => {
         try {
           // Biri hata verirse diğerleri yine gösterilir (dilimi olmaz, listede "—").
           const results = await Promise.all(specs.map(spec => spec.size().catch(e => ({ error: e }))));
@@ -94,7 +126,11 @@ qx.Class.define("ankamon.ui.DiskUsageSummary", {
             bytes: results[i].error ? null : results[i].bytes, error: results[i].error ? String(results[i].error.message || results[i].error) : null
           }));
           const disk = (results.find(r => r.disk) || {}).disk || null;
-          S.__cache = { items, disk, at: Date.now() };
+          const res = { items, disk, at: Date.now() };
+          if (generation !== S.__generation) {
+            return res; // arada silme oldu: bu (eski) sonuç tampona yazılmaz
+          }
+          S.__cache = res;
           try {
             localStorage.setItem(S.__STORE, JSON.stringify(S.__cache));
           } catch (e) {
@@ -102,10 +138,12 @@ qx.Class.define("ankamon.ui.DiskUsageSummary", {
           }
           return S.__cache;
         } finally {
-          S.__pending = null;
+          if (S.__pending === pending) {
+            S.__pending = null;
+          }
         }
       })();
-      return S.__pending;
+      return pending;
     },
 
     /** Tampondaki son sonuç (bellek, yoksa localStorage) — eski olabilir (at'e bakın); yoksa null. */

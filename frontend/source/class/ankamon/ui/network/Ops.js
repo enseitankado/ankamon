@@ -42,6 +42,8 @@ qx.Class.define("ankamon.ui.network.Ops", {
 
     // Sol ağaçtaki ağ listesini tazelemek için (bkz. ui.Shell): payload {networks:[…]}
     NETWORKS_CHANGED: "ankamon.networksChanged",
+    // Varlık grupları değişti (sol menüdeki Varlıklar ▸ <grup> düğümleri — bkz. ui.Shell): payload {groups:[…]}
+    GROUPS_CHANGED: "ankamon.netDeviceGroupsChanged",
 
     /** Ağın görünen adı: kullanıcı adı verdiyse o, yoksa CIDR (+ arabirimler). */
     networkLabel(net) {
@@ -158,12 +160,22 @@ qx.Class.define("ankamon.ui.network.Ops", {
     },
 
     /** @return {Promise<Boolean>} silindiyse true */
-    async remove(devices) {
+    /**
+     * Varlıkları Tüm Varlıklar'dan siler. @param groups {Array?} varlık grupları ({id, name, members}) — silinen
+     * varlıklar hangi gruplardaysa onlardan da düşeceği onay penceresinde yazılır (gruplar Tüm Varlıklar'dan türer).
+     */
+    async remove(devices, groups) {
       const esc = v => qx.bom.String.escape(String(v ?? ""));
       const names = devices.slice(0, 12).map(d => esc(this.deviceName(d))).join(", ") + (devices.length > 12 ? " …" : "");
+      const ids = new Set(devices.map(d => d.id));
+      const hit = (groups || []).map(g => ({ name: g.name, n: g.members.filter(id => ids.has(id)).length })).filter(g => g.n);
+      const groupNote = hit.length
+        ? "<br><br><b>Şu gruplardan da silinecek:</b> " +
+          hit.map(g => `${esc(g.name)}${devices.length > 1 ? ` (${g.n} varlık)` : ""}`).join(", ")
+        : "";
       const sure = await ankamon.ui.Dialog.confirm(
-        `Seçili <b>${devices.length}</b> cihaz envanterden silinsin mi?<br>${names}<br><br>` +
-        "Cihaz ağda yeniden görülürse yeni kayıt olarak tekrar eklenir (takma ad/not kaybolur).", "Sil");
+        `Seçili <b>${devices.length}</b> cihaz envanterden silinsin mi?<br>${names}${groupNote}<br><br>` +
+        "Cihaz ağda yeniden görülürse yeni kayıt olarak tekrar eklenir (takma ad/not ve grup üyeliği kaybolur).", "Sil");
       if (!sure) {
         return false;
       }

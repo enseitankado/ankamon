@@ -39,6 +39,12 @@
  * sürüm değiştiyse — tarayıcı yeni cihaz/durum değişikliği yazdıysa — liste hemen yeniden çekilir.
  * Ayrıca "Son görülme" gibi süreler bayatlamasın diye LIST_MS'de bir koşulsuz tazelenir.
  * Tarayıcı: worker/ankamon/netscan (yüke göre kendi sıklığını ayarlar), API: backend NetworkApi.
+ *
+ * Varlık grupları (kullanıcı isteği 2026-11-10; sol menü Varlıklar ▸ Tüm Varlıklar / <grup>): "Grup oluştur" işaretli
+ * varlıklardan adlı grup kurar. Grup görünümü AYRI bir grid değildir: bu sayfa setGroup(id) ile o grubun üyelerine
+ * süzülür — sütunlar, süzgeçler, sağ menü ve canlı güncelleme Tüm Varlıklar'ınkiyle aynıdır, grubun kendi taraması
+ * yoktur. Varlık silinince bütün gruplarından düşer (onay penceresi grupları sayar; sunucuda FK CASCADE). API:
+ * backend NetDeviceGroupsApi.
  */
 qx.Class.define("ankamon.page.Network", {
   extend: ankamon.page.Base,
@@ -48,6 +54,8 @@ qx.Class.define("ankamon.page.Network", {
     this._compact = true;
     this.__expanded = new Set();
     this.__networkId = 0;
+    this.__groupId = 0;
+    this.__groups = [];
     const Ops = ankamon.ui.network.Ops;
 
     this._addButton("Yenile", this.refresh);
@@ -59,6 +67,11 @@ qx.Class.define("ankamon.page.Network", {
       this._addButton("Ekle", () => this.__edit(null));
       this.__editButton = this._addButton("Düzenle", () => this.__single(d => this.__edit(d)));
       this.__deleteButton = this._addButton("Sil", () => this.__withSome(ds => this.__remove(ds)));
+      this.__groupButton = this._addButton("Grup oluştur", () => this.__withSome(ds => this.__createGroup(ds)))
+        .set({ toolTipText: "İşaretli varlıklardan adlı bir grup kurar; grup sol menüde Varlıklar altında görünür" });
+      // Grup görünümünde: gruptan çıkarma, yeniden adlandırma, grubu silme (varlıklar Tüm Varlıklar'da kalır).
+      this.__groupMenuButton = this._addButton("Grup ▾", () => this.__openGroupMenu(this.__groupMenuButton))
+        .set({ visibility: "excluded", toolTipText: "Bu grubun işlemleri: işaretlileri gruptan çıkar, yeniden adlandır, grubu sil" });
       this.__servicesButton = this._addButton("Servisleri tara", () => this.__withSome(ds => this.__scanServices(ds)))
         .set({ toolTipText: "İşaretli cihazların açık port ve servislerini sıranın başında tarar" });
       this._addButton("Şimdi tara", async () => {
@@ -253,6 +266,11 @@ qx.Class.define("ankamon.page.Network", {
     __servicesButton: null,
     __fixingChecks: false,
     __netsMenu: null,
+    __groupId: 0,
+    __groups: null,
+    __groupButton: null,
+    __groupMenuButton: null,
+    __netNote: "",
 
     /**
      * Sol ağaçtan ağ seçimi (0: bütün ağlar). Shell sayfayı göstermeden ÖNCE çağırır; liste
@@ -266,12 +284,44 @@ qx.Class.define("ankamon.page.Network", {
       }
     },
 
+    /**
+     * Sol ağaçtan varlık grubu seçimi (0: Tüm Varlıklar). Veri yeniden çekilmez: satırlar Tüm Varlıklar'ın
+     * listesinden süzülür (grup kendi başına tarama/sorgu yapmaz).
+     */
+    setGroup(id) {
+      if (this.__groupId !== id) {
+        this.__groupId = id;
+        this._checkAll(this.__table, false);
+        this.__apply();
+        this.__updateNote();
+      }
+      if (this.__groupMenuButton) {
+        this.__groupMenuButton.setVisibility(id ? "visible" : "excluded");
+      }
+    },
+
+    /** Gruplar (bkz. NetDeviceGroupsApi); sol menü düğümleri GROUPS_CHANGED ile eşitlenir. */
+    async __loadGroups() {
+      const data = await ankamon.io.Api.get("/network/groups");
+      this.__groups = data.groups || [];
+      qx.event.message.Bus.dispatchByName(ankamon.ui.network.Ops.GROUPS_CHANGED, { groups: this.__groups });
+      if (this.__groupId && !this.__currentGroup()) {
+        this.setGroup(0); // grup silinmiş (başka oturumda): Tüm Varlıklar
+      }
+      return this.__groups;
+    },
+
+    __currentGroup() {
+      return this.__groupId ? this.__groups.find(g => g.id === this.__groupId) || null : null;
+    },
+
     async _refresh() {
       const F = ankamon.util.Format;
       const Ops = ankamon.ui.network.Ops;
       const [nets, data] = await Promise.all([
         ankamon.io.Api.get("/network"),
-        ankamon.io.Api.get("/network/devices", { network: this.__networkId || 0 })
+        ankamon.io.Api.get("/network/devices", { network: this.__networkId || 0 }),
+        this.__loadGroups().catch(() => this.__groups)
       ]);
       this.__networks = nets.networks;
       qx.event.message.Bus.dispatchByName(Ops.NETWORKS_CHANGED, { networks: nets.networks });
@@ -344,9 +394,21 @@ qx.Class.define("ankamon.page.Network", {
       if (!net && paused.length) {
         note = `Taraması kapalı ağ: ${paused.map(n => Ops.networkLabel(n)).join(", ")} (Ağlar düğmesinden açılabilir).`;
       }
-      const online = data.devices.filter(d => d.online).length;
-      this.__note.setValue(`${data.devices.length} cihaz, ${online} çevrim içi, ${data.devices.length - online} çevrim dışı.` +
-        (note ? " " + note : ""));
+      this.__netNote = note;
+      this.__updateNote();
+    },
+
+    /** Alt not: gösterilen (grup görünümünde grubun) cihaz sayıları + ağ notu. */
+    __updateNote() {
+      if (!this.__rows) {
+        return;
+      }
+      const group = this.__currentGroup();
+      const devices = this.__rows.map(r => r.device).filter(d => !group || group.members.includes(d.id));
+      const online = devices.filter(d => d.online).length;
+      this.__note.setValue((group ? `<b>${qx.bom.String.escape(group.name)}</b> grubu: ` : "") +
+        `${devices.length} cihaz, ${online} çevrim içi, ${devices.length - online} çevrim dışı.` +
+        (this.__netNote ? " " + this.__netNote : ""));
     },
 
     /** Süzgeçleri ve sıralamayı uygular, açık cihazların servis satırlarını altlarına ekler. */
@@ -357,7 +419,9 @@ qx.Class.define("ankamon.page.Network", {
       const colFilters = this.__columns
         .map((column, index) => ({ index: index + 2, text: (this.__filterFields[column.id].getValue() || "").toLowerCase().trim() }))
         .filter(f => f.text);
-      let shown = this.__rows.filter(({ cells }) =>
+      const group = this.__currentGroup();
+      const members = group ? new Set(group.members) : null;
+      let shown = this.__rows.filter(({ device, cells }) => (!members || members.has(device.id)) &&
         colFilters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
 
       const col = this.__model.getSortColumnIndex();
@@ -472,7 +536,7 @@ qx.Class.define("ankamon.page.Network", {
       if (this.__editButton) {
         this.__editButton.setEnabled(count === 1);
       }
-      [this.__deleteButton, this.__servicesButton, this.__uncheckButton].filter(Boolean).forEach(button => {
+      [this.__deleteButton, this.__servicesButton, this.__groupButton, this.__uncheckButton].filter(Boolean).forEach(button => {
         if (button.getUserData("baseLabel") === null) {
           button.setUserData("baseLabel", button.getLabel());
         }
@@ -551,10 +615,94 @@ qx.Class.define("ankamon.page.Network", {
     },
 
     async __remove(devices) {
-      if (await ankamon.ui.network.Ops.remove(devices)) {
+      if (await ankamon.ui.network.Ops.remove(devices, this.__groups)) {
         this._checkAll(this.__table, false);
         this.refresh();
       }
+    },
+
+    /** "Grup oluştur": ad sorulur, işaretli varlıklarla grup kurulur ve sol menüde o grup açılır. */
+    async __createGroup(devices) {
+      const name = await ankamon.ui.Dialog.prompt(
+        `İşaretli <b>${devices.length}</b> varlıktan grup oluşturulacak. Grup adı:`, "", "Oluştur", "Grup oluştur");
+      if (!name) {
+        return;
+      }
+      try {
+        const res = await ankamon.io.Api.post("/network/groups", { name, ids: devices.map(d => d.id) });
+        this._checkAll(this.__table, false);
+        await this.__loadGroups();
+        qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "network", group: res.id });
+      } catch (e) {
+        ankamon.ui.Dialog.error(e);
+      }
+    },
+
+    /** Varlıkları gruba ekler (sağ menü ▸ Gruba ekle) ya da çıkarır. */
+    async __changeMembers(group, devices, remove) {
+      try {
+        await ankamon.io.Api.patch("/network/groups/" + group.id, { [remove ? "remove" : "add"]: devices.map(d => d.id) });
+        if (remove) {
+          this._checkAll(this.__table, false);
+        }
+        await this.__loadGroups();
+        this.__keepChecks(() => this.__apply());
+        this.__updateNote();
+      } catch (e) {
+        ankamon.ui.Dialog.error(e);
+      }
+    },
+
+    async __renameGroup(group) {
+      const name = await ankamon.ui.Dialog.prompt("Grubun yeni adı:", group.name, "Kaydet", "Grubu yeniden adlandır");
+      if (!name || name === group.name) {
+        return;
+      }
+      try {
+        await ankamon.io.Api.patch("/network/groups/" + group.id, { name });
+        await this.__loadGroups();
+        this.__updateNote();
+      } catch (e) {
+        ankamon.ui.Dialog.error(e);
+      }
+    },
+
+    async __deleteGroup(group) {
+      const sure = await ankamon.ui.Dialog.confirm(`<b>${qx.bom.String.escape(group.name)}</b> grubu silinsin mi?<br>` +
+        `Gruptaki ${group.members.length} varlık Tüm Varlıklar'da kalır; yalnız grup kaldırılır.`, "Grubu sil");
+      if (!sure) {
+        return;
+      }
+      try {
+        await ankamon.io.Api.del("/network/groups/" + group.id);
+        qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "network" });
+        await this.__loadGroups();
+      } catch (e) {
+        ankamon.ui.Dialog.error(e);
+      }
+    },
+
+    /** Grup görünümündeki "Grup ▾" düğmesinin menüsü. */
+    __openGroupMenu(button) {
+      const group = this.__currentGroup();
+      if (!group) {
+        return;
+      }
+      const menu = new qx.ui.menu.Menu();
+      const checked = this.__checkedDevices();
+      const add = (label, handler, enabled = true) => {
+        const item = new qx.ui.menu.Button(label);
+        item.setEnabled(enabled);
+        item.addListener("execute", handler);
+        menu.add(item);
+      };
+      add(`İşaretlileri gruptan çıkar${checked.length ? ` (${checked.length})` : ""}`,
+        () => this.__changeMembers(group, checked, true), checked.length > 0);
+      add("Grubu yeniden adlandır…", () => this.__renameGroup(group));
+      add("Grubu sil…", () => this.__deleteGroup(group));
+      menu.setOpener(button);
+      menu.addListenerOnce("disappear", () => qx.event.Timer.once(() => menu.destroy(), null, 0));
+      menu.open();
     },
 
     async __scanServices(devices) {
@@ -634,6 +782,26 @@ qx.Class.define("ankamon.page.Network", {
             () => ankamon.ui.network.PingWindow.show(pingable));
         }
         add("⟳", "Servisleri tara" + count, () => this.__scanServices(devices));
+        // Varlık grupları: Gruba ekle ▸ (var olan gruplar + yeni grup), grup görünümünde Gruptan çıkar.
+        const groupMenu = new qx.ui.menu.Menu();
+        this.__groups.forEach(g => {
+          const all = devices.every(d => g.members.includes(d.id));
+          const item = new qx.ui.menu.Button(g.name + (all ? " ✓" : ""));
+          item.setEnabled(!all);
+          item.addListener("execute", () => this.__changeMembers(g, devices, false));
+          groupMenu.add(item);
+        });
+        if (this.__groups.length) {
+          groupMenu.add(new qx.ui.menu.Separator());
+        }
+        const fresh = new qx.ui.menu.Button("Yeni grup…");
+        fresh.addListener("execute", () => this.__createGroup(devices));
+        groupMenu.add(fresh);
+        menu.add(new qx.ui.menu.Button("Gruba ekle" + count, null, null, groupMenu));
+        const group = this.__currentGroup();
+        if (group) {
+          add("⊖", `Gruptan çıkar (${group.name})` + count, () => this.__changeMembers(group, devices, true));
+        }
         add(ICON.edit, "Düzenle", () => this.__showDetails(device));
         add(ICON.delete, "Sil" + count, () => this.__remove(devices));
       }

@@ -26,18 +26,17 @@
  */
 
 /**
- * Tahta sağlığı ▸ Geçmiş: sürekli izlemenin seçili dönemle örtüşen tüm kayıtları (sürenler dahil); Kaynak sütunu bulgunun
- * nereden çıkarıldığını yazar (Log / Ölçüm / SSH verisi — bkz. backend AnomaliesApi KINDS source). Excel tarzı
- * sütun süzgeçli (bkz. page.Base _addColumnFilters). Özet'te çift tık bu sekmeyi o tahtaya süzer.
+ * Sağlık ▸ Geçmiş'in alt bölmesi (bkz. ui.anomaly.Records): sürekli izlemenin seçili dönemle örtüşen tüm kayıtları
+ * (sürenler dahil); Kaynak sütunu bulgunun nereden çıkarıldığını yazar (Log / Ölçüm / SSH verisi — bkz. backend
+ * AnomaliesApi KINDS source). Excel tarzı sütun süzgeçli (bkz. page.Base _addColumnFilters). Üstteki özette satır
+ * seçilince o tahtanın o bulgusuna süzülür (filterBoardKind).
  */
 qx.Class.define("ankamon.ui.anomaly.History", {
-  extend: qx.ui.tabview.Page,
+  extend: qx.ui.container.Composite,
 
   /** @param page {ankamon.page.Anomalies} */
   construct(page) {
-    super("Geçmiş");
-    this.setLayout(new qx.ui.layout.VBox(8));
-    this.setPadding(8);
+    super(new qx.ui.layout.VBox(4));
 
     this.__columns = [
       { id: "board", label: "Tahta", width: 200 },
@@ -82,9 +81,10 @@ qx.Class.define("ankamon.ui.anomaly.History", {
       this.__apply();
     },
 
-    /** Tahta sütununun süzgecini verilen adla doldurur (Özet → çift tık). */
-    filterBoard(board) {
-      this.__filterFields.board.setValue(board);
+    /** Tahta ve Bulgu süzgeçlerini doldurur (özette satır seçimi; null: o süzgeç boş). */
+    filterBoardKind(board, kind) {
+      this.__filterFields.board.setValue(board || "");
+      this.__filterFields.kind.setValue(kind || "");
       this.__apply();
     },
 

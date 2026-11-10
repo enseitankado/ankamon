@@ -26,7 +26,7 @@
  */
 
 /**
- * Tahta sağlığı ▸ Yardım sekmesi (bkz. page.Anomalies): bulguların iki yolu (sürekli izleme / SSH denetimi) ve sekmeler;
+ * Sağlık ▸ Yardım sekmesi (bkz. page.Anomalies): bulguların iki yolu (sürekli izleme / SSH denetimi) ve sekmeler;
  * SSH denetim raporunun ne olduğu, nasıl okunduğu, denetimlerin ne zaman/nasıl yapıldığı ve sık karşılaşılan durumlar (kullanıcı isteği: "buranın ne işe yaradığı, nasıl çalıştığı
  * anlaşılmıyor"). Takvim değerleri sabit yazılmaz — /api/diagnose'un schedule alanından (sunucunun .env'i:
  * DIAGNOSE_INTERVAL_DAYS, DIAGNOSE_RETRY_HOURS) ve şu an denetlenemeyen tahtalardan okunur. Kodda karşılığı
@@ -96,7 +96,7 @@ qx.Class.define("ankamon.page.MaintenanceHelp", {
 .mh .q{font-weight:700;margin-top:10px}
 </style>
 
-<h3>Tahta sağlığı ne işe yarar?</h3>
+<h3>Sağlık bölümü ne işe yarar?</h3>
 <p>Tahtalarda arızaya dönüşmeden önce fark edilmesi gereken donanım, yazılım ve ağ sorunlarını bulur. Bulgular
 <b>iki yoldan</b> gelir; her bulgunun yanında hangisinden geldiği, kaynağı ve nasıl bakıldığı yazar.</p>
 <table>

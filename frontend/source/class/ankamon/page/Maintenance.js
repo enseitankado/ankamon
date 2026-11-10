@@ -27,7 +27,7 @@
 
 /**
  * Tahtalar ▸ Sensörler / Ahenk (sol menüde Tahtalar altında, eski "Bakım"): sekmeler — "Sensörler" (Grafana panosu, page.Metrics) ve eklenti sekmeleri (ör. "Ahenk"). Sorun
- * tespiti raporu (page.Diagnose) ve yardımı (page.MaintenanceHelp) "Tahta sağlığı"na taşındı (bkz. page.Anomalies);
+ * tespiti raporu (page.Diagnose) ve yardımı (page.MaintenanceHelp) "Sağlık"a taşındı (bkz. page.Anomalies);
  * eski {tab: "diagnose"|"help"} istekleri oraya yönlenir. Her sekme yalnız kendi yetkisiyle görünür (bkz. ui.Shell PAGES).
  *
  * İçteki sayfalar olduğu gibi kullanılır: sayfa açılınca ya da sekme değişince görünen sekmenin sayfası
@@ -40,19 +40,19 @@ qx.Class.define("ankamon.page.Maintenance", {
   construct(user) {
     super(user, null);
     this._actions.exclude();
-    this.__tabs = new qx.ui.tabview.TabView();
+    // Sekmesiz (kullanıcı isteği 2026-11-10: Sensörler ve Ahenk ayrı sayfalar gibi, sekme çubuğu yok): sayfalar bir
+    // Stack'te, seçim yalnız sol menü yapraklarından (Ağ ▸ Sensörler, Ağ ▸ Akıllı Tahtalar ▸ Ahenk — bkz. ui.Shell PAGES).
+    // TabView'ın çubuğunu gizlemek olmaz: bazı temalar (ville MTabView) seçim değişince düğme konumundan animasyon
+    // yapar, gizli düğmede konum yok → hata. Stack, Base._rememberTab/selectTab'ın beklediği seçim arayüzünü taşır.
+    this.__tabs = new qx.ui.container.Stack();
     const add = (key, label, feature, create) => {
       if (feature && !this._can(feature)) {
         return;
       }
-      const tab = new qx.ui.tabview.Page(label).set({ layout: new qx.ui.layout.Grow(), padding: 8 });
+      const tab = new qx.ui.container.Composite(new qx.ui.layout.Grow()).set({ padding: 8 });
       tab.setUserData("key", key);
       tab.setUserData("page", create(user));
       tab.add(tab.getUserData("page"));
-      // Sayfa kendi sekme kulakçığına ipucu verebilir (ör. Bakım: ne yaptığı + otomatik tarama takvimi).
-      if (tab.getUserData("page").bindTabButton) {
-        tab.getUserData("page").bindTabButton(tab.getButton());
-      }
       this.__tabs.add(tab);
     };
     add("metrics", "Sensörler", "metrics", u => new ankamon.page.Metrics(u));

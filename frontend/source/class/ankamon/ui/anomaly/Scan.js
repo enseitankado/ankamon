@@ -26,7 +26,7 @@
  */
 
 /**
- * Tahta sağlığı ▸ Tara: seçilen tahtalara o an bakılır — iki yolun ikisi de buradan başlatılır:
+ * Sağlık ▸ Tara: seçilen tahtalara o an bakılır — iki yolun ikisi de buradan başlatılır:
  *   - Sürekli izleme denetimlerinin anlık yoklaması ("anomaly_scan" görevi — bkz. worker/ankamon/anomaly/scan.py): kuralın
  *     tahtada çalışan küçük betiği SSH ile o an çalışır; sonuç bu sekmenin tablosunda, kayıt tutulmaz.
  *   - Tam SSH denetimi ("diagnose" görevi — bkz. worker/ankamon/executor/diagnose.py; yalnız "diagnose" yetkisiyle):

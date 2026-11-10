@@ -23,58 +23,39 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Ağ rolleri: hangi arabirim tahta ağı, hangisi idari ağ (Ayarlar ▸ Ağ arabirimleri; settings.network_roles).
+"""Ağ rolleri — KALDIRILDI (kullanıcı isteği 2026-11-10): tahta ağı / idari ağ ayrımı yok.
 
-Sunucu iki (ya da daha çok) ağa bağlı olabilir: tahta ağı (tahtaları görmek/yönetmek) ve idari ağ (panele erişim).
-Tahtalar BÜTÜN ağlarda algılanır (kullanıcı isteği 2026-11-09): cihaz keşfi (ARP) her bağlı ağda, tahta olup olmadığına
-MAC karar verir (netscan/boardmac.py); loglardan tahta kaydı/IP güncellemesi MAC eşleşmesine bakar
-(tasks/boards_from_logs.py). Rol yalnız şunları tahta ağıyla sınırlar: pasif akış gözlemi ve tahta OLMAYAN
-cihazların servis/paylaşım/etkinlik/ad taramaları; MAC'i bilinmeyen log kaynağına güvenilip güvenilmeyeceği. Panel, web terminal, syslog alımı, WoL, ekran
-yansıtma ve Avahi iki ağda da çalışır (rol onları kısıtlamaz).
-
-Kural (Python: is_board_net, SQL: board_net_sql — ikisi aynı):
-  - board_iface seçiliyse: o arabirimin bağlı olduğu ağlar tahta ağıdır.
-  - yalnız admin_iface seçiliyse: YALNIZ idari arabirime bağlı ağlar dışındaki her ağ tahta ağıdır.
-  - hiçbiri seçili değilse (varsayılan): bağlı her ağ (eski davranış).
-İki arabirim aynı alt ağdaysa (geliştirme ortamı) o ağ hem tahta hem idari ağdır.
+Ankamon bütün giriş/çıkış hizmetlerini (ağ taraması ve akış gözlemi, servis/paylaşım/etkinlik taramaları, loglardan tahta
+kaydı, syslog alımı, WoL, ekran yansıtma, panel) sunucunun BÜTÜN ağ arabirimleri üzerinden yürütür (Ayarlar ▸ Ağ
+arabirimleri yalnız listeler). Eski settings.network_roles kaydı göç 048'de silindi. Arayüz (roles / is_board_net /
+scan_iface / board_net_sql / board_cidrs) çağıranlar değişmesin diye korunur: her ağ "tahta ağı" sayılır. Tahta olup
+olmadığına yine MAC karar verir (netscan/boardmac.py); ağlar arası IP yönlendirmesi engeli (install.sh ankamon-netguard)
+bir Ankamon hizmeti değildir, sürer.
 """
 
 from __future__ import annotations
 
 import ipaddress
 
-_SETTING = "(SELECT value FROM settings WHERE key = 'network_roles')"
-
 
 def roles(conn) -> dict:
-    row = conn.execute(f"SELECT {_SETTING} AS value").fetchone()
-    value = (row["value"] if row else None) or {}
-    return {"board_iface": value.get("board_iface") or "", "admin_iface": value.get("admin_iface") or ""}
+    return {"board_iface": "", "admin_iface": ""}
 
 
 def is_board_net(ifaces: list[str], role: dict) -> bool:
-    if role["board_iface"]:
-        return role["board_iface"] in ifaces
-    if role["admin_iface"]:
-        return not set(ifaces) <= {role["admin_iface"]}
     return True
 
 
 def scan_iface(net: dict, role: dict) -> str:
-    """Ağı taramak için kullanılacak arabirim: ağ tahta arabirimine de bağlıysa o, değilse ilk bulunan."""
-    return role["board_iface"] if role["board_iface"] in net["ifaces"] else net["iface"]
+    """Ağı taramak için kullanılacak arabirim: ağın bulunduğu (ilk) arabirim."""
+    return net["iface"]
 
 
 def board_net_sql(alias: str = "n") -> str:
-    """net_networks satırı (alias) tahta ağı mı — SQL koşulu; ayar her sorguda tablodan okunur."""
-    return (f"(CASE WHEN coalesce({_SETTING}->>'board_iface', '') <> ''"
-            f" THEN {_SETTING}->>'board_iface' = ANY({alias}.ifaces)"
-            f" WHEN coalesce({_SETTING}->>'admin_iface', '') <> ''"
-            f" THEN NOT ({alias}.ifaces <@ ARRAY[{_SETTING}->>'admin_iface'])"
-            f" ELSE true END)")
+    """net_networks satırı (alias) tahta ağı mı — her ağ (SQL koşulu)."""
+    return "true"
 
 
 def board_cidrs(conn, networks: list[dict]) -> list:
-    """Tahta ağlarının ip_network listesi (networks: ifaces.networks() çıktısı)."""
-    role = roles(conn)
-    return [ipaddress.ip_network(n["cidr"]) for n in networks if is_board_net(n["ifaces"], role)]
+    """Bağlı bütün ağların ip_network listesi (networks: ifaces.networks() çıktısı)."""
+    return [ipaddress.ip_network(n["cidr"]) for n in networks]

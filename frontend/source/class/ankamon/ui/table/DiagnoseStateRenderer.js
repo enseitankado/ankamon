@@ -4,7 +4,7 @@
  */
 
 /**
- * Tahta sağlığı ▸ Denetle tablosunun "Genel durum" sütunu: düzey rengi ve kalınlığı (bkz. page.Diagnose LEVEL), süren
+ * Sağlık ▸ Denetle tablosunun "Genel durum" sütunu: düzey rengi ve kalınlığı (bkz. page.Diagnose LEVEL), süren
  * denetimde ("Denetleniyor…") dönen halka (kalıcı kural — bkz. ui.JobSpinner). Hücre değeri düz metin kalır (süzgeç ve
  * hazır değer listesi onu görür).
  */
