@@ -170,7 +170,9 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         const info = [
           ["Bilgisayar adı", board.hostname || "—"],
           ["Durum", (board.alive ?? board.online) ? "Çevrim içi" : "Çevrim dışı"],
-          ["Yönetilebilir", board.online ? "Evet (SSH / sensör portu yanıt veriyor)" : "Hayır (SSH yanıt vermiyor)"],
+          ["Yönetilebilir", (board.manageable ?? board.online) ? "Evet (SSH ile oturum açılabiliyor)"
+            : board.ssh_login_failing ? "Hayır — SSH portu açık ama root girişi reddediliyor (tahtanın parolası farklı; Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları)"
+              : "Hayır (SSH yanıt vermiyor)"],
           ["Son log", board.last_log_at ? F.dateTime(board.last_log_at * 1000) : "—"],
           ["Model", facts.product || "—"],
           ["İşlemci", facts.cpu_model || "—"],

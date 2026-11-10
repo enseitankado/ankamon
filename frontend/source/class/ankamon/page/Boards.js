@@ -64,7 +64,7 @@ qx.Class.define("ankamon.page.Boards", {
     this.__columns = [
       // KALICI KURAL (kullanıcı 2026-11-10): Durum = ağda canlı mı (Varlıklar'la aynı); SSH erişimi ayrı "Yönetilebilir".
       { id: "status", label: "Durum", width: 100, hint: "Çevrimiçi: tahta ağda canlı (Varlıklar'daki durumla aynı — ağ taraması görüyor ya da SSH yanıt veriyor). Kapalı: ağda görülmüyor." },
-      { id: "manageable", label: "Yönetilebilir", width: 100, hint: "Evet: Ankamon tahtaya SSH (ya da sensör portu) ile bağlanabiliyor — komut, ekran, oturum işlemleri yapılabilir. Hayır: tahta ağda olsa da SSH yanıt vermiyor (kapalı / güvenlik duvarı)." },
+      { id: "manageable", label: "Yönetilebilir", width: 120, hint: "Evet: Ankamon tahtaya SSH ile oturum açabiliyor (son 3 dakikada başarılı yoklama) — komut, ekran, web terminali, oturum işlemleri yapılabilir. Hayır (parola): SSH portu açık ama giriş reddediliyor — tahtanın root parolası Ayarlar ▸ SSH erişimi'ndekinden farklı (Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları'ndan tahtanın parolası girilir). Hayır: SSH yanıt vermiyor." },
       { id: "name", label: "Takma ad / Ad" },
       { id: "hostname", label: "Bilgisayar adı", width: 150 },
       { id: "ip", label: "IP", width: 120 },
@@ -245,6 +245,14 @@ qx.Class.define("ankamon.page.Boards", {
      */
     /** "Durum" sütunu: ağda canlı (BoardsApi alive — Varlıklar'la aynı ölçü) → "Çevrimiçi", değilse "Kapalı". SSH erişimi
      * ayrı "Yönetilebilir" sütununda (board.online) — bkz. bellek smart-boards-online-vs-manageable. */
+    /** "Yönetilebilir" sütunu (BoardsApi manageable / ssh_login_failing). */
+    manageableText(board) {
+      if (board.manageable ?? board.online) {
+        return "Evet";
+      }
+      return board.ssh_login_failing ? "Hayır (parola)" : "Hayır";
+    },
+
     statusText(board) {
       return (board.alive ?? board.online) ? "Çevrimiçi" : "Kapalı";
     },
@@ -415,7 +423,7 @@ qx.Class.define("ankamon.page.Boards", {
           cells: [
             board.id, wasChecked.has(board.id),
             ankamon.page.Boards.statusText(board),
-            board.online ? "Evet" : "Hayır",
+            ankamon.page.Boards.manageableText(board),
             board.label || board.hostname || board.ip,
             board.hostname, board.ip, board.mac, board.wifi_mac || "", F.etap(board.etap, board.facts.cpu_model),
             ankamon.page.Boards.sessionText(board),

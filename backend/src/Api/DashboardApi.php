@@ -44,12 +44,12 @@ final class DashboardApi
         $canLogs = Auth::can($user, 'logs');
         return [
             // "online" Akıllı Tahtalar'daki "Çevrimiçi" ile aynı: ağda canlı (BoardsApi alive — SSH yanıtı ya da ağ
-            // taramasında MAC çevrim içi); "manageable" = SSH/sensör portu yanıt veriyor (b.online). Grid ile tutarsızlık olmasın.
+            // taramasında MAC çevrim içi); "manageable" = SSH ile oturum açılabiliyor (BoardsApi manageable). Grid ile tutarsızlık olmasın.
             'boards' => Db::one(
                 "SELECT count(*) AS total,
                         count(*) FILTER (WHERE b.online OR EXISTS (SELECT 1 FROM net_devices nd
                                                   WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online)) AS online,
-                        count(*) FILTER (WHERE b.online) AS manageable,
+                        count(*) FILTER (WHERE b.online AND (NOT b.monitor_enabled OR b.session_checked_at > now() - interval '3 minutes')) AS manageable,
                         count(*) FILTER (WHERE b.exporter_ok) AS exporter_ok,
                         count(*) FILTER (WHERE b.last_log_at > now() - interval '24 hours') AS logging
                  FROM boards b"

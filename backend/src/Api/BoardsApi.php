@@ -73,7 +73,13 @@ final class BoardsApi
         -- SSH/sensör portu erişimi (b.online) ayrı: arayüzde «Yönetilebilir». SSH yanıt veriyorsa cihaz da canlıdır (ARP
         -- turları arasında net_devices gecikebilir), bu yüzden alive = online OR net_online.
         EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online) AS net_online,
-        (b.online OR EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online)) AS alive";
+        (b.online OR EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online)) AS alive,
+        -- «Yönetilebilir» = SSH ile OTURUM açılabiliyor (kullanıcı bildirimi 2026-11-10: SSH portu açık ama root parolası
+        -- tutmayan tahta «Evet» görünüyordu): son 3 dakikada başarılı oturum yoklaması (worker tasks/session_probe — 30 sn'de
+        -- bir SSH ile giriş yapar). Yoklanmayan tahtada (sensör toplama kapalı) port durumu (b.online).
+        (b.online AND (NOT b.monitor_enabled OR b.session_checked_at > now() - interval '3 minutes')) AS manageable,
+        (b.ssh_ok AND b.monitor_enabled AND (b.session_checked_at IS NULL OR b.session_checked_at < now() - interval '3 minutes'))
+            AS ssh_login_failing";
 
     /**
      * boards + "şu anda log mu geliyor" (rl) — yalnız last_log_at'i hemen göstermek için (bir tahta

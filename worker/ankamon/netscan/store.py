@@ -243,7 +243,25 @@ def boards_from_devices(conn) -> int:
     "Akıllı tahta" olan (elle seçilmiş ya da tarayıcının tahmini — MAC öneki) ama Tahtalar'da kaydı olmayan her cihaz
     için tahta kaydı açılır (source 'scan'; takma ad, bilgisayar adı ve IP cihazdan). Kayıt yalnız AÇILIR: türü sonradan
     değişen cihazın tahta kaydı silinmez (geçmişi/oturumları var), Akıllı Tahtalar listesinden gizlenir (bkz. backend
-    BoardsApi LISTED); tür geri alınınca yeniden görünür."""
+    BoardsApi LISTED); tür geri alınınca yeniden görünür.
+
+    Önce sahiplenme: MAC'i boş eski bir kayıt (loglardan açılmış — yalnız bilgisayar adı/IP bilinir) aynı tahtaysa
+    (bilgisayar adı büyük/küçük harf duyarsız ya da IP eşleşir) yeni kayıt AÇILMAZ, MAC o kayda yazılır. Kullanıcı bildirimi
+    2026-11-10: "A1-1" (etap-973494, MAC'siz) varken aynı tahta için ikinci kayıt ("A Blok - 10C") açılmıştı."""
+    adopted = conn.execute(
+        f"""UPDATE boards b SET mac = d.mac, updated_at = now()
+            FROM (SELECT DISTINCT ON (d.mac) d.mac, d.ip, d.hostname FROM net_devices d
+                  WHERE COALESCE(NULLIF(d.device_type, ''), d.type_auto) = '{classify.BOARD}' AND d.source <> 'self'
+                    AND NOT EXISTS (SELECT 1 FROM boards x WHERE x.mac = d.mac OR x.wifi_mac = d.mac)
+                  ORDER BY d.mac, d.online DESC, d.last_seen_at DESC NULLS LAST) d
+            WHERE b.mac IS NULL AND b.id = (
+                SELECT y.id FROM boards y
+                WHERE y.mac IS NULL AND ((d.hostname <> '' AND lower(y.hostname) = lower(d.hostname)) OR y.ip = d.ip)
+                ORDER BY (d.hostname <> '' AND lower(y.hostname) = lower(d.hostname)) DESC, y.id LIMIT 1)
+            RETURNING b.id, b.mac::text AS mac"""
+    ).fetchall()
+    for r in adopted:
+        activity.record(conn, f"Tahta kaydına MAC eklendi (ağ envanterinden): #{r['id']} {r['mac']}")
     rows = conn.execute(
         f"""INSERT INTO boards (mac, ip, label, hostname, source)
             SELECT DISTINCT ON (d.mac) d.mac, d.ip, COALESCE(NULLIF(d.label, ''), k.label, ''), NULLIF(d.hostname, ''), 'scan'
