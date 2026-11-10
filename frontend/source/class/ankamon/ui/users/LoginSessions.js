@@ -90,6 +90,11 @@ qx.Class.define("ankamon.ui.users.LoginSessions", {
       { id: "action_names", label: "Kullandığı işlevler", width: 300 }
     ];
     this.__table = page._createTable(this.__columns, { storageKey: "logins.columns" });
+    // Durum ipucu: satırın "Son etkinlik" değeri (kullanıcı isteği 2026-11-10: grid'lerde Durum ipucunda son görülme).
+    const offset = this.__table.getUserData("offset") || 0;
+    const seenCol = offset + this.__columns.findIndex(c => c.id === "last_seen");
+    this.__table.getTableColumnModel().setDataCellRenderer(offset + this.__columns.findIndex(c => c.id === "status"),
+      new ankamon.ui.table.HintRenderer(info => (info.rowData && info.rowData[seenCol] ? `Son etkinlik: ${info.rowData[seenCol]}` : null)));
     this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this),
       { rows: () => (this.__rows || []).map(r => r.cells) });
     this.__table.addListener("cellDbltap", e => {
