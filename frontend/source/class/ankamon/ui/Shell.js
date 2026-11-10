@@ -739,7 +739,7 @@ qx.Class.define("ankamon.ui.Shell", {
         groups.forEach(group => {
           const leaf = new qx.ui.tree.TreeFile(group.name);
           this.__hideThemeIcon(leaf);
-          leaf.setUserData("page", folder.getUserData("page"));
+          leaf.setUserData("page", network.getUserData("page")); // Varlıklar sayfası (üst düğüm Ağ/Akıllı Tahtalar değil)
           leaf.setUserData("assetGroup", group.id);
           leaf.setUserData("memberCount", group.members.length);
           leaf.setToolTipText(`${group.name}: ${group.members.length} varlık (Varlıklar'dan türer; sürükleyerek yeri değişir)`);
