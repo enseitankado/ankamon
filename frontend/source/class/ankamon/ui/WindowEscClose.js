@@ -30,7 +30,7 @@
  * türeyen sınıflar, eklentilerin pencereleri) ön plandaki pencerede ESC'ye basılınca pencere kapanır; kaydedilmemiş
  * veri varsa önce onay sorulur.
  *
- * Uygulama açılışında bir kez kurulur (bkz. Application.main): kök bileşende tek bir keypress dinleyicisi. Tuş
+ * Uygulama açılışında bir kez kurulur (bkz. Application.main): kök bileşende keypress dinleyicisi (odak boşken belgede). Tuş
  * olayı odaktaki bileşenden köke kabarcıklanır; odak bir pencerenin içindeyse o pencere (ve yalnız ön plandaki
  * etkin pencere) kapanır. Açık menü, açılır liste (SelectBox/ComboBox) ve tarih seçici ESC'yi kendisi işleyip
  * durdurduğundan önce onlar kapanır, pencere kapanmaz. Uzak ekran ve web terminal iframe içinde olduğundan oradaki
@@ -81,20 +81,43 @@ qx.Class.define("ankamon.ui.WindowEscClose", {
         if (e.getKeyIdentifier() !== "Escape" || e.isCtrlPressed() || e.isAltPressed() || e.isShiftPressed()) {
           return;
         }
-        // Odak bir pencerenin içindeyse (ya da hiçbir bileşende değilse) ön plandaki etkin pencere kapanır: yeni açılan
-        // pencere (ör. onay) odağı her zaman almıyor, tuş arkadaki pencerenin alanından gelebilir. Odak sayfadaysa
-        // (ör. grid süzgeci) ESC sayfanındır.
+        // Odak bir pencerenin içindeyse ön plandaki pencere kapanır: yeni açılan pencere (ör. onay) odağı her zaman
+        // almıyor, tuş arkadaki pencerenin alanından gelebilir. Odak sayfadaysa (ör. grid süzgeci) ESC sayfanındır.
         const target = e.getTarget();
         if (target !== root && !this.__windowOf(target)) {
           return;
         }
-        const win = root.getActiveWindow();
-        if (!win || !win.isAllowClose() || !win.isVisible() || this.__asking === win) {
+        if (this.__closeTop(root)) {
+          e.stop();
+        }
+      });
+      // Hiçbir bileşen odakta değilken (ör. onay ESC ile kapandı, odak body'de) qx tuş olayını köke iletmez: ESC
+      // doğrudan belgeden yakalanır.
+      document.addEventListener("keydown", e => {
+        if (e.key !== "Escape" || e.ctrlKey || e.altKey || e.shiftKey || e.defaultPrevented ||
+            qx.ui.core.FocusHandler.getInstance().getFocusedWidget()) {
           return;
         }
-        e.stop();
-        this.__close(win);
+        if (this.__closeTop(root)) {
+          e.preventDefault();
+        }
       });
+    },
+
+    /**
+     * Ön plandaki pencereyi kapatır (gerekirse onayla). Etkin pencere yoksa ya da artık görünmüyorsa en üstteki
+     * görünür pencere. @return {Boolean} kapatılacak pencere vardı
+     */
+    __closeTop(root) {
+      const shown = w => w && !w.isDisposed() && w.isVisible();
+      const active = root.getActiveWindow();
+      const win = shown(active) ? active : root.getWindows().filter(shown)
+        .sort((a, b) => (b.getZIndex() || 0) - (a.getZIndex() || 0))[0];
+      if (!win || !win.isAllowClose() || this.__asking === win) {
+        return false;
+      }
+      this.__close(win);
+      return true;
     },
 
     async __close(win) {
