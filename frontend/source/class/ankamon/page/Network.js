@@ -66,7 +66,8 @@ qx.Class.define("ankamon.page.Network", {
         this.__pollState();
       }).set({ toolTipText: "Bağlı bütün ağlarda varlık taramasını hemen başlatır (makine çok yoğunsa yine ertelenir)" });
     }
-    this.__uncheckButton = this._addButton("İşaretleri kaldır", () => this._checkAll(this.__table, false));
+    // "İşaretleri kaldır" kalktı (kullanıcı isteği 2026-11-11: Tahtalar/Varlıklar/gruplarda tümünü seç/kaldır yok) — başlıktaki
+    // onay kutusu görünen satırların hepsini işaretler/kaldırır.
     this._addButton("Servisleri aç/kapat", () => this.__toggleAll())
       .set({ toolTipText: "Bütün cihazların port/servis alt satırlarını açar ya da kapatır" });
     if (this._can("network.manage")) {
@@ -249,7 +250,6 @@ qx.Class.define("ankamon.page.Network", {
     __note: null,
     __timer: null,
     __polling: false,
-    __uncheckButton: null,
     __editButton: null,
     __deleteButton: null,
     __servicesButton: null,
@@ -521,14 +521,12 @@ qx.Class.define("ankamon.page.Network", {
 
     __updateActionState() {
       const count = this.__checkedDevices().length;
-      [this.__editButton, this.__deleteButton,this.__servicesButton, this.__groupButton, this.__uncheckButton].filter(Boolean).forEach(button => {
+      [this.__editButton, this.__deleteButton, this.__servicesButton, this.__groupButton].filter(Boolean).forEach(button => {
         if (button.getUserData("baseLabel") === null) {
           button.setUserData("baseLabel", button.getLabel());
         }
         button.setLabel(count ? `${button.getUserData("baseLabel")} (${count})` : button.getUserData("baseLabel"));
-        if (button !== this.__uncheckButton) {
-          button.setEnabled(count >= 1);
-        }
+        button.setEnabled(count >= 1);
       });
     },
 
