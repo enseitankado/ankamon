@@ -66,5 +66,9 @@ ext/<ad>/
   satırı ve ekran kutucuğu menüsüne eklenir; `bar` verilirse araç çubuğunda düğme olur (`mirror`: maddenin alt
   menüsü düğmenin menüsüdür).
 
+- **Sol menü sayfası:** `ankamon.ext.Extensions.addPage({id, label, icon, feature, parent?, tabs?, create(user)})` —
+  `ui.Shell` PAGES biçimi; `create` bir `ankamon.page.Base` döndürür. `parent` yoksa sayfa kökte "Sistem"den önce durur;
+  ağaç, üst yol gösterimi ve sekme yaprakları çekirdek sayfalarındaki gibi kendiliğinden gelir.
+
 Yeni bir eklenti noktası gerekirse çekirdeğe **genel** bir kanca eklenir. Kanca hiçbir eklentiyi
 adıyla anmaz.

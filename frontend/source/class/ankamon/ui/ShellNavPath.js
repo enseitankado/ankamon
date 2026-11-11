@@ -27,7 +27,8 @@
 
 /**
  * Üst başlıktaki yol gösterimi: "Ankamon > Bakım > Sensörler". Sayfa başlıklarının yerine geçer (dikey alan
- * kazanılır — kullanıcı isteği). Parçalar "Ankamon" yazısıyla aynı düz metindir (yazı tipi, renk aynı); tıklanınca
+ * kazanılır — kullanıcı isteği). Parçalar "Ankamon" yazısıyla aynı renkte düz metindir (yol "Ankamon"dan bir tık küçük
+ * ve kalın değil — app-nav-path, kullanıcı isteği 2026-11-11); tıklanınca
  * altına seçenek listesi açılır: altı olan parçada kendi altındakiler, son parçada kardeşleri, "Ankamon"da ana menü.
  * Listedeki dallar alt menüdür; böylece ağacın tamamına buradan da gidilir.
  *
@@ -44,7 +45,7 @@ qx.Class.define("ankamon.ui.ShellNavPath", {
     this.setBackgroundColor("app-header");
     this.__menus = [];
     this.__parts = [];
-    const home = this.__part("Ankamon");
+    const home = this.__part("Ankamon", "app-title");
     home.addListener("tap", () => this.__tree && this.__open(home, this.__tree.getRoot().getChildren()));
     this.add(home);
   },
@@ -77,9 +78,9 @@ qx.Class.define("ankamon.ui.ShellNavPath", {
       this.__render();
     },
 
-    /** "Ankamon" ile aynı görünüm: tıklanabilir olduğu yalnız imleçten anlaşılır. */
-    __part(text) {
-      return new qx.ui.basic.Label(text).set({ font: "app-title", textColor: "app-header-text", cursor: "pointer" });
+    /** "Ankamon"dan bir tık küçük, kalın olmayan düz metin: tıklanabilir olduğu yalnız imleçten anlaşılır. */
+    __part(text, font) {
+      return new qx.ui.basic.Label(text).set({ font: font || "app-nav-path", textColor: "app-header-text", cursor: "pointer" });
     },
 
     /** Kökten seçili düğüme kadar olan düğümler. */
@@ -96,7 +97,7 @@ qx.Class.define("ankamon.ui.ShellNavPath", {
       this.__parts.forEach(widget => widget.destroy());
       this.__parts = [];
       this.__path().forEach(item => {
-        const sep = new qx.ui.basic.Label(">").set({ font: "app-title", textColor: "app-header-text", marginLeft: 8, marginRight: 8 });
+        const sep = new qx.ui.basic.Label(">").set({ font: "app-nav-path", textColor: "app-header-text", marginLeft: 8, marginRight: 8 });
         const part = this.__part(ankamon.ui.ShellNavPath.text(item));
         const kids = item.getChildren();
         // Altı varsa altındakiler, yoksa aynı düzeydekiler (ör. Sensörler → Bakım, Sensörler, Ahenk…).

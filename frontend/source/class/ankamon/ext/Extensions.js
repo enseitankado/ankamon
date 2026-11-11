@@ -43,7 +43,7 @@
  *  - "statusBar.usersVisible" (): alt çubuktaki oturum açmış kullanıcılar göstergesi (👤 + ipucu).
  *    Varsayılan gizli; işlendi ise (true) görünür.
  * Kanca dışındaki eklenti noktaları: addMaintenanceTab (Bakım sekmesi), addBoardMenu (Tahtalar sağ menüsü
- * maddesi ve isteğe bağlı araç çubuğu düğmesi).
+ * maddesi ve isteğe bağlı araç çubuğu düğmesi), addPage (sol menüde eklentinin kendi sayfası).
  *
  * Bir eklentinin durumu değişip kanca yanıtları farklılaşınca changed() çağrılır (CHANGED mesajı): kancayı
  * sürekli gösterilen bir öğe için soran çekirdek bileşenleri (ör. alt çubuk) yanıtı yeniden değerlendirir.
@@ -59,6 +59,7 @@ qx.Class.define("ankamon.ext.Extensions", {
     __started: false,
     __enabled: {},          // {eklenti-adı: etkin mi} — start()'ta GET /extensions/active'ten
     __maintenanceTabs: [],  // eklentilerin Bakım sekmeleri (bkz. addMaintenanceTab)
+    __pages: [],            // eklentilerin sol menü sayfaları (bkz. addPage)
     __boardMenus: [],       // eklentilerin Tahtalar sağ menüsü maddeleri (bkz. addBoardMenu)
 
     /**
@@ -135,6 +136,22 @@ qx.Class.define("ankamon.ext.Extensions", {
     /** @return {Array} eklentilerin Tahtalar araç çubuğu grupları (bkz. addBoardMenu bar). */
     boardBarGroups() {
       return this.__boardMenus.filter(spec => spec.bar).map(spec => spec.bar);
+    },
+
+    /**
+     * Bir eklenti sol menüye kendi sayfasını ekler — ui.Shell PAGES biçiminde: {id, label, icon?, feature? | features? |
+     * admin?, parent?, tabs?, retap?, create(user)}. create bir ankamon.page.Base döndürmelidir (Shell activate/selectTab/
+     * currentTab çağırır). parent verilmezse sayfa kökte "Sistem"den önce durur; yol gösterimi ve ağaç sekmeleri
+     * kendiliğinden gelir. icon: ağaçtaki metin simgesi (ui.Shell ICON gibi tek karakter). id çekirdek sayfalarla
+     * çakışmamalı (çakışan yok sayılır). init() içinde yalnız enabled(ad) ise çağrılmalı.
+     */
+    addPage(spec) {
+      this.__pages.push(spec);
+    },
+
+    /** @return {Array} eklentilerin kayıtlı sayfa tanımları (bkz. addPage). */
+    pages() {
+      return this.__pages;
     },
 
     /** @param name {String} kanca adı  @param handler {Function} true dönerse olay işlendi sayılır */

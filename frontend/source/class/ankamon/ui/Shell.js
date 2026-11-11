@@ -49,6 +49,7 @@ qx.Class.define("ankamon.ui.Shell", {
     this.__pages = {};
     this.__scrolls = {};
     this.setBackgroundColor("app-background");
+    ankamon.ui.Shell.mergeExtensionPages();
 
     this.add(this.__createHeader(), { edge: "north" });
 
@@ -132,6 +133,25 @@ qx.Class.define("ankamon.ui.Shell", {
   },
 
   statics: {
+    /**
+     * Eklentilerin sayfalarını (ankamon.ext.Extensions.addPage) PAGES'e katar — ağaç, yol gösterimi, OPEN_PAGE ve
+     * sayfa sırası (nav_order) onları çekirdek sayfalarıyla aynı yoldan görür. Üst sayfası olmayan, kökte "Sistem"den
+     * önce durur. Bir kez katılan (aynı id) yeniden katılmaz; çekirdek sayfa id'siyle çakışan yok sayılır.
+     */
+    mergeExtensionPages() {
+      const S = ankamon.ui.Shell;
+      ankamon.ext.Extensions.pages().forEach(spec => {
+        if (!spec || !spec.id || typeof spec.create !== "function" || S.PAGES.some(p => p.id === spec.id)) {
+          return;
+        }
+        if (spec.icon) {
+          S.ICON[spec.id] = spec.icon;
+        }
+        const system = S.PAGES.findIndex(p => p.id === "system");
+        S.PAGES.splice(spec.parent || system < 0 ? S.PAGES.length : system, 0, spec);
+      });
+    },
+
     /** sessionStorage anahtarı: yeniden yüklemeden sonra açılacak sayfanın kimliği (bkz. construct). */
     REOPEN_KEY: "ankamon.reopenPage",
 

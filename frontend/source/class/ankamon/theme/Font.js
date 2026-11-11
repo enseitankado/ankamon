@@ -76,6 +76,14 @@ qx.Theme.define("ankamon.theme.Font", {
       family: ["Segoe UI", "Roboto", "sans-serif"]
     },
 
+    // Üst çubukta "Ankamon"un yanındaki menü yolu (bkz. ui.ShellNavPath): başlıktan bir tık küçük, kalın değil
+    // (kullanıcı isteği 2026-11-11).
+    "app-nav-path": {
+      size: 14,
+      bold: false,
+      family: ["Segoe UI", "Roboto", "sans-serif"]
+    },
+
     // Üst çubukta "Ankamon" yazısının altındaki sürüm/derleme satırı (bkz. ui.Shell __createHeader).
     "app-surum-damgasi": {
       size: 10,
