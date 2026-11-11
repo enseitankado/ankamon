@@ -174,7 +174,12 @@ final class AnomaliesApi
         ],
         'uefi_nvram_high' => [
             'label' => 'UEFI NVRAM dolu',
-            'description' => 'UEFI değişken deposunun (NVRAM) boş alanı %10\'un altında. Depo dolarsa firmware yeni açılış girdisi/değişken yazamaz: güncellemede önyükleyici kaydı başarısız olabilir, tahta açılmayabilir. Yüksek doluluk tek başına sorun değildir: firmware her yazmada değişkenin yeni kopyasını ekler, eskileri açılışta toplar; bu yüzden doluluk tahtadan tahtaya %10-95 arasında değişir. Ayrıntıda canlı içerik de gösterilir (genellikle 9-19 KB; kalanı eskimiş kopya). Değer Bilgi kartı, ilk tanıma ve haftalık otomatik sorun taramasında toplanır.',
+            'description' => 'UEFI değişken deposunun (NVRAM) boş alanı %10\'un altında. Depo dolarsa firmware yeni açılış girdisi/değişken yazamaz: güncellemede önyükleyici kaydı başarısız olabilir, tahta açılmayabilir. Yüksek doluluk tek başına sorun değildir: firmware her yazmada değişkenin yeni kopyasını ekler, eskileri ancak toplama (reclaim) sırasında atar; bu yüzden doluluk tahtadan tahtaya %10-95 arasında değişir. Ayrıntıda canlı içerik de gösterilir (genellikle 9-19 KB; kalanı eskimiş kopya). '
+                . 'Firmware her açılışta yazar (açılış sayacı, giriş aygıtları, CSM açıksa eski tip/legacy açılış girdileri): Intel anakartlı (VESTEL 14MB57) tahtada açılış başına ~2,8 KB ölçüldü. '
+                . 'AMD anakartlı (14MB37C1) tahtalar dolunca açılışta kendiliğinden toplar. Intel anakartlı (14MB57) tahta ise depo %100 dolmuşken bile açılışta toplamadı. '
+                . 'Çözüm (doğrulandı, 2026-11-11): tahtanın başında BIOS kurulumuna (Setup) girip HİÇBİR ayarı değiştirmeden "Save & Exit" — firmware kaydetmeden önce toplar; ayarlar ve açılış girdileri korunur (örnekte %100 → %13). Linux\'tan uzaktan tetiklemek dolu depoda işe yaramaz (çekirdek son 5 KB\'a yazmaz). '
+                . 'Önlem: Pardus UEFI ile açıldığından BIOS\'ta CSM kapatılırsa eski tip açılış girdisi yazmaları biter, depo çok daha yavaş dolar. '
+                . 'Değer Bilgi kartı, ilk tanıma ve haftalık otomatik sorun taramasında toplanır.',
             'level' => 'warn',
             'scan' => true,
             'source' => 'SSH verisi',

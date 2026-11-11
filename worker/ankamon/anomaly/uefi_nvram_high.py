@@ -38,6 +38,15 @@ arasında gezer ve açılış sayısıyla ilişkisizdir (2026-11-11 filo ölçü
 değildir. Ayrıntıya canlı içerik (uefi_vars boyutları toplamı) de yazılır: doluluğun kalanı eskimiş kopyadır.
 Durum ölçümüdür (sürekli değil): her turda son toplanan değere bakılır; boş alan açılınca kayıt o toplanma
 anında biter.
+
+Saha bulguları (2026-11-11, "B Blok - Arge 2", VESTEL 14MB57 / AMI 4.6.5):
+- Firmware her açılışta yazar: MonotonicCounter, ConIn/ConInDev, CSM açıksa legacy BBS Boot#### girdilerinin
+  etkin bayrağı (+ görünmeyen BS değişkenleri) — açılış başına ~2,8 KB.
+- 14MB37C1 (AMD) dolunca açılışta kendiliğinden toplar (etap-8abea4, etap-8a716a, etap-8ac554). 14MB57 (Intel)
+  %100 dolu depoda (ham 265 B) açılışta TOPLAMADI.
+- Çözüm: BIOS Setup'a girip ayar değiştirmeden "Save & Exit" → toplandı (%100 → %13), değişkenler ve açılış
+  sırası korundu. Linux'tan tetikleme dolu depoda işlemez (x86 çekirdeği son 5 KB'a yazmaz, df boş 0).
+- Önlem: CSM kapatmak legacy Boot#### yazılarını keser.
 """
 
 import datetime
@@ -76,8 +85,8 @@ def judge(used: int, total: int, live: int | None = None) -> tuple[bool, str, di
     if free_pct < FREE_MIN_PCT:
         tail = f" — boş alan %{_tr(free_pct)}, firmware yeni değişken yazamayabilir"
         if live and live < used / 2:
-            tail += (" (doluluğun çoğu eskimiş kopya: firmware açılışta toplar; toplamazsa BIOS'ta"
-                     " varsayılanları yükleyip kaydetmek toplamayı tetikler)")
+            tail += (" (doluluğun çoğu eskimiş kopya. Çözüm: tahtanın başında BIOS kurulumuna girip ayar"
+                     " değiştirmeden \"Save & Exit\" — firmware toplar, ayarlar korunur)")
         return True, text + tail, detail
     return False, text + f" — boş alan %{_tr(free_pct)}", detail
 
