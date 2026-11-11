@@ -23,27 +23,27 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Anomali: UEFI değişken deposu (NVRAM) doluluğu filo ortalamasının belirgin üzerinde.
+"""Anomali: UEFI değişken deposunun (NVRAM) boş alanı %10'un altında.
 
 Kaynak: boards.facts->firmware_boot (store_used / store_total — efivarfs'in df'i, firmware QueryVariableInfo;
 bkz. executor/hwfacts.py _firmware_boot). Bilgi kartı, ilk tanıma ve haftalık otomatik sorun taraması toplar.
 
 Neden: NVRAM dolarsa firmware yeni değişken (açılış girdisi, BootNext, Secure Boot anahtarı) yazamaz;
 işletim sistemi güncellemesinde önyükleyici kaydı başarısız olur, bazı AMI firmware'leri açılışta takılır.
-Aynı modeldeki tahtalar benzer doluluktadır; belirgin sapma, birikmiş/eskimiş kopyalar (firmware toplamıyor)
-ya da tahtaya yazılmış fazladan veri demektir.
 
-Kural: tahtanın doluluk oranı, verisi olan tüm tahtaların ortalamasından en az MARGIN_PT puan yüksekse
-(ortalama için en az MIN_BOARDS tahta gerekir) ya da boş alan FREE_MIN_PCT'nin altındaysa anomali sürer.
-Durum ölçümüdür (sürekli değil): her turda son toplanan değere bakılır; oran düşünce kayıt o toplanma anında biter.
+Kural: yalnız boş alan FREE_MIN_PCT'nin altındaysa anomali sürer. Filo ortalamasıyla karşılaştırılmaz:
+AMI deposu log yapılıdır — her yazma değişkenin yeni kopyasını ekler, eskisi firmware açılışta toplayana
+(reclaim) dek yer kaplar. Canlı içerik her tahtada ~9-19 KB iken doluluk bu testere dişi yüzünden %9-96
+arasında gezer ve açılış sayısıyla ilişkisizdir (2026-11-11 filo ölçümü); ortalamanın üstünde olmak sorun
+değildir. Ayrıntıya canlı içerik (uefi_vars boyutları toplamı) de yazılır: doluluğun kalanı eskimiş kopyadır.
+Durum ölçümüdür (sürekli değil): her turda son toplanan değere bakılır; boş alan açılınca kayıt o toplanma
+anında biter.
 """
 
 import datetime
 
 KIND = "uefi_nvram_high"
-MARGIN_PT = 10.0      # ortalamanın bu kadar puan üzeri anomali (ör. ortalama %40 → %50 ve üstü)
-FREE_MIN_PCT = 10.0   # ortalamadan bağımsız: boş alan %10'un altıysa her zaman anomali
-MIN_BOARDS = 3
+FREE_MIN_PCT = 10.0   # boş alan %10'un altıysa anomali (128 KB depoda ~13 KB)
 WINDOW = datetime.timedelta(hours=1)
 
 _BOARDS = """
@@ -51,6 +51,8 @@ SELECT id, lower(COALESCE(NULLIF(hostname, ''), host(ip))) AS host,
        COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name,
        (facts->'firmware_boot'->>'store_used')::bigint AS used,
        (facts->'firmware_boot'->>'store_total')::bigint AS total,
+       (SELECT sum((v->>'size')::bigint) FROM jsonb_array_elements(
+            CASE WHEN jsonb_typeof(facts->'uefi_vars') = 'array' THEN facts->'uefi_vars' ELSE '[]' END) v) AS live,
        (facts->>'hw_collected_at')::bigint AS collected_at
 FROM boards
 WHERE (facts->'firmware_boot'->>'store_total')::bigint > 0
@@ -63,39 +65,30 @@ def _tr(value: float) -> str:
     return f"{value:.1f}".replace(".", ",").replace(",0", "")
 
 
-def fleet_average(conn) -> tuple[float | None, int]:
-    """Verisi olan tahtaların ortalama NVRAM doluluk oranı (%) ve tahta sayısı."""
-    rows = [r for r in conn.execute(_BOARDS).fetchall() if r["host"]]
-    if not rows:
-        return None, 0
-    return sum(100.0 * r["used"] / r["total"] for r in rows) / len(rows), len(rows)
-
-
-def judge(used: int, total: int, avg: float | None, count: int) -> tuple[bool | None, str, dict]:
-    """(anomali mi, özet, ayrıntı). Ortalama hesaplanamıyorsa yalnız boş alan eşiğine bakılır."""
+def judge(used: int, total: int, live: int | None = None) -> tuple[bool, str, dict]:
+    """(anomali mi, özet, ayrıntı). live: canlı değişkenlerin bayt toplamı (bilinmiyorsa None)."""
     pct = 100.0 * used / total
     free_pct = 100.0 - pct
-    detail = {"used_pct": round(pct, 1), "avg_pct": round(avg, 1) if avg is not None else None,
-              "used": used, "total": total, "boards": count}
+    detail = {"used_pct": round(pct, 1), "used": used, "total": total, "live": live}
     text = f"Doluluk %{_tr(pct)} ({used // 1024} KB / {total // 1024} KB)"
+    if live:
+        text += f", canlı içerik {max(1, round(live / 1024))} KB"
     if free_pct < FREE_MIN_PCT:
-        return True, text + f" — boş alan %{_tr(free_pct)}, firmware yeni değişken yazamayabilir", detail
-    if avg is None or count < MIN_BOARDS:
-        return None, text + f" — filo ortalaması için en az {MIN_BOARDS} tahtanın verisi gerekir", detail
-    over = pct - avg
-    if over >= MARGIN_PT:
-        return True, text + f" — filo ortalaması %{_tr(avg)} ({count} tahta), {_tr(over)} puan üzerinde", detail
-    return False, text + f" — filo ortalaması %{_tr(avg)} ({count} tahta)", detail
+        tail = f" — boş alan %{_tr(free_pct)}, firmware yeni değişken yazamayabilir"
+        if live and live < used / 2:
+            tail += (" (doluluğun çoğu eskimiş kopya: firmware açılışta toplar; toplamazsa BIOS'ta"
+                     " varsayılanları yükleyip kaydetmek toplamayı tetikler)")
+        return True, text + tail, detail
+    return False, text + f" — boş alan %{_tr(free_pct)}", detail
 
 
 def detect(conn, since):
     rows = [r for r in conn.execute(_BOARDS).fetchall() if r["host"]]
-    avg = sum(100.0 * r["used"] / r["total"] for r in rows) / len(rows) if rows else None
     open_ = {r["host"]: r for r in conn.execute(_OPEN, (KIND,)).fetchall()}
     now = datetime.datetime.now(datetime.timezone.utc)
     found = []
     for r in rows:
-        anomaly, text, detail = judge(r["used"], r["total"], avg, len(rows))
+        anomaly, text, detail = judge(r["used"], r["total"], r["live"])
         at = (datetime.datetime.fromtimestamp(r["collected_at"], datetime.timezone.utc)
               if r["collected_at"] else now)
         known = open_.pop(r["host"], None)
@@ -104,7 +97,7 @@ def detect(conn, since):
             found.append({"host": r["host"], "board_id": r["id"], "board_name": r["name"],
                           "started_at": known["started_at"] if known else at, "ended_at": None, "detail": detail})
         elif known:
-            # Oran ortalamaya indi (ya da filo ortalaması yükseldi): son toplanma anında biter.
+            # Boş alan açıldı (firmware topladı) ya da eşik altına hiç inmemişti: son toplanma anında biter.
             found.append({"host": r["host"], "board_id": r["id"], "board_name": r["name"],
                           "started_at": known["started_at"], "ended_at": max(at, known["started_at"]),
                           "detail": {**(known["detail"] or {}), "end_text": text}})
@@ -112,10 +105,12 @@ def detect(conn, since):
     return found, []
 
 
-# Anlık tarama (Anomaliler ▸ Tarama): efivarfs'in toplam/dolu baytı. Legacy (CSM) açılışta efivarfs yoktur.
+# Anlık tarama (Anomaliler ▸ Tarama): efivarfs'in toplam/dolu baytı + canlı değişkenlerin veri toplamı
+# (efivarfs dosya boyu = 4 bayt öznitelik + veri). Legacy (CSM) açılışta efivarfs yoktur.
 PROBE = r"""
 if [ -d /sys/firmware/efi/efivars ]; then
   df -B1 -P /sys/firmware/efi/efivars 2>/dev/null | awk 'NR==2{printf "total=%.0f\nused=%.0f\n", $2, $3}'
+  find /sys/firmware/efi/efivars -type f -printf '%s\n' 2>/dev/null | awk '$1>4{s+=$1-4} END{printf "live=%.0f\n", s}'
 else
   echo "legacy=1"
 fi
@@ -131,6 +126,9 @@ def evaluate(values: dict, ctx: dict) -> dict:
         return {"anomaly": None, "summary": "Değişken deposu okunamadı", "detail": {}}
     if total <= 0:
         return {"anomaly": None, "summary": "Değişken deposu boyutu bildirilmiyor", "detail": {}}
-    avg, count = fleet_average(ctx["conn"])
-    anomaly, text, detail = judge(used, total, avg, count)
+    try:
+        live = int(values.get("live") or 0) or None
+    except ValueError:
+        live = None
+    anomaly, text, detail = judge(used, total, live)
     return {"anomaly": anomaly, "summary": text, "detail": detail}

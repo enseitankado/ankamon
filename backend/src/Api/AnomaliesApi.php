@@ -174,7 +174,7 @@ final class AnomaliesApi
         ],
         'uefi_nvram_high' => [
             'label' => 'UEFI NVRAM dolu',
-            'description' => 'UEFI değişken deposunun (NVRAM) doluluk oranı filodaki tahtaların ortalamasından en az 10 puan yüksek ya da boş alanı %10\'un altında. Depo dolarsa firmware yeni açılış girdisi/değişken yazamaz: güncellemede önyükleyici kaydı başarısız olabilir, tahta açılmayabilir. Değer Bilgi kartı, ilk tanıma ve haftalık otomatik sorun taramasında toplanır; ortalama için en az 3 tahtanın verisi gerekir.',
+            'description' => 'UEFI değişken deposunun (NVRAM) boş alanı %10\'un altında. Depo dolarsa firmware yeni açılış girdisi/değişken yazamaz: güncellemede önyükleyici kaydı başarısız olabilir, tahta açılmayabilir. Yüksek doluluk tek başına sorun değildir: firmware her yazmada değişkenin yeni kopyasını ekler, eskileri açılışta toplar; bu yüzden doluluk tahtadan tahtaya %10-95 arasında değişir. Ayrıntıda canlı içerik de gösterilir (genellikle 9-19 KB; kalanı eskimiş kopya). Değer Bilgi kartı, ilk tanıma ve haftalık otomatik sorun taramasında toplanır.',
             'level' => 'warn',
             'scan' => true,
             'source' => 'SSH verisi',
