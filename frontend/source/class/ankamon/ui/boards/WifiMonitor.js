@@ -89,14 +89,45 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       boards.filter(b => wifiUp(b) && !cabled(b)).forEach(b => plan.set(b.id, { noSniff: "wifionly" }));
       if (both.length) {
         const esc = qx.bom.String.escape;
-        const ok = await ankamon.ui.Dialog.confirm(
+        // Üç seçenek (kullanıcı isteği 2026-11-11 — "Dahil etmeden tara"): dinlemeye dahil et / Wi-Fi'yi koparmadan yalnız
+        // ağ taraması / hiç açma.
+        const answer = await this.__askBoth(
           `<b>${both.map(b => esc(name(b))).join(", ")}</b> hem kabloyla hem Wi-Fi ile bağlı.<br><br>Wi-Fi trafiğini dinlemek için ` +
           `${both.length > 1 ? "bu tahtaların" : "bu tahtanın"} <b>Wi-Fi bağlantısı kopacak</b> ve pencere açık kaldıkça kopuk ` +
-          "kalacak (kablo bağlantısı ve uzaktan erişim sürer); pencere kapanınca Wi-Fi yeniden bağlanır.<br><br>Dinlemeye dahil " +
-          "edilsin mi? <i>Vazgeç</i> derseniz bu tahtalarda yalnız ağ taraması yapılır.", "Dahil et (Wi-Fi kopacak)");
-        both.forEach(b => plan.set(b.id, ok ? { force: true } : { noSniff: "declined" }));
+          "kalacak (kablo bağlantısı ve uzaktan erişim sürer); pencere kapanınca Wi-Fi yeniden bağlanır.<br><br>" +
+          "<b>Dahil etmeden tara</b>: Wi-Fi bağlantısı kopmaz, bu tahtalarda yalnız çevredeki Wi-Fi ağları taranır (dinleme yok).");
+        if (answer === null) {
+          return null;
+        }
+        both.forEach(b => plan.set(b.id, answer ? { force: true } : { noSniff: "declined" }));
       }
       return plan;
+    },
+
+    /** @return {Promise} true: dahil et, false: dahil etmeden tara, null: vazgeç (pencere açılmaz). */
+    __askBoth(message) {
+      return new Promise(resolve => {
+        const win = ankamon.ui.Dialog.window("Wi-Fi Monitör", 520);
+        let answer = null;
+        win.add(new qx.ui.basic.Label(message).set({ rich: true, wrap: true }));
+        const cancel = new qx.ui.form.Button("Vazgeç").set({ toolTipText: "Wi-Fi Monitör açılmaz" });
+        const scan = new qx.ui.form.Button("Dahil etmeden tara").set({
+          toolTipText: "Wi-Fi bağlantısı kopmaz; bu tahtalarda yalnız ağ taraması yapılır" });
+        const ok = new qx.ui.form.Button("Dahil et (Wi-Fi kopacak)");
+        cancel.addListener("execute", () => win.close());
+        scan.addListener("execute", () => {
+          answer = false;
+          win.close();
+        });
+        ok.addListener("execute", () => {
+          answer = true;
+          win.close();
+        });
+        win.addListener("close", () => resolve(answer));
+        ankamon.ui.Dialog.buttons(win, [cancel, scan, ok]);
+        win.open();
+        scan.focus();
+      });
     },
 
     /**
@@ -111,12 +142,18 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       if (this.__win && this.__win.ctx) {
         const fresh = boards.filter(b => !this.__win.ctx.has(b.id));
         const plan = await this.__wifimonPlan(fresh);
+        if (!plan) {
+          return; // Vazgeç
+        }
         fresh.forEach(board => this.__win.ctx.addBoard(board, plan.get(board.id) || {}));
         this.__win.open();
         this.__win.focus();
         return;
       }
       const plan = await this.__wifimonPlan(boards);
+      if (!plan) {
+        return; // Vazgeç: pencere açılmaz
+      }
       const bounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280 };
       const win = ankamon.ui.Dialog.window("Wi-Fi Monitör", Math.max(900, Math.min(1400, bounds.width - 40)), { maximizable: true });
       win.setHeight(640);
@@ -389,6 +426,17 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         tabs.setSelection([findingsPage]);
       };
 
+      // Satıra çift tıklama: bütün ayrıntılar (ipuçlarının tamamı + sensörler + konum — ui.boards.WifimonDetail;
+      // kullanıcı isteği 2026-11-11). İşaret sütunu (1) çift tıklamada açılmaz.
+      table.addListener("cellDbltap", e => {
+        if (e.getColumn() === 1) {
+          return;
+        }
+        const m = meta.get(table.getTableModel().getValue(0, e.getRow()));
+        if (m && !m.sensor) {
+          ankamon.ui.boards.WifimonDetail.open(m, meta);
+        }
+      });
       // Tespitler sağ tık: tıklanan satır işaretliyse bütün işaretlilere, değilse yalnız ona uygulanır.
       table.addListener("cellContextmenu", e => {
         const row = e.getRow();

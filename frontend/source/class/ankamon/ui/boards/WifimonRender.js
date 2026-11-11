@@ -58,8 +58,12 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
     COLUMNS: [
       { id: "level", label: "Durum", width: 110, choices: true, hint: "Bulgunun öne çıkma düzeyi" },
       { id: "sensor", label: "Sensör", width: 150, choices: true, hint: "Vericiyi duyan Ankamon tahtası (Wi-Fi kartıyla dinleyen)" },
-      { id: "device", label: "Tespit edilen cihaz", width: 170,
-        hint: "Duyulan vericinin MAC adresi (N× = aynı cihaz sayılan N rastgele adres; ipucunda hepsi)" },
+      { id: "device", label: "Tespit edilen cihaz", width: 150,
+        hint: "Duyulan vericinin MAC adresi (satıra çift tıklayın: bütün ayrıntılar)" },
+      // Eskiden cihaz adının başındaki "N×" (kullanıcı isteği 2026-11-11: ayrı sütun). Görülme sayısı DEĞİL: aynı cihaz
+      // sayılıp bu satırda birleşen rastgele adres sayısı (row.addrs; ölçütler WifimonClassify.MERGE_CRITERIA).
+      { id: "addrs", label: "Adres sayısı", width: 84, choices: true,
+        hint: "Aynı cihaz sayılıp bu satırda birleşen (rastgele) MAC adresi sayısı — telefonlar adreslerini değiştirir; ipucunda adresler" },
       { id: "kind", label: "Tür", width: 170, choices: true },
       { id: "name", label: "Ad", width: 170, hint: "Ağ adı (SSID); bağlı cihazda bağlı olduğu ağ" },
       { id: "signal", label: "Sinyal", width: 175, hint: "Sinyal gücü ve kaba yakınlık" },
@@ -311,16 +315,18 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
         const id = `${feed.board.id}|${item.key}`;
         const name = this.__nameText(row);
         const hasSignal = !(row.signal === null || row.signal === undefined);
-        rows.push([id, opts.checked.has(id), lv.label, feed.name, row.addr || "", this.__kindText(row), name,
+        const addrCount = Math.max(1, (row.addrs || []).length);
+        rows.push([id, opts.checked.has(id), lv.label, feed.name, row.addr || "", addrCount, this.__kindText(row), name,
           hasSignal ? `${row.signal}% ${Classify.proximity(row.signal)}` : "", terms.map(t => t.text).join(" · "),
           this.__vendorText(row), seen.join(" · ")]);
         meta.set(id, {
-          sensor: false, feed, item, lastAt: item.lastAt || 0, level: item.level, signal: hasSignal ? row.signal : -1,
+          sensor: false, feed, item, row, lastAt: item.lastAt || 0, level: item.level, signal: hasSignal ? row.signal : -1,
+          texts: { level: lv.label, kind: this.__kindText(row), name, evidence: terms, vendor: this.__vendorText(row), seen: seen.join(" · ") },
           html: {
             level: this.chip(lv.label, lv.color, lv.tip),
             sensor: `${feed.watching && feed.ws ? '<span style="color:#1e8e3e">●</span> ' : ""}${esc(feed.name)}`,
-            device: ((row.addrs || []).length > 1 ? `<span style="color:#1a73e8;font-weight:600">${row.addrs.length}×</span> ` : "") +
-              `<span style="font-family:monospace;font-size:12px">${esc(row.addr || "")}</span>`,
+            device: `<span style="font-family:monospace;font-size:12px">${esc(row.addr || "")}</span>`,
+            addrs: addrCount > 1 ? `<span style="color:#1a73e8;font-weight:600">${addrCount}</span>` : "1",
             signal: this.bar(row.signal),
             evidence: terms.map(t => esc(t.text)).join(" · "),
             vendor: row.vendor ? `<b>${esc(row.vendor)}</b>` : `<span style="opacity:.6">${esc(this.__vendorText(row))}</span>`,
@@ -332,6 +338,7 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
             level: lv.tip + (seen.length ? `\nSon görülme: ${seen.join(" · ")}` : ""),
             sensor: feed.watching && feed.ws ? `${feed.name} — sürekli izleniyor` : feed.name,
             device: this.__deviceHint(row),
+            addrs: addrCount > 1 ? `Aynı cihaz sayılan ${addrCount} adres:\n${(row.addrs || []).join("\n")}` : "Tek adres",
             kind: this.__kindHint(row),
             name: name || null,
             signal: hasSignal ? `Sinyal %${row.signal} — ${Classify.proximity(row.signal)} (kaba yakınlık ipucu)` +
