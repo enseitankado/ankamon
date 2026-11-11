@@ -115,7 +115,9 @@ qx.Class.define("ankamon.ext.Extensions", {
      * @param spec {Map} {
      *   build: (board, boards, user) → qx.ui.menu.Button|null — maddeyi kurar (BoardOps.menuButton ile; null: yok).
      *     ActionBar yetkiyi sınamak için sentetik tahtayla da çağırır ({id: 0, online, label: ""}).
-     *   bar: {id, label, iconSvg|icon, mirror?, primary?, sep?, single?, hint?} — isteğe bağlı araç çubuğu düğmesi;
+     *   parent: isteğe bağlı çekirdek grubunun etiketi (ör. "Komut çalıştır"): madde o grubun alt menüsüne girer;
+     *     araç çubuğunda da o grubun düğmesinde görünür (grup yoksa — yetki/çevrimdışı — eklentinin kendi bölümüne).
+     *   bar: {id, label, iconSvg|icon, mirror?, primary?, sep?, single?, hint?} — isteğe bağlı ayrı araç çubuğu düğmesi;
      *     mirror maddenin etiketiyse düğmenin menüsü maddenin alt menüsünün aynısıdır.
      * }
      */
@@ -123,11 +125,16 @@ qx.Class.define("ankamon.ext.Extensions", {
       this.__boardMenus.push(spec);
     },
 
-    /** @return {Array} eklentilerin bu tahta(lar) için kurduğu sağ menü maddeleri (hata veren eklenti atlanır). */
+    /** @return {Array} eklentilerin bu tahta(lar) için kurduğu sağ menü maddeleri (hata veren eklenti atlanır); parent
+     * verilen maddede userData "ankamon.menuParent" (bkz. page.Boards.__rowMenu). */
     boardMenuItems(board, boards, user) {
       return this.__boardMenus.map(spec => {
         try {
-          return spec.build(board, boards, user) || null;
+          const item = spec.build(board, boards, user) || null;
+          if (item && spec.parent) {
+            item.setUserData("ankamon.menuParent", spec.parent);
+          }
+          return item;
         } catch (e) {
           qx.log.Logger.error(this, `Eklenti sağ menü maddesi kurulamadı: ${e}`);
           return null;

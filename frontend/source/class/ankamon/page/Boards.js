@@ -1469,7 +1469,16 @@ qx.Class.define("ankamon.page.Boards", {
       const ICON = ankamon.ui.Shell.ICON;
       const add = (icon, label, handler) => menu.add(ankamon.ui.BoardOps.menuButton(icon, label, handler.bind(this)));
       // Eklentilerin maddeleri (bkz. ankamon.ext.Extensions.addBoardMenu): ortak işlemlerin ardında, kendi bölümünde.
-      const own = ankamon.ext.Extensions.boardMenuItems(board, boards, this._user);
+      // parent verilen madde o çekirdek grubunun alt menüsüne (ör. Komut çalıştır ▸ TiHA); grup yoksa kendi bölümüne.
+      const own = ankamon.ext.Extensions.boardMenuItems(board, boards, this._user).filter(item => {
+        const parent = item.getUserData("ankamon.menuParent");
+        const host = parent && menu.getChildren().find(c => c instanceof qx.ui.menu.Button && c.getMenu()
+          && c.getUserData("ankamon.menuKey") === parent);
+        if (host) {
+          host.getMenu().add(item);
+        }
+        return !host;
+      });
       if (own.length) {
         if (menu.getChildren().length) {
           menu.add(new qx.ui.menu.Separator());

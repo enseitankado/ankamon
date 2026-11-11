@@ -1027,8 +1027,8 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         group(ICON.run, "Komut çalıştır" + count, commands);
 
-        // Yönet ▸ Ekranı göster, Bilgisayarı yönet, Uyandır, Uyut, Kilitle, Kilidi aç, giriş kilitleri, Web Filtre ▸ …
-        // Ekran ▸ Ekranımı yansıt ▸ <kalite> + Ses, Ekran görüntüsü al, Ekranı başka bilgisayara aktar…, Ekran aktarımını
+        // Yönet ▸ Ekranı göster, Bilgisayarı yönet, Uyandır, Uyut, giriş kilitleri, Web Filtre ▸ …
+        // Ekran ▸ Ekranı kilitle, Ekran kilidini aç, Ekranımı yansıt ▸ <kalite> + Ses, Ekran görüntüsü al, Ekranı başka bilgisayara aktar…, Ekran aktarımını
         // durdur (kullanıcı isteği, 2026-11-05: eski "Ekran" grubu "Yönet" oldu, görüntü iletimi ayrı "Ekran" grubunda).
         // Araç çubuğu (ui.boards.ActionBar) aynı maddeleri kendi düğmelerine dağıtır — değişiklik orada da gözden geçirilir.
         const screens = sub();
@@ -1051,17 +1051,18 @@ qx.Class.define("ankamon.ui.BoardOps", {
             ? sessionOps.sleep(list)
             : this.__job({ type: "sleep", board_ids: list.map(b => b.id) }, "Ekranı uyut")));
         }
-        // Kilitle: "Kilidi aç"a dek tahtada tam ekran "Kilitli"; klavye, fare ve dokunmatik çalışmaz, yeniden
-        // açılışta da sürer (bkz. worker executor/screenlock.py). Oturumu kilitle'den (parolayla açılır) ayrı.
+        // Ekranı kilitle: "Ekran kilidini aç"a dek tahtada tam ekran "Kilitli"; klavye, fare ve dokunmatik çalışmaz, yeniden
+        // açılışta da sürer (bkz. worker executor/screenlock.py). Oturumu kilitle'den (parolayla açılır) ayrı. Ekran grubunda
+        // (kullanıcı isteği 2026-11-11: Yönet'e taşınınca "artık yok" sanılıyordu); araç çubuğunda Ekran ve Kilit düğmelerinde.
         if (can("screen.lock")) {
           // Kapat/yeniden başlat gibi çıktı penceresinin altında "Bu pencereyi bir daha gösterme" kutusu
           // (kullanıcı isteği; __powerJob ile — kutu işaretliyse kilitleme yine yapılır, pencere açılmaz).
           // Durumu bilinmeyen tahta (screen_locked gelmeyen çağıran) iki maddede de sayılır.
-          stateAdd(screens, ICON.screenLock, "Kilitle" + count, online.filter(b => b.screen_locked !== true), list => (sessionOps && sessionOps.screenLock
+          stateAdd(display, ICON.screenLock, "Ekranı kilitle" + count, online.filter(b => b.screen_locked !== true), list => (sessionOps && sessionOps.screenLock
             ? sessionOps.screenLock(list, true)
             : this.__powerJob({ type: "screen_lock", board_ids: list.map(b => b.id) }, "Ekranı kilitle",
                 "screen_lock", "kilitleme", user)));
-          stateAdd(screens, ICON.screenUnlock, "Kilidi aç" + count, online.filter(b => b.screen_locked !== false), list => (sessionOps && sessionOps.screenLock
+          stateAdd(display, ICON.screenUnlock, "Ekran kilidini aç" + count, online.filter(b => b.screen_locked !== false), list => (sessionOps && sessionOps.screenLock
             ? sessionOps.screenLock(list, false)
             : this.__job({ type: "screen_unlock", board_ids: list.map(b => b.id) }, "Ekran kilidini aç")));
         }
@@ -1125,7 +1126,11 @@ qx.Class.define("ankamon.ui.BoardOps", {
           sessions.add(this.menuButton(ICON.sessions, "Oturum aç" + count, null,
             this.__accountMenu(online, "açılır", (acc, label) => this.__login(online, acc, label, sessionOps))));
           subAdd(sessions, ICON.logout, "Oturumu kapat" + count, () => this.sessionAction("logout", online, sessionOps));
-          subAdd(sessions, ICON.lock, "Oturumu kilitle" + count, () => this.sessionAction("lock", online, sessionOps));
+          // Yalnız açık (ve kilitli olmayan) oturumu olan tahtalar (kullanıcı isteği 2026-11-11: oturumsuz tahtada hiçbir
+          // şey yapılmasın, "bir şey yapılmadı" iletisi de çıkmasın). Oturum bilgisi gelmeyen çağıranda tahta uygun sayılır.
+          const lockable = online.filter(b => (b.session_username === undefined || !!b.session_username) && b.session_locked !== true);
+          stateAdd(sessions, ICON.lock, "Oturumu kilitle" + (lockable.length > 1 ? ` (${lockable.length} tahta)` : ""), lockable,
+            list => this.sessionAction("lock", list, sessionOps));
         }
         if (can("screen")) {
           // Ekranlar önizlemesinde sonuç kutucukların sol altında, grid'de iş penceresinde görünür; her

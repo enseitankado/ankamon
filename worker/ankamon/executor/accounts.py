@@ -179,13 +179,12 @@ exit 1
 
 # "Oturumu kilitle": LightDM Seat.Lock (ETAP'ta `dm-tool lock` ile aynı; dm-tool XDG_SEAT_PATH ister,
 # SSH'de yok — doğrudan D-Bus). Oturum AÇIK kalır, seat0'da greeter etkinleşir. Çıktının İLK satırı
-# kilitlenen kullanıcının adıdır (yoksa boş).
+# kilitlenen kullanıcının adıdır (yoksa boş). Açık oturum yoksa hiçbir şey yapılmaz ve ileti de yazılmaz (kullanıcı isteği
+# 2026-11-11: oturumsuz tahtada "bir şey yapılmadı" iletisi istenmiyor; arayüz bu tahtaları zaten göndermez).
 _LOCK_SCRIPT = _PICK_SESSION + r"""
 set -u
 line=$(pick_session '{user}')
 if [ -z "$line" ]; then
-    echo ""
-    echo "Açık kullanıcı oturumu yok — bir şey yapılmadı."
     exit 0
 fi
 set -- $line

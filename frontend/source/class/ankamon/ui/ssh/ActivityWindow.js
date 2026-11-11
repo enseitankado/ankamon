@@ -70,10 +70,15 @@ qx.Class.define("ankamon.ui.ssh.ActivityWindow", {
     const store = ankamon.ui.ssh.ActivityStore.getInstance();
     const win = this.__win = ankamon.ui.Dialog.window("SSH etkinliği — Ankamon'un dışarıya açtığı bağlantılar", 1250,
       { maximizable: true });
-    win.set({ height: 580, resizable: true, contentPadding: 8, layout: new qx.ui.layout.VBox(6) });
+    // Fareyle rahat boyutlandırma (kullanıcı bildirimi 2026-11-11: kenarlar zor tutuluyordu): tutma payı 5 → 10 piksel,
+    // pencere ekrana sığarak açılır (sabit 1250×580 küçük ekranda sağ/alt kenarı dışarı taşırıyordu), içerik daralabilir
+    // (üst satır ve tablolar küçük en-az boyutlu — yoksa pencere içeriğin en geniş hâlinden küçültülemiyordu).
+    const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1300, height: 700 };
+    win.set({ width: Math.min(1250, root.width - 40), height: Math.min(580, root.height - 40), minWidth: 480, minHeight: 260,
+      resizable: true, resizeSensitivity: 10, contentPadding: 8, layout: new qx.ui.layout.VBox(6) });
 
     const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-    this.__filter = new qx.ui.form.TextField().set({ placeholder: "Süz (cihaz, IP, kaynak, komut …)", width: 280 });
+    this.__filter = new qx.ui.form.TextField().set({ placeholder: "Süz (cihaz, IP, kaynak, komut …)", width: 280, minWidth: 120 });
     this.__filter.addListener("input", () => this.__renderAll());
     bar.add(this.__filter);
     // Varsayılan: yalnız açık bağlantılar (kullanıcı isteği 2026-11-11).
@@ -93,7 +98,7 @@ qx.Class.define("ankamon.ui.ssh.ActivityWindow", {
     bar.add(clear);
     bar.add(new qx.ui.core.Spacer(), { flex: 1 });
     // Açık bağlantıların toplam anlık trafiği (kullanıcı isteği): ↓ alınan, ↑ gönderilen.
-    this.__traffic = new qx.ui.basic.Label("Anlık trafik: ölçülüyor …").set({ rich: true, font: "bold" });
+    this.__traffic = new qx.ui.basic.Label("Anlık trafik: ölçülüyor …").set({ rich: true, font: "bold", minWidth: 60, allowShrinkX: true });
     bar.add(this.__traffic);
     win.add(bar);
 
@@ -196,7 +201,7 @@ qx.Class.define("ankamon.ui.ssh.ActivityWindow", {
     __makeTable(model, columns) {
       const table = new qx.ui.table.Table(model, {
         tableColumnModel: obj => new qx.ui.table.columnmodel.Resize(obj)
-      }).set({ statusBarVisible: false, showCellFocusIndicator: false, columnVisibilityButtonVisible: false });
+      }).set({ statusBarVisible: false, showCellFocusIndicator: false, columnVisibilityButtonVisible: false, minWidth: 200, minHeight: 120 });
       const cm = table.getTableColumnModel();
       cm.setColumnVisible(0, false);
       const behavior = cm.getBehavior();

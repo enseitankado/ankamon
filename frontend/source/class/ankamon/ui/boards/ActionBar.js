@@ -63,7 +63,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       { id: "watch", label: "Ekran", icon: "deviceDesktop", primary: "Ekranı göster", single: "primary", mirror: "Ekran",
         extra: ["Ekranı göster"] },
       { id: "manage", label: "Yönet", icon: "mouse", primary: "Bilgisayarı yönet", mirror: "Yönet" },
-      { id: "lock", label: "Kilit", icon: "lock", primary: "Kilitle" },
+      { id: "lock", label: "Kilit", icon: "lock", primary: "Ekranı kilitle" },
       { id: "command", label: "Komut", icon: "terminal2", primary: "Hazır / Serbest komut çalıştır", sep: true },
       // Sağ menüdeki grup "Kullanıcılar" → "Oturumlar" oldu (kullanıcı isteği, 2026-11-09); düğme de aynı adla.
       { id: "users", label: "Oturumlar", icon: "users" },
@@ -86,7 +86,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     ITEMS: {
       "Ekranı göster": "watch", "Ekran görüntüsü al": "watch", "Bilgisayarı yönet": "manage",
       "Uyandır": "power", "Uyut": "power",
-      "Kilitle": "lock", "Kilidi aç": "lock", "Klavyeyi kilitle": "lock", "Klavye kilidini aç": "lock", "Fareyi kilitle": "lock",
+      "Ekranı kilitle": "lock", "Ekran kilidini aç": "lock", "Klavyeyi kilitle": "lock", "Klavye kilidini aç": "lock", "Fareyi kilitle": "lock",
       "Fare kilidini aç": "lock", "Dokunmatiği kilitle": "lock", "Dokunmatik kilidini aç": "lock",
       "Ekranımı yansıt": "watch", "Ekranı başka bilgisayara aktar…": "watch", "Ekran aktarımını durdur": "watch",
       "Görev yöneticisi": "taskmgr", "Web sitesi aç…": "web", "Wi-Fi Monitör": "wifi", "Sohbet": "chat",
