@@ -1476,8 +1476,9 @@ qx.Class.define("ankamon.page.Boards", {
         }
         own.forEach(item => menu.add(item));
       }
-      // Logları göster + Bilgi kartı: ortak (bkz. BoardOps.logsAndInfo — Bakım ▸ Ahenk sağ menüsü de kullanır).
-      const extra = ankamon.ui.BoardOps.logsAndInfo(board, this._user, boards).map(item => () => menu.add(item));
+      // Bilgi kartı: ortak (bkz. BoardOps.logsAndInfo). "Logları göster" burada yok (kullanıcı isteği 2026-11-11):
+      // Bilgisayar ayrıntıları penceresindeki "Loglar" düğmesinde.
+      const extra = ankamon.ui.BoardOps.logsAndInfo(board, this._user, boards, { noLogs: true }).map(item => () => menu.add(item));
       // Bilgisayarı aç (WoL) artık BoardOps.menu'de "Bilgisayarı kapat"ın hemen yanında (kullanıcı
       // isteği: ikisi komşu); çevrimiçi tahtada orada devre dışı görünür.
       if (this._can("boards.manage")) {
@@ -1494,15 +1495,10 @@ qx.Class.define("ankamon.page.Boards", {
         }
         extra.forEach(fn => fn());
       }
-      // Eski üst düğme satırından (kullanıcı isteğiyle kaldırıldı) buraya taşınanlar: grid işaretleri
-      // (yalnız o an GÖRÜNEN/süzülmüş satırlar — bkz. _checkAll) ve elle tahta ekleme.
-      const shown = (this.__shownBoards || []).length;
-      const checked = this._checkedIds(this.__table).length;
-      menu.add(new qx.ui.menu.Separator());
-      add(ICON.checkAll || "☑", "Tümünü işaretle" + (shown ? ` (${shown})` : ""), () => this._checkAll(this.__table, true));
-      add(ICON.uncheckAll || "☐", "İşaretleri kaldır" + (checked ? ` (${checked})` : ""), () => this._checkAll(this.__table, false));
-      menu.getChildren()[menu.getChildren().length - 1].setEnabled(checked > 0);
+      // "Tümünü işaretle / İşaretleri kaldır" sağ menüden kalktı (kullanıcı isteği 2026-11-11): başlıktaki onay kutusu
+      // görünen satırların hepsini işaretler/kaldırır. Elle tahta ekleme kalır.
       if (this._can("boards.manage")) {
+        menu.add(new qx.ui.menu.Separator());
         add(ICON.add || "＋", "Tahta ekle…", () => this.__edit(null));
       }
       return menu;

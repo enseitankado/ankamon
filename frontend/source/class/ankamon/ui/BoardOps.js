@@ -103,6 +103,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
         "Wi-Fi kartının kalıcı (fabrika) MAC adresi — isteğe bağlı. Tahta açıkken Ankamon karttan okuyup kendiliğinden " +
         "doldurur. Tahta Wi-Fi ile bağlıyken ağ taramasında tanınmasını sağlar; uzaktan uyandırma kablolu MAC ile yapılır.");
       form.text("exporter_port", "Sensör portu", String(board.exporter_port ?? 9100));
+      // Kayıtlı tahtada IP ve MAC'ler SALT OKUNUR (kullanıcı isteği 2026-11-11): ağ taramasından / tahtanın kendisinden
+      // öğrenilir; Kaydet bunları göndermez (pencere açıkken tarayıcının güncellediği değer eskisiyle ezilmesin).
+      const locked = adding ? [] : ["ip", "mac", "wifi_mac"];
+      locked.forEach(key => form.getField(key).set({ readOnly: true }));
       form.check("monitor_enabled", "Sensör verisi toplansın", board.monitor_enabled !== false)
         .setToolTipText("Sensör verisi bilgisayar ağda ulaşılabilir olduğunda toplanır.");
       // "Bu bir akıllı tahtadır" işareti formdan kalktı (kullanıcı isteği 2026-11-10: varlık türü seçilebiliyor) — Genel ▸
@@ -110,6 +114,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       form.addField("notes", "Not", new qx.ui.form.TextArea(board.notes || "").set({ wrap: true, autoSize: true, minimalLineHeight: 3 }));
       const read = () => {
         const values = form.values();
+        locked.forEach(key => delete values[key]);
         values.exporter_port = parseInt(values.exporter_port, 10) || 0;
         if (adding && (!values.label || !values.mac)) {
           ankamon.ui.Dialog.error("Takma ad ve kablolu MAC adresi zorunlu.");
@@ -936,12 +941,14 @@ qx.Class.define("ankamon.ui.BoardOps", {
      * menu()'nün dışında kalan iki ortak madde (Tahtalar sağ menüsünde Düzenle/Sil'in üstünde, Bakım ▸ Ahenk'te
      * de): Logları göster (Loglar sayfasını bu tahtaya süzülmüş açar — bkz. ui.Shell.OPEN_LOGS) ve hemen altında
      * Bilgi kartı (kullanıcı isteği; yalnız çevrimiçi tahtada). Yetkiye göre boş dizi dönebilir.
+     * @param opts {Map?} {noLogs: true} — Logları göster eklenmez (Tahtalar/Varlıklar: Bilgisayar ayrıntıları ▸ Loglar
+     *   düğmesine taşındı — kullanıcı isteği 2026-11-11)
      */
-    logsAndInfo(board, user, boards = [board]) {
+    logsAndInfo(board, user, boards = [board], opts = {}) {
       const can = feature => user.is_admin || user.features.includes(feature);
       const ICON = ankamon.ui.Shell.ICON;
       const items = [];
-      if (can("logs")) {
+      if (can("logs") && !opts.noLogs) {
         items.push(this.menuButton(ICON.logs, "Logları göster", () =>
           qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_LOGS, board.id)));
       }

@@ -83,6 +83,20 @@ ankamon_sshlog() {
         "$now" "$pid" "$(esc "$src")" "$(esc "$tool")" "$(esc "$target")" "$(esc "$port")" "$(esc "$tunnel")" "$j" \
         >> "$L" 2>/dev/null
     chmod 644 "$L" 2>/dev/null
+    # Komut ÇIKTISI (kullanıcı isteği 2026-11-11: SSH etkinliği ▸ komut penceresinde sonuç): komutlu, tünelsiz ssh
+    # çağrılarında stdout/stderr FIFO + tee ile çağırana AYNEN geçer, ilk 128 KB'ı out/<pid>-<ts>.out/.err'e yazılır.
+    # Uzun/ikili akışlar yakalanmaz: ekran (VNC/ses/sohbet akışları), dosya işlemleri, dosya yöneticisi, web terminal.
+    ANKAMON_CAP=""
+    case "$src" in
+        screen|files|filemanager|webssh) ;;
+        *)
+            if [ "$tool" = ssh ] && [ -z "$tunnel" ] && [ -n "$cmd" ] && mkdir -p "$D/out" 2>/dev/null; then
+                b="$D/out/$pid-$now"
+                rm -f "$b.o1" "$b.o2" "$b.e1" "$b.e2"
+                mkfifo "$b.o1" "$b.o2" "$b.e1" "$b.e2" 2>/dev/null && ANKAMON_CAP=$b
+            fi ;;
+    esac
+    b=$ANKAMON_CAP
     # İzleyici: çift fork (sshpass'ın çocuğu olmasın), standart akışlar kapalı (çağıran stdout'un EOF'unu beklerken
     # takılmasın). Süreç zombi kalırsa (çağıran henüz toplamadı) da bitmiş sayılır.
     (
@@ -93,9 +107,31 @@ ankamon_sshlog() {
                 sleep 1
             done
             printf '{"ev":"end","ts":%s,"pid":%s,"start":%s}\n' "$(date +%s)" "$pid" "$now" >> "$L" 2>/dev/null
+            if [ -n "$b" ]; then
+                rm -f "$b.o1" "$b.o2" "$b.e1" "$b.e2"
+                chmod 644 "$b.out" "$b.err" 2>/dev/null
+                # Arada bir eski çıktılar budanır (en yeni 3000 çağrı kalır).
+                if [ $((pid % 25)) = 0 ]; then
+                    ls -1t "$D/out" 2>/dev/null | grep '\.out$' | tail -n +3001 | while read -r f; do
+                        rm -f "$D/out/$f" "$D/out/${f%.out}.err"
+                    done
+                fi
+            fi
         ) </dev/null >/dev/null 2>&1 &
     ) </dev/null >/dev/null 2>&1
 }
+ANKAMON_CAP=""
 [ "${ANKAMON_SSHLOG:-1}" = 0 ] || ankamon_sshlog "$@" 2>/dev/null
 
+if [ -n "$ANKAMON_CAP" ]; then
+    b=$ANKAMON_CAP
+    # Önce okuyucular (çift fork — sshpass'ın çocuğu olmasınlar): yakalayıcı ilk 128 KB'ı yazar, kalanı boşaltır
+    # (akış hiç tıkanmaz); tee çağıranın stdout/stderr'ine aynen iletir. sshpass öldürülse de yazma ucu kapanınca
+    # tee'ler EOF alıp çıkar (çağıran EOF'u eskisi gibi alır). PID ve diğer tanımlayıcılar (ansible -d fd) korunur.
+    ( { head -c 131072 > "$b.out"; cat; } < "$b.o2" >/dev/null 2>&1 & )
+    ( { head -c 131072 > "$b.err"; cat; } < "$b.e2" >/dev/null 2>&1 & )
+    ( tee "$b.o2" < "$b.o1" 2>/dev/null & )
+    ( tee "$b.e2" < "$b.e1" >&2 2>/dev/null & )
+    exec /usr/bin/sshpass "$@" > "$b.o1" 2> "$b.e1"
+fi
 exec /usr/bin/sshpass "$@"

@@ -41,7 +41,7 @@ import time
 OUT = "/opt/ankamon/software-versions.json"
 APK = ["nginx", "php84", "php84-fpm", "grafana", "telegraf", "rsyslog", "python3", "py3-psycopg", "py3-tornado",
        "ansible-core", "openssh-client-default", "sshpass", "sshfs", "openssl", "arp-scan", "nmap", "samba-client",
-       "supervisor", "bash", "curl"]
+       "supervisor", "bash", "curl", "iproute2-ss"]
 
 
 def run(*cmd):

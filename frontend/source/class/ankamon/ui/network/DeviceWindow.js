@@ -42,6 +42,15 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
   type: "static",
 
   statics: {
+    /** facts.wifi_bands ("2.4,5") → "2,4 GHz ve 5 GHz". */
+    bands(facts) {
+      const list = String((facts && facts.wifi_bands) || "").split(",").filter(Boolean).map(b => b.replace(".", ",") + " GHz");
+      if (list.length) {
+        return list.length > 1 ? list.slice(0, -1).join(", ") + " ve " + list[list.length - 1] : list[0];
+      }
+      return facts && facts.wifi_chip ? "bilinmiyor (bir sonraki donanım bilgisi toplamasında dolar)" : "—";
+    },
+
     /**
      * @param opts {Map} {device?: ağ envanteri satırı (NetworkApi devices), board?: tahta ({id} yeter),
      *   user?: oturum sahibi (yoksa /auth/me), onSaved?: Function}
@@ -143,8 +152,9 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
           // ikisine de yazılır (Varlıklar ve Akıllı Tahtalar aynı adı gösterir).
           deviceForm.text("label", "Takma ad", board ? (board.label || device.label) : device.label, "ör. Müdür odası yazıcısı")
             .setToolTipText(board ? "Varlıklar ve Akıllı Tahtalar'da aynı ad (ikisine de kaydedilir)" : null);
-          deviceForm.text("ip", "IP adresi", device.ip).setToolTipText(
-            "En son keşifte (ağ taraması ya da tahtanın logları) görülen adres; cihaz yeni adreste görülünce kendiliğinden güncellenir.");
+          // Salt okunur (kullanıcı isteği 2026-11-11): keşiften gelir, Kaydet göndermez.
+          deviceForm.text("ip", "IP adresi", device.ip).set({ readOnly: true, toolTipText:
+            "En son keşifte (ağ taraması ya da tahtanın logları) görülen adres; cihaz yeni adreste görülünce kendiliğinden güncellenir." });
           deviceForm.text("hostname", "Bilgisayar adı", device.hostname);
           typeBox = new qx.ui.form.ComboBox().set({ value: device.device_type_manual || "",
             placeholder: device.type_auto ? `otomatik: ${device.type_auto}` : "otomatik" });
@@ -183,7 +193,12 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
           ["İşlemci", facts.cpu_model || "—"],
           ["İşletim sistemi", facts.os_name || "—"],
           ["BIOS", [facts.bios_vendor, facts.bios_version, facts.bios_date].filter(Boolean).join(" ") || "—"],
-          ["Seri no", facts.serial || facts.board_serial || "—"]
+          ["Seri no", facts.serial || facts.board_serial || "—"],
+          // Wi-Fi kartı (kullanıcı isteği 2026-11-11): fabrika MAC'i, modeli, sürücüsü ve desteklediği bantlar
+          // (worker executor/hwfacts — WIFI_CHIP/WIFI_BANDS; bantlar bir sonraki donanım toplamasında dolar).
+          ["Wi-Fi MAC", board.wifi_mac || facts.wifi_mac || "—"],
+          ["Wi-Fi kartı", [facts.wifi_chip, facts.wifi_driver ? `(${facts.wifi_driver} sürücüsü)` : ""].filter(Boolean).join(" ") || "—"],
+          ["Wi-Fi bantları", ankamon.ui.network.DeviceWindow.bands(facts)]
         ];
         body.add(new qx.ui.basic.Label("Tahta bilgileri").set({ font: "bold", marginTop: 6 }));
         body.add(this.__htmlTable(null, ["Alan", "Değer"], info, [170, "1*"], plain));
@@ -223,6 +238,16 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
       win.add(tabs, { flex: 1 });
 
       const buttons = [];
+      // Loglar (kullanıcı isteği 2026-11-11: Tahtalar/Varlıklar sağ menüsünden buraya taşındı): Loglar sayfasını bu
+      // tahtaya süzülmüş açar (bkz. ui.Shell.OPEN_LOGS).
+      if (board && can("logs")) {
+        const logs = new qx.ui.form.Button("Loglar").set({ toolTipText: "Loglar sayfasını bu bilgisayarın loglarına süzülmüş açar" });
+        logs.addListener("execute", () => {
+          qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_LOGS, board.id);
+          win.close();
+        });
+        buttons.push(logs);
+      }
       const copyAll = new qx.ui.form.Button("Tümünü kopyala").set({ toolTipText: "Tüm ayrıntıları düz metin olarak panoya kopyalar" });
       copyAll.addListener("execute", () => ankamon.util.Clipboard.copy(`Bilgisayar ayrıntıları — ${name}\n` + plain.join("\n")));
       buttons.push(copyAll);
@@ -245,6 +270,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
             let label = null;
             if (deviceForm) {
               const values = deviceForm.values();
+              delete values.ip; // salt okunur
               values.device_type = (typeBox.getValue() || "").trim();
               label = values.label;
               await ankamon.io.Api.patch("/network/devices/" + device.id, values);

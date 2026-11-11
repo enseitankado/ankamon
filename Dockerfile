@@ -38,11 +38,18 @@ RUN mkdir -p source/resource/ankamon/vis \
  && cp node_modules/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js \
        node_modules/vis-timeline/styles/vis-timeline-graph2d.min.css \
        node_modules/vis-timeline/LICENSE.md source/resource/ankamon/vis/
+# Sözdizimi renklendirme (SSH etkinliği ▸ komut penceresi — ui.ssh.CommandView): highlight.js (BSD-3-Clause,
+# https://highlightjs.org) hazır tarayıcı derlemesi (bash/python/json … yaygın diller gömülü) + açık/koyu stil.
+RUN mkdir -p source/resource/ankamon/hljs \
+ && cp node_modules/@highlightjs/cdn-assets/highlight.min.js \
+       node_modules/@highlightjs/cdn-assets/styles/github.min.css \
+       node_modules/@highlightjs/cdn-assets/styles/github-dark.min.css \
+       node_modules/@highlightjs/cdn-assets/LICENSE source/resource/ankamon/hljs/
 # Sistem ▸ Yazılımlar için ön yüz kütüphanelerinin sürümleri ve MAC üretici tablosunun indirildiği gün.
 RUN node -e 'const v = p => require("/src/node_modules/" + p + "/package.json").version; \
       const fs = require("fs"); const m = fs.statSync("/out/manuf.gz"); \
       fs.writeFileSync("/out/frontend-versions.json", JSON.stringify({ qooxdoo: v("@qooxdoo/framework"), \
-        "vis-timeline": v("vis-timeline"), node: process.versions.node, \
+        "vis-timeline": v("vis-timeline"), "highlight.js": v("@highlightjs/cdn-assets"), node: process.versions.node, \
         manuf: m.size > 0 ? m.mtime.toISOString().slice(0, 10) : "" }))'
 RUN npx qx compile --target=build \
  && rm -rf compiled/build/transpiled compiled/build/db.json compiled/build/resource-db.json
@@ -77,7 +84,7 @@ RUN sed -i 's|https://|http://|' /etc/apk/repositories \
       php84-ctype php84-mbstring php84-tokenizer php84-openssl php84-phar php84-curl php84-simplexml \
       grafana telegraf \
       rsyslog rsyslog-pgsql rsyslog-mmutf8fix \
-      python3 py3-psycopg py3-yaml ansible-core openssh-client sshpass fping \
+      python3 py3-psycopg py3-yaml ansible-core openssh-client sshpass fping iproute2-ss \
       py3-pip py3-tornado py3-paramiko \
       sshfs openssl \
       arp-scan nmap nmap-nselibs nmap-scripts samba-client \

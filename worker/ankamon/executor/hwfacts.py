@@ -142,6 +142,20 @@ if [ -n "$wifi" ]; then
     chip=$(lspci -s "$(basename "$dev")" 2>/dev/null | sed 's/^[^ ]* [^:]*: //')
     [ -n "$chip" ] || chip="$(cat "$dev/../manufacturer" 2>/dev/null) $(cat "$dev/../product" 2>/dev/null)"  # USB wifi
     echo "WIFI_CHIP=$chip"
+    # Desteklenen bantlar (Bilgisayar ayrıntıları — kullanıcı isteği 2026-11-11): NetworkManager'ın kart özellikleri;
+    # yoksa iw'nin bant listesi (Band 1 = 2,4 GHz, Band 2 = 5 GHz, Band 4 = 6 GHz).
+    props=$(nmcli -t -f WIFI-PROPERTIES device show "$wifi" 2>/dev/null)
+    bands=""
+    echo "$props" | grep -q '2GHZ:yes' && bands="2.4"
+    echo "$props" | grep -q '5GHZ:yes' && bands="${bands:+$bands,}5"
+    if [ -z "$bands" ] && command -v iw >/dev/null 2>&1; then
+        phy=$(basename "$(readlink /sys/class/net/$wifi/phy80211 2>/dev/null)" 2>/dev/null)
+        info=$(iw phy "$phy" info 2>/dev/null)
+        echo "$info" | grep -q 'Band 1:' && bands="2.4"
+        echo "$info" | grep -q 'Band 2:' && bands="${bands:+$bands,}5"
+        echo "$info" | grep -q 'Band 4:' && bands="${bands:+$bands,}6"
+    fi
+    echo "WIFI_BANDS=$bands"
     echo "WIFI_RADIO=$(nmcli radio wifi 2>/dev/null)"
     echo "WIFI_STATE=$(nmcli -t -f DEVICE,STATE device 2>/dev/null | awk -F: -v d="$wifi" '$1==d{print $2; exit}')"
     for r in /sys/class/rfkill/rfkill*; do
@@ -274,6 +288,7 @@ _FIELDS = {
     "WIFI_MAC": "wifi_mac",
     "WIFI_DRIVER": "wifi_driver",
     "WIFI_CHIP": "wifi_chip",
+    "WIFI_BANDS": "wifi_bands",
     "WIFI_RADIO": "wifi_radio",
     "WIFI_STATE": "wifi_state",
     "WIFI_BLOCKED": "wifi_blocked",

@@ -28,7 +28,8 @@
 /**
  * Alt çubuğun (ui.StatusBar) bir mini paneli (kullanıcı isteği 2026-11-10): CPU, RAM, disk, ağ trafiği, ağ taraması,
  * SSH bağlantıları … Tek satırlık, ince çerçeveli kutu — çubuğun yüksekliğini artırmaz. Metin sığmazsa kırpılır
- * (genişlik kullanıcınındır). Sağ kenarındaki tutamaç sürüklenerek genişlik ayarlanır ("resized" olayı); kutunun
+ * (genişlik kullanıcınındır). İKİ kenarındaki tutamaçtan sürüklenerek genişlik ayarlanır (kullanıcı isteği 2026-11-11;
+ * "resized" olayı): sağ kenar sağa, sol kenar sola çekilince genişler; kutunun
  * kendisi sürüklenerek çubukta yeri değiştirilir — sürükleme yönetimi kapsayıcıda (StatusBar), panel yalnız
  * "dragStart" bildirir. Sürüklemeden tıklanırsa "activate" (ör. SSH penceresini aç).
  */
@@ -61,7 +62,7 @@ qx.Class.define("ankamon.ui.statusbar.MiniPanel", {
     this.__defaultWidth = width;
     this.set({
       width, minWidth: ankamon.ui.statusbar.MiniPanel.MIN_WIDTH, allowGrowX: false, allowShrinkX: false,
-      height: 18, allowGrowY: false, padding: [0, 0, 0, 4], cursor: "grab",
+      height: 18, allowGrowY: false, padding: 0, cursor: "grab",
       decorator: new qx.ui.decoration.Decorator().set({ width: 1, color: "app-border", radius: 3 })
     });
     // Zengin metin (renkli uyarı) ama sarmaz: sığmayan kısım kırpılır.
@@ -69,13 +70,16 @@ qx.Class.define("ankamon.ui.statusbar.MiniPanel", {
       font: "app-mono", textColor: "app-muted", rich: true, wrap: false, allowGrowX: true, allowShrinkX: true,
       minWidth: 0, anonymous: true
     });
+    // Genişlik tutamaçları: sol ve sağ kenar.
+    this.__leftGrip = new qx.ui.core.Widget().set({ width: 4, allowGrowY: true, cursor: "ew-resize" });
+    this.add(this.__leftGrip);
+    this.__leftGrip.addListener("pointerdown", e => this.__onGripDown(e, this.__leftGrip, -1));
     this.add(this.__label, { flex: 1 });
-    // Genişlik tutamacı (sağ kenar).
     this.__grip = new qx.ui.core.Widget().set({ width: 5, allowGrowY: true, cursor: "ew-resize" });
     this.add(this.__grip);
-    this.__grip.addListener("pointerdown", this.__onGripDown, this);
+    this.__grip.addListener("pointerdown", e => this.__onGripDown(e, this.__grip, 1));
     this.addListener("pointerdown", e => {
-      if (e.isLeftPressed() && e.getTarget() !== this.__grip) {
+      if (e.isLeftPressed() && e.getTarget() !== this.__grip && e.getTarget() !== this.__leftGrip) {
         this.fireDataEvent("dragStart", e);
       }
     });
@@ -87,6 +91,8 @@ qx.Class.define("ankamon.ui.statusbar.MiniPanel", {
     __defaultWidth: null,
     __label: null,
     __grip: null,
+    __leftGrip: null,
+    __gripSign: 1,
     __gripX: null,
     __gripWidth: null,
 
@@ -109,25 +115,27 @@ qx.Class.define("ankamon.ui.statusbar.MiniPanel", {
       }
     },
 
-    __onGripDown(e) {
+    /** @param sign {Number} 1: sağ kenar (sağa çekince genişler), -1: sol kenar (sola çekince genişler) */
+    __onGripDown(e, grip, sign) {
       if (!e.isLeftPressed()) {
         return;
       }
       e.stopPropagation();
+      this.__gripSign = sign;
       this.__gripX = e.getDocumentLeft();
       this.__gripWidth = this.getBounds() ? this.getBounds().width : this.getWidth();
-      this.__grip.capture();
-      this.__grip.addListener("pointermove", this.__onGripMove, this);
-      this.__grip.addListenerOnce("pointerup", () => {
-        this.__grip.releaseCapture();
-        this.__grip.removeListener("pointermove", this.__onGripMove, this);
+      grip.capture();
+      grip.addListener("pointermove", this.__onGripMove, this);
+      grip.addListenerOnce("pointerup", () => {
+        grip.releaseCapture();
+        grip.removeListener("pointermove", this.__onGripMove, this);
         this.fireEvent("resized");
       });
     },
 
     __onGripMove(e) {
       const P = ankamon.ui.statusbar.MiniPanel;
-      const width = Math.round(this.__gripWidth + e.getDocumentLeft() - this.__gripX);
+      const width = Math.round(this.__gripWidth + this.__gripSign * (e.getDocumentLeft() - this.__gripX));
       this.setWidth(Math.max(P.MIN_WIDTH, Math.min(P.MAX_WIDTH, width)));
     }
   }

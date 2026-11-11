@@ -149,6 +149,62 @@ final class SshActivityApi
      * (ilk yükleme dosya sonundan başlar) yarım ilk satır atılır; son satır yarımsa (yazım sürüyor) sonraki tura kalır.
      * @return array{0: string, 1: int}
      */
+    /**
+     * Bir SSH çağrısının çıktısı (kullanıcı isteği 2026-11-11: komut penceresinde sonuç). sshpass sarmalayıcısı komutlu,
+     * tünelsiz çağrıların stdout/stderr'inin ilk 128 KB'ını out/<pid>-<ts>.out/.err'e yazar (ekran/dosya akışları hariç).
+     * ?key=<pid>:<ts>
+     */
+    public function output(Request $request, array $user): array
+    {
+        $key = (string) ($request->query('key') ?? '');
+        if (!preg_match('/^(\d{1,9}):(\d{1,12})$/', $key, $m)) {
+            return ['available' => false, 'reason' => 'Bu bağlantının çıktısı kaydedilmez (etkileşimli/tünel/akış).'];
+        }
+        $base = self::DIR . '/out/' . $m[1] . '-' . $m[2];
+        $read = static function (string $path): ?string {
+            if (!is_file($path)) {
+                return null;
+            }
+            $text = (string) @file_get_contents($path, false, null, 0, 131072);
+            return mb_convert_encoding($text, 'UTF-8', 'UTF-8');
+        };
+        $out = $read($base . '.out');
+        $err = $read($base . '.err');
+        if ($out === null && $err === null) {
+            return ['available' => false,
+                'reason' => 'Çıktı kaydı yok (ekran/dosya akışı, tünel, web terminal, eski kayıt ya da budanmış).'];
+        }
+        $size = (@filesize($base . '.out') ?: 0);
+        return [
+            'available' => true,
+            'stdout' => $out ?? '',
+            'stderr' => $err ?? '',
+            'truncated' => $size >= 131072 || (@filesize($base . '.err') ?: 0) >= 131072,
+            // Yazım sürüyor mu (FIFO'lar bağlantı bitince silinir).
+            'running' => file_exists($base . '.o1'),
+        ];
+    }
+
+    /**
+     * Ankamon süreçlerinin açık TCP bağlantıları ve anlık trafik (worker/ankamon/connwatch.py yazar). İstek, izleyicinin
+     * örneklemeyi sürdürmesi için `want` dosyasına dokunur — pencere kapanınca (istek gelmeyince) örnekleme durur.
+     */
+    public function connections(Request $request, array $user): array
+    {
+        @touch(self::DIR . '/want');
+        $data = json_decode((string) @file_get_contents(self::DIR . '/conns.json'), true);
+        if (!is_array($data) || !isset($data['ts']) || $data['ts'] < time() - 15) {
+            return ['ready' => false, 'conns' => [], 'names' => []];
+        }
+        $ips = [];
+        foreach ($data['conns'] ?? [] as $c) {
+            if (!empty($c['rip']) && filter_var($c['rip'], FILTER_VALIDATE_IP)) {
+                $ips[$c['rip']] = true;
+            }
+        }
+        return ['ready' => true, 'ts' => $data['ts'], 'conns' => $data['conns'] ?? [], 'names' => $this->ipNames(array_keys($ips))];
+    }
+
     private function read(string $path, int $from, int $to): array
     {
         if ($to <= $from) {
@@ -191,10 +247,16 @@ final class SshActivityApi
                 }
             }
         }
+        return $this->ipNames(array_keys($ips));
+    }
+
+    /** IP listesi → tahta takma adı / ağ envanteri adı. */
+    private function ipNames(array $ips): array
+    {
         if (!$ips) {
             return [];
         }
-        $list = '{' . implode(',', array_keys($ips)) . '}';
+        $list = '{' . implode(',', $ips) . '}';
         $rows = Db::all(
             "SELECT ip, name FROM (
                 SELECT host(ip) AS ip, COALESCE(NULLIF(label, ''), NULLIF(hostname, '')) AS name, 1 AS pri

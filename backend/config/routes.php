@@ -133,6 +133,8 @@ return [
     ['GET',    '/api/session-activity',  [Api\SessionActivityApi::class, 'index'], 'logs'],
     // Alt çubuk ▸ SSH paneli: Ankamon'un dışarıya açtığı SSH bağlantıları ve komutları (canlı, yalnız yönetici).
     ['GET',    '/api/ssh-activity',      [Api\SshActivityApi::class, 'index'], 'admin'],
+    ['GET',    '/api/ssh-activity/output', [Api\SshActivityApi::class, 'output'], 'admin'],
+    ['GET',    '/api/ssh-activity/connections', [Api\SshActivityApi::class, 'connections'], 'admin'],
     ['GET',    '/api/storage/session-activity', [Api\SessionActivityApi::class, 'stats'], 'logs.manage'],
     ['DELETE', '/api/storage/session-activity', [Api\SessionActivityApi::class, 'delete'], 'logs.manage'],
     ['GET',    '/api/ntfy',              [Api\NtfyApi::class, 'index'],        'anomalies'],
