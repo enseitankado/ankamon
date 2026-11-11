@@ -334,7 +334,9 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
             device: this.__deviceHint(row),
             kind: this.__kindHint(row),
             name: name || null,
-            signal: hasSignal ? `Sinyal %${row.signal} — ${Classify.proximity(row.signal)} (kaba yakınlık ipucu)` : null,
+            signal: hasSignal ? `Sinyal %${row.signal} — ${Classify.proximity(row.signal)} (kaba yakınlık ipucu)` +
+              (typeof row.rssi === "number" ? `\n${row.rssi} dBm${row.rssi_est ? " (yüzdeden tahmini)" : ""}` : "") +
+              (row.band && row.band !== "?" ? ` · ${row.band === "2.4" ? "2,4" : row.band} GHz` : "") : null,
             evidence: terms.length ? terms.map(t => t.tip === t.text ? t.text : `${t.text}: ${t.tip}`).join("\n") : null,
             vendor: row.vendor || (row.random ? "Rastgele (yerel yönetimli) adres: üretici kodu (OUI) taşımaz, üretici belirlenemez."
               : "Adresin üretici kodu (OUI) listede bulunamadı."),

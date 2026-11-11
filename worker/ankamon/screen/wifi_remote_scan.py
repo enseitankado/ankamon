@@ -54,7 +54,7 @@ Program /run/ankamon-wifimon/prog.sh olarak yazılıp sh (dash) ile çalışır.
 Bilinen sınır: geçici açıkken tahtanın gücü kesilirse trap da bekçi de çalışamaz; NetworkManager radyoyu açık hatırlar. Başlangıç
 durumu kalıcı diskte ($P/orig) olduğundan bir sonraki Wi-Fi Monitör oturumu önce onu geri yükler.
 
-Çıktı: önce @@INFO + @@START; her tarama @@RADIO/@@DEV/@@LIST/@@INFO bölümleri + @@END; yoklama dinlendiyse ardından
+Çıktı: önce @@INFO + @@START; her tarama @@RADIO/@@DEV/@@LIST/@@IWDUMP (iw scan dump: BSS/freq/signal)/@@INFO bölümleri + @@END; yoklama dinlendiyse ardından
 @@PROBE (JSON satırları) + @@PROBEINFO + @@PEND; sonda @@RESTORED + @@DONE.
 """
 
@@ -349,6 +349,10 @@ scan_once() {
   echo '@@RADIO'; wifi_radio
   echo '@@DEV'; n -t -f DEVICE,TYPE,STATE,CONNECTION device
   echo '@@LIST'; cat "$TMP"
+  # Erişim noktalarının gerçek sinyali (dBm) ve frekansı: NetworkManager'ın son taramasının çekirdek önbelleği (yeni tarama
+  # yapmaz). Güvenilir vericilerin konumu için sensör başına dBm istatistiği tutulur (bkz. wifimon_signal_log.py).
+  echo '@@IWDUMP'
+  [ -n "$W_DEV" ] && command -v iw >/dev/null 2>&1 && timeout 5 iw dev "$W_DEV" scan dump 2>/dev/null | grep -E '^BSS |^[[:space:]]*(freq|signal):'
   info
   echo '@@END'
   [ "$PROBE" = 1 ] || return 0

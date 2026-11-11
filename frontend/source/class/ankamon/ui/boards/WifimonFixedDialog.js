@@ -31,6 +31,11 @@
  * seçilen tahtanın sınıfı — kullanıcı isteği 2026-11-10; PUT /api/wifimon/fixed). Eski "ağ adı" ve "Bluetooth" kayıtları artık
  * uygulanmaz (güven yalnız MAC ile — kullanıcı isteği 2026-11-06), silinebilsinler diye listelenir (bkz. ui.boards.WifiMonitor, backend
  * WifimonFixedEmittersApi).
+ *
+ * Fiziksel konum (kullanıcı isteği 2026-11-11): MAC'li her kaydın yanında sensörlerin o cihazı bant bant hangi güçte duyduğu
+ * (Wi-Fi Monitör açıkken kaydedilen istatistik — GET /api/wifimon/locations), konum önerisi ve "Konum (yanındaki sensör)" açılır
+ * listesi (kod adı ya da bilgisayar adı / kablolu MAC); seçim hemen kaydedilir (PUT /api/wifimon/locations), istenirse aynı
+ * fiziksel cihazın diğer radyo adreslerine de (bkz. ui.boards.WifimonLocation).
  */
 qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
   type: "static",
@@ -48,8 +53,20 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
       const esc = qx.bom.String.escape;
       // Satırlar kırılmasın (kullanıcı isteği): geniş pencere (ekrana sığdığı kadar), hücreler tek satır; sığmazsa yatay kaydırma.
       const bounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280 };
-      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör — güvenilir listesi", Math.min(1180, bounds.width - 40), { maximizable: true });
-      win.setHeight(480);
+      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör — güvenilir listesi", Math.min(1560, bounds.width - 40), { maximizable: true });
+      win.setHeight(520);
+      const Loc = ankamon.ui.boards.WifimonLocation;
+      // Konum verisi: sensör × bant sinyal istatistiği, kayıtlı konumlar, sensör listesi (bkz. WifimonLocationsApi).
+      let loc = null;
+      const locBar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ marginBottom: 6 });
+      const locInfo = new qx.ui.basic.Label("Sinyal verisi yükleniyor…").set({ rich: true, alignY: "middle" });
+      const siblings = new qx.ui.form.CheckBox("Aynı fiziksel cihazın diğer adreslerine de uygula").set({ value: true,
+        toolTipText: "Erişim noktası her radyosu (2,4 / 5 GHz) için ayrı adres yayınlar; ilk 5 baytı aynı adresler tek cihaz sayılır." });
+      const refresh = new qx.ui.form.Button("Sinyal verisini yenile");
+      locBar.add(locInfo, { flex: 1 });
+      locBar.add(siblings);
+      locBar.add(refresh);
+      win.add(locBar);
       const html = new qx.ui.embed.Html("").set({ overflowY: "auto", overflowX: "auto" });
       win.add(html, { flex: 1 });
       const all = new qx.ui.form.CheckBox("Tümünü seç");
@@ -79,12 +96,51 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
       const draw = () => {
         const list = getFixed();
         const td = "padding:3px 8px;border-bottom:1px solid rgba(127,127,127,.2);white-space:nowrap";
+        const attr = t => esc(t || "").replace(/"/g, "&quot;");
+        const sensorsById = new Map(((loc && loc.sensors) || []).map(x => [x.id, x]));
+        const placed = new Map(((loc && loc.locations) || []).map(x => [x.addr, x]));
+        const sensorOptions = ((loc && loc.sensors) || []).map(x => [x.id, Loc.sensorName(x)])
+          .sort((a, b) => a[1].localeCompare(b[1], "tr"));
+        // Konum sütunları: MAC'li kayıtlarda sensör sinyalleri, öneri, açılır liste (eski ağ adı / BT kayıtlarında boş).
+        const locCells = f => {
+          if (!(f.kind === "bssid" || f.kind === "probe")) {
+            return `<td style="${td}"></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"></td>`;
+          }
+          if (!loc) {
+            return `<td style="${td};opacity:.6" colspan="4">yükleniyor…</td>`;
+          }
+          const rows = Loc.groupStats(f.kind, f.value, loc.stats);
+          const addrs = Array.from(new Set([f.value.toUpperCase()].concat(rows.map(r => r.addr)))).sort();
+          const bands = Array.from(new Set(rows.map(r => r.band)));
+          const bandOf = a => Array.from(new Set(rows.filter(r => r.addr === a).map(r => Loc.BAND_LABEL[r.band] || r.band))).join(", ") || "bu dönemde duyulmadı";
+          const group = f.kind === "bssid"
+            ? `<td style="${td};font-family:monospace" title="${attr("Aynı fiziksel cihaz sayılan adresler (ilk 5 bayt aynı — kestirim):\n" +
+              addrs.map(a => `${a} — ${bandOf(a)}`).join("\n"))}">${esc(Loc.groupKey(f.kind, f.value))}:xx` +
+              `<span style="font-family:inherit;opacity:.7"> · ${addrs.length} adres${bands.length ? " (" + bands.map(b => Loc.BAND_LABEL[b] || b).join(" + ") + ")" : ""}</span></td>`
+            : `<td style="${td};opacity:.7">tek adres</td>`;
+          const ranked = Loc.rank(rows);
+          const sum = Loc.summary(ranked, sensorsById);
+          const sug = Loc.suggest(ranked, sensorsById);
+          const here = placed.get(f.value.toUpperCase());
+          const select = `<select data-addr="${attr(f.value.toUpperCase())}" data-kind="${attr(f.kind)}" style="max-width:240px">` +
+            `<option value="">— belirlenmedi —</option>` +
+            sensorOptions.map(([id, name]) => `<option value="${id}"${here && here.board_id === id ? " selected" : ""}>${esc(name)}` +
+              `${sug && sug.boardId === id ? " ★" : ""}</option>`).join("") + "</select>";
+          const hereTip = here ? `Kayıtlı konum: ${here.sensor_name}${here.sensor_mac ? " (kablolu MAC " + here.sensor_mac.toUpperCase() + ")" : ""} — ` +
+            `${here.set_by}, ${new Date(here.set_ts).toLocaleString("tr-TR")}` : "Konum belirlenmedi. ★ = öneri.";
+          return group +
+            `<td style="${td}" title="${attr(sum.tip || "Bu cihazı son " + loc.days + " günde hiçbir sensör duymadı (Wi-Fi Monitör açıkken kaydedilir).")}">` +
+            `${sum.text ? esc(sum.text) : '<span style="opacity:.6">veri yok</span>'}</td>` +
+            `<td style="${td}" title="${attr(sug ? sug.tip : "")}">${sug ? esc(sug.text) : '<span style="opacity:.6">—</span>'}</td>` +
+            `<td style="${td}" title="${attr(hereTip)}">${select}</td>`;
+        };
         html.setHtml(list.length ? `<table style="border-collapse:collapse;width:100%;font-size:13px"><tr>` +
-          ["", "Tür", "Değer", "Ad", "Kapsam", "İşaretleyen"].map(h => `<th style="${td};text-align:left">${h}</th>`).join("") + "</tr>" +
+          ["", "Tür", "Değer", "Ad", "Fiziksel cihaz", "Sensörlerde sinyal (dBm)", "Konum önerisi", "Konum (yanındaki sensör)", "Kapsam", "İşaretleyen"]
+            .map(h => `<th style="${td};text-align:left">${h}</th>`).join("") + "</tr>" +
           list.map(f => `<tr><td style="${td}"><input type="checkbox" data-id="${f.id}"></td>` +
             `<td style="${td}">${this.KIND_LABEL[f.kind] || esc(f.kind)}</td>` +
             `<td style="${td};font-family:${f.kind === "ssid" ? "inherit" : "monospace"}">${esc(f.value)}</td>` +
-            `<td style="${td}">${esc(f.label || "")}</td>` +
+            `<td style="${td}">${esc(f.label || "")}</td>` + locCells(f) +
             `<td style="${td}">${f.board_id ? esc(f.board_name || "#" + f.board_id) : "<b>Okul geneli</b>"}</td>` +
             `<td style="${td};opacity:.75">${esc(f.created_by || "")} · ${new Date(f.created_ts).toLocaleString("tr-TR")}</td></tr>`).join("") +
           "</table>" : `<div style="padding:12px;opacity:.75">Güvenilir listesi boş.</div>`);
@@ -127,8 +183,38 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
         }
         draw();
       });
+      const loadLoc = () => ankamon.io.Api.get("/wifimon/locations").then(res => {
+        if (win.isDisposed()) {
+          return;
+        }
+        loc = res;
+        const sensors = new Set((res.stats || []).map(r => r.board_id)).size;
+        const samples = (res.stats || []).reduce((a, r) => a + r.n, 0);
+        locInfo.setValue(`Son ${res.days} gün: ${sensors} sensör, ${samples} ölçüm. Sinyal verisi Wi-Fi Monitör açıkken her taramada ` +
+          "kaydedilir; ortalama dBm (5 GHz +7 dB düzeltmeli) en yüksek sensör önerilir (★). Satırların ipuçlarında bant bant ayrıntı.");
+        draw();
+      }).catch(err => locInfo.setValue("Sinyal verisi alınamadı: " + esc(String((err && err.message) || err))));
+      refresh.addListener("execute", loadLoc);
+      // Konum seçimi hemen kaydedilir (açılır listeler HTML tabloda; değişiklik kaba bağlı tek dinleyiciyle yakalanır).
+      html.addListenerOnce("appear", () => html.getContentElement().getDomElement().addEventListener("change", async ev => {
+        const sel = ev.target;
+        if (!sel || !sel.dataset || !sel.dataset.addr) {
+          return;
+        }
+        const addr = sel.dataset.addr;
+        const kind = sel.dataset.kind;
+        const addrs = siblings.getValue() && kind === "bssid" && loc
+          ? Array.from(new Set([addr].concat(Loc.groupStats(kind, addr, loc.stats).map(r => r.addr)))) : [addr];
+        try {
+          await ankamon.io.Api.put("/wifimon/locations", { addrs, board_id: sel.value ? Number(sel.value) : null });
+        } catch (err) {
+          ankamon.ui.Dialog.error(err);
+        }
+        await loadLoc();
+      }));
       win.open();
       draw();
+      loadLoc();
     }
   }
 });

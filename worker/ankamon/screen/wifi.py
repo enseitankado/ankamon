@@ -66,7 +66,7 @@ import tornado.websocket
 
 from .. import db
 from ..executor.hwfacts import mark_wifi_radio
-from . import wifimon_phone_hints, wifimon_probe_merge, wifimon_sightings
+from . import wifimon_phone_hints, wifimon_probe_merge, wifimon_signal_log, wifimon_sightings
 from .wifi_remote_scan import wifimon_remote_command
 
 log = logging.getLogger("ankamon.screen.wifi")
@@ -109,6 +109,8 @@ def parse(sections: dict) -> dict:
             "signal": int(f[6]) if f[6].isdigit() else 0, "security": f[7]})
     for row in wifi:
         wifimon_phone_hints.annotate_wifi_ap(row)
+    # Gerçek dBm (iw scan dump; yoksa yüzdeden tahmin) ve bant — sensör başına sinyal istatistiği için (wifimon_signal_log).
+    wifimon_signal_log.attach_dbm(wifi, wifimon_signal_log.parse_iw_dump(sections.get("IWDUMP", [])))
     out["rows"] = sorted(wifi, key=lambda n: (-n["active"], -(n["signal"] if n["signal"] is not None else -1)))
     return out
 
@@ -161,6 +163,7 @@ def _wifimon_build(parser, board_id: int, sections: dict) -> dict:
     data = parser(sections)
     _wifimon_mark_boards(data["rows"])
     wifimon_sightings.record_and_annotate(board_id, data["rows"])
+    wifimon_signal_log.record(board_id, data["rows"])  # güvenilir vericilerin konumu için sinyal istatistiği (göç 050)
     return data
 
 
