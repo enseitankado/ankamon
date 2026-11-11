@@ -1070,7 +1070,9 @@ qx.Class.define("ankamon.page.Base", {
       });
       popup.add(clear);
       popup.addListener("disappear", () => qx.event.Timer.once(() => popup.dispose(), this, 0));
-      popup.placeToWidget(button, true);
+      // Canlı konumlama yok: liste açıkken pencere kapanırsa (düğme yok edilince) qx konum güncellemesi "getDomElement
+      // of null" hatası veriyordu (pencere tablolarında — bkz. filterTable).
+      popup.placeToWidget(button, false);
       popup.show();
       if (search) {
         qx.event.Timer.once(() => !search.isDisposed() && search.focus(), this, 50);
