@@ -125,6 +125,10 @@ qx.Class.define("ankamon.ui.ExtensionsSettings", {
           const field = new qx.ui.form.TextField(value != null ? String(value) : "").set({
             placeholder: param.placeholder || ""
           });
+          if (param.default_from) {
+            // Sunucu boş ayarı çekirdek ayarından doldurur (ExtensionsApi default_from); aynı değer kalırsa izlemeyi sürdürür.
+            field.setToolTipText("Ayarlar ▸ Kuruluş'tan otomatik dolar; değiştirmezseniz oradaki değişikliği izler.");
+          }
           form.addField(key, label, field);
         }
       });

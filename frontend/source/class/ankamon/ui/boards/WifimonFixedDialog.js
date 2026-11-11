@@ -77,7 +77,25 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
       const scope = new qx.ui.form.SelectBox().set({ width: 240, toolTipText: "Seçilen kayıtların yeni kapsamı" });
       scope.add(new qx.ui.form.ListItem("Okul geneli", null, ""));
       const apply = new qx.ui.form.Button("Seçilenlerin kapsamını değiştir");
-      const row = ankamon.ui.Dialog.buttons(win, [apply, del, close]);
+      // Eklentilerin düğmeleri (ankamon.ext.Extensions.addWifiTrustedAction): işaretli kayıtlarla çalışır.
+      const extButtons = ankamon.ext.Extensions.wifiTrustedActions().map(spec => {
+        const button = new qx.ui.form.Button(spec.label).set({ toolTipText: spec.hint || null });
+        button.addListener("execute", async () => {
+          const ids = new Set(boxes().filter(b => b.checked).map(b => Number(b.dataset.id)));
+          const rows = getFixed().filter(f => ids.has(f.id));
+          if (!rows.length) {
+            ankamon.ui.Dialog.alert("Önce listeden kayıt işaretleyin.", spec.label);
+            return;
+          }
+          try {
+            await spec.run(rows);
+          } catch (e) {
+            ankamon.ui.Dialog.error(e);
+          }
+        });
+        return button;
+      });
+      const row = ankamon.ui.Dialog.buttons(win, extButtons.concat([apply, del, close]));
       row.addAt(all, 0);
       row.addAt(new qx.ui.core.Spacer(), 1, { flex: 1 });
       row.addAt(new qx.ui.basic.Label("Kapsam:").set({ alignY: "middle" }), 2);

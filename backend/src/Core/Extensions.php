@@ -85,7 +85,36 @@ final class Extensions
     public static function setting(string $name, string $key, mixed $default = null): mixed
     {
         $value = Settings::get('ext.' . $name . '.' . $key);
+        if ($value === null || $value === '') {
+            // Şemada "default_from" varsa boş ayar çekirdek ayarından dolar (ör. Ayarlar ▸ Kuruluş).
+            foreach ((self::get($name)['settings'] ?? []) as $param) {
+                if (($param['key'] ?? null) === $key && isset($param['default_from'])) {
+                    $core = self::coreDefault((string) $param['default_from']);
+                    if ($core !== null && $core !== '') {
+                        return $core;
+                    }
+                }
+            }
+        }
         return $value ?? $default;
+    }
+
+    /**
+     * Eklenti ayar şemasındaki "default_from" yolunun değeri: "<çekirdek ayar anahtarı>.<alan>" (ör. "organization.name" →
+     * Ayarlar ▸ Kuruluş adı). Ayar boş bırakıldıkça eklenti bu değeri kullanır; Kuruluş değişince kendiliğinden izler.
+     * Yol bulunamazsa null.
+     */
+    public static function coreDefault(string $path): mixed
+    {
+        $parts = explode('.', $path);
+        $value = Settings::get(array_shift($parts));
+        foreach ($parts as $part) {
+            if (!is_array($value) || !array_key_exists($part, $value)) {
+                return null;
+            }
+            $value = $value[$part];
+        }
+        return is_scalar($value) ? $value : null;
     }
 
     private static function json(string $file): array

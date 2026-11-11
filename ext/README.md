@@ -70,5 +70,10 @@ ext/<ad>/
   `ui.Shell` PAGES biçimi; `create` bir `ankamon.page.Base` döndürür. `parent` yoksa sayfa kökte "Sistem"den önce durur;
   ağaç, üst yol gösterimi ve sekme yaprakları çekirdek sayfalarındaki gibi kendiliğinden gelir.
 
+- **Wi-Fi Monitör güvenilir listesi:** `ankamon.ext.Extensions.addWifiTrustedAction({label, hint, run(rows)})` — pencerenin
+  düğme satırına düğme; `run` işaretli kayıtlarla (`{id, kind, value, label, board_id, board_name}`) çağrılır.
+- **Ayarın çekirdekten dolması:** `extension.json` ayarında `"default_from": "organization.name"` — alan boşken çekirdek ayarının
+  değeri gösterilir ve `Core\Extensions::setting` onu döndürür (ör. Ayarlar ▸ Kuruluş); aynı değer kaydedilirse izlemeyi sürdürür.
+
 Yeni bir eklenti noktası gerekirse çekirdeğe **genel** bir kanca eklenir. Kanca hiçbir eklentiyi
 adıyla anmaz.

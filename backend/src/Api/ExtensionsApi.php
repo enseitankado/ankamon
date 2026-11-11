@@ -40,7 +40,8 @@ use Ankamon\Core\Settings;
 /**
  * Yüklü eklentiler ve ayarları — yalnız yönetici. Çekirdek eklentileri adıyla bilmez; EXT_DIR taranır
  * (bkz. Core\Extensions). Ayar şeması action.json "params" biçimindedir → doğrulama Core\Actions ile
- * ortaktır. Parolalar yanıtta maskelenir ('***'); kaydederken '***' / boş gelen parola "değiştirme"dir.
+ * ortaktır. Parolalar yanıtta maskelenir ('***'); kaydederken '***' / boş gelen parola "değiştirme"dir. Şemada "default_from"
+ * (ör. "organization.name") olan alan boşken çekirdek ayarından doldurulur (bkz. Core\Extensions::coreDefault).
  */
 final class ExtensionsApi
 {
@@ -98,6 +99,11 @@ final class ExtensionsApi
             } elseif ($type === 'number' && $value !== '') {
                 $value = (int) $value;
             }
+            // Kuruluş'tan dolan değer olduğu gibi kaydedilirse boş saklanır: ayar çekirdek ayarını izlemeyi sürdürür.
+            if (isset($param['default_from']) && $value !== ''
+                && (string) $value === (string) Extensions::coreDefault((string) $param['default_from'])) {
+                $value = '';
+            }
             Settings::set('ext.' . $name . '.' . $key, $value);
         }
         Audit::log($user, $request, 'extensions.settings', $name);
@@ -113,6 +119,9 @@ final class ExtensionsApi
             $stored = Settings::get('ext.' . $name . '.' . $key);
             if (($param['type'] ?? 'text') === 'password') {
                 $values[$key] = ($stored !== null && $stored !== '') ? '***' : '';
+            } elseif (($stored === null || $stored === '') && isset($param['default_from'])) {
+                // Boş ayar çekirdek ayarından dolar (ör. "organization.name" — Ayarlar ▸ Kuruluş); bkz. Extensions::coreDefault.
+                $values[$key] = Extensions::coreDefault((string) $param['default_from']) ?? ($param['default'] ?? '');
             } else {
                 $values[$key] = $stored ?? ($param['default'] ?? '');
             }

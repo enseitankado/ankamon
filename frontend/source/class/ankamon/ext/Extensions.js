@@ -43,7 +43,8 @@
  *  - "statusBar.usersVisible" (): alt çubuktaki oturum açmış kullanıcılar göstergesi (👤 + ipucu).
  *    Varsayılan gizli; işlendi ise (true) görünür.
  * Kanca dışındaki eklenti noktaları: addMaintenanceTab (Bakım sekmesi), addBoardMenu (Tahtalar sağ menüsü
- * maddesi ve isteğe bağlı araç çubuğu düğmesi), addPage (sol menüde eklentinin kendi sayfası).
+ * maddesi ve isteğe bağlı araç çubuğu düğmesi), addPage (sol menüde eklentinin kendi sayfası), addWifiTrustedAction
+ * (Wi-Fi Monitör güvenilir listesinde işaretli kayıtlara düğme).
  *
  * Bir eklentinin durumu değişip kanca yanıtları farklılaşınca changed() çağrılır (CHANGED mesajı): kancayı
  * sürekli gösterilen bir öğe için soran çekirdek bileşenleri (ör. alt çubuk) yanıtı yeniden değerlendirir.
@@ -60,6 +61,7 @@ qx.Class.define("ankamon.ext.Extensions", {
     __enabled: {},          // {eklenti-adı: etkin mi} — start()'ta GET /extensions/active'ten
     __maintenanceTabs: [],  // eklentilerin Bakım sekmeleri (bkz. addMaintenanceTab)
     __pages: [],            // eklentilerin sol menü sayfaları (bkz. addPage)
+    __wifiTrustedActions: [], // eklentilerin Wi-Fi Monitör güvenilir listesi düğmeleri (bkz. addWifiTrustedAction)
     __boardMenus: [],       // eklentilerin Tahtalar sağ menüsü maddeleri (bkz. addBoardMenu)
 
     /**
@@ -147,6 +149,20 @@ qx.Class.define("ankamon.ext.Extensions", {
      */
     addPage(spec) {
       this.__pages.push(spec);
+    },
+
+    /**
+     * Wi-Fi Monitör ▸ Güvenilir listesi penceresine düğme ekler (ui.boards.WifimonFixedDialog): {label, hint?, run(rows)}.
+     * run, işaretli kayıtlarla çağrılır — [{id, kind, value, label, board_id, board_name}] (kind: bssid erişim noktası,
+     * probe Wi-Fi cihazı) — ve Promise döndürebilir. İşaret yoksa düğme uyarır, run çağrılmaz.
+     */
+    addWifiTrustedAction(spec) {
+      this.__wifiTrustedActions.push(spec);
+    },
+
+    /** @return {Array} eklentilerin güvenilir listesi düğmeleri (bkz. addWifiTrustedAction). */
+    wifiTrustedActions() {
+      return this.__wifiTrustedActions;
     },
 
     /** @return {Array} eklentilerin kayıtlı sayfa tanımları (bkz. addPage). */
