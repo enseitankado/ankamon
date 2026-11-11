@@ -52,8 +52,10 @@ Açılışta kilit penceresi pencere yöneticisinden (compositor, giriş ekranı
 açılınca pencere en üstte görünse de ekrana çizilmiyordu (Arge 1'de 2026-11-02'de yeniden üretildi). Bu yüzden
 pencere bileşim durumu değişince kapanır, bekçi onu hemen yeniden açar.
 
-Kilit yazısının altında tahtanın kimliği (info.json, kilitlerken Ankamon'daki kayıttan): takma ad (kod adı)
-büyükçe, altında bilgisayar adı, ETAP modeli/fazı, kablolu/kablosuz MAC ve IP — kilitli tahtayı bulmak/bildirmek için.
+Kilit yazısının altında "Cihaz kilitlenmiştir." (kullanıcı isteği 2026-11-11; önce "yönetici tarafından" yazıyordu) ve
+tahtanın kimliği (info.json, kilitlerken Ankamon'daki kayıttan): takma ad (kod adı) büyükçe, altında eklentilerin
+satırları (ör. envanter numarası — ankamon.ext.device_identity_rows), bilgisayar adı, ETAP modeli/fazı, kablolu/kablosuz
+MAC ve IP — kilitli tahtayı bulmak/bildirmek için.
 
 Oturum yoklaması (executor/session_probe.py) SCRIPT'teki "L" satırıyla kilit durumunu okur
 (boards.screen_locked — göç 035); Tahtalar grid'inin "Oturum" hücresi "… / Kilitli" yazar.
@@ -63,6 +65,7 @@ from __future__ import annotations
 
 import json
 
+from .. import ext
 from .accounts import _ssh
 from .display import _ACTIVE_X
 
@@ -272,7 +275,7 @@ box.pack_start(icon, False, False, 0)
 title = Gtk.Label(label="Kilitli")
 title.get_style_context().add_class("ankamon-lock-title")
 box.pack_start(title, False, False, 0)
-sub = Gtk.Label(label="Bu tahta yönetici tarafından kilitlendi.")
+sub = Gtk.Label(label="Cihaz kilitlenmiştir.")
 sub.get_style_context().add_class("ankamon-lock-sub")
 box.pack_start(sub, False, False, 0)
 code = info.get("code") or ""
@@ -440,6 +443,10 @@ def identities(conn, board_ids: list[int]) -> dict[int, dict]:
                         "rows": [["Bilgisayar adı", r["hostname"] or ""], ["ETAP", model],
                                  ["Kablolu MAC", (r["mac"] or "").upper()],
                                  ["Kablosuz MAC", (r["wifi_mac"] or "").upper()], ["IP", r["ip"] or ""]]}
+    # Eklentilerin kimlik satırları (ör. envanter numarası) kod adının hemen altına; çekirdek eklentiyi adıyla bilmez.
+    for board_id, extra in ext.device_identity_rows(conn, board_ids).items():
+        if board_id in out:
+            out[board_id]["rows"] = list(extra) + out[board_id]["rows"]
     return out
 
 

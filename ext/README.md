@@ -72,6 +72,9 @@ ext/<ad>/
 
 - **Wi-Fi Monitör güvenilir listesi:** `ankamon.ext.Extensions.addWifiTrustedAction({label, hint, run(rows)})` — pencerenin
   düğme satırına düğme; `run` işaretli kayıtlarla (`{id, kind, value, label, board_id, board_name}`) çağrılır.
+- **Cihaz kimliği satırları (kilit ekranı):** `worker/device_identity.py` içinde `ROWS(conn, board_ids)` →
+  `{board_id: [[ad, değer], …]}` — Ekranı kilitle'de tahtanın kilit ekranındaki kimlik bilgisine satır eklenir (kod adının
+  altına; boş değerler atlanır). Bkz. worker `ankamon.ext.device_identity_rows`.
 - **Ayarın çekirdekten dolması:** `extension.json` ayarında `"default_from": "organization.name"` — alan boşken çekirdek ayarının
   değeri gösterilir ve `Core\Extensions::setting` onu döndürür (ör. Ayarlar ▸ Kuruluş); aynı değer kaydedilirse izlemeyi sürdürür.
 

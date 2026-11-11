@@ -50,6 +50,11 @@ SSH_PORT = 22
 # Çevrimdışı sayılmadan önce üst üste istenen başarısız yoklama sayısı (histerezis).
 FAILS_BEFORE_OFFLINE = 2
 
+# "Bilgisayarı kapat" komutundan (boards.shutdown_at) sonra tahta bu süre içinde SSH'te yeniden görünmediyse kapalı
+# sayılır: ilk başarısız yoklamada çevrim dışı (FAILS_BEFORE_OFFLINE beklenmez) ve ağ kaydı (Varlıklar) da çevrim dışı.
+# Kapanış birkaç saniye SSH'e yanıt verebilir; tahta yeniden açılırsa bu süreden sonra görülür ve kural düşer.
+SHUTDOWN_GRACE = "3 minutes"
+
 _fails: dict[int, int] = {}
 _exporter_fails: dict[int, int] = {}
 
@@ -74,9 +79,14 @@ async def _probe_board_ssh_and_exporter(boards: list[dict]) -> list[tuple]:
 
 
 def run(conn) -> None:
-    boards = conn.execute("SELECT id, host(ip) AS ip, exporter_port FROM boards WHERE ip IS NOT NULL").fetchall()
+    boards = conn.execute(
+        f"""SELECT id, host(ip) AS ip, exporter_port,
+                  (shutdown_at IS NOT NULL AND (last_seen_at IS NULL OR last_seen_at < shutdown_at + interval '{SHUTDOWN_GRACE}'))
+                  AS shut_down
+           FROM boards WHERE ip IS NOT NULL""").fetchall()
     if not boards:
         return
+    shut_down = {b["id"] for b in boards if b["shut_down"]}
     seen_ids = set()
     for board_id, ssh, exporter in asyncio.run(_probe_board_ssh_and_exporter(boards)):
         seen_ids.add(board_id)
@@ -86,7 +96,8 @@ def run(conn) -> None:
             online = True
         else:
             _fails[board_id] = _fails.get(board_id, 0) + 1
-            online = _fails[board_id] < FAILS_BEFORE_OFFLINE
+            # Kapatma komutundan sonra ulaşılamıyorsa beklemeden çevrim dışı (kullanıcı isteği 2026-11-11).
+            online = _fails[board_id] < FAILS_BEFORE_OFFLINE and board_id not in shut_down
 
         if exporter:
             _exporter_fails[board_id] = 0
@@ -102,8 +113,24 @@ def run(conn) -> None:
                WHERE id = %s""",
             (ssh, exporter_ok, online, reachable, board_id),
         )
+    _mark_shut_down_offline(conn)
     # Artık yoklanmayan (silinmiş/elden çıkmış) tahtalar için sayaçlar süresiz birikmesin.
     for stale_id in set(_fails) - seen_ids:
         _fails.pop(stale_id, None)
     for stale_id in set(_exporter_fails) - seen_ids:
         _exporter_fails.pop(stale_id, None)
+
+
+def _mark_shut_down_offline(conn) -> None:
+    """Kapatma komutu verilmiş ve SSH'e ulaşılamayan tahtanın ağ kaydını (Varlıklar — net_devices) çevrim dışı yapar.
+
+    Ağ taraması kapanan cihazı ancak birkaç tur sonra düşürür (ARP önbelleği); Akıllı Tahtalar ve Varlıklar aynı durumu
+    göstersin diye burada hemen düşürülür. Tahta yeniden açılınca SSH yoklaması last_seen_at'i ilerletir, koşul düşer ve
+    ağ taraması cihazı yeniden çevrim içi yazar.
+    """
+    conn.execute(
+        f"""UPDATE net_devices nd SET online = false, state_changed_at = now()
+            FROM boards b
+            WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
+              AND b.shutdown_at IS NOT NULL AND NOT b.online
+              AND (b.last_seen_at IS NULL OR b.last_seen_at < b.shutdown_at + interval '{SHUTDOWN_GRACE}')""")

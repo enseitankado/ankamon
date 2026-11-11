@@ -33,7 +33,7 @@
  * kodu yoktur. GROUPS'ta adı geçmeyen yeni menü maddesi "Diğer" düğmesinde kendiliğinden görünür.
  * Menüye eklenen, değişen ya da çıkan her madde için burada GROUPS/ITEMS da gözden geçirilir (kalıcı kural).
  *
- * Düğme: simgeye basmak grubun birincil işini yapar (primary yoksa ya da o an uygulanamıyorsa menüyü açar); ▾ aynı
+ * Düğme: simgeye basmak grubun birincil işini yapar (primary yoksa, menuOnly ise ya da o an uygulanamıyorsa menüyü açar); ▾ aynı
  * türdeki bütün işleri açar. Güç gibi tek basışta tehlikeli işlerde bilerek primary yoktur.
  *
  * Çubuğun başında görünüm bölümü (addViewControls): ne gösterildiğini seçer, menüden gelmez. Çubuk sayfanın üstünde
@@ -60,14 +60,18 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       // Yansıt maddeleri bu düğmede birleşti, çoklu tahtada yansıtma/aktarma sağ menü "Ekran" grubundan yapılır.
       // Kullanıcı kararı (2026-11-05, iki istek çelişince soruldu): çoklu seçimde de açık — yansıt/görüntü al/aktar çoklu
       // tahtada; yalnız Ekranı göster tek tahta seçiliyken (single: "primary").
+      // menuOnly (kullanıcı isteği 2026-11-11): Ekran, Komut ve Dosyalar düğmesine basmak birincil işi çalıştırmaz, alt
+      // seçenekleri açar (birincil yine menünün başında).
       { id: "watch", label: "Ekran", icon: "deviceDesktop", primary: "Ekranı göster", single: "primary", mirror: "Ekran",
-        extra: ["Ekranı göster"] },
+        extra: ["Ekranı göster"], menuOnly: true },
       { id: "manage", label: "Yönet", icon: "mouse", primary: "Bilgisayarı yönet", mirror: "Yönet" },
-      { id: "lock", label: "Kilit", icon: "lock", primary: "Ekranı kilitle" },
-      { id: "command", label: "Komut", icon: "terminal2", primary: "Hazır / Serbest komut çalıştır", sep: true },
+      // Kilit altında oturum ekranının kilidi de (kullanıcı isteği 2026-11-11): "Oturumu kilitle" Oturumlar'da kalır,
+      // burada da görünür (extra — başka gruptaki madde).
+      { id: "lock", label: "Kilit", icon: "lock", primary: "Ekranı kilitle", extra: ["Oturumu kilitle"] },
+      { id: "command", label: "Komut", icon: "terminal2", primary: "Hazır / Serbest komut çalıştır", sep: true, menuOnly: true },
       // Sağ menüdeki grup "Kullanıcılar" → "Oturumlar" oldu (kullanıcı isteği, 2026-11-09); düğme de aynı adla.
       { id: "users", label: "Oturumlar", icon: "users" },
-      { id: "files", label: "Dosyalar", icon: "folders", primary: "Dosya yöneticisi" },
+      { id: "files", label: "Dosyalar", icon: "folders", primary: "Dosya yöneticisi", menuOnly: true },
       { id: "taskmgr", label: "Görevler", icon: "activity", primary: "Görev yöneticisi" },
       { id: "web", label: "Web sitesi", icon: "worldWww", primary: "Web sitesi aç…", sep: true },
       { id: "wifi", label: "Wi-Fi", icon: "wifi", primary: "Wi-Fi Monitör" },
@@ -438,6 +442,12 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     /** Seçim boşken yalnız noSelection maddeleri çalışır: sentetik kayıt üzerinde başka madde sunulmaz. */
     __leaves(group, groups, none, count) {
       let leaves = groups.get(group.id) || [];
+      if (!group.mirror && group.extra) {
+        // Başka grupta duran maddeler (ör. Kilit ▸ Oturumu kilitle): grubun kendi maddelerinin ardına eklenir.
+        const all = [...groups.values()].flat();
+        const extra = group.extra.map(k => all.find(l => l.getUserData("ankamon.menuKey") === k)).filter(l => l && !leaves.includes(l));
+        leaves = leaves.concat(extra);
+      }
       if (group.mirror) {
         const box = groups.containers && groups.containers[group.mirror];
         const own = box ? box.getChildren().filter(item => item instanceof qx.ui.menu.Button) : [];
@@ -489,7 +499,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
           b.setEnabled(on);
           b.setOpacity(on ? 1 : ankamon.ui.boards.ActionBar.OFF_OPACITY);
         });
-        w.arrow.setVisibility(leaves.length > 1 || !group.primary ? "visible" : "excluded");
+        w.arrow.setVisibility(leaves.length > 1 || !group.primary || group.menuOnly ? "visible" : "excluded");
         // Birincil madde zengin ipucu taşıyorsa (userData "ankamon.menuHint", HTML — ör. Ahenk ▸ ETAP kontrol)
         // düğmede de o gösterilir; yoksa (seçim yokken madde de yok) grubun sabit hint'i (HTML, eklenti verir).
         // Düz toolTipText tek satırdır, uzun açıklama sığmaz.
@@ -519,7 +529,7 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     },
 
     __tip(group, leaves) {
-      const primary = group.primary && leaves.find(l => l.getUserData("ankamon.menuKey") === group.primary);
+      const primary = !group.menuOnly && group.primary && leaves.find(l => l.getUserData("ankamon.menuKey") === group.primary);
       return primary && primary.getEnabled() ? group.primary : `${group.label}: seçenekler`;
     },
 
@@ -527,7 +537,8 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
       const cur = this.__current();
       const groups = cur.menu ? this.__collect(cur.menu) : new Map();
       const leaves = this.__leaves(group, groups, cur.none, cur.boards.length);
-      const primary = group.primary && leaves.find(l => l.getUserData("ankamon.menuKey") === group.primary && l.getEnabled());
+      // menuOnly: düğme yalnız alt seçenekleri açar (bkz. GROUPS).
+      const primary = !group.menuOnly && group.primary && leaves.find(l => l.getUserData("ankamon.menuKey") === group.primary && l.getEnabled());
       if (primary && !primary.getMenu()) {
         this.__run(primary, cur.boards);
         this.__dropMenu(cur.menu);

@@ -223,6 +223,10 @@ def _run_job(job) -> None:
                                 # İşlem bitiş kancaları (eklenti-farkında): bir eklenti worker'ı bir action id
                                 # için callback kaydettiyse 'ok' bitişte çalıştırılır (ör. rapor okuyup tabloya
                                 # yazma). Çekirdek hiçbir eklentiyi adıyla bilmez (bkz. _JOB_DONE_HOOKS).
+                                # Kapatma tahtada başarıyla bitti: SSH'e ulaşılamayınca cihaz beklemeden çevrim dışı
+                                # sayılsın (bkz. tasks/board_status SHUTDOWN_GRACE, BoardsApi alive; göç 051).
+                                if result["status"] == "ok" and action == "shutdown":
+                                    wconn.execute("UPDATE boards SET shutdown_at = now() WHERE id = %s", (t["board_id"],))
                                 if result["status"] == "ok" and action in _JOB_DONE_HOOKS:
                                     try:
                                         _JOB_DONE_HOOKS[action](wconn, t, user, password, job["id"], ev)

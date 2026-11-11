@@ -75,10 +75,17 @@ final class BoardsApi
         -- Bayat ağ kaydı sayılmaz (kullanıcı bildirimi 2026-11-10, 192.168.23.181): tahta kapanınca SSH yoklaması hemen
         -- düşer ama ağ taraması ancak 2 tur sonra çevrim dışı yazar; o arada tahta «açık» görünüyordu. SSH'in son
         -- yanıtından (b.last_seen_at) sonra ağ taraması tahtayı yeniden görmediyse ağ kaydı canlılık kanıtı değildir.
-        EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
-                AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at)) AS net_online,
-        (b.online OR EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
-                AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at))) AS alive,
+        -- Kapatma komutu (kullanıcı isteği 2026-11-11): «Bilgisayarı kapat» tahtada bittiyse (b.shutdown_at — göç 051) ve
+        -- tahta o andan beri SSH'te görünmediyse ağ kaydı canlılık sayılmaz — cihaz beklemeden çevrim dışı. Yeniden
+        -- açılıp SSH yanıt verince (last_seen_at ilerler) kural düşer. Süre worker tasks/board_status SHUTDOWN_GRACE ile aynı.
+        (EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
+                AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at))
+         AND NOT (b.shutdown_at IS NOT NULL AND NOT b.online
+                  AND (b.last_seen_at IS NULL OR b.last_seen_at < b.shutdown_at + interval '3 minutes'))) AS net_online,
+        (b.online OR (EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
+                AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at))
+         AND NOT (b.shutdown_at IS NOT NULL
+                  AND (b.last_seen_at IS NULL OR b.last_seen_at < b.shutdown_at + interval '3 minutes')))) AS alive,
         -- «Yönetilebilir» TEK ölçüt (kullanıcı isteği 2026-11-10): tahtaya SSH ile root girişi BAŞARILI — son 3 dakikada
         -- başarılı oturum yoklaması (worker tasks/session_probe: SSH portu açık her tahtaya 30 sn'de bir ssh_access
         -- kullanıcısıyla — root — ve tahtaya özel parola varsa onunla giriş yapar). Port açıklığı, sensör toplama vb. sayılmaz.

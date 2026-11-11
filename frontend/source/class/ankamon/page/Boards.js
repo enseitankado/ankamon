@@ -664,10 +664,11 @@ qx.Class.define("ankamon.page.Boards", {
       this.__screenView = this.__loadScreenView();
       const list = (this._user.ui_prefs || {})["boards.listView"] === true;
       this.__viewButtons = this.__actionBar.addViewControls([
+        // Sıra (kullanıcı isteği 2026-11-11): Liste, ekran kutucuklarına ait düğmelerin (Ekranlar, Sensörler, Başarım) sağında.
         { id: "screens", label: "Ekranlar", icon: "layoutGrid", group: true, tip: "Tahtaların canlı ekran kutucukları" },
-        { id: "list", label: "Liste", icon: "list", group: true, tip: "Tahtaları tablo olarak gösterir" },
         { id: "stats", label: "Sensörler", icon: "temperature", tip: "Kutucukların altında işlemci, bellek, disk sıcaklığı, fan ve pil voltajı barı" },
-        { id: "perf", label: "Başarım", icon: "gauge", tip: "Ekran alanında tahtanın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)" }
+        { id: "perf", label: "Başarım", icon: "gauge", tip: "Ekran alanında tahtanın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)" },
+        { id: "list", label: "Liste", icon: "list", group: true, tip: "Tahtaları tablo olarak gösterir" }
       ], (id, on) => {
         if (!this.__viewReady) {
           return;     // açılışta kayıtlı seçim uygulanıyor: yeniden kaydedilmez
