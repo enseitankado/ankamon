@@ -246,7 +246,7 @@ qx.Class.define("ankamon.ui.files.Pane", {
         }
       });
       // Sütun süzgeçleri + hazır değer listeleri (bütün grid'ler gibi; Sahip/Grup/İzin/tür gibi az çeşitli sütunlarda liste).
-      ankamon.page.Base.filterTable(table);
+      ankamon.page.Base.filterTable(table, { choicesFor: ["Sahip", "Grup", "İzin"] });
       return table;
     },
 

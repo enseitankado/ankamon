@@ -136,7 +136,7 @@ qx.Class.define("ankamon.ui.boards.EtaKisitWebFilter", {
       behavior.setWidth(1, 90);
       behavior.setWidth(2, 90);
       table.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.MULTIPLE_INTERVAL_SELECTION);
-      ankamon.page.Base.filterTable(table);
+      ankamon.page.Base.filterTable(table, { choicesFor: ["Adres"] });
       win.add(table, { flex: 1 });
 
       const small = text => new qx.ui.basic.Label(text).set({ rich: true, wrap: true, allowGrowX: true, font: "small", opacity: 0.8 });
