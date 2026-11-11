@@ -273,6 +273,19 @@ def boards_from_devices(conn) -> int:
     ).fetchall()
     for r in rows:
         activity.record(conn, f"Yeni tahta (ağ envanterinde akıllı tahta): {r['mac']} ({r['ip'] or 'IP yok'})")
+    # Kayıt açılırken cihazın adı çoğu zaman henüz bilinmez (ad/NetBIOS taraması sonra doldurur): adı boş tahta kaydı,
+    # cihazın sonradan öğrenilen adını alır (kullanıcı bildirimi 2026-11-11: Tahtalar listesinde "Bilgisayar adı" boş,
+    # Bilgisayar ayrıntılarında dolu). NetBIOS adı büyük harfle gelir (ETAP-8AB221): tahta adları gibi küçük harfe çevrilir.
+    named = conn.execute(
+        """UPDATE boards b SET hostname = CASE WHEN d.hostname = upper(d.hostname) THEN lower(d.hostname) ELSE d.hostname END,
+                  updated_at = now()
+           FROM (SELECT DISTINCT ON (mac) mac, hostname FROM net_devices WHERE COALESCE(hostname, '') <> ''
+                 ORDER BY mac, online DESC, last_seen_at DESC NULLS LAST) d
+           WHERE COALESCE(b.hostname, '') = '' AND (d.mac = b.mac OR d.mac = b.wifi_mac)
+           RETURNING b.id, b.hostname"""
+    ).fetchall()
+    for r in named:
+        activity.record(conn, f"Tahta kaydına bilgisayar adı eklendi (ağ envanterinden): #{r['id']} {r['hostname']}")
     return len(rows)
 
 

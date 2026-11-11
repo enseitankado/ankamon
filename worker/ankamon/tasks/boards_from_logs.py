@@ -141,12 +141,15 @@ def run(conn) -> None:
             continue
         board_mac = boardmac.is_board_mac(mac)
         # Bilgisayar adı değişmiş kayıtlı tahta (TiHA dinamik adı): MAC'iyle bulunur, IP'si güncellenir (ad
-        # board_identity görevinde bağlanır).
+        # board_identity görevinde bağlanır). Kayıtta bilgisayar adı HİÇ yoksa (ağ taramasıyla ya da elle açılmış kayıt —
+        # board_identity yalnız MAC'siz kayıtları okur, bunlara hiç bakmaz) logdaki ad yazılır: yoksa Tahtalar listesinde
+        # "Bilgisayar adı" sonsuza dek boş kalıyordu (kullanıcı bildirimi 2026-11-11). Ad varsa değiştirilmez.
         if mac and conn.execute(
-                """UPDATE boards SET ip = %(ip)s::inet, last_log_at = %(last_log_at)s, updated_at = now()
+                """UPDATE boards SET ip = %(ip)s::inet, last_log_at = %(last_log_at)s, updated_at = now(),
+                          hostname = CASE WHEN %(fill)s THEN COALESCE(NULLIF(hostname, ''), %(host)s) ELSE hostname END
                    WHERE mac = %(mac)s::macaddr OR (wifi_mac = %(mac)s::macaddr AND NOT EXISTS (
                        SELECT 1 FROM boards x WHERE x.mac = %(mac)s::macaddr))""",
-                dict(row, mac=mac)).rowcount:
+                dict(row, mac=mac, fill=bool(row["host"]) and not _looks_fake(row["host"], ip))).rowcount:
             continue
         # Elle (yalnız IP ile) eklenmiş kayıt varsa adını tamamla: kaynak o kaydın MAC'iyle ya da tahta MAC'iyle.
         updated = 0
