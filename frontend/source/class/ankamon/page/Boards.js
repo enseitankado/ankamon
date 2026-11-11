@@ -258,6 +258,22 @@ qx.Class.define("ankamon.page.Boards", {
       return (board.alive ?? board.online) ? "Çevrimiçi" : "Kapalı";
     },
 
+    /**
+     * "Wi-Fi" sütunu (ui.FactsView.wifiStatus kuralı). Bağlı/bağlı değil ve ağ adı, oturum yoklaması tazeyse
+     * (netifs, 30 sn — CABLE_FRESH_S) ondan alınır; donanım bilgisi (facts) yalnız ilk tanınmada/Bilgi kartında
+     * toplandığından günlerce eski kalabiliyor (bağlı görünüp bağlı olmayan tahta). Bağlıysa "Bağlı (Ağ adı)".
+     */
+    wifiText(board) {
+      const f = board.facts || {};
+      const fresh = board.netifs && board.session_checked_at &&
+        Date.now() / 1000 - board.session_checked_at < ankamon.page.Boards.CABLE_FRESH_S;
+      const live = fresh && (board.netifs.ifaces || []).find(i => i.kind === "wifi");
+      const merged = live ? Object.assign({}, f, live.state === 100
+        ? { wifi_state: "connected", wifi_ssid: live.ssid || live.connection || "" }
+        : { wifi_state: "disconnected" }) : f;
+      return (ankamon.ui.FactsView.wifiStatus(merged) || { text: "" }).text;
+    },
+
     cableText(board) {
       const wired = ((board.netifs && board.netifs.ifaces) || []).filter(i => i.kind === "ethernet");
       if (!board.online) {
@@ -428,7 +444,7 @@ qx.Class.define("ankamon.page.Boards", {
             board.label || board.hostname || board.ip,
             board.hostname, board.ip, board.mac, board.wifi_mac || "", F.etap(board.etap, board.facts.cpu_model),
             ankamon.page.Boards.sessionText(board),
-            (ankamon.ui.FactsView.wifiStatus(board.facts) || { text: "" }).text,
+            ankamon.page.Boards.wifiText(board),
             ankamon.page.Boards.cableText(board),
             board.facts.disk_total_bytes ? F.bytes(board.facts.disk_total_bytes) : "",
             board.facts.mem_installed_bytes || board.facts.mem_total_bytes ? ankamon.ui.FactsView.ramText(board.facts, false) : "",

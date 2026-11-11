@@ -110,7 +110,10 @@ qx.Class.define("ankamon.ui.FactsView", {
         return { text: "Devre dışı", kind: "idle" };
       }
       if (f.wifi_radio === "enabled") {
-        return { text: f.wifi_state === "connected" ? "Etkin · bağlı" : "Etkin", kind: "ok" };
+        if (f.wifi_state === "connected") { // bağlıysa "Etkin" yazılmaz, ağ adı yazılır (kullanıcı isteği 2026-11-11)
+          return { text: f.wifi_ssid ? `Bağlı (${f.wifi_ssid})` : "Bağlı", kind: "ok" };
+        }
+        return { text: "Etkin", kind: "ok" };
       }
       return { text: "Bilinmiyor", kind: "idle" };
     },
