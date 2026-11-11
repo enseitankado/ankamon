@@ -12,7 +12,7 @@
     "@qooxdoo/framework": "7.9.3"
   },
   "dependencies": {
-    "@highlightjs/cdn-assets": "11.11.1",
-    "vis-timeline": "^8.5.4"
+    "@highlightjs/cdn-assets": "11.12.0",
+    "vis-timeline": "^8.5.6"
   }
 }
