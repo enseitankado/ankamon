@@ -10,7 +10,7 @@ declare(strict_types=1);
 // kullanılabilir — ör. "shell" Tahtalar sayfasının sağ menüsünden açılır, sayfa ise "boards" ister.
 // UsersApi kaydederken üst özelliği kendiliğinden ekler; Kullanıcılar penceresi alt özellikleri
 // üstünün altında girintili gösterir ve üstü kapalıyken devre dışı bırakır.
-return [
+$ozellikBagimliliklari = [
     'boards.manage' => 'boards',
     'actions' => 'boards',
     'power' => 'boards',
@@ -43,3 +43,10 @@ return [
     'leagues.exclude' => 'logs',
     'network.manage' => 'network',
 ];
+
+// Eklentilerin kendi yetkileri: ext/<ad>/feature_deps.php aynı biçimde dizi döndürür (çekirdek hiçbir eklentiyi adıyla
+// bilmez). Çekirdek anahtarı ezilemez; etkin olmayan eklentinin yetkisi de listelenir (yönetici önceden verebilsin).
+foreach (glob(\Ankamon\Core\Extensions::dir() . '/*/feature_deps.php') ?: [] as $eklentiDosyasi) {
+    $ozellikBagimliliklari += (array) require $eklentiDosyasi;
+}
+return $ozellikBagimliliklari;

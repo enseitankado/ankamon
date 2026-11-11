@@ -122,6 +122,25 @@ qx.Class.define("ankamon.ui.boards.ActionBar", {
     this.__groups = config.groups || Bar.GROUPS;
     this.__items = config.items || Bar.ITEMS;
     this.__containers = config.containers || Bar.CONTAINERS;
+    if (!config.groups) {
+      // Eklenti düğmeleri (ankamon.ext.Extensions.addBoardMenu bar): "Diğer"den önce; mirror'lu düğmenin alt menüsü
+      // kapsayıcı sayılır (maddeleri "Diğer"e düşmez).
+      const extra = ankamon.ext.Extensions.boardBarGroups();
+      if (extra.length) {
+        const other = this.__groups.findIndex(g => g.id === "other");
+        this.__groups = this.__groups.slice();
+        this.__groups.splice(other < 0 ? this.__groups.length : other, 0, ...extra);
+        this.__containers = Object.assign({}, this.__containers);
+        this.__items = Object.assign({}, this.__items);
+        extra.forEach(g => {
+          if (g.mirror) {
+            this.__containers[g.mirror] = g.id;
+          } else if (g.primary) {
+            this.__items[g.primary] = g.id;
+          }
+        });
+      }
+    }
     this.__perBoard = config.perBoard || Bar.PER_BOARD;
     this.__getAll = config.getAll || null;
     this.__widgets = new Map();

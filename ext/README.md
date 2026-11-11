@@ -29,8 +29,14 @@ ext/<ad>/
 │   ├── routes.php                 config/routes.php biçiminde rota dizisi döndürür
 │   ├── boot.php                   (isteğe bağlı) her istekte bir kez yüklenir — genel kanca kaydı için
 │   └── src/…                      AnkamonExt\<Ad>\… sınıfları (src/ altındaki yola göre yüklenir)
-└── worker/
-    └── tasks.py                   TASKS = [run(conn) tanımlayan modüller]
+├── worker/
+│   ├── tasks.py                   TASKS = [run(conn) tanımlayan modüller]
+│   ├── job_hooks.py               JOB_DONE / JOB_FINISHED = {hazır işlem id: fn}
+│   └── tools.json                 tahtalara taşınan dış araçlar
+├── actions/<id>/                  hazır işlemler (action.json + run.sh)
+├── db/migrations/*.sql            eklentinin tabloları (ext:<ad>:<dosya> olarak bir kez)
+├── features.php, feature_deps.php eklentinin yetkileri
+└── extension.json                 Ayarlar ▸ Eklentiler (başlık, açıklama, ayarlar)
 ```
 
 - **Arayüz:** derleme `frontend/`'i kütüphane olarak ekler (bkz. `frontend/ext-libs.js`).
@@ -47,6 +53,18 @@ ext/<ad>/
   bkz. arayüz `io.Api`) gibi hep genel adlıdır; kanca hiçbir eklentiyi adıyla anmaz.
 - **Worker:** `worker/tasks.py`'deki görevler çekirdek periyodik görevleriyle aynı turda çalışır.
   Eklentinin `worker/` dizini import yoluna eklenir.
+- **Hazır işlemler:** `actions/<id>/action.json` + `run.sh` (çekirdek actions/ ile aynı biçim; id'ler geneldir,
+  eklentiye özgü önek kullanın). `worker/job_hooks.py`: `JOB_DONE = {id: fn}` işlem 'ok' bitince,
+  `JOB_FINISHED = {id: fn}` betik tahtada bittiğinde (başarısız olsa da; fn'e sonuç da verilir) çağrılır —
+  büyük sonuçlar tahtadaki dosyadan okunup eklentinin tablosuna yazılır.
+- **Dış araçlar:** `worker/tools.json` — tek dosyalı araç (`repo`, `branch`, `file`, `remote_dir`) ya da
+  `"kind": "archive"` ile çok dosyalı araç (`sources: [{repo, ref: "release"|<dal>, include, dest?}]`): sunucu
+  günde en çok bir kez sürüm denetler, tahtaya yalnız değişince SFTP ile koyar (`action.json` `"tools"`).
+- **Yetkiler:** `features.php` (anahtar → açıklama) ve `feature_deps.php` (alt → üst) çekirdek kataloğuyla
+  birleşir; kullanıcılara Kullanıcılar penceresinden verilir. Rotada erişim düzeyi olarak kullanılır.
+- **Tahtalar sağ menüsü / araç çubuğu:** `ankamon.ext.Extensions.addBoardMenu({build, bar})` — madde grid
+  satırı ve ekran kutucuğu menüsüne eklenir; `bar` verilirse araç çubuğunda düğme olur (`mirror`: maddenin alt
+  menüsü düğmenin menüsüdür).
 
 Yeni bir eklenti noktası gerekirse çekirdeğe **genel** bir kanca eklenir. Kanca hiçbir eklentiyi
 adıyla anmaz.

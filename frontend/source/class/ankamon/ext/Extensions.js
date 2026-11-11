@@ -42,6 +42,8 @@
  *    bölümü gösterilmez (yalnız arayüz; API yönetici yetkisiyle yine erişilebilir).
  *  - "statusBar.usersVisible" (): alt çubuktaki oturum açmış kullanıcılar göstergesi (👤 + ipucu).
  *    Varsayılan gizli; işlendi ise (true) görünür.
+ * Kanca dışındaki eklenti noktaları: addMaintenanceTab (Bakım sekmesi), addBoardMenu (Tahtalar sağ menüsü
+ * maddesi ve isteğe bağlı araç çubuğu düğmesi).
  *
  * Bir eklentinin durumu değişip kanca yanıtları farklılaşınca changed() çağrılır (CHANGED mesajı): kancayı
  * sürekli gösterilen bir öğe için soran çekirdek bileşenleri (ör. alt çubuk) yanıtı yeniden değerlendirir.
@@ -57,6 +59,7 @@ qx.Class.define("ankamon.ext.Extensions", {
     __started: false,
     __enabled: {},          // {eklenti-adı: etkin mi} — start()'ta GET /extensions/active'ten
     __maintenanceTabs: [],  // eklentilerin Bakım sekmeleri (bkz. addMaintenanceTab)
+    __boardMenus: [],       // eklentilerin Tahtalar sağ menüsü maddeleri (bkz. addBoardMenu)
 
     /**
      * Oturum açıldığında BİR KEZ, Shell oluşturulmadan ÖNCE (bkz. ankamon.Application): önce eklentilerin
@@ -100,6 +103,38 @@ qx.Class.define("ankamon.ext.Extensions", {
     /** @return {Array} kayıtlı Bakım sekmesi tanımları ({key,label,feature,create}). */
     maintenanceTabs() {
       return this.__maintenanceTabs;
+    },
+
+    /**
+     * Bir eklenti Tahtalar sağ menüsüne (grid satırı ve ekran kutucuğu — ikisi de page.Boards.__rowMenu) madde
+     * ekler; araç çubuğu menüden türediği için madde çubukta da görünür (bkz. ui.boards.ActionBar). init() içinde
+     * yalnız eklenti etkinse çağrılmalı.
+     * @param spec {Map} {
+     *   build: (board, boards, user) → qx.ui.menu.Button|null — maddeyi kurar (BoardOps.menuButton ile; null: yok).
+     *     ActionBar yetkiyi sınamak için sentetik tahtayla da çağırır ({id: 0, online, label: ""}).
+     *   bar: {id, label, iconSvg|icon, mirror?, primary?, sep?, single?, hint?} — isteğe bağlı araç çubuğu düğmesi;
+     *     mirror maddenin etiketiyse düğmenin menüsü maddenin alt menüsünün aynısıdır.
+     * }
+     */
+    addBoardMenu(spec) {
+      this.__boardMenus.push(spec);
+    },
+
+    /** @return {Array} eklentilerin bu tahta(lar) için kurduğu sağ menü maddeleri (hata veren eklenti atlanır). */
+    boardMenuItems(board, boards, user) {
+      return this.__boardMenus.map(spec => {
+        try {
+          return spec.build(board, boards, user) || null;
+        } catch (e) {
+          qx.log.Logger.error(this, `Eklenti sağ menü maddesi kurulamadı: ${e}`);
+          return null;
+        }
+      }).filter(Boolean);
+    },
+
+    /** @return {Array} eklentilerin Tahtalar araç çubuğu grupları (bkz. addBoardMenu bar). */
+    boardBarGroups() {
+      return this.__boardMenus.filter(spec => spec.bar).map(spec => spec.bar);
     },
 
     /** @param name {String} kanca adı  @param handler {Function} true dönerse olay işlendi sayılır */

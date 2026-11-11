@@ -48,15 +48,19 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("ankamon.runner")
 
 
-def _load_job_done_hooks() -> dict:
-    """Eklentilerin iş-bitiş kancaları: ext/<ad>/worker/job_hooks.py içindeki JOB_DONE = {action_id: fn}.
-    fn(conn, board, user, password, job_id, events) — ilgili işlem 'ok' bitince çağrılır. Çekirdek hiçbir
-    eklentiyi adıyla bilmez; bir action id için kayıtlı callback varsa çalıştırır (ör. rapor okuyup yazma).
+def _load_job_done_hooks() -> tuple[dict, dict]:
+    """Eklentilerin iş-bitiş kancaları: ext/<ad>/worker/job_hooks.py içindeki
+    JOB_DONE = {action_id: fn}: fn(conn, board, user, password, job_id, events) — ilgili işlem 'ok' bitince;
+    JOB_FINISHED = {action_id: fn}: fn(conn, board, user, password, job_id, events, result) — betik tahtada
+    çalışıp bittiğinde ('ok' ya da 'failed'; bağlanılamayan tahtada çağrılmaz). Tahtadaki aracın kendi çıkış
+    kodunu taşıyan işlemler başarısızlıkta da sonuç dosyasını okuyabilsin diye. Çekirdek hiçbir eklentiyi
+    adıyla bilmez; bir action id için kayıtlı callback varsa çalıştırır (ör. rapor okuyup yazma).
     """
     import glob
     import importlib.util
     import sys
     hooks: dict = {}
+    finished: dict = {}
     for path in glob.glob("/opt/ankamon/ext/*/worker/job_hooks.py"):
         worker_dir = os.path.dirname(path)
         if worker_dir not in sys.path:
@@ -67,12 +71,13 @@ def _load_job_done_hooks() -> dict:
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
             hooks.update(getattr(mod, "JOB_DONE", {}) or {})
+            finished.update(getattr(mod, "JOB_FINISHED", {}) or {})
         except Exception:
             log.exception("eklenti iş-bitiş kancası yüklenemedi: %s", path)
-    return hooks
+    return hooks, finished
 
 
-_JOB_DONE_HOOKS = _load_job_done_hooks()
+_JOB_DONE_HOOKS, _JOB_FINISHED_HOOKS = _load_job_done_hooks()
 
 JOB_THREADS = int(os.environ.get("RUNNER_JOB_THREADS", "8"))  # aynı anda çalışan görev
 # Tahta iş parçacıklarının (her biri kendi bağlantısı, SSH süresince tutar) TÜM görevler toplamında aynı anda
@@ -221,6 +226,11 @@ def _run_job(job) -> None:
                                 if result["status"] == "ok" and action in _JOB_DONE_HOOKS:
                                     try:
                                         _JOB_DONE_HOOKS[action](wconn, t, user, password, job["id"], ev)
+                                    except Exception:
+                                        log.exception("işlem bitiş kancası hatası: %s", action)
+                                if result["status"] in ("ok", "failed") and action in _JOB_FINISHED_HOOKS:
+                                    try:
+                                        _JOB_FINISHED_HOOKS[action](wconn, t, user, password, job["id"], ev, result)
                                     except Exception:
                                         log.exception("işlem bitiş kancası hatası: %s", action)
                     except Exception as e:  # tek tahtanın beklenmedik hatası diğerlerini durdurmasın

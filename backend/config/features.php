@@ -8,7 +8,7 @@ declare(strict_types=1);
 
 // etapadmin'in kullanıcılara tek tek açıp kapatabildiği arayüz özellikleri.
 // Kullanıcı ve ayar yönetimi listede yoktur: yalnız yöneticiye açıktır.
-return [
+$ozellikKatalogu = [
     'dashboard' => 'Genel bakış',
     'boards' => 'Tahtaları görüntüleme',
     'boards.manage' => 'Tahta kayıtlarını ekleme, düzenleme ve silme',
@@ -48,3 +48,10 @@ return [
     'leagues.exclude' => 'Ligler ▸ Kullanım sıralaması / Ders arası sıralaması: görev gereği sürekli açık kalan tahtaları ve kullanıcıları sıralama dışı bırakma, listeyi düzenleme (herkesin sıralama görünümünü değiştirir, veri silinmez)',
     'sessions.hosts' => 'Oturumlar ▸ Kullanıcılar zaman çizelgesinde Tahtalar\'a kayıtlı olmayan bilgisayarın kayıtlarını silme (satırın sağ menüsü: oturumlar, açık/kapalı aralıkları, isteğe bağlı ham logları)',
 ];
+
+// Eklentilerin kendi yetkileri: ext/<ad>/features.php aynı biçimde dizi döndürür (çekirdek hiçbir eklentiyi adıyla
+// bilmez). Çekirdek anahtarı ezilemez; etkin olmayan eklentinin yetkisi de listelenir (yönetici önceden verebilsin).
+foreach (glob(\Ankamon\Core\Extensions::dir() . '/*/features.php') ?: [] as $eklentiDosyasi) {
+    $ozellikKatalogu += (array) require $eklentiDosyasi;
+}
+return $ozellikKatalogu;

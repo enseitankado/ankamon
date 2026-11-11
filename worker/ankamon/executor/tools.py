@@ -72,6 +72,9 @@ TOOLS = {
 
 # Eklentiler kendi dış araçlarını ext/<ad>/worker/tools.json ile ekleyebilir (çekirdek hiçbir eklentiyi
 # adıyla bilmez). Biçim: {"<araç-adı>": {title, repo, branch, file, remote_dir, check_every_run?}}.
+# Çok dosyalı araçlar için "kind": "archive" (bkz. _ensure_archive): {title, kind, remote_dir, sources: [
+#   {repo, ref: "release" | <dal>, include: [yollar], dest?: <alt dizin>}]} — kaynaklar tek arşivde birleşir,
+#   tahtada remote_dir bütünüyle (atomik) değiştirilir.
 def _load_ext_tools() -> None:
     import glob
     for path in glob.glob("/opt/ankamon/ext/*/worker/tools.json"):
@@ -98,6 +101,8 @@ class ToolError(RuntimeError):
 
 def remote_path(name: str) -> str:
     t = TOOLS[name]
+    if t.get("kind") == "archive":
+        return t["remote_dir"]
     return f"{t['remote_dir']}/{t['file']}"
 
 
@@ -148,6 +153,8 @@ def ensure(name: str, events) -> dict:
     Python sözdizimi denetlenip atomik olarak yerine konur. Hata olursa eldeki kopya kullanılır;
     hiç kopya yoksa ToolError."""
     tool = TOOLS[name]
+    if tool.get("kind") == "archive":
+        return _ensure_archive(name, events)
     os.makedirs(_local_dir(name), mode=0o755, exist_ok=True)
     local = os.path.join(_local_dir(name), tool["file"])
     state = _state(name)
@@ -211,6 +218,8 @@ def _write_version(name: str, state: dict) -> None:
 def upload(board: dict, user: str, password: str, name: str, local: dict, events, timeout: int = 60) -> None:
     """Aracı tahtaya kopyalar (yalnız gerekiyorsa). Hata olursa ToolError."""
     tool = TOOLS[name]
+    if tool.get("kind") == "archive":
+        return _upload_archive(board, user, password, name, local, events, timeout)
     dst = remote_path(name)
     target = f"{user}@{board['ip']}"
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
@@ -238,4 +247,168 @@ def upload(board: dict, user: str, password: str, name: str, local: dict, events
                        input=batch.encode(), capture_output=True, env=env, timeout=timeout)
     if r.returncode != 0:
         raise ToolError("SFTP kopyalama başarısız: " + (r.stderr.decode("utf-8", "replace").strip() or str(r.returncode)))
+    events.add("info", f"{tool['title']}: kopyalandı ({os.path.getsize(local['path']) // 1024} KB)")
+
+
+# --- Çok dosyalı araçlar ("kind": "archive") ------------------------------------------------------------
+# Örnek: bir eklentinin GUI'siz kullanılan sihirbazı (paket dizini + yardımcı araçlar). Kaynak başına sürüm
+# "release" ise son GitHub sürümünün etiketi, değilse dalın son commit'idir; günün ilk kullanımında (yerel
+# tarih) denetlenir, biri değişmişse bütün kaynaklar o sürümleriyle indirilip TEK arşivde birleştirilir.
+# Tahta her seferinde indirmez: tahtadaki kopyanın arşiv özeti (remote_dir/.ankamon-arsiv-sha256) aynıysa atlanır.
+
+_ARCHIVE_NAME = "arsiv.tar.gz"
+_ARCHIVE_MAX_BYTES = 64 << 20        # tek kaynak tarball'ının üst sınırı (yanlış depo/ref koruması)
+_ARCHIVE_MARK = ".ankamon-arsiv-sha256"
+
+
+def _arsiv_kaynak_surumu(src: dict) -> str:
+    """Kaynağın şu anki sürümü: "release" → son sürüm etiketi (ör. v0.1.100), dal → son commit (40 hane)."""
+    if src.get("ref", "release") == "release":
+        tag = json.loads(_api(f"/repos/{src['repo']}/releases/latest")).get("tag_name") or ""
+        if not tag:
+            raise ToolError(f"{src['repo']}: son sürüm etiketi okunamadı")
+        return tag
+    sha = _api(f"/repos/{src['repo']}/commits/{src['ref']}", "application/vnd.github.sha").decode().strip()
+    if len(sha) < 7:
+        raise ToolError(f"{src['repo']}: son commit okunamadı")
+    return sha
+
+
+def _arsiv_kaynagini_ac(src: dict, version: str, staging: str) -> int:
+    """Kaynağın tarball'ını (api.github.com → codeload yönlendirmesi) indirip yalnız `include` yollarını
+    staging/<dest>/ altına açar. Bağlantı, mutlak yol, '..' ve normal dosya/dizin dışı üye atlanır.
+    @return açılan dosya sayısı"""
+    import io
+    import tarfile
+    req = urllib.request.Request(f"https://api.github.com/repos/{src['repo']}/tarball/{version}",
+                                 headers={"Accept": "application/vnd.github+json", "User-Agent": "ankamon"})
+    with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT * 3, context=_ssl_context()) as r:
+        data = r.read(_ARCHIVE_MAX_BYTES + 1)
+    if len(data) > _ARCHIVE_MAX_BYTES:
+        raise ToolError(f"{src['repo']}: arşiv {_ARCHIVE_MAX_BYTES >> 20} MB sınırını aşıyor")
+    include = [p.strip("/") for p in src.get("include") or []]
+    dest_root = os.path.join(staging, (src.get("dest") or "").strip("/"))
+    count = 0
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
+        for member in tar.getmembers():
+            parts = member.name.split("/", 1)          # GitHub tarball'ı "<sahip>-<depo>-<sha>/" altında
+            if len(parts) < 2 or not parts[1]:
+                continue
+            rel = parts[1].rstrip("/")
+            pieces = rel.split("/")
+            if include and not any(rel == p or rel.startswith(p + "/") for p in include):
+                continue
+            if rel.startswith("/") or ".." in pieces or "__pycache__" in pieces:
+                continue
+            target = os.path.join(dest_root, rel)
+            if member.isdir():
+                os.makedirs(target, exist_ok=True)
+            elif member.isfile():
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with tar.extractfile(member) as fsrc, open(target, "wb") as fdst:
+                    fdst.write(fsrc.read())
+                os.chmod(target, 0o755 if member.mode & 0o111 else 0o644)
+                count += 1
+    if not count:
+        raise ToolError(f"{src['repo']}@{version}: arşivde istenen yollar yok ({', '.join(include) or 'tümü'})")
+    return count
+
+
+def _arsiv_etiketi(tool: dict, versions: dict) -> str:
+    """İnsanın okuyacağı sürüm: ilk kaynağın sürümü (+ diğerlerinin kısa commit'i)."""
+    labels = []
+    for src in tool["sources"]:
+        v = versions.get(src["repo"], "")
+        labels.append(v[:7] if len(v) == 40 else v)
+    return labels[0] + (f" (+{', '.join(labels[1:])})" if len(labels) > 1 else "")
+
+
+def _ensure_archive(name: str, events) -> dict:
+    """Çok dosyalı aracın sunucudaki arşivini hazırlar. Döner: {"path", "commit" (sürüm etiketi), "sha256",
+    "versions"}. Günde bir sürüm denetimi; hata olursa eldeki arşiv kullanılır, hiç yoksa ToolError."""
+    import shutil
+    import tarfile
+    import tempfile
+    tool = TOOLS[name]
+    base = _local_dir(name)
+    os.makedirs(base, mode=0o755, exist_ok=True)
+    local = os.path.join(base, _ARCHIVE_NAME)
+    state = _state(name)
+    today = _dt.date.today().isoformat()
+    have = os.path.exists(local) and state.get("sha256") == _sha256(local)
+
+    def result() -> dict:
+        return {"path": local, "commit": state["label"], "sha256": state["sha256"], "versions": state["versions"]}
+
+    if have and state.get("checked") == today and not tool.get("check_every_run"):
+        events.add("info", f"{tool['title']}: sunucudaki kopya kullanılıyor (sürüm {state['label']}, bugün denetlendi)")
+        events.flush()
+        return result()
+
+    events.add("info", f"{tool['title']}: günün ilk kullanımı — GitHub'da yeni sürüm denetleniyor…")
+    events.flush()
+    try:
+        versions = {src["repo"]: _arsiv_kaynak_surumu(src) for src in tool["sources"]}
+        if have and versions == state.get("versions"):
+            events.add("info", f"{tool['title']}: sunucudaki kopya güncel (sürüm {state['label']})")
+            state["checked"] = today
+        else:
+            staging = tempfile.mkdtemp(prefix=f"{name}.", dir=base)
+            try:
+                files = sum(_arsiv_kaynagini_ac(src, versions[src["repo"]], staging) for src in tool["sources"])
+                with open(os.path.join(staging, ".ankamon-surum.json"), "w", encoding="utf-8") as fh:
+                    json.dump(versions, fh, ensure_ascii=False)
+                with tarfile.open(local + ".tmp", "w:gz") as tar:
+                    for entry in sorted(os.listdir(staging)):
+                        tar.add(os.path.join(staging, entry), arcname=entry)
+                os.replace(local + ".tmp", local)
+            finally:
+                shutil.rmtree(staging, ignore_errors=True)
+            old = state.get("label")
+            state = {"versions": versions, "label": _arsiv_etiketi(tool, versions), "sha256": _sha256(local),
+                     "checked": today, "updated_at": _dt.datetime.now().isoformat(timespec="seconds")}
+            events.add("info", f"{tool['title']}: {'yeni sürüm indirildi' if old else 'indirildi'} — {state['label']}"
+                               f"{f' (önceki {old})' if old else ''}, {files} dosya, {os.path.getsize(local) // 1024} KB")
+        _save_state(name, state)
+    except Exception as e:  # ağ, TLS, API sınırı, bozuk arşiv…
+        if not have:
+            raise ToolError(f"{tool['title']} indirilemedi ve sunucuda kopyası yok: {e}") from e
+        events.add("err", f"{tool['title']}: sürüm denetlenemedi ({e}); sunucudaki kopya kullanılıyor "
+                          f"(sürüm {state['label']})")
+    events.flush()
+    return result()
+
+
+def _upload_archive(board: dict, user: str, password: str, name: str, local: dict, events, timeout: int) -> None:
+    """Arşivi tahtaya kopyalayıp remote_dir'i atomik olarak değiştirir (yalnız arşiv özeti farklıysa)."""
+    tool = TOOLS[name]
+    dst = tool["remote_dir"].rstrip("/")
+    target = f"{user}@{board['ip']}"
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
+
+    def ssh(command: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["sshpass", "-e", "ssh", "-T", *_SSH_OPTS, target, command],
+                              stdin=subprocess.DEVNULL, capture_output=True, env=env, timeout=timeout)
+
+    probe = ssh(f"cat {dst}/{_ARCHIVE_MARK} 2>/dev/null; true")
+    if probe.returncode != 0:
+        raise ToolError(f"tahtaya bağlanılamadı: {probe.stderr.decode('utf-8', 'replace').strip() or probe.returncode}")
+    if probe.stdout.decode().strip() == local["sha256"]:
+        events.add("info", f"{tool['title']}: tahtadaki kopya güncel ({dst}, sürüm {local['commit']}) — kopyalama atlandı")
+        return
+
+    events.add("info", f"{tool['title']}: SFTP ile kopyalanıyor → {dst} (sürüm {local['commit']})")
+    events.flush()
+    part = f"/var/tmp/ankamon-{name}.tar.gz.part"
+    r = subprocess.run(["sshpass", "-e", "sftp", "-q", "-o", "BatchMode=no", *_SSH_OPTS, "-b", "-", target],
+                       input=f"put {local['path']} {part}\n".encode(), capture_output=True, env=env, timeout=timeout)
+    if r.returncode != 0:
+        raise ToolError("SFTP kopyalama başarısız: " + (r.stderr.decode("utf-8", "replace").strip() or str(r.returncode)))
+    # Yeni dizine açılır, sonra eskisiyle yer değiştirir: yarım kopya hiçbir zaman çalıştırılmaz.
+    swap = (f'set -e; d={dst}; t={part}; rm -rf "$d.new" "$d.old"; mkdir -p "$d.new"; '
+            f'tar -xzf "$t" -C "$d.new" --no-same-owner; echo {local["sha256"]} > "$d.new/{_ARCHIVE_MARK}"; '
+            f'if [ -d "$d" ]; then mv "$d" "$d.old"; fi; mv "$d.new" "$d"; rm -rf "$d.old" "$t"')
+    r = ssh(swap)
+    if r.returncode != 0:
+        raise ToolError("arşiv tahtada açılamadı: " + (r.stderr.decode("utf-8", "replace").strip() or str(r.returncode)))
     events.add("info", f"{tool['title']}: kopyalandı ({os.path.getsize(local['path']) // 1024} KB)")

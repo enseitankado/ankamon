@@ -1468,6 +1468,14 @@ qx.Class.define("ankamon.page.Boards", {
       const menu = ankamon.ui.BoardOps.menu(board, this._user, boards, sessionOps) || new qx.ui.menu.Menu();
       const ICON = ankamon.ui.Shell.ICON;
       const add = (icon, label, handler) => menu.add(ankamon.ui.BoardOps.menuButton(icon, label, handler.bind(this)));
+      // Eklentilerin maddeleri (bkz. ankamon.ext.Extensions.addBoardMenu): ortak işlemlerin ardında, kendi bölümünde.
+      const own = ankamon.ext.Extensions.boardMenuItems(board, boards, this._user);
+      if (own.length) {
+        if (menu.getChildren().length) {
+          menu.add(new qx.ui.menu.Separator());
+        }
+        own.forEach(item => menu.add(item));
+      }
       // Logları göster + Bilgi kartı: ortak (bkz. BoardOps.logsAndInfo — Bakım ▸ Ahenk sağ menüsü de kullanır).
       const extra = ankamon.ui.BoardOps.logsAndInfo(board, this._user, boards).map(item => () => menu.add(item));
       // Bilgisayarı aç (WoL) artık BoardOps.menu'de "Bilgisayarı kapat"ın hemen yanında (kullanıcı
