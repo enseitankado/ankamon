@@ -34,6 +34,49 @@ qx.Class.define("ankamon.page.Base", {
   type: "abstract",
 
   statics: {
+    /**
+     * Hücre ipuçları (kullanıcı isteği 2026-11-12: Varlıklar ve ondan beslenen grid'ler): sütun tanımındaki
+     * cellHint — metin ya da (rowData, value) → metin|null — o sütunun her hücresine title olarak yazılır
+     * (ui.ToolTipPolicy gösterir). Hücrenin görevi ve verinin nereden geldiği sade dille anlatılır. Sütunun mevcut
+     * çizicisi korunur (durum rengi, tür ikonu…): yalnız _getCellAttributes'ı sarılır; çizicinin kendi ipucu
+     * (ör. "Son görülme: …") varsa açıklama onun altına eklenir. Özel çizici bu çağrıdan SONRA atanırsa yeniden çağrılmalı.
+     * @param table {qx.ui.table.Table} @param columns {Array} [{id, cellHint?}] — modelde id'leriyle bulunur
+     */
+    setCellHints(table, columns) {
+      const model = table.getTableModel();
+      const columnModel = table.getTableColumnModel();
+      const esc = text => qx.bom.String.escape(text).replace(/"/g, "&quot;");
+      columns.filter(column => column.cellHint).forEach(column => {
+        const col = model.getColumnIndexById(column.id);
+        let renderer = col == null ? null : columnModel.getDataCellRenderer(col);
+        if (renderer && renderer.constructor === qx.ui.table.cellrenderer.Default) {
+          // qx bütün düz sütunlara TEK bir Default çizici verir (columnmodel.Basic) — sütuna özel ipucu için ayrı örnek.
+          renderer = new qx.ui.table.cellrenderer.Default();
+          columnModel.setDataCellRenderer(col, renderer);
+        }
+        if (!renderer || renderer.__ankamonCellHint) {
+          return;
+        }
+        renderer.__ankamonCellHint = true;
+        const own = renderer._getCellAttributes.bind(renderer);
+        renderer._getCellAttributes = info => {
+          const attrs = own(info) || "";
+          const hint = typeof column.cellHint === "function" ? column.cellHint(info.rowData || [], info.value) : column.cellHint;
+          if (!hint) {
+            return attrs;
+          }
+          const m = /title="([^"]*)"/.exec(attrs);
+          if (!m) {
+            return `${attrs} title="${esc(hint)}"`;
+          }
+          return attrs.replace(m[0], `title="${m[1]}&#10;&#10;${esc(hint)}"`);
+        };
+      });
+    },
+
+    /** Sütun menüsünde başlık yerine yazılacak hint'in en çok uzunluğu (daha uzunu açıklama cümlesidir). */
+    MENU_HINT_MAX: 40,
+
     // Sayfanın sekmesi değişti ({page, tab}) — ui.Shell ağaçtaki sekme yaprağını vurgular.
     TAB_CHANGED: "ankamon.tabChanged",
 
@@ -725,12 +768,14 @@ qx.Class.define("ankamon.page.Base", {
       table.addListener("columnVisibilityMenuCreateEnd", e => {
         const menu = e.getData().menu;
         const children = menu.getChildren();
-        // Kısa başlıklı sütunlar menüde tam adlarıyla ("hint") görünür. Menü sırası Table'ınkiyle
-        // aynı: i. düğme = getOverallColumnAtX(i).
+        // Kısa başlıklı sütunlar menüde tam adlarıyla görünür: menuLabel, yoksa KISA hint (ör. "Disk" → "Disk sıcaklığı").
+        // Uzun hint açıklamadır (cümle) — menüye yazılırsa satır ekranı aşar (Akıllı Tahtalar: Durum/Yönetilebilir,
+        // 2026-11-12); o sütun menüde kendi başlığıyla kalır. Menü sırası Table'ınkiyle aynı: i. düğme = getOverallColumnAtX(i).
         children.forEach((button, i) => {
           const column = columns[columnModel.getOverallColumnAtX(i) - offset];
-          if (column && column.hint && button.setLabel) {
-            button.setLabel(column.hint);
+          const full = column && (column.menuLabel || (column.hint && column.hint.length <= ankamon.page.Base.MENU_HINT_MAX ? column.hint : null));
+          if (full && button.setLabel) {
+            button.setLabel(full);
           }
         });
         for (let i = offset - 1; i >= 0; i--) {

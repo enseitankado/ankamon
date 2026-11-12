@@ -28,7 +28,8 @@
 /**
  * Disk kullanımı sayfasının (bkz. page.DiskUsage, ui.DiskUsage) tek bir veri sekmesi: bir veri türünün kapsamlarını
  * (tahta, görev, "tümü"…) kayıt sayısı ve YAKLAŞIK boyutuyla listeler; Ctrl/Shift ile tekli ya da
- * çoklu seçilen kapsamları sağ menüden veya "Seçilenleri sil" düğmesinden KALICI olarak siler.
+ * çoklu seçilen kapsamları sağ menüden veya "Seçilenleri sil" düğmesinden KALICI olarak siler ya da "İndir" ile
+ * dosya olarak indirir (satırın scope'u silme ve indirme isteğinde aynıdır — bkz. backend StorageExportApi).
  * Türün kendine özgü kısmı (sütunlar, yükleme, silme isteği) `spec` ile verilir:
  *
  *   label    {String}   sekme başlığı
@@ -63,6 +64,16 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
     const refresh = new qx.ui.form.Button("Tazele");
     refresh.addListener("execute", () => this.load());
     bar.add(refresh);
+    // İndir (kullanıcı isteği 2026-11-12): seçili kapsamların verisi dosya olarak — silmeyle aynı kapsam (bkz. backend
+    // StorageExportApi). Sekme tanımında mode yoksa (eklenti sekmesi vb.) düğme konmaz.
+    if (spec.mode && spec.download !== false) {
+      this.__downloadBtn = new qx.ui.form.Button(`${ankamon.ui.Shell.ICON.backup} Seçilenleri indir`).set({
+        enabled: false, toolTipText: "Seçili satırların verisini bilgisayarınıza indirir (loglar/ölçümler gzip'li CSV, görevler NDJSON, " +
+          "ekran görüntüleri tar, yedekler kendi dosyası)"
+      });
+      this.__downloadBtn.addListener("execute", () => this.__downloadMany(this.__selected()));
+      bar.add(this.__downloadBtn);
+    }
     this.__deleteBtn = new qx.ui.form.Button(`${ankamon.ui.Shell.ICON.delete} Seçilenleri kalıcı sil`).set({ enabled: false });
     this.__deleteBtn.addListener("execute", () => this.__deleteMany(this.__selected()));
     bar.add(this.__deleteBtn);
@@ -96,8 +107,41 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
     this.addListenerOnce("appear", () => this.load());
   },
 
+  statics: {
+    /**
+     * url'yi gizli bir iframe'de açar: sunucu dosyayı ek (attachment) olarak verirse tarayıcı indirir, sayfa değişmez.
+     * Hata yanıtı (JSON) iframe'e yüklenir — okunup kullanıcıya gösterilir. iframe bir süre sonra kaldırılır.
+     */
+    download(url, name) {
+      const frame = document.createElement("iframe");
+      frame.style.display = "none";
+      frame.addEventListener("load", () => {
+        let text = "";
+        try {
+          text = frame.contentDocument && frame.contentDocument.body ? frame.contentDocument.body.textContent : "";
+        } catch (e) {
+          text = "";
+        }
+        if (text) {
+          let message = text;
+          try {
+            message = JSON.parse(text).error || text;
+          } catch (e) {
+            // düz metin
+          }
+          ankamon.ui.Dialog.error(new Error(`${name || "İndirme"}: ${message}`));
+        }
+      });
+      frame.src = url;
+      document.body.appendChild(frame);
+      // Uzun hazırlanan indirmeler (yedek arşivi) için geniş süre; indirme başladıktan sonra iframe'in kalkması onu kesmez.
+      setTimeout(() => frame.remove(), 10 * 60 * 1000);
+    }
+  },
+
   members: {
     __spec: null,
+    __downloadBtn: null,
 
     /** Sekmenin tanımı (page.DiskUsage.openWith sekmeyi spec.mode ile bulur). */
     getSpec() {
@@ -155,6 +199,11 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
     },
 
     __updateButton() {
+      if (this.__downloadBtn) {
+        const d = this.__downloadable(this.__selected()).length;
+        this.__downloadBtn.setEnabled(d > 0);
+        this.__downloadBtn.setLabel(`${ankamon.ui.Shell.ICON.backup} Seçilenleri indir` + (d > 0 ? ` (${d})` : ""));
+      }
       const n = this.__selected().filter(r => r.deletable && r.n > 0).length;
       this.__deleteBtn.setEnabled(n > 0);
       this.__deleteBtn.setLabel(`${ankamon.ui.Shell.ICON.delete} Seçilenleri kalıcı sil` + (n > 0 ? ` (${n})` : ""));
@@ -180,8 +229,40 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
         (selected.length > 1 ? ` (${selected.length})` : ""));
       del.setEnabled(selected.some(r => r.deletable && r.n > 0));
       del.addListener("execute", () => this.__deleteMany(selected));
+      if (this.__downloadBtn) {
+        const n = this.__downloadable(selected).length;
+        const down = new qx.ui.menu.Button(`${ankamon.ui.Shell.ICON.backup} İndir` + (n > 1 ? ` (${n})` : ""));
+        down.setEnabled(n > 0);
+        down.addListener("execute", () => this.__downloadMany(selected));
+        menu.add(down);
+      }
       menu.add(del);
       this.__table.setContextMenu(menu);
+    },
+
+    /**
+     * İndirilebilir satırlar: kapsamı (scope) olan ve boş olmayanlar; "tümü" seçiliyse yalnız o, grup satırı seçiliyse
+     * o grubun tek tek satırları ayrıca indirilmez (silmeyle aynı kural — bkz. __deleteMany).
+     */
+    __downloadable(selected) {
+      const candidates = selected.filter(r => r.scope && r.n > 0);
+      const all = candidates.find(r => r.all);
+      const groups = new Set(candidates.filter(r => r.groupAll).map(r => r.groupAll));
+      return all ? [all] : candidates.filter(r => r.groupAll || !groups.has(r.group));
+    },
+
+    /** Seçili kapsamları birer dosya olarak indirir (tarayıcının indirme listesine düşer). */
+    __downloadMany(selected) {
+      const rows = this.__downloadable(selected);
+      rows.forEach((row, i) => {
+        const url = "/api/storage/export?" + new URLSearchParams(Object.assign({ mode: this.__spec.mode }, row.scope)).toString();
+        // Tarayıcılar art arda tetiklenen indirmeleri engelleyebilir: aralıklı.
+        qx.event.Timer.once(() => ankamon.ui.DiskUsageTab.download(url, row.name), this, i * 800);
+      });
+      if (rows.length) {
+        this.__status.setValue(`İndirme başlatıldı: ${qx.bom.String.escape(rows.map(r => r.name).join(", "))} ` +
+          "<span style='opacity:.7'>(büyük veride hazırlanması birkaç dakika sürebilir)</span>");
+      }
     },
 
     /**

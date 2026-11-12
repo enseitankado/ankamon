@@ -96,9 +96,22 @@ qx.Class.define("ankamon.ui.Shell", {
     } catch (e) {
       // sessionStorage erişilemiyor — ilk sayfaya düş.
     }
+    // Tarayıcı yenilenince (F5) en son açık sayfa/sekmeye dönülür (kullanıcı isteği 2026-11-12): ağaçta her seçim
+    // sessionStorage'a yazılır (bkz. __rememberNav) — sekmeye özel, sekme kapanınca unutulur.
+    let lastNav = null;
+    if (!reopen) {
+      try {
+        lastNav = JSON.parse(sessionStorage.getItem(ankamon.ui.Shell.LAST_NAV_KEY) || "null");
+      } catch (e) {
+        lastNav = null;
+      }
+    }
     const reopenPage = reopen && ankamon.ui.Shell.PAGES.find(p => p.id === reopen);
+    const lastPage = lastNav && lastNav.page && ankamon.ui.Shell.PAGES.find(p => p.id === lastNav.page);
     if (reopenPage && this.__allowed(reopenPage)) {
       this.__openPage({ page: reopen });
+    } else if (lastPage && this.__allowed(lastPage)) {
+      this.__openPage(lastNav);
     } else {
       const first = this.__nodes[0];
       if (first) {
@@ -154,6 +167,8 @@ qx.Class.define("ankamon.ui.Shell", {
 
     /** sessionStorage anahtarı: yeniden yüklemeden sonra açılacak sayfanın kimliği (bkz. construct). */
     REOPEN_KEY: "ankamon.reopenPage",
+    /** sessionStorage anahtarı: ağaçta en son seçilen düğüm {page, tab?, group?} — tarayıcı yenilenince açılır. */
+    LAST_NAV_KEY: "ankamon.lastNav",
 
     // Sol menü genişliği (piksel): varsayılan ve kayıtlı değerin uygulanacağı sınırlar.
     NAV_DEFAULT: 250,
@@ -165,7 +180,7 @@ qx.Class.define("ankamon.ui.Shell", {
       dashboard: "◈", boards: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
       info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", bulk: "⇄", wakeScreen: "☀", sleepScreen: "☾", screenLock: "🔐", screenUnlock: "🔓", cast: "⇪", logout: "⏏", lock: "🔒", password: "🔑", diagnose: "⚕", system: "⚒", diskusage: "⛁", software: "⬢",
-      network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "♥", leagues: "♛",
+      network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "✚", leagues: "♛",
       screenshot: "📷", keyboard: "⌨", mouse: "🖱", touch: "☝", unlockInput: "🔓", relay: "⇶", relayStop: "⏹", chat: "💬", web: "🌐", webFilter: "🛡", wifi: "📶", movements: "☰"
     },
 
@@ -249,6 +264,9 @@ qx.Class.define("ankamon.ui.Shell", {
       // Sistem'in alt seçenekleri simgesiz (kullanıcı isteği 2026-11-10: noIcon).
       { id: "diskusage", label: "Disk kullanımı", feature: "logs.manage", parent: "system", retap: true, noIcon: true, create: u => new ankamon.page.DiskUsage(u),
         tabs: () => [{ key: "summary", label: "Özet" }].concat(ankamon.ui.DiskUsage.specs().map(spec => ({ key: spec.mode, label: spec.label }))) },
+      // Yedekler (kullanıcı isteği 2026-11-12): bütün yedeklemelerin kontrol paneli — plan, son sonuç, Şimdi al, veri
+      // depolarının yedek kapsamı (bkz. page.Backups). Dosyaların kendisi Disk kullanımı ▸ Yedekler'de.
+      { id: "backups", label: "Yedekler", admin: true, parent: "system", retap: true, noIcon: true, create: u => new ankamon.page.Backups(u) },
       // Konteynerdeki kritik yazılımlar: sürüm, durum, Ankamon'daki işlevi (yalnız yönetici).
       { id: "software", label: "Yazılımlar", admin: true, parent: "system", retap: true, noIcon: true, create: u => new ankamon.page.Software(u) },
       // Kullanıcılar ▸ Kullanıcılar (yalnız yönetici) + Oturumlar ('logins'): features yöneticide her zaman
@@ -396,6 +414,8 @@ qx.Class.define("ankamon.ui.Shell", {
       }
       this.__tree.getContentElement().addClass("ankamon-nav-tree");
 
+      // Seçili düğüm (sayfa + sekme/grup) sekme oturumunda saklanır: tarayıcı yenilenince oraya dönülür (bkz. construct).
+      this.__tree.addListener("changeSelection", e => this.__rememberNav(e.getData()[0]));
       this.__tree.addListener("changeSelection", e => {
         const item = e.getData()[0];
         if (this.__silentTree || !item || !item.getUserData("page")) {
@@ -871,6 +891,26 @@ qx.Class.define("ankamon.ui.Shell", {
         widget.openWith(data);
       } else if (data.tab) {
         widget.selectTab(data.tab);
+      }
+    },
+
+    /** Ağaçta seçilen düğümü LAST_NAV_KEY'e yazar: {page, tab?, group?} (kip/ara grup düğümleri sayfaya düşer). */
+    __rememberNav(item) {
+      const page = item && item.getUserData("page");
+      if (!page) {
+        return;
+      }
+      const nav = { page: page.id };
+      if (item.getUserData("tab") && !item.getUserData("group")) {
+        nav.tab = item.getUserData("tab");
+      }
+      if (item.getUserData("assetGroup")) {
+        nav.group = item.getUserData("assetGroup");
+      }
+      try {
+        sessionStorage.setItem(ankamon.ui.Shell.LAST_NAV_KEY, JSON.stringify(nav));
+      } catch (e) {
+        // sessionStorage erişilemiyor: yenilemede ilk sayfa açılır.
       }
     },
 

@@ -15,7 +15,7 @@ SUMMARY=/run/ankamon/backups.json
     printf '{"updated":%s,"dir":"%s","keep_full":%s,"keep_config":%s,"full_at":"%s","config_every_hours":%s,"files":[' \
         "$(date +%s)" "$DIR" "${BACKUP_KEEP_FULL:-0}" "${BACKUP_KEEP_CONFIG:-0}" "${BACKUP_FULL_AT:-}" "${BACKUP_CONFIG_EVERY_HOURS:-0}"
     sep=""
-    for f in "$DIR"/*.dump; do
+    for f in "$DIR"/*.dump "$DIR"/*.tar.gz; do
         [ -f "$f" ] || continue
         set -- $(stat -c '%s %Y' "$f")
         printf '%s{"name":"%s","bytes":%s,"mtime":%s}' "$sep" "$(basename "$f")" "$1" "$2"

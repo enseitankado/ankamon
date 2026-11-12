@@ -147,12 +147,18 @@ return [
     ['DELETE', '/api/storage/ntfy',      [Api\NtfyApi::class, 'deleteMessages'], 'logs.manage'],
     ['GET',    '/api/storage/backups',   [Api\BackupStatsApi::class, 'stats'], 'logs.manage'],
     ['DELETE', '/api/storage/backups',   [Api\BackupStatsApi::class, 'delete'], 'logs.manage'],
+    // Disk kullanımı ▸ İndir: satırın kapsamındaki veri (silmeyle aynı kapsam parametreleri; bkz. StorageExportApi).
+    ['GET',    '/api/storage/export',    [Api\StorageExportApi::class, 'export'], 'logs.manage'],
     ['GET',    '/api/storage/policy',    [Api\StoragePolicyApi::class, 'policy'], 'logs.manage'],
     ['GET',    '/api/storage/logqueue',  [Api\LogQueueStatsApi::class, 'stats'], 'logs.manage'],
     ['DELETE', '/api/storage/logqueue',  [Api\LogQueueStatsApi::class, 'delete'], 'logs.manage'],
     ['GET',    '/api/activity',          [Api\ActivityApi::class, 'index'],    'user'],
     ['GET',    '/api/system/stats',      [Api\SystemApi::class, 'stats'],      'user'],
     // Sistem sayfası (yalnız yönetici): servisler, zamanlanmış işler, veritabanı, yapılandırma.
+    // Sistem ▸ Yedekler: yedekleme planı, son sonuçlar, Şimdi al, veri depoları (bkz. BackupsApi).
+    ['GET',    '/api/backups',           [Api\BackupsApi::class, 'index'],      'admin'],
+    ['PUT',    '/api/backups/policy',    [Api\BackupsApi::class, 'update'],     'admin'],
+    ['POST',   '/api/backups/run',       [Api\BackupsApi::class, 'run'],        'admin'],
     ['GET',    '/api/system/overview',   [Api\SystemInfoApi::class, 'overview'], 'admin'],
     ['GET',    '/api/system/services',   [Api\ServicesApi::class, 'index'],     'admin'],
     ['POST',   '/api/system/services',   [Api\ServicesApi::class, 'control'],   'admin'],

@@ -142,6 +142,12 @@ final class NetworkApi
             $device['discoveries'] = json_decode((string) $device['discoveries'], true) ?: [];
         }
         unset($device);
+        // Sensörler sütunu: bağlı tahta kaydına son 24 saatte sensör verisi geldi mi (bkz. Core\BoardSensors::lastSeenAll).
+        $sensors = \Ankamon\Core\BoardSensors::lastSeenAll();
+        foreach ($devices as &$device) {
+            $device['sensors_at'] = $device['board_id'] !== null ? ($sensors[(int) $device['board_id']] ?? null) : null;
+        }
+        unset($device);
         // ETAP faz bilgisi (bkz. migration 018, worker netscan/etap_phase.py); yoksa null.
         $devices = array_map(static fn(array $d) => ['etap' => $d['etap'] === null ? null : json_decode((string) $d['etap'], true)] + $d, $devices);
         return ['devices' => $devices] + $state;

@@ -150,12 +150,8 @@ final class SystemInfoApi
             'policies' => $policies,
             'backup' => $backup === null ? null : [
                 'updated' => (int) ($backup['updated'] ?? 0) * 1000,
-                'config_every_hours' => (int) ($backup['config_every_hours'] ?? 0),
-                'full_at' => $backup['full_at'] ?? null,
-                'keep_config' => (int) ($backup['keep_config'] ?? 0),
-                'keep_full' => (int) ($backup['keep_full'] ?? 0),
                 'latest' => $latest,
-            ],
+            ] + \Ankamon\Core\BackupPolicy::summaryFields(), // plan Sistem ▸ Yedekler'den (settings.backup_policy)
             'cursors' => Db::all(
                 "SELECT name, (extract(epoch FROM value) * 1000)::bigint AS value,
                         (extract(epoch FROM updated_at) * 1000)::bigint AS updated_at

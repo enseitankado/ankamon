@@ -46,8 +46,8 @@ use Ankamon\Core\Storage;
 final class BackupStatsApi
 {
     private const SUMMARY = '/run/ankamon/backups.json';
-    private const NAME = '/^(config|full|grafana)-[0-9]{8}-[0-9]{6}\.dump$/';
-    private const KINDS = ['full', 'config', 'grafana'];
+    public const NAME = '/^(config|full|grafana|files)-[0-9]{8}-[0-9]{6}\.(dump|tar\.gz)$/';
+    public const KINDS = ['full', 'config', 'grafana', 'files'];
 
     public function stats(Request $request): array
     {
@@ -58,7 +58,7 @@ final class BackupStatsApi
         }
         $files = array_map(fn(array $f) => [
             'name' => (string) $f['name'],
-            'kind' => strtok((string) $f['name'], '-'), // full | config | grafana
+            'kind' => strtok((string) $f['name'], '-'), // full | config | grafana | files
             'bytes' => (int) $f['bytes'],
             'mtime' => (int) $f['mtime'] * 1000,
         ], $data['files']);
@@ -67,10 +67,8 @@ final class BackupStatsApi
             'files' => $files,
             'total' => ['n' => count($files), 'bytes' => array_sum(array_column($files, 'bytes'))],
             'dir' => $data['dir'] ?? '/data/backups',
-            'keep_full' => (int) ($data['keep_full'] ?? 0),
-            'keep_config' => (int) ($data['keep_config'] ?? 0),
             'disk' => Storage::diskSpace(),
-        ];
+        ] + \Ankamon\Core\BackupPolicy::summaryFields(); // saklama sayıları Sistem ▸ Yedekler planından
     }
 
     /**

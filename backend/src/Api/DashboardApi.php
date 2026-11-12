@@ -159,12 +159,8 @@ final class DashboardApi
             'bytes' => $total,
             'kinds' => $byKind,
             'latest' => $latest,
-            'keep_full' => (int) ($data['keep_full'] ?? 0),
-            'keep_config' => (int) ($data['keep_config'] ?? 0),
-            'full_at' => $data['full_at'] ?? null,
-            'config_every_hours' => (int) ($data['config_every_hours'] ?? 0),
             'updated' => (int) ($data['updated'] ?? 0),
-        ];
+        ] + \Ankamon\Core\BackupPolicy::summaryFields(); // plan Sistem ▸ Yedekler'den (settings.backup_policy)
     }
 
     private const BACKUP_SUMMARY = '/run/ankamon/backups.json';

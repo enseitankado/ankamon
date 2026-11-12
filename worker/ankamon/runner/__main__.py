@@ -457,9 +457,10 @@ def _run_job(job) -> None:
             user, password = _board_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
-            removed = backup.cleanup()
+            keep = backup.keep_hours(conn)
+            removed = backup.cleanup(keep_job=keep)
             if removed:
-                general.add("info", f"{removed} eski yedek dizini silindi ({backup.KEEP_HOURS} saatten eski).")
+                general.add("info", f"{removed} eski yedek dizini silindi ({keep} saatten eski).")
             for t in targets:
                 ev = stream.Events(conn, job["id"], t["board_id"])
                 try:
@@ -476,7 +477,7 @@ def _run_job(job) -> None:
             user, password = _board_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
-            backup.cleanup()
+            backup.cleanup(keep_job=backup.keep_hours(conn))
             try:
                 row = conn.execute("SELECT is_admin FROM users WHERE username = %s", (job["username"],)).fetchone()
                 archive, meta = home_restore.prepare_home_restore(

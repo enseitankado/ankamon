@@ -57,6 +57,34 @@ final class BoardSensors
         WHEN name LIKE 'smartmon_%' OR name LIKE 'nvme_%' THEN 'disk_temp'
     END";
 
+    /** Sensörler sütununun penceresi: bu süre içinde sensör verisi gelen cihaz "Var" sayılır. */
+    public const SEEN_WINDOW = '24 hours';
+
+    /**
+     * Son SEEN_WINDOW içinde sensör (metrik izleme / node_exporter → Telegraf) verisi gelen cihazlar ve son geliş anı:
+     * [board_id => epoch]. Varlıklar ve Akıllı Tahtalar'ın "Sensörler" sütunu (kullanıcı isteği 2026-11-12). Her
+     * cihazda tek seri olan node_boot_time_seconds bakılır: saatlik özet (metrics_1h, ~30 ms) + özetin henüz
+     * kapsamadığı son 10 dakikanın ham verisi. Ham tabloda 24 saatlik tarama sıkıştırılmış parçalar yüzünden ~8 sn sürüyordu.
+     */
+    public static function lastSeenAll(): array
+    {
+        $rows = Db::all(
+            "SELECT board_id, extract(epoch FROM max(t))::bigint AS at FROM (
+                 SELECT g.board_id, m.time + interval '1 hour' AS t FROM metrics_1h m JOIN metrics_tag g USING (tag_id)
+                 WHERE g.name = 'node_boot_time_seconds' AND m.time > now() - interval '" . self::SEEN_WINDOW . "'
+                 UNION ALL
+                 SELECT g.board_id, m.time FROM metrics m JOIN metrics_tag g USING (tag_id)
+                 WHERE g.name = 'node_boot_time_seconds' AND m.time > now() - interval '10 minutes'
+             ) x WHERE board_id ~ '^[0-9]+$' GROUP BY board_id"
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            // Saatlik özetin dilimi bitişiyle sayılır; şimdiden ileri olamaz.
+            $out[(int) $row['board_id']] = min(time(), (int) $row['at']);
+        }
+        return $out;
+    }
+
     /** Tüm tahtaların son 5 dakikadaki değerleri: [board_id => [key => değer]]. */
     public static function latestAll(): array
     {

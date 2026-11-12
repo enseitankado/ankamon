@@ -588,13 +588,15 @@ qx.Class.define("ankamon.page.Dashboard", {
           }
           const kind = (k, what, lastRow) => {
             const g = b.kinds[k] || { files: 0, bytes: 0 };
-            return `${lastRow ? "└" : "├"}── ${(k + "-*.dump").padEnd(15)} ${String(g.files).padStart(3)} dosya · ` +
+            return `${lastRow ? "└" : "├"}── ${(k + (k === "files" ? "-*.tar.gz" : "-*.dump")).padEnd(15)} ${String(g.files).padStart(3)} dosya · ` +
               `${F.bytes(g.bytes).padStart(9)}  ${muted(what)}\n`;
           };
           body = `<b>data/backups</b>: toplam <b>${F.bytes(b.bytes)}</b> · ${n(b.files)} dosya` +
             pre(kind("full", `tam yedek (loglar + sensör dahil) · günde 1 (${esc(b.full_at)}), son ${b.keep_full} tutulur`) +
               kind("config", `ayarlar/kullanıcılar/tahtalar · ${b.config_every_hours} saatte 1, son ${b.keep_config} tutulur`) +
-              kind("grafana", "Grafana pano ayarları · config ile birlikte", true)) +
+              kind("grafana", "Grafana pano ayarları · config ile birlikte") +
+              kind("files", `/data dosya depoları (tar.gz) · günde 1 (${esc(b.files_at || "")}), son ${b.keep_files} tutulur`, true)) +
+            muted("Plan: Sistem ▸ Yedekler") + "<br>" +
             (b.latest.full
               ? `Son tam yedek: ${esc(b.latest.full.name)} — ${F.bytes(b.latest.full.bytes)}, ` +
                 `${esc(F.dateTime(b.latest.full.mtime * 1000))}<br>`

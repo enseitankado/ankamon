@@ -110,6 +110,8 @@ qx.Class.define("ankamon.page.Boards", {
       { id: "disk_temp", label: "Disk", hint: "Disk sıcaklığı", width: 100 },
       { id: "fan_rpm", label: "Fan", hint: "Fan devri", width: 90 },
       { id: "battery_v", label: "CMOS pili", width: 80 },
+      // Son 24 saatte sensör verisi geldi mi — Var/Yok (Varlıklar'la aynı ölçüt; backend Core\BoardSensors::lastSeenAll).
+      { id: "sensors", label: "Sensörler", hint: "Sensör verisi geliyor mu (son 24 saat)", width: 90, choices: true },
       { id: "seen", label: "Son görülme", width: 120 },
       { id: "log", label: "Son log", width: 120 }
     ];
@@ -125,6 +127,15 @@ qx.Class.define("ankamon.page.Boards", {
     // "Oturum" sütunu: ekran kilitliyse "(kilitli)" ifadesi kırmızı+kalın (bkz. ui.table.SessionRenderer).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "session"),
       new ankamon.ui.table.SessionRenderer());
+    // Hücre ipuçları: sütunun görevi ve verinin kaynağı (kullanıcı isteği 2026-11-12; bkz. ui.network.AssetCellHints).
+    // Özel çiziciler (Durum, Oturum) atandıktan SONRA: onların kendi ipucu açıklamanın üstünde kalır.
+    ankamon.ui.network.AssetCellHints.apply(this.__columns, ankamon.ui.network.AssetCellHints.BOARDS, {
+      sensors: row => {
+        const board = this.__boards && this.__boards.get(row[0]);
+        return board && board.sensors_at ? "Son sensör verisi: " + ankamon.util.Format.ago(board.sensors_at) : null;
+      }
+    });
+    ankamon.page.Base.setCellHints(this.__table, this.__columns);
     // İşaretler Ekranlar kutucuklarına yansır — bkz. __updateActionState.
     this.__table.getTableModel().addListener("dataChanged", this.__updateActionState, this);
     // Ekranlar kutucukları listenin O ANKİ satır sırasıyla dizilir (sütun başlığıyla sıralama dahil) — bkz. __syncShownOrder.
@@ -454,6 +465,7 @@ qx.Class.define("ankamon.page.Boards", {
             mbit(m.net_rx_mbit), mbit(m.net_tx_mbit),
             unit(m.cpu_temp, " °C"), unit(m.case_temp, " °C"), unit(m.disk_temp, " °C"),
             unit(m.fan_rpm, " RPM"), m.battery_v === null || m.battery_v === undefined ? "" : m.battery_v.toFixed(2) + " V",
+            board.sensors_at ? "Var" : "Yok",
             F.ago(board.last_seen_at), F.ago(board.last_log_at)
           ]
         };
@@ -662,7 +674,8 @@ qx.Class.define("ankamon.page.Boards", {
      */
     __createViewControls() {
       this.__screenView = this.__loadScreenView();
-      const list = (this._user.ui_prefs || {})["boards.listView"] === true;
+      // Varsayılan görünüm Liste (kullanıcı isteği 2026-11-12); kullanıcı Ekranlar'ı seçtiyse o hatırlanır.
+      const list = (this._user.ui_prefs || {})["boards.listView"] !== false;
       this.__viewButtons = this.__actionBar.addViewControls([
         // Sıra (kullanıcı isteği 2026-11-12): Liste · Ekranlar · Sensörler · Başarım.
         { id: "list", label: "Liste", icon: "list", group: true, tip: "Tahtaları tablo olarak gösterir" },

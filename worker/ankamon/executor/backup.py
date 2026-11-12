@@ -144,8 +144,19 @@ def job_dir(job_id: int) -> str:
     return os.path.join(BASE_DIR, f"job-{int(job_id)}")
 
 
-def cleanup(now: float | None = None) -> int:
-    """KEEP_HOURS'tan eski görev dizinlerini siler (disk dolmasın). Döner: silinen dizin sayısı."""
+def keep_hours(conn) -> int:
+    """Ev dizini yedeklerinin saklama süresi (saat): Sistem ▸ Yedekler planı (settings.backup_policy.home.keep_hours),
+    yoksa KEEP_HOURS (HOME_BACKUP_KEEP_HOURS). Yedekleme servisi (docker/backup/backup.sh) de saatte bir aynı süreyle siler."""
+    try:
+        row = conn.execute("SELECT value->'home'->'keep_hours' AS h FROM settings WHERE key = 'backup_policy'").fetchone()
+        value = row and row["h"]
+        return int(value) if isinstance(value, int) and 1 <= value <= 2160 else KEEP_HOURS
+    except Exception:  # noqa: BLE001 — ayar okunamazsa kurulum varsayılanı
+        return KEEP_HOURS
+
+
+def cleanup(now: float | None = None, keep_job: int | None = None) -> int:
+    """keep_job (vars. KEEP_HOURS) saatten eski görev dizinlerini siler (disk dolmasın). Döner: silinen dizin sayısı."""
     now = now or time.time()
     removed = 0
     try:
@@ -154,7 +165,7 @@ def cleanup(now: float | None = None) -> int:
         return 0
     for name in entries:
         path = os.path.join(BASE_DIR, name)
-        keep = KEEP_HOURS if name.startswith("job-") else RESTORE_UPLOAD_KEEP_HOURS if name.startswith("restore-") else None
+        keep = (keep_job if keep_job is not None else KEEP_HOURS) if name.startswith("job-") else RESTORE_UPLOAD_KEEP_HOURS if name.startswith("restore-") else None
         if keep is not None and os.path.isdir(path) and now - os.path.getmtime(path) > keep * 3600:
             shutil.rmtree(path, ignore_errors=True)
             removed += 1

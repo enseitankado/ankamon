@@ -37,8 +37,8 @@ qx.Class.define("ankamon.ui.DiskUsage", {
 
   statics: {
     JOB_STATUS: { queued: "Kuyrukta", running: "Çalışıyor", done: "Tamamlandı", failed: "Hatalı" },
-    BACKUP_KIND: { full: "Tam (loglar + sensör dahil)", config: "Yapılandırma", grafana: "Grafana" },
-    BACKUP_GROUP: { full: "tam yedekler", config: "yapılandırma yedekleri", grafana: "Grafana yedekleri" },
+    BACKUP_KIND: { full: "Tam (loglar + sensör dahil)", config: "Yapılandırma", grafana: "Grafana", files: "Dosya depoları (/data)" },
+    BACKUP_GROUP: { full: "tam yedekler", config: "yapılandırma yedekleri", grafana: "Grafana yedekleri", files: "dosya yedekleri" },
 
     /**
      * Sekme tanımları, sayfadaki sırasıyla (bkz. page.DiskUsage). Her tanımın `mode`'u sekmenin
@@ -380,7 +380,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
             rows,
             info: this.__info(spec, data,
               `${data.total.n} dosya, ${F.bytes(data.total.bytes)} (${qx.bom.String.escape(data.dir)}; ` +
-              `saklanan: ${data.keep_full} tam, ${data.keep_config} yapılandırma)`)
+              `saklanan: ${data.keep_full} tam, ${data.keep_config} yapılandırma, ${data.keep_files} dosya — plan: Sistem ▸ Yedekler)`)
           };
         },
         remove: async row => {

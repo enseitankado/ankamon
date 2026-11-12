@@ -91,23 +91,32 @@ final class Storage
      */
     public static function rootRequest(string $target, array $lines): int
     {
+        return (int) self::rootRequestText($target, $lines);
+    }
+
+    /**
+     * rootRequest'in ham yanıtlı hâli: servisin .done dosyasına yazdığı metni döner (ör. "export" hedefinde
+     * hazırlanan indirme dosyasının adı). $wait: en çok bekleme (sn) — arşiv hazırlamak silmeden uzun sürebilir.
+     */
+    public static function rootRequestText(string $target, array $lines, int $wait = self::ROOT_WAIT_SECONDS): string
+    {
         if (!is_dir(self::ROOT_REQUESTS) || !is_writable(self::ROOT_REQUESTS)) {
-            throw new ApiError(503, 'Silme servisi (storage-ops) istek kabul etmiyor — servis çalışmıyor olabilir.');
+            throw new ApiError(503, 'Disk servisi (storage-ops) istek kabul etmiyor — servis çalışmıyor olabilir.');
         }
         $id = self::ROOT_REQUESTS . '/' . bin2hex(random_bytes(8));
         // Önce .tmp, sonra yeniden adlandırma: servis yarım yazılmış isteği okumasın.
         file_put_contents("$id.tmp", $target . "\n" . implode("\n", $lines) . "\n");
         rename("$id.tmp", "$id.req");
 
-        $deadline = microtime(true) + self::ROOT_WAIT_SECONDS;
+        $deadline = microtime(true) + $wait;
         while (!is_file("$id.done")) {
             if (microtime(true) > $deadline) {
                 @unlink("$id.req");
-                throw new ApiError(504, 'Silme servisi zamanında yanıt vermedi; silme yapılmamış ya da yarım kalmış olabilir.');
+                throw new ApiError(504, 'Disk servisi (storage-ops) zamanında yanıt vermedi; işlem yapılmamış ya da yarım kalmış olabilir.');
             }
             usleep(250_000);
         }
-        $done = (int) trim((string) file_get_contents("$id.done"));
+        $done = trim((string) file_get_contents("$id.done"));
         @unlink("$id.done");
         return $done;
     }

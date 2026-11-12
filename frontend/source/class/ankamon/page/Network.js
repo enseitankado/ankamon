@@ -117,7 +117,10 @@ qx.Class.define("ankamon.page.Network", {
       // bellek network-usage-study). Boş = ölçülmedi/güvenilmez (Linux/kamera/yanıt yok). Sona eklendi:
       // servis/paylaşım alt satırları sabit (düşük) sütun sırası kullanır, boş kalır.
       { id: "activity", label: "Ağ etkinliği", hint: "Göreli ağ yoğunluğu 0–100 (anlık en yüksek görülen akış = 100; pasif gözlem). Ham değer: 'Ağ akışı' sütunu.", width: 120 },
-      { id: "activity_detail", label: "Ağ akışı", hint: "Görülen akış ayrıntısı: kbit/sn + baskın protokol; görünür akış yoksa Windows IP-ID gönderim hızı (sakin/boş).", width: 170 }
+      { id: "activity_detail", label: "Ağ akışı", hint: "Görülen akış ayrıntısı: kbit/sn + baskın protokol; görünür akış yoksa Windows IP-ID gönderim hızı (sakin/boş).", width: 170 },
+      // Sensörler: bağlı tahta kaydına son 24 saatte sensör verisi geldi mi — Var/Yok (kullanıcı isteği 2026-11-12;
+      // backend Core\BoardSensors::lastSeenAll). Sona eklendi: servis/paylaşım alt satırları sabit sütun sırası kullanır.
+      { id: "sensors", label: "Sensörler", hint: "Sensör verisi geliyor mu (son 24 saat)", width: 90, choices: true }
       // Ayrı "Takma ad" (MAC kaydı) sütunu yok (kullanıcı isteği, 2026-10-19: "Takma ad / Ad" ile yineleniyordu);
       // MAC ↔ takma ad kaydı "Takma ad / Ad"ın kendisini besler — bkz. ui.network.Ops.deviceName (known_alias).
     ];
@@ -135,6 +138,22 @@ qx.Class.define("ankamon.page.Network", {
     // "Varlık türü" hücresine türe özgü minik ikon (bkz. ui.table.DeviceTypeRenderer).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "type"),
       new ankamon.ui.table.DeviceTypeRenderer());
+    // Hücre ipuçları: sütunun görevi ve verinin kaynağı (kullanıcı isteği 2026-11-12; bkz. ui.network.AssetCellHints).
+    // Yalnız cihaz satırlarında — servis/paylaşım alt satırlarının hücreleri başka anlam taşır.
+    const deviceRow = row => typeof row[0] === "number";
+    ankamon.ui.network.AssetCellHints.apply(this.__columns, ankamon.ui.network.AssetCellHints.NETWORK, {
+      sensors: row => {
+        const d = deviceRow(row) && this.__devices && this.__devices.get(row[0]);
+        return d && d.sensors_at ? "Son sensör verisi: " + ankamon.util.Format.ago(d.sensors_at) : null;
+      }
+    });
+    this.__columns.forEach(column => {
+      const hint = column.cellHint;
+      if (hint) {
+        column.cellHint = (row, value) => (deviceRow(row) ? (typeof hint === "function" ? hint(row, value) : hint) : null);
+      }
+    });
+    ankamon.page.Base.setCellHints(this.__table, this.__columns);
     // Süzgeçler görünüm başına saklanır: Varlıklar ve her varlık grubu kendi süzgeciyle açılır (bkz. setGroup).
     this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply,
       { rows: () => (this.__rows || []).map(r => r.cells),
@@ -367,7 +386,8 @@ qx.Class.define("ankamon.page.Network", {
             .map(k => ankamon.page.Network.DISCOVERY[k] || k).join(", "),
           d.notes || "",
           F.etap(d.etap),
-          normNum(d), flowText(d)
+          normNum(d), flowText(d),
+          d.sensors_at ? "Var" : "Yok"
         ]
       }));
       this.__apply();

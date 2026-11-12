@@ -126,7 +126,9 @@ final class BoardsApi
     public function index(): array
     {
         $boards = Db::all('SELECT ' . self::COLUMNS . ' ' . self::FROM . ' WHERE ' . self::LISTED . ' ORDER BY b.label, b.hostname, b.ip');
-        return ['boards' => array_map(self::boardRowForPanel(...), $boards)];
+        // Sensörler sütunu (Varlıklar'la aynı ölçüt — bkz. Core\BoardSensors::lastSeenAll).
+        $sensors = \Ankamon\Core\BoardSensors::lastSeenAll();
+        return ['boards' => array_map(static fn(array $b) => self::boardRowForPanel($b) + ['sensors_at' => $sensors[(int) $b['id']] ?? null], $boards)];
     }
 
     public function show(Request $request): array

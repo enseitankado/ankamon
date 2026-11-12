@@ -30,9 +30,9 @@
 # /run/ankamon/storage-ops/<kimlik>.req dosyasına yazar, bu döngü (root) 2 sn'de bir okur, adları KATI
 # desenlerle doğrular (yalnız bilinen dosya/klasör adları — yol, joker kabul edilmez), siler ve silinen
 # adedi <kimlik>.done'a yazar (bkz. backend Core\Storage::rootRequest). İstek biçimi:
-#   1. satır: hedef — "backups" ya da "logqueue"
-#   backups : satır başına dosya adı (config|full|grafana-YYYYMMDD-HHMMSS.dump), "*" (tümü) ya da
-#             "<tür>:*" (o türün tümü, ör. "full:*")
+#   1. satır: hedef — "backups", "logqueue" ya da "export" (indirme dosyası hazırla — bkz. export_files)
+#   backups : satır başına dosya adı (config|full|grafana-YYYYMMDD-HHMMSS.dump, files-YYYYMMDD-HHMMSS.tar.gz),
+#             "*" (tümü) ya da "<tür>:*" (o türün tümü, ör. "full:*")
 #   logqueue: "live" (rsyslog'un bekleyen disk kuyruğu — rsyslog durdurulur, ankamon_pg.* silinir,
 #             yeniden başlatılır; parça parça silmek kuyruğun konum dosyasını bozar) ya da
 #             "bozuk-YYYYMMDD-HHMMSS" (rsyslog.sh'ın açılışta kenara aldığı bozuk kuyruk klasörü)
@@ -41,29 +41,40 @@ set -u
 REQ=/run/ankamon/storage-ops
 BACKUPS="${BACKUP_DIR:-/data/backups}"
 SPOOL=/data/rsyslog
+# İndirme dosyaları (export hedefi): nginx X-Accel-Redirect ile /_exports/'tan verir (bkz. nginx-default.conf,
+# backend StorageExportApi); 60 dakikadan eski olanlar döngüde silinir.
+EXPORTS=/data/.exports
+# Yedek dosyası adları (bkz. docker/backup/backup.sh): veritabanı dökümleri .dump, dosya yedeği .tar.gz.
+BACKUP_RE='^(config|full|grafana|files)-[0-9]{8}-[0-9]{6}\.(dump|tar\.gz)$'
 
 log() { echo "$(date '+%F %T') storage-ops: $*"; }
 
 mkdir -p "$REQ" && chown nobody:nobody "$REQ" && chmod 700 "$REQ"
 rm -f "$REQ"/*.req "$REQ"/*.done "$REQ"/*.tmp
+mkdir -p "$EXPORTS" && rm -f "$EXPORTS"/* && chown root:nginx "$EXPORTS" && chmod 750 "$EXPORTS"
+
+# Bir istek satırının (ad, "*" ya da "<tür>:*") karşılık geldiği yedek dosyalarını basar.
+backup_files() {
+    name=$1
+    for f in "$BACKUPS"/*; do
+        [ -f "$f" ] || continue
+        b=$(basename "$f")
+        echo "$b" | grep -Eq "$BACKUP_RE" || continue
+        case "$name" in
+            "*") echo "$f" ;;
+            *:\*) case "$b" in "${name%:*}"-*) echo "$f" ;; esac ;;
+            *) [ "$b" = "$name" ] && echo "$f" ;;
+        esac
+    done
+}
 
 # backups isteği: stdin'den adlar; silinen adedi basar.
 delete_backups() {
     n=0
     while read -r name; do
-        case "$name" in
-            "*") glob="*" ;;
-            full:\*|config:\*|grafana:\*) glob="${name%:*}-*" ;;
-            *) glob="" ;;
-        esac
-        if [ -n "$glob" ]; then
-            for f in "$BACKUPS"/$glob.dump; do
-                [ -f "$f" ] && rm -f "$f" && n=$((n + 1)) && log "yedek silindi: $(basename "$f")" >&2
-            done
-            continue
-        fi
-        echo "$name" | grep -Eq '^(config|full|grafana)-[0-9]{8}-[0-9]{6}\.dump$' || continue
-        [ -f "$BACKUPS/$name" ] && rm -f "$BACKUPS/$name" && n=$((n + 1)) && log "yedek silindi: $name" >&2
+        for f in $(backup_files "$name"); do
+            rm -f "$f" && n=$((n + 1)) && log "yedek silindi: $(basename "$f")" >&2
+        done
     done
     sh /opt/ankamon/backup/summary.sh
     echo "$n"
@@ -93,13 +104,59 @@ delete_logqueue() {
     echo "$n"
 }
 
+# export isteği (Disk kullanımı ▸ İndir): ilk satır tür (backups|logqueue), kalanlar adlar (silmedeki biçim).
+# İndirme dosyasını EXPORTS'a hazırlar ve adını basar; bir şey yoksa boş satır. Tek yedek dosyası kopyalanmadan
+# sabit bağlantıyla (aynı disk), birden çoğu tar ile; kuyruk tar.gz ile (dosyalar root'a ait, 0600).
+export_files() {
+    read -r kind
+    id="$(date +%Y%m%d-%H%M%S)-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
+    list=$(mktemp)
+    case "$kind" in
+        backups)
+            while read -r name; do backup_files "$name"; done | sort -u > "$list"
+            count=$(wc -l < "$list")
+            if [ "$count" -eq 1 ]; then
+                f=$(cat "$list")
+                out="$id-$(basename "$f")"
+                ln "$f" "$EXPORTS/$out" 2>/dev/null || cp "$f" "$EXPORTS/$out"
+            elif [ "$count" -gt 1 ]; then
+                out="$id-yedekler.tar"
+                sed 's|.*/||' "$list" | tar -cf "$EXPORTS/$out" -C "$BACKUPS" -T -
+            fi
+            ;;
+        logqueue)
+            while read -r name; do
+                if [ "$name" = live ]; then
+                    for f in "$SPOOL"/ankamon_pg.*; do [ -f "$f" ] && basename "$f"; done
+                elif echo "$name" | grep -Eq '^bozuk-[0-9]{8}-[0-9]{6}$' && [ -d "$SPOOL/$name" ]; then
+                    echo "$name"
+                fi
+            done | sort -u > "$list"
+            if [ -s "$list" ]; then
+                out="$id-log-kuyrugu.tar.gz"
+                tar -czf "$EXPORTS/$out" -C "$SPOOL" -T "$list"
+            fi
+            ;;
+    esac
+    rm -f "$list"
+    if [ -n "${out:-}" ] && [ -f "$EXPORTS/$out" ]; then
+        chmod 644 "$EXPORTS/$out"
+        log "indirme hazırlandı: $out" >&2
+        echo "$out"
+    else
+        echo ""
+    fi
+}
+
 while true; do
+    find "$EXPORTS" -maxdepth 1 -type f -mmin +60 -delete 2>/dev/null
     for req in "$REQ"/*.req; do
         [ -f "$req" ] || continue
         target=$(head -n 1 "$req")
         case "$target" in
             backups) n=$(tail -n +2 "$req" | delete_backups) ;;
             logqueue) n=$(tail -n +2 "$req" | delete_logqueue) ;;
+            export) n=$(tail -n +2 "$req" | export_files) ;;
             *) n=0; log "bilinmeyen hedef: $target" ;;
         esac
         rm -f "$req"
