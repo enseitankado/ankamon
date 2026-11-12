@@ -61,6 +61,7 @@ final class DataStores
         'home-backups' => ['Ev dizini yedekleri', 'Cihaz ev dizini yedekleri (Yedekle/Geri al)'],
         'rsyslog' => ['Log kuyruğu', 'Veritabanına yazılmayı bekleyen loglar'],
         '.exports' => ['Geçici indirmeler', 'Disk kullanımı ▸ İndir dosyaları'],
+        'ext' => ['Eklenti verileri', 'Eklentilerin kendi dosyaları (/data/ext/<eklenti>)'],
     ];
 
     /** @return list<array{store:string, location:string, kind:string, backups:list<string>, note:string}> */
