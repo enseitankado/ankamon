@@ -297,7 +297,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       let s = "<b>SSH denetimi</b>: Ankamon tahtaya SSH ile girip donanım ve sistem sağlığını ölçer: disk (SMART) ve boş alan, " +
         "işlemci ve kasa sıcaklığı, fan, RAM, güncellemeler, başarısız servisler… Her tahta bir " +
         "satırdır (sütunlar süzülür ve sıralanır); tahtayı seçince bulguları ve önerileri altta görünür. <b>Şimdi tara</b> açık tüm tahtaları hemen denetler " +
-        "(seçili tahtalar: <b>Tara</b> sekmesi). BIOS pili ve saat sürekli izlemededir.";
+        "(seçili tahtalar: üstte ① tahtaları, ② <i>Tam SSH denetimi</i>ni seçip <b>Tara</b>). BIOS pili ve saat sürekli izlemededir.";
       s += `<br><br><b>Otomatik tarama:</b> her tahta en az ${esc(sc ? sc.interval_days : 7)} günde bir, sunucu yükü ve ` +
         "ağ trafiği düşükken; tahta yalnız açıkken taranabilir. Her tahtanın zamanı ayrı işlediğinden otomatik " +
         "taramalar çoğu kez yalnız birkaç tahtayı kapsar.";

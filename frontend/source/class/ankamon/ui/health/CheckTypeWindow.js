@@ -109,7 +109,7 @@ qx.Class.define("ankamon.ui.health.CheckTypeWindow", {
           }
         });
         field("Bulgu düzeyi", level, "Durum'da tahtanın genel durumunu ve sıralamayı belirler.");
-        const scan = new qx.ui.form.CheckBox("Tara sekmesinde anlık yoklanabilir").set({
+        const scan = new qx.ui.form.CheckBox("Denetle sekmesinde anlık yoklanabilir").set({
           value: !!k.scan, enabled: !!k.scan_supported
         });
         field("Anlık taranır", scan, k.scan_supported ? "" : "Bu denetimin tahtada anlık yoklaması yok (yalnız sürekli izlemede).");
@@ -134,7 +134,7 @@ qx.Class.define("ankamon.ui.health.CheckTypeWindow", {
         field("Sıklık", days, `gün: her tahta en az bu kadar günde bir kendiliğinden denetlenir (varsayılan ${row.daysDefault} gün). ` +
           "<b>Bütün SSH denetimi başlıkları için ortaktır</b> (hepsine aynı bağlantıda bakılır).");
         info("Bulgu düzeyi", `${row.level} — denetimin sonucuna göre (ölçülen değer ve eşiklerle)`);
-        info("Anlık taranır", "Evet — Tara sekmesinde \"Tam SSH denetimi\" ya da Denetle ▸ Şimdi tara");
+        info("Anlık taranır", "Evet — Denetle sekmesinde ② \"Tam SSH denetimi\" ya da ③ SSH denetim raporları ▸ Şimdi tara");
         collect = () => ({ path: "/diagnose/interval", body: { days: days.getValue() === row.daysDefault ? null : days.getValue() } });
         reset = () => days.setValue(row.daysDefault);
         days.setEnabled(canEdit);

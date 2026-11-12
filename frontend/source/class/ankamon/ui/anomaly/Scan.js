@@ -26,26 +26,33 @@
  */
 
 /**
- * Sağlık ▸ Tara: seçilen tahtalara o an bakılır — iki yolun ikisi de buradan başlatılır:
+ * Sağlık ▸ Denetle (kullanıcı isteği 2026-11-12: eski "Denetle" ve "Tara" sekmeleri birleşti; kimlik "reports", eski "Tarama"
+ * kimliği buraya yönlenir — bkz. page.Anomalies OLD_TABS). İki yol da buradan başlatılır ve sonuçları buradadır:
  *   - Sürekli izleme denetimlerinin anlık yoklaması ("anomaly_scan" görevi — bkz. worker/ankamon/anomaly/scan.py): kuralın
- *     tahtada çalışan küçük betiği SSH ile o an çalışır; sonuç bu sekmenin tablosunda, kayıt tutulmaz.
+ *     tahtada çalışan küçük betiği SSH ile o an çalışır; sonuç "Anlık yoklama" iç sekmesinde, kayıt tutulmaz.
  *   - Tam SSH denetimi ("diagnose" görevi — bkz. worker/ankamon/executor/diagnose.py; yalnız "diagnose" yetkisiyle):
- *     haftalık otomatik denetimin aynısı; sonucu "Denetle" sekmesine yazılır, Durum'a yansır.
- * Son taramanın sonucu sekme yeniden açılınca gösterilir.
+ *     haftalık otomatik denetimin aynısı; seçili tahtalarda ② ile ya da açık tüm tahtalarda "Şimdi tara" ile. Raporları
+ *     "SSH denetim raporları" iç sekmesinde (gömülü page.Diagnose — rapor seçici, grid, bulgular), Durum'a yansır.
  *
- * Sol: tahta listesi (onay kutulu; arama, Tümü / Çevrim içi / Hiçbiri). Sağ üst: taranabilir anomali türleri.
- * Sağ alt: sonuç tablosu (tahta × anomali; Var / Yok / Taranamadı), "Yalnız bulunanlar" süzgeci (varsayılan
- * işaretli); çift tık → o tahtanın Geçmiş'i. Bölümler arasında iki ayırıcı (1 | 2, 2 / 3). Son seçimler (tahtalar,
- * türler) ve ayırıcı konumları kullanıcı başına sunucuda hatırlanır.
+ * Yerleşim: üstte ① tahtalar (onay kutulu; arama, Tümü / Çevrim içi / Hiçbiri) | ② denetim türleri ve Tara; altta tam
+ * genişlikte ③ Sonuçlar (iç sekmeler: SSH denetim raporları, Anlık yoklama — "Yalnız anomali bulunanlar" süzgeci;
+ * çift tık → o tahtanın Geçmiş'i). Son seçimler (tahtalar, türler, iç sekme) ve ayırıcı konumları kullanıcı başına
+ * sunucuda hatırlanır. Son anlık yoklamanın sonucu sekme yeniden açılınca gösterilir.
  */
 qx.Class.define("ankamon.ui.anomaly.Scan", {
   extend: qx.ui.tabview.Page,
 
-  /** @param page {ankamon.page.Anomalies} */
-  construct(page) {
-    super("Tara");
-    this.setUserData("key", "Tarama"); // eski etiket: sol menü yaprağı ve hatırlanan sekme kaydı
+  /**
+   * @param page {ankamon.page.Anomalies}
+   * @param reports {ankamon.page.Diagnose?} SSH denetim raporları ("diagnose" yetkisi yoksa null)
+   */
+  construct(page, reports) {
+    super("Denetle");
+    this.setUserData("key", "reports");
+    // Sağlık sayfası sekme seçilince/yenilenince gömülü rapor sayfasını activate()/refresh() eder (bkz. page.Anomalies).
+    this.setUserData("page", reports || null);
     this.__page = page;
+    this.__reports = reports || null;
     this.__sshAllowed = page._can("diagnose");
     this.__sshPref = (page._user.ui_prefs || {})["anomalies.scan.ssh"] === true;
     this.setLayout(new qx.ui.layout.Grow());
@@ -55,13 +62,18 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     this.__hasBoardPref = Array.isArray(prefs["anomalies.scan.boards"]);
     this.__kindPref = prefs["anomalies.scan.kinds"] || null;
 
-    // İki ayırıcı: 1 | (2 / 3). Konumları kullanıcı başına sunucuda (ui_prefs["anomalies.scan.split"] = {left, top}).
-    // Ayırıcı bırakılınca SplitPane sabit boyutlu ilk bölmeye setWidth/setHeight çağırır → change olayı kaydeder
-    // (pencere daralınca yalnız yerleşim küçülür, özellik değişmez: kaydedilmez — bkz. ui.Shell nav.width).
-    const saved = prefs["anomalies.scan.split"] || {};
-    const split = new qx.ui.splitpane.Pane("horizontal");
+    // İki ayırıcı: (1 | 2) / 3. Konumları kullanıcı başına sunucuda (ui_prefs["anomalies.denetle.split"] = {left, top};
+    // birleşmeden önceki "anomalies.scan.split" farklı yerleşimindi, kullanılmaz). Ayırıcı bırakılınca SplitPane sabit
+    // boyutlu ilk bölmeye setWidth/setHeight çağırır → change olayı kaydeder (pencere daralınca yalnız yerleşim küçülür,
+    // özellik değişmez: kaydedilmez — bkz. ui.Shell nav.width).
+    const saved = prefs[ankamon.ui.anomaly.Scan.SPLIT_PREF] || {};
+    const outer = new qx.ui.splitpane.Pane("vertical");
+    this.__outerSplit = outer;
+    this.add(outer);
+    const split = new qx.ui.splitpane.Pane("horizontal").set({ height: saved.top || ankamon.ui.anomaly.Scan.TOP_HEIGHT });
     this.__mainSplit = split;
-    this.add(split);
+    outer.add(split, 0);
+    split.addListener("changeHeight", e => this.__saveSplit("top", e.getData()));
     const boards = this.__createBoardsPane().set({ width: saved.left || null });
     if (!saved.left) {
       // İlk açılış: eskisi gibi 2/5 genişlik (kullanıcı sürüklemediği için kaydedilmez).
@@ -72,21 +84,32 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       });
     }
     split.add(boards, 0);
-    split.add(this.__createRightPane(saved.top || null), 1);
+    split.add(this.__createKindPane(), 1);
     boards.addListener("changeWidth", e => this.__saveSplit("left", e.getData()));
+    outer.add(this.__createResultsPane(), 1);
 
     // Sekme ilk kez açılınca tahtalar yüklenir (sayfa 30 sn'de bir yenilense de liste yalnız açıkken tazelenir).
     this.addListener("appear", () => this.__loadBoards());
   },
 
   statics: {
-    POLL_MS: 1000
+    POLL_MS: 1000,
+    /** Üst bölümün (① | ②) ilk yüksekliği; kullanıcı sürükleyince kayıtlı değer kullanılır. */
+    TOP_HEIGHT: 330,
+    /** Ayırıcı konumlarının ui_prefs anahtarı. */
+    SPLIT_PREF: "anomalies.denetle.split",
+    /** Seçili iç sonuç sekmesinin ui_prefs anahtarı ("ssh" | "quick"). */
+    RESULT_TAB_PREF: "anomalies.denetle.results"
   },
 
   members: {
     __page: null,
     __mainSplit: null,
-    __rightSplit: null,
+    __outerSplit: null,
+    __reports: null,
+    __resultTabs: null,
+    __sshTab: null,
+    __quickTab: null,
     __checked: null,
     __hasBoardPref: false,
     __kindPref: null,
@@ -152,16 +175,17 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         return;
       }
       const user = this.__page._user;
-      const current = Object.assign({}, (user.ui_prefs || {})["anomalies.scan.split"] || {}, { [key]: value });
+      const pref = ankamon.ui.anomaly.Scan.SPLIT_PREF;
+      const current = Object.assign({}, (user.ui_prefs || {})[pref] || {}, { [key]: value });
       clearTimeout(this.__splitTimer);
-      this.__splitTimer = setTimeout(() => ankamon.page.Base.savePref(user, "anomalies.scan.split", current), 300);
+      this.__splitTimer = setTimeout(() => ankamon.page.Base.savePref(user, pref, current), 300);
     },
 
     __splitTimer: null,
     __splitDefaulting: false,
 
     /**
-     * Tür listesinin dikey kaydırma çubuğu ve 2/3 arasındaki YATAY ayırıcı 1/2 ayırıcısıyla aynı kalınlıkta ve
+     * Tür listesinin dikey kaydırma çubuğu ve üst bölümle 3 arasındaki YATAY ayırıcı 1/2 ayırıcısıyla aynı kalınlıkta ve
      * renkte görünür (kalınlık ve zemin rengi o ayırıcıdan okunur — her temada eşleşir). Yatay ayırıcının
      * kalınlığı yüksekliğidir (kullanıcı isteği: dikey kaydırma çubuğunun kalınlığıyla aynı).
      * @param scroll {qx.ui.container.Scroll}
@@ -171,7 +195,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       const width = (splitter.getBounds() || {}).width || splitter.getSizeHint().width;
       const bar = scroll.getChildControl("scrollbar-y");
       bar.set({ width, minWidth: width, maxWidth: width });
-      const across = this.__rightSplit.getChildControl("splitter");
+      const across = this.__outerSplit.getChildControl("splitter");
       across.set({ height: width, minHeight: width, maxHeight: width });
       const color = splitter.getBackgroundColor();
       if (color) {
@@ -180,20 +204,12 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       }
     },
 
-    /** @param top {Integer?} 2. bölmenin kayıtlı yüksekliği (yoksa içeriğin doğal yüksekliği) */
-    __createRightPane(top) {
-      // 2 ile 3 arasında yatay ayırıcı (1 ile 2/3 arasındaki gibi).
-      const pane = new qx.ui.splitpane.Pane("vertical").set({ marginLeft: 5 });
-      this.__rightSplit = pane;
-      const box = ankamon.ui.StepBox.create(2, "Denetimleri seç ve tara", "seçili tahtalara şu an bakılır").set({
-        height: top, marginBottom: 5
-      });
-      pane.add(box, 0);
-      box.addListener("changeHeight", e => this.__saveSplit("top", e.getData()));
+    /** ② Denetimleri seç ve tara: denetim türleri (kaydırmalı), Tara düğmesi, ilerleme, SSH denetimi notu. */
+    __createKindPane() {
+      const box = ankamon.ui.StepBox.create(2, "Denetimleri seç ve tara", "seçili tahtalara şu an bakılır").set({ marginLeft: 5 });
       this.__kindBox = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
-      // Tür listesi kaydırmalı: 2. bölgenin en küçük yüksekliği artık listeye bağlı değil, 2/3 ayırıcısı serbestçe
-      // yukarı çekilebilir (eskiden ~670 px'in altına inmiyordu); liste sığmazsa dikey kaydırma çubuğu çıkar.
-      // Başlıkla ilk tür arasında boşluk (kullanıcı isteği: "Oturumsuz açık" başlığa yapışık görünüyordu).
+      // Tür listesi kaydırmalı: üst bölümün en küçük yüksekliği listeye bağlı değil, ayırıcı serbestçe çekilebilir; liste
+      // sığmazsa dikey kaydırma çubuğu çıkar. Başlıkla ilk tür arasında boşluk (kullanıcı isteği).
       const kindScroll = new qx.ui.container.Scroll(this.__kindBox).set({ minHeight: 40, marginTop: 8 });
       kindScroll.addListenerOnce("appear", () => this.__matchScrollbar(kindScroll));
       box.add(kindScroll, { flex: 1 });
@@ -207,23 +223,41 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       this.__status = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
       run.add(this.__status, { flex: 1 });
       box.add(run);
-      // Tam SSH denetiminin sonucu burada değil, Denetle sekmesinde: başlatılınca not ve geçiş düğmesi.
+      // Tam SSH denetimi başlatılınca not ve raporuna geçiş düğmesi (rapor ③'te "SSH denetim raporları" iç sekmesinde).
       this.__sshRow = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ visibility: "excluded", marginTop: 4 });
       this.__sshNote = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
       this.__sshRow.add(this.__sshNote, { flex: 1 });
-      const toReports = new qx.ui.form.Button("Denetle sekmesine git");
-      toReports.addListener("execute", () => this.__page.showReports());
+      const toReports = new qx.ui.form.Button("SSH raporunu göster");
+      toReports.addListener("execute", () => this.showReport());
       this.__sshRow.add(toReports);
       box.add(this.__sshRow);
+      return box;
+    },
 
+    /**
+     * ③ Sonuçlar (tam genişlik): iç sekmeler "SSH denetim raporları" (gömülü page.Diagnose — eski Denetle sekmesinin
+     * tamamı: Yenile, Şimdi tara, Rapor seçici, grid, bulgular) ve "Anlık yoklama" (eski Tara sonuç tablosu).
+     */
+    __createResultsPane() {
       const results = ankamon.ui.StepBox.create(3, "Sonuçlar").set({ marginTop: 5 });
-      pane.add(results, 1);
-      const head = results.getChildren()[0]; // başlık satırı: sağına süzgeç onay kutusu
+      this.__resultTabs = new qx.ui.tabview.TabView();
+      if (this.__reports) {
+        this.__sshTab = new qx.ui.tabview.Page("SSH denetim raporları").set({ layout: new qx.ui.layout.Grow(), padding: 6 });
+        this.__sshTab.setUserData("key", "ssh");
+        this.__sshTab.add(this.__reports);
+        this.__resultTabs.add(this.__sshTab);
+      }
+      this.__quickTab = new qx.ui.tabview.Page("Anlık yoklama").set({ layout: new qx.ui.layout.VBox(4), padding: 6 });
+      this.__quickTab.setUserData("key", "quick");
+      const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
+      head.add(new qx.ui.basic.Label("Sürekli izleme denetimlerinin seçili tahtalarda o anki sonucu (kayıt tutulmaz).")
+        .set({ textColor: "app-muted" }));
       head.add(new qx.ui.core.Spacer(), { flex: 1 });
       // Varsayılan işaretli (kullanıcı isteği): önce bulunanlar görünür.
       this.__onlyFound = new qx.ui.form.CheckBox("Yalnız anomali bulunanlar").set({ value: true });
       this.__onlyFound.addListener("changeValue", () => this.__renderResults());
       head.add(this.__onlyFound);
+      this.__quickTab.add(head);
 
       const columns = [
         { id: "board", label: "Tahta", width: 180 },
@@ -240,8 +274,49 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         }
       });
       this.__resultTable.setToolTipText("Çift tıklayın: o tahtanın anomali kayıtları (Geçmiş)");
-      results.add(this.__resultTable, { flex: 1 });
-      return pane;
+      this.__quickTab.add(this.__resultTable, { flex: 1 });
+      this.__resultTabs.add(this.__quickTab);
+
+      // Son seçilen iç sekme hatırlanır (yoksa SSH raporları — eski Denetle'nin açılış görünümü).
+      const saved = (this.__page._user.ui_prefs || {})[ankamon.ui.anomaly.Scan.RESULT_TAB_PREF];
+      const first = this.__resultTabs.getChildren().find(t => t.getUserData("key") === saved);
+      if (first) {
+        this.__resultTabs.setSelection([first]);
+      }
+      this.__resultTabs.addListener("changeSelection", e => {
+        const tab = e.getData()[0];
+        if (tab) {
+          ankamon.page.Base.savePref(this.__page._user, ankamon.ui.anomaly.Scan.RESULT_TAB_PREF, tab.getUserData("key"));
+          if (tab === this.__sshTab) {
+            this.__reports.activate();
+          }
+        }
+      });
+      results.add(this.__resultTabs, { flex: 1 });
+      return results;
+    },
+
+    /**
+     * ③'te SSH denetim raporlarını gösterir; board verilirse rapor o tahtaya süzülür (Durum'dan SSH bulgusuna çift tık —
+     * bkz. page.Anomalies.openFinding).
+     */
+    showReport(board) {
+      if (!this.__sshTab) {
+        return;
+      }
+      this.__resultTabs.setSelection([this.__sshTab]);
+      if (board) {
+        this.__reports.showBoard(board);
+      } else {
+        this.__reports.refresh();
+      }
+    },
+
+    /** ③'te anlık yoklama sonuçlarını gösterir (anlık yoklama başlatılınca). */
+    __showQuick() {
+      if (this.__resultTabs.getSelection()[0] !== this.__quickTab) {
+        this.__resultTabs.setSelection([this.__quickTab]);
+      }
     },
 
     /**
@@ -259,9 +334,10 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         const heading = (path, text) => this.__kindBox.add(new qx.ui.basic.Label(
           `<span style="color:${P[path].color};font-weight:bold">${P[path].text}</span> — ${text}`).set({
           rich: true, wrap: true, allowGrowX: true, marginTop: 4, marginBottom: 4 }));
-        // Tam SSH denetimi: haftalık otomatik denetimin aynısı, seçili tahtalarda şimdi (sonucu Denetle sekmesinde).
+        // Tam SSH denetimi: haftalık otomatik denetimin aynısı, seçili tahtalarda şimdi (sonucu ③ SSH denetim raporlarında).
         if (this.__sshAllowed) {
-          heading("ssh", "Ankamon tahtaya SSH ile girip ölçer; sonucu <b>Denetle</b> sekmesine yazılır ve Durum'a yansır.");
+          heading("ssh", "Ankamon tahtaya SSH ile girip ölçer; sonucu aşağıda <b>SSH denetim raporları</b>nda, Durum'a da yansır. " +
+            "Açık tüm tahtalar için raporların üstündeki <b>Şimdi tara</b>.");
           this.__sshCheck = new qx.ui.form.CheckBox("Tam SSH denetimi (disk sağlığı, sıcaklık, boş alan, güncellemeler, servisler…)").set({
             value: this.__sshPref
           });
@@ -272,7 +348,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         }
         if (scannable.length) {
           heading("watch", "bu denetimler sürekli kendiliğinden yapılır; burada seçilen tahtalarda <b>o an</b> tahtaya bakılır, " +
-            "sonuç aşağıdaki tabloda (kayıt tutulmaz).");
+            "sonuç aşağıda <b>Anlık yoklama</b>da (kayıt tutulmaz).");
         }
         scannable.forEach(kind => {
           const check = new qx.ui.form.CheckBox(kinds[kind].label).set({
@@ -408,7 +484,10 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
           try {
             const job = await ankamon.io.Api.post("/jobs", { type: "diagnose", board_ids: online });
             this.__sshNote.setValue(`<b style="color:${ankamon.ui.health.Status.PATH.ssh.color}">SSH denetimi</b> başlatıldı ` +
-              `(${online.length} açık tahta, görev #${job.id}). Sonuç <b>Denetle</b> sekmesinde ve Durum'da görünür.`);
+              `(${online.length} açık tahta, görev #${job.id}). Sonuç aşağıda <b>SSH denetim raporları</b>nda ve Durum'da görünür.`);
+            if (!kinds.length) {
+              this.showReport(); // yalnız SSH denetimi istendi: süren raporu göster
+            }
           } catch (e) {
             this.__sshNote.setValue("SSH denetimi başlatılamadı: " + qx.bom.String.escape(e.message || String(e)));
           }
@@ -427,6 +506,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         return;
       }
       this.__lastJobShown = res.id;
+      this.__showQuick();
       this.__follow(res.id);
     },
 

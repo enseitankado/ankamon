@@ -853,7 +853,7 @@ qx.Class.define("ankamon.page.Base", {
      */
     /**
      * Kendi süzgeç mantığı olmayan grid'e sütun süzgeçleri + hazır değer listeleri (kullanıcı isteği 2026-11-10: BÜTÜN grid'ler
-     * — Loglar, Genel bakış, Sağlık ▸ Tara/Bildirimler, Yazılımlar, Hesaplar…). Modelin setData'sı sarılır: çağıran yine BÜTÜN
+     * — Loglar, Genel bakış, Sağlık ▸ Denetle/Bildirimler, Yazılımlar, Hesaplar…). Modelin setData'sı sarılır: çağıran yine BÜTÜN
      * satırları verir; burada saklanır ve yalnız süzgeçlere uyanlar tabloya yazılır (satır dizileri ortak — onay kutusu
      * değerleri süzme sırasında korunur). Eşleşme filterMatch ile (hazır listedeki "A" | "B" seçimleri dahil).
      * @return {Map} süzgeç kutuları (bkz. _addColumnFilters)

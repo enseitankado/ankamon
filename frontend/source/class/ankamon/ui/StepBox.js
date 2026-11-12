@@ -28,7 +28,7 @@
 /**
  * Numaralı adım kutusu (kullanıcı isteği: bileşenler ana işlemlere göre gruplanır, sıra numarası büyük ve
  * fark edilir): ince çerçeve, başlıkta vurgu renginde daire içinde numara + adım adı (+ soluk açıklama).
- * Dosyaları dağıt/topla (ui.files.BulkPanel) ve Anomaliler ▸ Tarama (ui.anomaly.Scan) aynı görünümü kullanır.
+ * Dosyaları dağıt/topla (ui.files.BulkPanel) ve Sağlık ▸ Denetle (ui.anomaly.Scan) aynı görünümü kullanır.
  */
 qx.Class.define("ankamon.ui.StepBox", {
   type: "static",

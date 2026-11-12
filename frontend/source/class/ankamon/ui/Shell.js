@@ -207,9 +207,9 @@ qx.Class.define("ankamon.ui.Shell", {
       // başına yetki sayfanın içinde. Eski "Bakım ▸ Bakım/Yardım" bağlantıları __openPage'de buraya yönlenir.
       // Etiket "Sağlık" (kullanıcı isteği 2026-11-10).
       { id: "anomalies", label: "Sağlık", features: ["anomalies", "diagnose"], collapsed: true, create: u => new ankamon.page.Anomalies(u),
-        tabs: [{ key: "status", label: "Durum" }, { key: "reports", label: "Denetle", feature: "diagnose" },
+        // Denetle = eski Denetle + Tara tek sekmede (kullanıcı isteği 2026-11-12; eski "Tarama" kimliği buraya yönlenir).
+        tabs: [{ key: "status", label: "Durum" }, { key: "reports", label: "Denetle" },
           { key: "Geçmiş", label: "Geçmiş", feature: "anomalies" },
-          { key: "Tarama", label: "Tara" },
           { key: "notifications", label: "Bildirimler", feature: "anomalies" }, { key: "help", label: "Yardım" }] },
       // Bakım: "Sensörler" (Grafana) ve eklenti sekmeleri (ör. Ahenk) — bkz. page.Maintenance. Sorun tespiti raporu
       // "Sağlık"a taşındı. features: herhangi biri yeterli (sekme başına yetki sayfanın içinde). Sensörler ayrı menü öğesi DEĞİL (kullanıcı

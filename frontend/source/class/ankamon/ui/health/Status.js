@@ -31,7 +31,7 @@
  * Bulgular iki yoldan gelir ve her satırda hangisinden geldiği yazar:
  *   - Sürekli izleme: Ankamon tahtaya BAĞLANMADAN, tahtanın gönderdiği loglardan, kendi okuduğu ölçümlerden ve daha önce
  *     toplanmış verilerden birkaç dakikada bir çıkarır (anomali kuralları). Yalnız şu an SÜRENLER.
- *   - SSH denetimi: Ankamon tahtaya SSH ile girip ölçer (haftalık otomatik ya da Tara sekmesinden elle). Her tahtanın EN SON
+ *   - SSH denetimi: Ankamon tahtaya SSH ile girip ölçer (haftalık otomatik ya da Denetle sekmesinden elle). Her tahtanın EN SON
  *     denetiminin Acil/Dikkat bulguları ve denetlenemeyen tahtalar.
  *
  * Üst tablo tahta başına bir satır (en kötü düzey, iki yolun özeti); alttaki tablo seçili tahtanın (seçim yoksa hepsinin)
