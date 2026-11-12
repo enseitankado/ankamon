@@ -95,7 +95,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
   statics: {
     POLL_MS: 1000,
     /** Üst bölümün (① | ②) ilk yüksekliği; kullanıcı sürükleyince kayıtlı değer kullanılır. */
-    TOP_HEIGHT: 330,
+    TOP_HEIGHT: 290,
     /** Ayırıcı konumlarının ui_prefs anahtarı. */
     SPLIT_PREF: "anomalies.denetle.split",
     /** Seçili iç sonuç sekmesinin ui_prefs anahtarı ("ssh" | "quick"). */

@@ -125,7 +125,9 @@ qx.Class.define("ankamon.page.Diagnose", {
     this.__table.setToolTipText("Bir tahtayı seçin: aşağıda yalnız onun bulguları ve önerileri görünür");
     const top2 = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ paddingBottom: ankamon.ui.health.Status.PANE_GAP });
     top2.add(this.__table, { flex: 1 });
-    split.add(top2, 1);
+    // Grid 2 pay, bulgular 1 pay: Denetle sekmesine gömülünce (③ Sonuçlar — bkz. ui.anomaly.Scan) alan küçüldü, 1:1 grid'e
+    // 1-2 satır bırakıyordu (kullanıcı isteği 2026-11-12 birleşmesi). Ayırıcı sürüklenebilir.
+    split.add(top2, 2);
 
     const bottom = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ paddingTop: ankamon.ui.health.Status.PANE_GAP });
     this.__html = new qx.ui.embed.Html("").set({
