@@ -174,16 +174,17 @@ final class AnomaliesApi
         ],
         'uefi_nvram_high' => [
             'label' => 'UEFI NVRAM dolu',
-            'description' => 'UEFI değişken deposunun (NVRAM) boş alanı %10\'un altında. Depo dolarsa firmware yeni açılış girdisi/değişken yazamaz: güncellemede önyükleyici kaydı başarısız olabilir, tahta açılmayabilir. Yüksek doluluk tek başına sorun değildir: firmware her yazmada değişkenin yeni kopyasını ekler, eskileri ancak toplama (reclaim) sırasında atar; bu yüzden doluluk tahtadan tahtaya %10-95 arasında değişir. Ayrıntıda canlı içerik de gösterilir (genellikle 9-19 KB; kalanı eskimiş kopya). '
-                . 'Firmware her açılışta yazar (açılış sayacı, giriş aygıtları, CSM açıksa eski tip/legacy açılış girdileri): Intel anakartlı (VESTEL 14MB57) tahtada açılış başına ~2,8 KB ölçüldü. '
-                . 'AMD anakartlı (14MB37C1) tahtalar dolunca açılışta kendiliğinden toplar. Intel anakartlı (14MB57) tahta ise depo %100 dolmuşken bile açılışta toplamadı. '
-                . 'Çözüm (doğrulandı, 2026-11-11): tahtanın başında BIOS kurulumuna (Setup) girip HİÇBİR ayarı değiştirmeden "Save & Exit" — firmware kaydetmeden önce toplar; ayarlar ve açılış girdileri korunur (örnekte %100 → %13). Linux\'tan uzaktan tetiklemek dolu depoda işe yaramaz (çekirdek son 5 KB\'a yazmaz). '
-                . 'Önlem: Pardus UEFI ile açıldığından BIOS\'ta CSM kapatılırsa eski tip açılış girdisi yazmaları biter, depo çok daha yavaş dolar. '
+            // Cihazdan, markadan/modelden ve işletim sisteminden bağımsız anlatım (kullanıcı isteği 2026-11-12: izlenen
+            // cihaz tamamen farklı bir platform olabilir). Saha ölçümleri worker/ankamon/anomaly/uefi_nvram_high.py'de.
+            'description' => 'UEFI değişken deposunun (NVRAM) boş alanı %10\'un altında. Depo dolarsa firmware yeni açılış girdisi/değişken yazamaz: işletim sistemi güncellemesinde önyükleyici kaydı başarısız olabilir, cihaz açılmayabilir. Yüksek doluluk tek başına sorun değildir: firmware her yazmada değişkenin yeni kopyasını ekler, eskileri ancak toplama (reclaim) sırasında atar; bu yüzden doluluk cihazdan cihaza geniş bir aralıkta değişir. Ayrıntıda canlı içerik de gösterilir (kalanı eskimiş kopya). '
+                . 'Firmware her açılışta da yazabilir (açılış sayacı, giriş aygıtları, CSM/legacy açıksa eski tip açılış girdileri). Bazı firmware\'ler depo dolunca açılışta kendiliğinden toplar, bazıları toplamaz. '
+                . 'Çözüm: cihazın başında firmware (BIOS/UEFI) kurulumuna girip HİÇBİR ayarı değiştirmeden "Save & Exit" — çoğu firmware kaydetmeden önce toplar; ayarlar ve açılış girdileri korunur. İşletim sisteminden uzaktan tetiklemek dolu depoda genellikle işe yaramaz. '
+                . 'Önlem: cihaz UEFI kipinde açılıyorsa firmware\'de CSM/legacy desteği kapatılırsa eski tip açılış girdisi yazmaları biter, depo çok daha yavaş dolar. '
                 . 'Değer Bilgi kartı, ilk tanıma ve haftalık otomatik sorun taramasında toplanır.',
             'level' => 'warn',
             'scan' => true,
             'source' => 'SSH verisi',
-            'source_detail' => 'Daha önce SSH ile toplanan donanım bilgisi: tahta ilk tanındığında ve Bilgi kartı açıldığında (1 sa önbellek) tazelenir. Kural 60 sn\'de bir bakar ama veri bu kadar güncel değildir.',
+            'source_detail' => 'Daha önce SSH ile toplanan donanım bilgisi: cihaz ilk tanındığında ve Bilgi kartı açıldığında (1 sa önbellek) tazelenir. Kural 60 sn\'de bir bakar ama veri bu kadar güncel değildir.',
             'every' => '60 sn',
         ],
     ];

@@ -50,6 +50,11 @@
 qx.Class.define("ankamon.page.Diagnose", {
   extend: ankamon.page.Base,
 
+  events: {
+    /** Rapor yüklendi/değişti (veri: görev — {targets: [{board_id, board, ip, status, output …}], latest, …}). */
+    reportLoaded: "qx.event.type.Data"
+  },
+
   construct(user) {
     // Başlık yok; düğmeler, rapor seçici, başlatılma bilgisi ve ilerleme tek satırda (kullanıcı isteği).
     super(user, null);
@@ -87,7 +92,7 @@ qx.Class.define("ankamon.page.Diagnose", {
     this.add(top);
 
 
-    const split = new qx.ui.splitpane.Pane("vertical");
+    const split = this.__split = new qx.ui.splitpane.Pane("vertical");
     const thick = ankamon.ui.health.Status.SPLITTER;
     split.getChildControl("splitter").set({ height: thick, minHeight: thick, maxHeight: thick });
     this.add(split, { flex: 1 });
@@ -152,8 +157,23 @@ qx.Class.define("ankamon.page.Diagnose", {
   },
 
   members: {
+    __split: null,
     __columns: null,
     __table: null,
+
+    /**
+     * Gömülü kip (Sağlık ▸ Denetle ▸ ③ Sonuçlar — kullanıcı isteği 2026-11-12: SSH denetim raporları ile anlık yoklama tek
+     * grid'de): yalnız üst satır (Yenile, Şimdi tara, Rapor seçici, ilerleme) görünür; rapor "reportLoaded" olayıyla
+     * dışarı verilir, satırları ui.anomaly.Scan çizer.
+     */
+    setEmbedded(on) {
+      this.__split.setVisibility(on ? "excluded" : "visible");
+    },
+
+    /** Yüklü rapor (görev) ya da null. */
+    getReport() {
+      return this.__job || null;
+    },
     __filters: null,
     __allRows: null,
     __pendingBoard: null,
@@ -397,6 +417,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       rows.sort((x, y) => x[C.rank] - y[C.rank] || String(x[C.board]).localeCompare(String(y[C.board]), "tr", { numeric: true }));
       this.__allRows = rows;
       this.__apply();
+      this.fireDataEvent("reportLoaded", this.__job || null);
     },
 
     __targets: null,

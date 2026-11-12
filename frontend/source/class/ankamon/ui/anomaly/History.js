@@ -29,7 +29,8 @@
  * Sağlık ▸ Geçmiş'in alt bölmesi (bkz. ui.anomaly.Records): sürekli izlemenin seçili dönemle örtüşen tüm kayıtları
  * (sürenler dahil); Kaynak sütunu bulgunun nereden çıkarıldığını yazar (Log / Ölçüm / SSH verisi — bkz. backend
  * AnomaliesApi KINDS source). Excel tarzı sütun süzgeçli (bkz. page.Base _addColumnFilters). Üstteki özette satır
- * seçilince o tahtanın o bulgusuna süzülür (filterBoardKind).
+ * seçilince o tahtanın o bulgusuna süzülür (filterBoardKind). Satıra çift tıklama: kaydın bütün alanları (kırpılmadan)
+ * kipli pencerede — ui.anomaly.RowDetail (kullanıcı isteği 2026-11-12).
  */
 qx.Class.define("ankamon.ui.anomaly.History", {
   extend: qx.ui.container.Composite,
@@ -50,6 +51,14 @@ qx.Class.define("ankamon.ui.anomaly.History", {
     this.__table = page._createTable(this.__columns, { storageKey: "anomalies.history.columns" });
     this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this),
       { rows: () => (this.__rows || []).map(r => r.cells) });
+    this.__table.addListener("cellDbltap", e => {
+      const id = this.__table.getTableModel().getValue(0, e.getRow());
+      const row = (this.__rows || []).find(r => r.cells[0] === id);
+      if (row) {
+        this.__showRow(row);
+      }
+    });
+    this.__table.setToolTipText("Satıra çift tıklayın: kaydın tamamı");
     this.add(this.__table, { flex: 1 });
     this.__count = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
     this.add(this.__count);
@@ -70,6 +79,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
         const seconds = (a.ended_at || now) - a.started_at;
         return {
           seconds,
+          anomaly: a,
           cells: [
             a.id, a.board, a.kindLabel, a.source || "", F.dateTime(a.started_at * 1000),
             a.ended_at ? F.dateTime(a.ended_at * 1000) : "—",
@@ -79,6 +89,22 @@ qx.Class.define("ankamon.ui.anomaly.History", {
         };
       });
       this.__apply();
+    },
+
+    /** Kaydın bütün alanları kipli pencerede (Ayrıntı grid'de kırpılıyordu). */
+    __showRow(row) {
+      const a = row.anomaly;
+      const c = row.cells;
+      ankamon.ui.anomaly.RowDetail.open(`${a.kindLabel} — ${a.board}`, [
+        ["Tahta", c[1]],
+        ["Bulgu", c[2]],
+        ["Kaynak", c[3]],
+        ["Başlangıç", c[4]],
+        ["Bitiş", c[5]],
+        ["Süre", c[6]],
+        ["Ayrıntı", c[7]],
+        ["Bu bulgu nedir?", a.kindDesc]
+      ]);
     },
 
     /** Tahta ve Bulgu süzgeçlerini doldurur (özette satır seçimi; null: o süzgeç boş). */

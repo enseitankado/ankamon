@@ -85,8 +85,9 @@ def judge(used: int, total: int, live: int | None = None) -> tuple[bool, str, di
     if free_pct < FREE_MIN_PCT:
         tail = f" — boş alan %{_tr(free_pct)}, firmware yeni değişken yazamayabilir"
         if live and live < used / 2:
-            tail += (" (doluluğun çoğu eskimiş kopya. Çözüm: tahtanın başında BIOS kurulumuna girip ayar"
-                     " değiştirmeden \"Save & Exit\" — firmware toplar, ayarlar korunur)")
+            # Platformdan bağımsız (kullanıcı isteği 2026-11-12): cihaz/marka/işletim sistemi anılmaz.
+            tail += (" (doluluğun çoğu eskimiş kopya. Çözüm: cihazın başında firmware (BIOS/UEFI) kurulumuna girip"
+                     " ayar değiştirmeden \"Save & Exit\" — firmware toplar, ayarlar korunur)")
         return True, text + tail, detail
     return False, text + f" — boş alan %{_tr(free_pct)}", detail
 

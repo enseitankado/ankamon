@@ -29,15 +29,16 @@
  * Sağlık ▸ Denetle (kullanıcı isteği 2026-11-12: eski "Denetle" ve "Tara" sekmeleri birleşti; kimlik "reports", eski "Tarama"
  * kimliği buraya yönlenir — bkz. page.Anomalies OLD_TABS). İki yol da buradan başlatılır ve sonuçları buradadır:
  *   - Sürekli izleme denetimlerinin anlık yoklaması ("anomaly_scan" görevi — bkz. worker/ankamon/anomaly/scan.py): kuralın
- *     tahtada çalışan küçük betiği SSH ile o an çalışır; sonuç "Anlık yoklama" iç sekmesinde, kayıt tutulmaz.
- *   - Tam SSH denetimi ("diagnose" görevi — bkz. worker/ankamon/executor/diagnose.py; yalnız "diagnose" yetkisiyle):
- *     haftalık otomatik denetimin aynısı; seçili tahtalarda ② ile ya da açık tüm tahtalarda "Şimdi tara" ile. Raporları
- *     "SSH denetim raporları" iç sekmesinde (gömülü page.Diagnose — rapor seçici, grid, bulgular), Durum'a yansır.
+ *     tahtada çalışan küçük betiği SSH ile o an çalışır; kayıt tutulmaz.
+ *   - Tam denetim ("diagnose" görevi — bkz. worker/ankamon/executor/diagnose.py; yalnız "diagnose" yetkisiyle): haftalık
+ *     otomatik denetimin aynısı; seçili tahtalarda ② ile ya da açık tüm tahtalarda "Şimdi tara" ile. Durum'a yansır.
+ * ②'de iki yolun ayrımı vurgulanmaz (kullanıcı isteği 2026-11-12) — her sonucun kaynağı ③'ün Kaynak sütununda.
  *
  * Yerleşim: üstte ① tahtalar (onay kutulu; arama, Tümü / Çevrim içi / Hiçbiri) | ② denetim türleri ve Tara; altta tam
- * genişlikte ③ Sonuçlar (iç sekmeler: SSH denetim raporları, Anlık yoklama — "Yalnız anomali bulunanlar" süzgeci;
- * çift tık → o tahtanın Geçmiş'i). Son seçimler (tahtalar, türler, iç sekme) ve ayırıcı konumları kullanıcı başına
- * sunucuda hatırlanır. Son anlık yoklamanın sonucu sekme yeniden açılınca gösterilir.
+ * genişlikte ③ Sonuçlar — TEK grid: tam denetim raporunun kontrolleri (gömülü page.Diagnose'un yalnız üst satırı: Yenile,
+ * Şimdi tara, Rapor seçici), son anlık yoklama ve süren sürekli izleme bulguları; Kaynak sütunu (uzak bağlantı / tahtanın
+ * gönderdiği loglar), "Yalnız sorunlular" (varsayılan), çift tık → satırın tamamı (ui.anomaly.RowDetail). Son seçimler
+ * ve ayırıcı konumları kullanıcı başına sunucuda hatırlanır. Son anlık yoklamanın sonucu sekme yeniden açılınca gösterilir.
  */
 qx.Class.define("ankamon.ui.anomaly.Scan", {
   extend: qx.ui.tabview.Page,
@@ -99,7 +100,14 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     /** Ayırıcı konumlarının ui_prefs anahtarı. */
     SPLIT_PREF: "anomalies.denetle.split",
     /** Seçili iç sonuç sekmesinin ui_prefs anahtarı ("ssh" | "quick"). */
-    RESULT_TAB_PREF: "anomalies.denetle.results"
+    RESULT_TAB_PREF: "anomalies.denetle.results",
+    /** Kaynak sütunu metinleri (sonucun nereden elde edildiği). */
+    SOURCE: {
+      ssh: "Uzak bağlantı (SSH ile tahtadan okundu)",
+      quick: "Uzak bağlantı (SSH, anlık yoklama)",
+      metric: "Uzak bağlantı (Ankamon'un topladığı sensör ölçümleri)",
+      log: "Tahtanın gönderdiği loglar"
+    }
   },
 
   members: {
@@ -107,9 +115,6 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     __mainSplit: null,
     __outerSplit: null,
     __reports: null,
-    __resultTabs: null,
-    __sshTab: null,
-    __quickTab: null,
     __checked: null,
     __hasBoardPref: false,
     __kindPref: null,
@@ -223,101 +228,87 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       this.__status = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
       run.add(this.__status, { flex: 1 });
       box.add(run);
-      // Tam SSH denetimi başlatılınca not ve raporuna geçiş düğmesi (rapor ③'te "SSH denetim raporları" iç sekmesinde).
+      // Tam denetim başlatılınca kısa not (sonuçlar ③'te).
       this.__sshRow = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ visibility: "excluded", marginTop: 4 });
       this.__sshNote = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
       this.__sshRow.add(this.__sshNote, { flex: 1 });
-      const toReports = new qx.ui.form.Button("SSH raporunu göster");
-      toReports.addListener("execute", () => this.showReport());
-      this.__sshRow.add(toReports);
       box.add(this.__sshRow);
       return box;
     },
 
     /**
-     * ③ Sonuçlar (tam genişlik): iç sekmeler "SSH denetim raporları" (gömülü page.Diagnose — eski Denetle sekmesinin
-     * tamamı: Yenile, Şimdi tara, Rapor seçici, grid, bulgular) ve "Anlık yoklama" (eski Tara sonuç tablosu).
+     * ③ Sonuçlar (tam genişlik) — TEK grid (kullanıcı isteği 2026-11-12: eski "SSH denetim raporları" ve "Anlık yoklama"
+     * iç sekmeleri birleşti). Satırlar: tam denetim raporunun kontrolleri (üstteki rapor seçicide seçili rapor — gömülü
+     * page.Diagnose'un yalnız üst satırı görünür), son anlık yoklamanın sonuçları ve sürmekte olan sürekli izleme
+     * bulguları. Kaynak sütunu sonucun nereden elde edildiğini yazar: uzak bağlantıyla (Ankamon tahtaya SSH ile girip
+     * okudu / Ankamon'un tahtadan topladığı sensör ölçümleri) mı, tahtanın gönderdiği loglardan mı. Çift tıklama: satırın
+     * tamamı (ui.anomaly.RowDetail).
      */
     __createResultsPane() {
       const results = ankamon.ui.StepBox.create(3, "Sonuçlar").set({ marginTop: 5 });
-      this.__resultTabs = new qx.ui.tabview.TabView();
       if (this.__reports) {
-        this.__sshTab = new qx.ui.tabview.Page("SSH denetim raporları").set({ layout: new qx.ui.layout.Grow(), padding: 6 });
-        this.__sshTab.setUserData("key", "ssh");
-        this.__sshTab.add(this.__reports);
-        this.__resultTabs.add(this.__sshTab);
+        this.__reports.setEmbedded(true);
+        this.__reports.addListener("reportLoaded", () => this.__renderResults());
+        results.add(this.__reports);
       }
-      this.__quickTab = new qx.ui.tabview.Page("Anlık yoklama").set({ layout: new qx.ui.layout.VBox(4), padding: 6 });
-      this.__quickTab.setUserData("key", "quick");
-      const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-      head.add(new qx.ui.basic.Label("Sürekli izleme denetimlerinin seçili tahtalarda o anki sonucu (kayıt tutulmaz).")
-        .set({ textColor: "app-muted" }));
+      const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ marginTop: 2 });
+      this.__resultNote = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true });
+      head.add(this.__resultNote);
       head.add(new qx.ui.core.Spacer(), { flex: 1 });
-      // Varsayılan işaretli (kullanıcı isteği): önce bulunanlar görünür.
-      this.__onlyFound = new qx.ui.form.CheckBox("Yalnız anomali bulunanlar").set({ value: true });
+      // Varsayılan işaretli: önce sorunlar görünür.
+      this.__onlyFound = new qx.ui.form.CheckBox("Yalnız sorunlular").set({ value: true,
+        toolTipText: "Sorunsuz (Sorun yok / Yok) satırları gizler" });
       this.__onlyFound.addListener("changeValue", () => this.__renderResults());
       head.add(this.__onlyFound);
-      this.__quickTab.add(head);
+      results.add(head);
 
-      const columns = [
-        { id: "board", label: "Tahta", width: 180 },
-        { id: "kind", label: "Denetim", width: 140 },
-        { id: "result", label: "Sonuç", width: 110 },
-        { id: "detail", label: "Ayrıntı" }
+      this.__resultColumns = [
+        { id: "board", label: "Tahta", width: 170 },
+        { id: "check", label: "Denetim", width: 210 },
+        { id: "result", label: "Sonuç", width: 100, choices: true },
+        { id: "detail", label: "Ayrıntı", width: 420 },
+        { id: "source", label: "Kaynak", width: 210, choices: true,
+          hint: "Sonucun nereden elde edildiği: uzak bağlantıyla (Ankamon tahtaya bağlanıp okudu) mı, tahtanın gönderdiği loglardan mı" },
+        { id: "at", label: "Zaman", width: 140 }
       ];
-      this.__resultTable = this.__page._createTable(columns, { prefsKey: "anomalies.scan.results.columns", filterable: true });
+      this.__resultTable = this.__page._createTable(this.__resultColumns, { prefsKey: "anomalies.denetle.merged.columns" });
+      this.__resultFields = this.__page._addColumnFilters(this.__resultTable, this.__resultColumns, () => this.__applyResults(),
+        { rows: () => (this.__mergedRows || []).map(r => r.cells), persist: true });
       this.__resultTable.getTableColumnModel().setDataCellRenderer(3, new qx.ui.table.cellrenderer.Html());
       this.__resultTable.addListener("cellDbltap", e => {
-        const board = this.__resultTable.getTableModel().getValue(1, e.getRow());
-        if (board) {
-          this.__page.showBoard(board);
+        const id = this.__resultTable.getTableModel().getValue(0, e.getRow());
+        const row = (this.__mergedRows || []).find(r => r.cells[0] === id);
+        if (row) {
+          ankamon.ui.anomaly.RowDetail.open(`${row.plain.check} — ${row.plain.board}`, [
+            ["Tahta", row.plain.board], ["Denetim", row.plain.check], ["Sonuç", row.plain.result], ["Ayrıntı", row.plain.detail],
+            ["Öneri", row.plain.advice], ["Kaynak", row.plain.source], ["Zaman", row.plain.at]
+          ]);
         }
       });
-      this.__resultTable.setToolTipText("Çift tıklayın: o tahtanın anomali kayıtları (Geçmiş)");
-      this.__quickTab.add(this.__resultTable, { flex: 1 });
-      this.__resultTabs.add(this.__quickTab);
-
-      // Son seçilen iç sekme hatırlanır (yoksa SSH raporları — eski Denetle'nin açılış görünümü).
-      const saved = (this.__page._user.ui_prefs || {})[ankamon.ui.anomaly.Scan.RESULT_TAB_PREF];
-      const first = this.__resultTabs.getChildren().find(t => t.getUserData("key") === saved);
-      if (first) {
-        this.__resultTabs.setSelection([first]);
-      }
-      this.__resultTabs.addListener("changeSelection", e => {
-        const tab = e.getData()[0];
-        if (tab) {
-          ankamon.page.Base.savePref(this.__page._user, ankamon.ui.anomaly.Scan.RESULT_TAB_PREF, tab.getUserData("key"));
-          if (tab === this.__sshTab) {
-            this.__reports.activate();
-          }
-        }
-      });
-      results.add(this.__resultTabs, { flex: 1 });
+      this.__resultTable.setToolTipText("Satıra çift tıklayın: satırın tamamı");
+      results.add(this.__resultTable, { flex: 1 });
+      // Gömülü rapor sayfası Denetle açılınca tazelenir (eskiden iç sekmesi seçilince).
+      this.addListener("appear", () => this.__reports && this.__reports.activate());
       return results;
     },
 
-    /**
-     * ③'te SSH denetim raporlarını gösterir; board verilirse rapor o tahtaya süzülür (Durum'dan SSH bulgusuna çift tık —
-     * bkz. page.Anomalies.openFinding).
-     */
+    /** ③'te raporu gösterir; board verilirse grid o tahtaya süzülür (Durum'dan bulguya çift tık — page.Anomalies.openFinding). */
     showReport(board) {
-      if (!this.__sshTab) {
-        return;
-      }
-      this.__resultTabs.setSelection([this.__sshTab]);
-      if (board) {
-        this.__reports.showBoard(board);
-      } else {
+      if (this.__reports) {
         this.__reports.refresh();
+      }
+      if (board && this.__resultFields) {
+        this.__resultFields.board.setValue(`"${board}"`);
       }
     },
 
-    /** ③'te anlık yoklama sonuçlarını gösterir (anlık yoklama başlatılınca). */
-    __showQuick() {
-      if (this.__resultTabs.getSelection()[0] !== this.__quickTab) {
-        this.__resultTabs.setSelection([this.__quickTab]);
-      }
+    /** Sürmekte olan sürekli izleme bulguları (page.Anomalies — Geçmiş verisinden, ended_at boş olanlar). */
+    setActive(anomalies) {
+      this.__active = (anomalies || []).filter(a => !a.ended_at);
+      this.__renderResults();
     },
+
+    __showQuick() {},
 
     /**
      * Sayfanın verisiyle (30 sn'de bir) çağrılır: tür listesi ilk seferde kurulur; kullanıcının son taraması
@@ -330,25 +321,16 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         this.__kindBox.removeAll();
         this.__kindChecks = {};
         const esc = qx.bom.String.escape;
-        const P = ankamon.ui.health.Status.PATH;
-        const heading = (path, text) => this.__kindBox.add(new qx.ui.basic.Label(
-          `<span style="color:${P[path].color};font-weight:bold">${P[path].text}</span> — ${text}`).set({
-          rich: true, wrap: true, allowGrowX: true, marginTop: 4, marginBottom: 4 }));
-        // Tam SSH denetimi: haftalık otomatik denetimin aynısı, seçili tahtalarda şimdi (sonucu ③ SSH denetim raporlarında).
+        // SSH denetimi / sürekli izleme ayrımı burada vurgulanmaz (kullanıcı isteği 2026-11-12): yalnız seçenekler;
+        // her sonucun nereden geldiği ③ Sonuçlar'ın Kaynak sütununda.
         if (this.__sshAllowed) {
-          heading("ssh", "Ankamon tahtaya SSH ile girip ölçer; sonucu aşağıda <b>SSH denetim raporları</b>nda, Durum'a da yansır. " +
-            "Açık tüm tahtalar için raporların üstündeki <b>Şimdi tara</b>.");
-          this.__sshCheck = new qx.ui.form.CheckBox("Tam SSH denetimi (disk sağlığı, sıcaklık, boş alan, güncellemeler, servisler…)").set({
+          this.__sshCheck = new qx.ui.form.CheckBox("Tam denetim (disk sağlığı, sıcaklık, boş alan, güncellemeler, servisler…)").set({
             value: this.__sshPref
           });
           this.__sshCheck.addListener("changeValue", () => this.__updateButton());
           this.__kindBox.add(this.__sshCheck);
-          this.__kindBox.add(new qx.ui.basic.Label("Haftada bir kendiliğinden de yapılır. Tahtada yalnız okuma yapılır, " +
-            "tahta başına 1-2 sn sürer.").set({ rich: true, wrap: true, allowGrowX: true, textColor: "app-muted", marginLeft: 22, marginBottom: 8 }));
-        }
-        if (scannable.length) {
-          heading("watch", "bu denetimler sürekli kendiliğinden yapılır; burada seçilen tahtalarda <b>o an</b> tahtaya bakılır, " +
-            "sonuç aşağıda <b>Anlık yoklama</b>da (kayıt tutulmaz).");
+          this.__kindBox.add(new qx.ui.basic.Label("Haftada bir kendiliğinden de yapılır; tahtada yalnız okuma yapılır, " +
+            "tahta başına 1-2 sn sürer.").set({ rich: true, wrap: true, allowGrowX: true, textColor: "app-muted", marginLeft: 22, marginBottom: 6 }));
         }
         scannable.forEach(kind => {
           const check = new qx.ui.form.CheckBox(kinds[kind].label).set({
@@ -479,17 +461,15 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         const online = (this.__boards || []).filter(b => this.__checked.has(b.id) && b.online).map(b => b.id);
         this.__sshRow.setVisibility("visible");
         if (!online.length) {
-          this.__sshNote.setValue("SSH denetimi: seçili tahtaların hiçbiri açık değil; kapalı tahta denetlenemez.");
+          this.__sshNote.setValue("Tam denetim: seçili tahtaların hiçbiri açık değil; kapalı tahta denetlenemez.");
         } else {
           try {
             const job = await ankamon.io.Api.post("/jobs", { type: "diagnose", board_ids: online });
-            this.__sshNote.setValue(`<b style="color:${ankamon.ui.health.Status.PATH.ssh.color}">SSH denetimi</b> başlatıldı ` +
-              `(${online.length} açık tahta, görev #${job.id}). Sonuç aşağıda <b>SSH denetim raporları</b>nda ve Durum'da görünür.`);
-            if (!kinds.length) {
-              this.showReport(); // yalnız SSH denetimi istendi: süren raporu göster
-            }
+            this.__sshNote.setValue(`Tam denetim başlatıldı (${online.length} açık tahta, görev #${job.id}); ` +
+              "sonuçlar aşağıda ve Durum'da görünür.");
+            this.showReport(); // süren denetim raporu ③'e gelsin
           } catch (e) {
-            this.__sshNote.setValue("SSH denetimi başlatılamadı: " + qx.bom.String.escape(e.message || String(e)));
+            this.__sshNote.setValue("Tam denetim başlatılamadı: " + qx.bom.String.escape(e.message || String(e)));
           }
         }
       } else {
@@ -574,25 +554,109 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     },
 
     __renderResults() {
+      if (!this.__resultTable) {
+        return;
+      }
+      const F = ankamon.util.Format;
+      const S = ankamon.ui.table.StatusRenderer;
+      const L = ankamon.page.Diagnose.LEVEL;
+      const red = S.colorOf("Çevrim dışı");
+      const green = S.colorOf("Çevrim içi");
+      const esc = qx.bom.String.escape;
+      const SRC = ankamon.ui.anomaly.Scan.SOURCE;
+      const rows = [];
+      const add = (id, rank, plain, resultHtml, detailHtml) => {
+        rows.push({ rank, plain, problem: rank < 4,
+          cells: [id, plain.board, plain.check, plain.result, detailHtml, plain.source, plain.at],
+          html: resultHtml });
+      };
+      // 1) Tam denetim raporu (seçili rapor).
+      const report = this.__reports ? this.__reports.getReport() : null;
+      (report ? report.targets : []).forEach(t => {
+        let r = null;
+        if (t.status === "ok") {
+          try {
+            r = JSON.parse(t.output || "{}");
+          } catch (e) {
+            r = null;
+          }
+        }
+        const at = r && r.collected_at ? F.dateTime(r.collected_at * 1000) : (t.finished_at ? F.dateTime(t.finished_at * 1000) : "");
+        if (["queued", "running"].includes(t.status)) {
+          add(`ssh:${t.board_id}:pending`, 5, { board: t.board, check: "Tam denetim", result: t.status === "running" ? "Denetleniyor" : "Sırada",
+            detail: "", source: SRC.ssh, at: "" }, null, "");
+          return;
+        }
+        if (!r) {
+          const why = String(t.output || "").replace(/\s+/g, " ").trim();
+          add(`ssh:${t.board_id}:err`, 1, { board: t.board, check: "Tam denetim", result: "Ulaşılamadı", detail: why, source: SRC.ssh, at },
+            null, esc(why));
+          return;
+        }
+        (r.checks || []).forEach((c, i) => {
+          const level = L[c.level] || { text: c.level };
+          const rank = { bad: 0, warn: 2, info: 3, ok: 6 }[c.level] ?? 5;
+          // Son 24 saatin sıcaklığı tahtaya bağlanılarak değil, Ankamon'un sürekli topladığı ölçümlerden hesaplanır.
+          const source = c.group === "İşlemci sıcaklığı" ? SRC.metric : SRC.ssh;
+          add(`ssh:${t.board_id}:${i}`, rank, { board: t.board, check: `${c.group} › ${c.title}`, result: level.text,
+            detail: c.detail || "", advice: c.advice || "", source, at },
+          level.color ? S.html(level.text, level.color) : null,
+          esc(c.detail || "") + (c.advice ? ` <span style="opacity:.65">— ${esc(c.advice)}</span>` : ""));
+        });
+      });
+      // 2) Son anlık yoklama.
+      const label = { found: ["Var", red, 1], clear: ["Yok", green, 7], unknown: ["Taranamadı", null, 4], pending: ["Taranıyor", null, 5] };
+      const when = this.__job ? F.dateTime((this.__job.finished_at || this.__job.created_at) * 1000) : "";
+      this.__resultRows().forEach(r => {
+        const [text, color, rank] = label[r.state];
+        add(`quick:${r.id}`, rank, { board: r.board, check: (this.__kindLabels || {})[r.kind] || r.kind, result: text,
+          detail: r.text || "", source: SRC.quick, at: r.state === "pending" ? "" : when },
+        r.running ? ankamon.ui.JobSpinner.label("Taranıyor") : (color ? S.html(text, color) : null), esc(r.text || ""));
+      });
+      // 3) Süren sürekli izleme bulguları.
+      (this.__active || []).forEach(a => {
+        const source = a.source === "Log" ? SRC.log : (a.source === "Ölçüm" ? SRC.metric : (a.source || ""));
+        add(`watch:${a.id}`, 1, { board: a.board, check: a.kindLabel || a.kind, result: "Sürüyor",
+          detail: a.text || "", advice: a.kindDesc || "", source, at: F.dateTime(a.started_at * 1000) },
+        S.html("Sürüyor", red), esc(a.text || ""));
+      });
+      rows.sort((x, y) => x.rank - y.rank || String(x.plain.board).localeCompare(String(y.plain.board), "tr", { numeric: true }));
+      this.__mergedRows = rows;
+      this.__applyResults();
+      if (this.__job) {
+        this.__updateQuickStatus();
+      } else {
+        this.__status.setValue("Tahtaları ve denetimleri seçip Tara'ya basın.");
+      }
+    },
+
+    /** Süzgeçler + "Yalnız sorunlular" → grid. */
+    __applyResults() {
+      const all = this.__mergedRows || [];
+      const only = this.__onlyFound.getValue();
+      const filters = this.__resultColumns
+        .map((c, i) => ({ i: i + 1, text: ((this.__resultFields[c.id] || { getValue: () => "" }).getValue() || "").trim() }))
+        .filter(f => f.text);
+      const shown = all.filter(r => (!only || r.problem) && filters.every(f => ankamon.page.Base.filterMatch(r.cells[f.i], f.text)));
+      this.__resultTable.getTableModel().setData(shown.map(r => {
+        const cells = r.cells.slice();
+        if (r.html) {
+          cells[3] = r.html;
+        }
+        return cells;
+      }));
+      const problems = all.filter(r => r.problem).length;
+      this.__resultNote.setValue(`${shown.length} satır gösteriliyor · ${problems} sorun · ${all.length} toplam`);
+    },
+
+    /** ② altındaki durum satırı: son anlık yoklamanın özeti. */
+    __updateQuickStatus() {
       const all = this.__resultRows();
       const job = this.__job;
       const S = ankamon.ui.table.StatusRenderer;
       const red = S.colorOf("Çevrim dışı");
       const green = S.colorOf("Çevrim içi");
-      const label = { found: ["Var", red], clear: ["Yok", green], unknown: ["Taranamadı", null], pending: ["…", null] };
-      const order = { found: 0, unknown: 1, pending: 2, clear: 3 };
-      const rows = all.filter(r => !this.__onlyFound.getValue() || r.state === "found")
-        .sort((a, b) => order[a.state] - order[b.state] || a.board.localeCompare(b.board, "tr"));
       const esc = qx.bom.String.escape;
-      this.__resultTable.getTableModel().setData(rows.map(r => {
-        const [text, color] = label[r.state];
-        return [r.id, r.board, (this.__kindLabels || {})[r.kind] || r.kind,
-          r.running ? ankamon.ui.JobSpinner.label("Taranıyor") : (color ? S.html(text, color) : text), r.text || ""];
-      }));
-      if (!job) {
-        this.__status.setValue("Tahtaları ve anomalileri seçip Tara'ya basın.");
-        return;
-      }
       const boards = job.targets.length;
       const pending = job.targets.filter(t => ["queued", "running"].includes(t.status)).length;
       const foundBoards = new Set(all.filter(r => r.state === "found").map(r => r.board)).size;
@@ -605,6 +669,12 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       html += ` <span style="opacity:.75">· ${boards} tahta` + (unreachable ? `, ${unreachable} tanesine ulaşılamadı` : "") +
         (pending ? "" : ` · ${esc(String(when))}`) + "</span>";
       this.__status.setValue(html);
-    }
+    },
+
+    __resultColumns: null,
+    __resultFields: null,
+    __resultNote: null,
+    __mergedRows: null,
+    __active: null
   }
 });

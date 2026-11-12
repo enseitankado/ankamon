@@ -213,6 +213,8 @@ qx.Class.define("ankamon.page.Anomalies", {
           text: ankamon.page.Anomalies.describe(a)
         }));
         this.__history.setData(rows, from);
+        // Denetle ▸ ③ Sonuçlar: süren sürekli izleme bulguları da birleşik grid'de (kaynağı loglar/ölçümler).
+        this.__scan.setActive(rows);
         this.__scan.setKinds(data.kinds, data.last_scan_job);
       } else {
         this.__scan.setKinds({}, null);
