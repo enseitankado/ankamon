@@ -72,7 +72,7 @@ final class DashboardApi
                  WHERE received_at > now() - interval '24 hours' AND severity <= 3
                  ORDER BY received_at DESC LIMIT 15"
             ),
-            // Hedef tahtalar ([{id, name}]): satır sağ menüsündeki "Hata loglarını göster" için.
+            // Hedef cihazlar ([{id, name}]): satır sağ menüsündeki "Hata loglarını göster" için.
             'recent_jobs' => array_map(
                 fn($job) => ['targets' => json_decode((string) $job['targets'], true) ?: []] + $job,
                 Db::all(

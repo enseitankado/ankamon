@@ -48,7 +48,7 @@ final class ChatApi
         )];
     }
 
-    /** Disk kullanımı: tahta (ad) başına ileti sayısı, ilk/son; boyut tablodan orantılı (tahmini). */
+    /** Disk kullanımı: cihaz (ad) başına ileti sayısı, ilk/son; boyut tablodan orantılı (tahmini). */
     public function stats(Request $request): array
     {
         $bytes = Storage::relationBytes('chat_messages');
@@ -74,7 +74,7 @@ final class ChatApi
         ];
     }
 
-    /** Kalıcı silme: name=<kayıttaki tahta adı> ya da all=1. Geri alınamaz; audit_log'a yazılır. */
+    /** Kalıcı silme: name=<kayıttaki cihaz adı> ya da all=1. Geri alınamaz; audit_log'a yazılır. */
     public function delete(Request $request, array $user): array
     {
         if ($request->query('all') === '1') {

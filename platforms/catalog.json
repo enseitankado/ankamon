@@ -40,7 +40,7 @@
     { "id": "screen_power", "title": "Ekranı uyandır / uyut", "menu": ["Uyandır", "Uyut"], "jobs": ["wake", "sleep"],
       "impl": { "linux": "xset dpms (X oturumu)" } },
     { "id": "screen_lock", "title": "Ekran kilidi", "menu": ["Ekranı kilitle", "Ekran kilidini aç"], "jobs": ["screen_lock", "screen_unlock"],
-      "impl": { "linux": "tahta bekçisi + EVIOCGRAB + tam ekran pencere" } },
+      "impl": { "linux": "cihaz bekçisi + EVIOCGRAB + tam ekran pencere" } },
     { "id": "input_lock", "title": "Klavye / fare / dokunmatik kilidi",
       "menu": ["Klavyeyi kilitle", "Klavye kilidini aç", "Fareyi kilitle", "Fare kilidini aç", "Dokunmatiği kilitle", "Dokunmatik kilidini aç"],
       "jobs": ["input_lock"], "impl": { "linux": "evdev EVIOCGRAB" } },
@@ -72,13 +72,13 @@
     { "id": "home_backup", "title": "Yedekle / Geri al", "menu": ["Yedekle/Geri al"], "jobs": ["backup_home", "restore_home", "home_sizes"],
       "impl": { "linux": "tar + SSH (/home)" } },
     { "id": "taskmgr", "title": "Görev yöneticisi", "menu": ["Görev yöneticisi"],
-      "impl": { "linux": "canlı SSH + tahta ajanı (/proc, systemd)" } },
+      "impl": { "linux": "canlı SSH + cihaz ajanı (/proc, systemd)" } },
     { "id": "open_url", "title": "Web sitesi aç", "menu": ["Web sitesi aç…"], "jobs": ["open_url"],
       "impl": { "linux": "xdg-open (oturum sahibinin X oturumunda)" } },
     { "id": "wifimon", "title": "Wi-Fi Monitör", "menu": ["Wi-Fi Monitör"],
       "impl": { "linux": "nmcli + iw monitör kipi" } },
     { "id": "chat", "title": "Sohbet", "menu": ["Sohbet"],
-      "impl": { "linux": "tahtada GTK sohbet penceresi" } },
+      "impl": { "linux": "cihazda GTK sohbet penceresi" } },
     { "id": "power_on", "title": "Bilgisayarı aç (Wake-on-LAN)", "menu": ["Bilgisayarı aç (WoL)"], "jobs": ["wol"],
       "impl": { "linux": "sihirli paket", "windows": "sihirli paket", "macos": "sihirli paket", "other": "sihirli paket" } },
     { "id": "power_off", "title": "Kapat / yeniden başlat", "menu": ["Bilgisayarı kapat", "Bilgisayarı yeniden başlat"],
@@ -88,7 +88,7 @@
       "impl": { "linux": "donanım bilgisi toplayıcı (SSH)" } },
     { "id": "diagnose", "title": "Sorun tespiti", "jobs": ["diagnose", "anomaly_scan"],
       "impl": { "linux": "SSH denetimi" } },
-    { "id": "record", "title": "Kayıt işlemleri", "menu": ["Logları göster", "Düzenle", "Sil", "Tahta ekle…"],
+    { "id": "record", "title": "Kayıt işlemleri", "menu": ["Logları göster", "Düzenle", "Sil", "Cihaz ekle…"],
       "impl": { "linux": "Ankamon", "windows": "Ankamon", "macos": "Ankamon", "other": "Ankamon" } }
   ]
 }

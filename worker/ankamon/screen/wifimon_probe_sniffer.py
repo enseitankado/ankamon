@@ -23,9 +23,9 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Wi-Fi Monitör: tahtada çalışan Wi-Fi dinleyicisi — yoklamalar ve bağlı cihazlar (bkz. wifi_remote_scan.py, wifi.py).
+"""Wi-Fi Monitör: cihazda çalışan Wi-Fi dinleyicisi — yoklamalar ve bağlı cihazlar (bkz. wifi_remote_scan.py, wifi.py).
 
-Tahtanın kartı monitör kipindeki ek bir arabirimle (ankamon-mon0) o an ayarlı kanaldaki bütün 802.11 çerçevelerini duyar;
+Cihazın kartı monitör kipindeki ek bir arabirimle (ankamon-mon0) o an ayarlı kanaldaki bütün 802.11 çerçevelerini duyar;
 program bunlardan üç türü kullanır:
 - Yoklama (probe request): bağlı olmayan ama Wi-Fi'si açık cihazlar çevredeki ağları aramak için ara ara yayar.
 - Bağlı cihazın gönderdiği veri çerçevesi (ToDS=1, FromDS=0; boş "null data" dahil): bir erişim noktasına BAĞLI cihaz.
@@ -33,7 +33,7 @@ program bunlardan üç türü kullanır:
   çerçeve (FromDS) sayılmaz: cihaz AP'nin kapsamında herhangi bir yerde (başka kat) olabilir. İçerik şifrelidir, okunmaz;
   yalnız başlıktaki adresler (cihaz, AP) kullanılır.
 - Beacon: BSSID → ağ adı (bağlı cihazın hangi ağa bağlı olduğunu adlandırmak için).
-Program /run/ankamon-wifimon/probe.py olarak yazılır, tahtanın kendi python3'ü ile (yalnız standart kitaplık) çalışır: AF_PACKET
+Program /run/ankamon-wifimon/probe.py olarak yazılır, cihazın kendi python3'ü ile (yalnız standart kitaplık) çalışır: AF_PACKET
 ham soket, radiotap başlığından sinyal (dBm).
 
 Kanal planı: 2,4 GHz 1/6/11 (yoklama için yeterli: telefonların tam taraması her kanalı dolaşır) + son taramada (nmcli

@@ -23,11 +23,11 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Kuyruktaki görevleri sırayla alır, türüne göre tahtalarda çalıştırır ve sonuçları yazar.
+"""Kuyruktaki görevleri sırayla alır, türüne göre cihazlarda çalıştırır ve sonuçları yazar.
 
 Görevi API kuyruğa koyar (bkz. backend JobsApi); yürütme burada, host erişimi olan worker'da yapılır.
 Her tur bir görev işler; uzun görevler diğer periyodik işleri bloklamasın diye küçük tutulur.
-Komut/işlem görevlerinin her tahtadaki sonucu ayrıca command_log'a (komut logları) yazılır.
+Komut/işlem görevlerinin her cihazdaki sonucu ayrıca command_log'a (komut logları) yazılır.
 """
 
 from __future__ import annotations
@@ -99,14 +99,14 @@ def run(conn) -> None:
 
 
 def _dispatch(conn, job, params, targets) -> dict[int, dict]:
-    """Hedeflerde işi çalıştırır. Her tahtanın sonucu hazır olur olmaz (en yavaş tahtayı beklemeden)
+    """Hedeflerde işi çalıştırır. Her cihazın sonucu hazır olur olmaz (en yavaş cihazı beklemeden)
     `_write_one` ile hemen `job_targets`'a yazılır — bkz. ansible.run()'daki on_result; Jobs.js
     bunu polling ile canlı yakalar."""
     if not targets:
         return {}
     names = {t["board_id"]: t["name"] for t in targets}
-    # Hepsi "Çalışıyor" görünsün: _write_one her tahtayı bitince tek tek ok/failed'a çevirecek,
-    # kullanıcı polling'de hangi tahtaların hâlâ beklediğini anında görsün.
+    # Hepsi "Çalışıyor" görünsün: _write_one her cihazı bitince tek tek ok/failed'a çevirecek,
+    # kullanıcı polling'de hangi cihazların hâlâ beklediğini anında görsün.
     conn.execute(
         "UPDATE job_targets SET status = 'running' WHERE job_id = %s AND board_id = ANY(%s)",
         (job["id"], [t["board_id"] for t in targets]))
@@ -124,7 +124,7 @@ def _dispatch(conn, job, params, targets) -> dict[int, dict]:
         raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
     hosts = [{"id": t["board_id"], "ip": t["ip"]} for t in targets if t["ip"]]
     if not hosts:
-        raise RuntimeError("Seçilen tahtaların IP adresi yok.")
+        raise RuntimeError("Seçilen cihazların IP adresi yok.")
 
     def on_result(board_id, result):
         _write_one(conn, job, board_id, result, names.get(board_id, ""))
@@ -164,8 +164,8 @@ def _wol_result(ok: bool, msg: str) -> dict:
 
 
 def _write_one(conn, job, board_id: int, result: dict, name: str) -> None:
-    """Tek bir tahtanın sonucunu hemen yazar — `_dispatch` içinden (ansible on_result veya wol döngüsü)
-    o tahta bitince anında çağrılır, en yavaş tahtayı beklemeden; `conn` autocommit olduğundan
+    """Tek bir cihazın sonucunu hemen yazar — `_dispatch` içinden (ansible on_result veya wol döngüsü)
+    o cihaz bitince anında çağrılır, en yavaş cihazı beklemeden; `conn` autocommit olduğundan
     `/api/jobs/{id}` bunu hemen görür (Jobs.js'in 2 sn'lik polling'i canlı akış hissi verir)."""
     conn.execute(
         """UPDATE job_targets SET status = %s, exit_code = %s, output = %s, finished_at = now()
@@ -185,7 +185,7 @@ def _write_one(conn, job, board_id: int, result: dict, name: str) -> None:
 
 
 def _write_results(conn, job, results: dict[int, dict], targets: list[dict]) -> str:
-    """Tahta başına sonuçlar `_dispatch` sırasında `_write_one` ile zaten yazıldı; burada yalnız
+    """Cihaz başına sonuçlar `_dispatch` sırasında `_write_one` ile zaten yazıldı; burada yalnız
     genel iş özetini kapatır."""
     total = len(results)
     ok = sum(1 for r in results.values() if r["status"] == "ok")
@@ -193,11 +193,11 @@ def _write_results(conn, job, results: dict[int, dict], targets: list[dict]) -> 
     skipped = sum(1 for r in results.values() if r["status"] == "skipped")
     ran = total - skipped
     status = "done" if (ran and ok == ran) or not total else "failed"
-    summary = f"{ok}/{ran} tahtada başarılı" if ran else ("Hiçbir hedefte uygulanamadı" if total else "Hedef tahta yok.")
+    summary = f"{ok}/{ran} cihazda başarılı" if ran else ("Hiçbir hedefte uygulanamadı" if total else "Hedef cihaz yok.")
     if skipped:
         summary += f" · {skipped} atlandı (işletim sistemi)"
     if job["type"] == "ntfy_test" and not total:
-        summary = "Deneme bildirimi gönderildi (ntfy sunucusu kabul etti)."   # tahtasız görev: hata olsaydı failed olurdu
+        summary = "Deneme bildirimi gönderildi (ntfy sunucusu kabul etti)."   # cihazsız görev: hata olsaydı failed olurdu
     conn.execute(
         "UPDATE jobs SET status = %s, finished_at = now(), summary = %s WHERE id = %s",
         (status, summary, job["id"]))

@@ -23,13 +23,13 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtalara SSH ile dosya işlemleri (listeleme, silme, ad değiştirme, klasör oluşturma).
+"""Cihazlara SSH ile dosya işlemleri (listeleme, silme, ad değiştirme, klasör oluşturma).
 
-Bağlantılar OpenSSH ControlMaster ile tahta başına paylaşılır: ilk komut asıl bağlantıyı açar (parola
+Bağlantılar OpenSSH ControlMaster ile cihaz başına paylaşılır: ilk komut asıl bağlantıyı açar (parola
 sshpass ile), sonrakiler aynı bağlantı üzerinde ~20 ms'de çalışır — gezinirken her tıklamada yeni bir
 SSH el sıkışması (~0,5 sn) olmaz. Ortak bağlantı boşta CONTROL_PERSIST saniye sonra kendiliğinden kapanır.
 
-Tahtada çalışan her betik `sh -c '<betik>' sh <arg>…` biçiminde çağrılır: yollar/adlar betiğe metin olarak
+Cihazda çalışan her betik `sh -c '<betik>' sh <arg>…` biçiminde çağrılır: yollar/adlar betiğe metin olarak
 gömülmez, konumsal argüman olarak geçer (tırnak/boşluk/özel karakter güvenli).
 """
 
@@ -82,13 +82,13 @@ def _error(rc: int, err: str) -> RemoteError:
     if rc == 5:
         return RemoteError("SSH parolası reddedildi.")
     if rc == 255:
-        return RemoteError("Tahtaya SSH ile ulaşılamadı.")
+        return RemoteError("Cihaza SSH ile ulaşılamadı.")
     lines = [line for line in err.strip().splitlines() if line.strip()]
     return RemoteError(lines[-1][:300] if lines else f"İşlem başarısız (çıkış {rc}).")
 
 
 async def run(access: dict, script: str, *args: str, timeout: float = 60) -> bytes:
-    """Betiği tahtada çalıştırır; başarıda stdout döner, başarısızlıkta RemoteError fırlatır."""
+    """Betiği cihazda çalıştırır; başarıda stdout döner, başarısızlıkta RemoteError fırlatır."""
     cmd, env = ssh_command(access, script, *args)
     proc = await asyncio.create_subprocess_exec(
         *cmd, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE,
@@ -105,7 +105,7 @@ async def run(access: dict, script: str, *args: str, timeout: float = 60) -> byt
 
 
 # Dizin listesi: girdi başına "tür\thedef türü\tboyut\tsahip\tgrup\tizin(sekizlik)\tmtime\tad\0".
-# Sahip/grup adları tahtanın kendi kullanıcı veritabanından çözülür (sayısal uid değil). İlk satır
+# Sahip/grup adları cihazın kendi kullanıcı veritabanından çözülür (sayısal uid değil). İlk satır
 # dizinin kendisi (sahip/grup/izin + gerçek yol).
 _LIST = r"""
 cd -- "$1" 2>/dev/null || { echo "Dizin açılamadı: $1" >&2; exit 3; }

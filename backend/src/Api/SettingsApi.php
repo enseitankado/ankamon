@@ -36,7 +36,7 @@ use Ankamon\Core\NetifControl;
 use Ankamon\Core\Request;
 use Ankamon\Core\Settings;
 
-/** Sistem ayarları — yalnız yönetici. Tahta parolaları hiçbir zaman geri gönderilmez. */
+/** Sistem ayarları — yalnız yönetici. Cihaz parolaları hiçbir zaman geri gönderilmez. */
 final class SettingsApi
 {
     public function show(): array
@@ -93,7 +93,7 @@ final class SettingsApi
 
     /**
      * Sunucunun işletim sistemindeki ağ arabirimleri (konteyner host ağında: host'un kartları — Ayarlar ▸ Ağ arabirimleri).
-     * Ankamon bütün hizmetlerini bunların HEPSİ üzerinden yürütür; tahta ağı / idari ağ ayrımı yok (kullanıcı isteği
+     * Ankamon bütün hizmetlerini bunların HEPSİ üzerinden yürütür; cihaz ağı / idari ağ ayrımı yok (kullanıcı isteği
      * 2026-11-10). Yalnız döngü (lo) ve Docker'ın kendi iç arabirimleri (docker0, br-*, veth*) atlanır.
      * [{name, up, kind: "wired"|"wireless"|"virtual", mac, speed (Mbit/sn ya da null), addresses: ["192.168.1.5/24", …]}]
      */

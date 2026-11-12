@@ -26,10 +26,10 @@
  */
 
 /**
- * Sağlık ▸ Geçmiş'in üst bölmesi (eski "Özet" sekmesi — bkz. ui.anomaly.Records): seçili dönemde tahta (ve tür) başına
+ * Sağlık ▸ Geçmiş'in üst bölmesi (eski "Özet" sekmesi — bkz. ui.anomaly.Records): seçili dönemde cihaz (ve tür) başına
  * anomali sayısı, toplam/en uzun süre, son başlangıç, şu an sürüyor mu. Süreler döneme kırpılır (dönem başından önce
  * başlayan kaydın yalnız dönem içindeki kısmı sayılır). Sütun süzgeçli (bkz. page.Base _addColumnFilters). Satır seçilince
- * alttaki kayıtlar o tahtanın o bulgusuna süzülür (onSelect). Her sütun başlığının ve hücrenin açıklayıcı ipucu var
+ * alttaki kayıtlar o cihazın o bulgusuna süzülür (onSelect). Her sütun başlığının ve hücrenin açıklayıcı ipucu var
  * (kullanıcı isteği; bkz. HINTS ve ui.table.HintRenderer).
  */
 qx.Class.define("ankamon.ui.anomaly.Summary", {
@@ -37,20 +37,20 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
 
   /**
    * @param page {ankamon.page.Anomalies}
-   * @param onSelect {Function} (tahta, bulgu) — seçim kalkınca (null, null)
+   * @param onSelect {Function} (cihaz, bulgu) — seçim kalkınca (null, null)
    */
   construct(page, onSelect) {
     super(new qx.ui.layout.VBox(4));
 
-    // Tahta ve Anomali her zaman hazır listeli (kullanıcı isteği): satır azken (her tahtanın birkaç türü)
+    // Cihaz ve Anomali her zaman hazır listeli (kullanıcı isteği): satır azken (her cihazın birkaç türü)
     // otomatik karar "değer sayısı satır sayısına yakın" diye listeyi gizliyordu (bkz. Base.choicesSuitable).
     this.__columns = [
-      { id: "board", label: "Tahta", width: 200, choices: true, hint: "Bulgunun görüldüğü tahta. Satırı seçin: aşağıda yalnız onun kayıtları" },
+      { id: "board", label: "Cihaz", width: 200, choices: true, hint: "Bulgunun görüldüğü cihaz. Satırı seçin: aşağıda yalnız onun kayıtları" },
       { id: "kind", label: "Anomali", width: 140, choices: true, hint: "Bulgu türü (sürekli izleme denetimi); ayrıntısı Yardım ▸ Denetim türleri'nde" },
       { id: "count", label: "Sayı", width: 70, hint: "Seçili rapor döneminde bu bulgunun kaç kez başladığı" },
       { id: "total", label: "Toplam süre", width: 130, hint: "Dönem içinde toplam sürdüğü zaman (dönem başından önce başlayan kaydın yalnız dönem içindeki kısmı sayılır)" },
       { id: "longest", label: "En uzun", width: 120, hint: "En uzun süren tek kaydın süresi (dönem dışına taşan kısmı dahil)" },
-      { id: "last", label: "Son başlangıç", width: 150, hint: "Bu bulgunun bu tahtada en son başladığı an" },
+      { id: "last", label: "Son başlangıç", width: 150, hint: "Bu bulgunun bu cihazda en son başladığı an" },
       { id: "now", label: "Şu an", hint: "Bulgu şu an sürüyor mu (Sürüyor = henüz bitmedi)" }
     ];
     this.__table = page._createTable(this.__columns, { prefsKey: "anomalies.summary.columns", persistSort: true });
@@ -82,7 +82,7 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
       const row = sm.isSelectionEmpty() ? null : model.getRowData(sm.getLeadSelectionIndex());
       onSelect(row ? row[1] : null, row ? row[2] : null);
     });
-    this.__table.setToolTipText("Bir satır seçin: aşağıda yalnız o tahtanın o bulgusunun kayıtları görünür");
+    this.__table.setToolTipText("Bir satır seçin: aşağıda yalnız o cihazın o bulgusunun kayıtları görünür");
     this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this),
       { rows: () => this.__rows || [], persist: true });
     this.add(this.__table, { flex: 1 });
@@ -128,7 +128,7 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
       this.__apply();
     },
 
-    /** Tahta süzgecini verilen adla doldurur (Durum'dan çift tık). */
+    /** Cihaz süzgecini verilen adla doldurur (Durum'dan çift tık). */
     filterBoard(board) {
       this.__table.getSelectionModel().resetSelection();
       this.__filterFields.board.setValue(board || "");

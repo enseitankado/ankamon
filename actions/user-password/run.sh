@@ -21,7 +21,7 @@ elif command -v mkpasswd >/dev/null 2>&1; then
 fi
 case "${OZET:-}" in
     '$6$'*) ;;
-    *) echo "Parola özetlenemedi (tahtada openssl ya da mkpasswd yok)." >&2; exit 3 ;;
+    *) echo "Parola özetlenemedi (cihazda openssl ya da mkpasswd yok)." >&2; exit 3 ;;
 esac
 
 ayarlanan=0
@@ -33,7 +33,7 @@ for U in $ADLAR; do
         *) echo "✗ $U: geçersiz kullanıcı adı"; hata=$((hata + 1)); continue ;;
     esac
     if ! uid=$(id -u -- "$U" 2>/dev/null); then
-        echo "– $U: bu tahtada yok, atlandı"
+        echo "– $U: bu cihazda yok, atlandı"
         atlanan=$((atlanan + 1))
         continue
     fi
@@ -58,13 +58,13 @@ for U in $ADLAR; do
 done
 
 echo
-echo "Özet: $ayarlanan hesabın parolası ayarlandı, $atlanan bu tahtada yoktu, $hata ayarlanamadı."
+echo "Özet: $ayarlanan hesabın parolası ayarlandı, $atlanan bu cihazda yoktu, $hata ayarlanamadı."
 # Açılışta parola sıfırlama servisi etkinse verilen parola kalıcı değildir (bkz. actions/user-add).
 case "$(systemctl is-enabled tiha-boot-password-wipe.service 2>/dev/null)" in
     enabled|enabled-runtime)
         if [ ! -e /etc/tiha/boot-wipe.disabled ]; then
             echo
-            echo "⚠ UYARI: Bu tahtada açılışta parola sıfırlama servisi etkin: etapadmin dışındaki hesapların parolası"
+            echo "⚠ UYARI: Bu cihazda açılışta parola sıfırlama servisi etkin: etapadmin dışındaki hesapların parolası"
             echo "  yalnız bir sonraki açılışa kadar geçerlidir, sonrasında giriş EBA-QR, PIN ya da USB ile yapılır."
         fi ;;
 esac

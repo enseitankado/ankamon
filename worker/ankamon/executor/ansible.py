@@ -25,20 +25,20 @@
 
 """Ansible'a ince sarmalayıcı (ad-hoc + --tree).
 
-Yetkili uzaktan bakım içindir: tahtalara erişim bilgileri (kullanıcı/parola) yöneticinin arayüzde
+Yetkili uzaktan bakım içindir: cihazlara erişim bilgileri (kullanıcı/parola) yöneticinin arayüzde
 tanımladığı ayarlardan gelir ([[tiha-features]]: TiHA yalnız root ve etapadmin'e SSH izni verir).
-Her tahtada verilen kabuk betiğini (``ansible.builtin.script``) çalıştırır.
+Her cihazda verilen kabuk betiğini (``ansible.builtin.script``) çalıştırır.
 
-Sonuç ``--tree`` ile tahta başına JSON dosyasına yazılır; bu ansible-core'un kendi özelliğidir ve ek
+Sonuç ``--tree`` ile cihaz başına JSON dosyasına yazılır; bu ansible-core'un kendi özelliğidir ve ek
 koleksiyon (ansible.posix json callback) gerektirmez. Dosyalardan çıkış kodu + çıktı okunur.
 
 **Canlı sonuç**: ansible'ın "tree" callback eklentisi (ansible/plugins/callback/tree.py)
-``v2_runner_on_ok``/``_on_failed``/``_on_unreachable`` olaylarında, o tahtanın görevi biter bitmez
-(TÜM tahtalar değil, yalnız O tahta) dosyayı diske yazar — yani ağaç dizini ansible süreci HÂLÂ
-ÇALIŞIRKEN tahta tahta dolar. ``run()`` bunu kullanır: süreci ``subprocess.run`` ile bloke etmek
+``v2_runner_on_ok``/``_on_failed``/``_on_unreachable`` olaylarında, o cihazın görevi biter bitmez
+(TÜM cihazlar değil, yalnız O cihaz) dosyayı diske yazar — yani ağaç dizini ansible süreci HÂLÂ
+ÇALIŞIRKEN cihaz cihaz dolar. ``run()`` bunu kullanır: süreci ``subprocess.run`` ile bloke etmek
 yerine ``Popen`` ile başlatıp ağaç dizinini kısa aralıklarla yoklar, yeni beliren her dosyayı hemen
 okuyup (varsa) ``on_result(board_id, result)`` ile çağırana anında bildirir — çağıran (jobs.py) bunu
-``job_targets``'a o anda yazar, en yavaş tahtayı beklemeden.
+``job_targets``'a o anda yazar, en yavaş cihazı beklemeden.
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ _CONNECT_TIMEOUT = 10
 
 
 def _inventory(hosts: list[dict], user: str, password: str) -> str:
-    """Hedef tahtalardan geçici bir INI envanteri üretir. Satır: board_<id> ansible_host=<ip>."""
+    """Hedef cihazlardan geçici bir INI envanteri üretir. Satır: board_<id> ansible_host=<ip>."""
     lines = ["[boards]"]
     for host in hosts:
         lines.append(f"board_{host['id']} ansible_host={host['ip']}")
@@ -69,7 +69,7 @@ def _inventory(hosts: list[dict], user: str, password: str) -> str:
         f"ansible_password={password}",
         "ansible_connection=ssh",
         "ansible_python_interpreter=auto_silent",
-        # İmajdan çıkan tahtaların anahtarları ilk açılışta değişir; bilinen_hosts denetimi kapalı.
+        # İmajdan çıkan cihazların anahtarları ilk açılışta değişir; bilinen_hosts denetimi kapalı.
         "ansible_ssh_common_args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
         f"-o ConnectTimeout={_CONNECT_TIMEOUT}",
     ]
@@ -90,9 +90,9 @@ _POLL_SECONDS = 1.0
 
 def run(hosts: list[dict], user: str, password: str, *, body: str,
         env: dict | None = None, timeout: int = 120, on_result=None) -> dict[int, dict]:
-    """``body`` kabuk betiğini her tahtada çalıştırır.
+    """``body`` kabuk betiğini her cihazda çalıştırır.
 
-    Süreç devam ederken ağaç dizinini yoklar; bir tahtanın sonucu belirir belirmez (varsa)
+    Süreç devam ederken ağaç dizinini yoklar; bir cihazın sonucu belirir belirmez (varsa)
     ``on_result(board_id, result)`` ile anında bildirir — ``on_result`` None ise yalnız dönüş
     değeri üzerinden (eskisi gibi, iş bitince toplu) kullanılabilir (bkz. board_identity.py).
 
@@ -114,7 +114,7 @@ def run(hosts: list[dict], user: str, password: str, *, body: str,
 
         cmd = ["ansible", "boards", "-i", inv, "--tree", tree,
                "-m", "ansible.builtin.script", "-a", script,
-               "-f", "20"]  # en çok 20 tahtaya paralel
+               "-f", "20"]  # en çok 20 cihaza paralel
         deadline = time.monotonic() + timeout * max(1, len(hosts)) + 60
         pending = {host["id"] for host in hosts}
 
@@ -166,7 +166,7 @@ def _parse_result(res: dict) -> dict:
     """``--tree`` JSON dosyasının (zaten yüklenmiş) içeriğini board sonucuna çevirir."""
     if res.get("unreachable"):
         return {"status": "unreachable", "rc": None,
-                "output": (res.get("msg") or "Tahtaya bağlanılamadı.")[:4000]}
+                "output": (res.get("msg") or "Cihaza bağlanılamadı.")[:4000]}
     rc = res.get("rc")
     stdout = (res.get("stdout") or "").strip()
     # SSH'ın her bağlantıda bastığı zararsız "Shared connection ... closed" satırı çıktıdan ayıklanır.

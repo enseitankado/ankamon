@@ -28,16 +28,16 @@
 /**
  * Canlı görev çıktısı penceresi (Komut çalıştır, Kapat, Uyandır… hepsi buradan izlenir).
  *
- * Görev başlar başlamaz açılır ve /api/jobs/{id}/events'i kısa aralıkla artımlı okur: her tahta için
+ * Görev başlar başlamaz açılır ve /api/jobs/{id}/events'i kısa aralıkla artımlı okur: her cihaz için
  * "bağlanılıyor → bağlandı → çıktı satırları → çıkış kodu" akışı oluştukça görünür (bkz.
- * worker/ankamon/runner). Birden fazla tahta varsa solda tahta listesi (durum simgesiyle) + "Tümü"
- * vardır; seçilen tahtanın ayrıntısı sağdadır. Tek tahtada liste gizlenir.
+ * worker/ankamon/runner). Birden fazla cihaz varsa solda cihaz listesi (durum simgesiyle) + "Tümü"
+ * vardır; seçilen cihazın ayrıntısı sağdadır. Tek cihazda liste gizlenir.
  *
- * Komut/hazır işlemde tahtalar PARALEL, kaynak yetmezse grup grup çalışır (bkz. runner/__main__.py):
+ * Komut/hazır işlemde cihazlar PARALEL, kaynak yetmezse grup grup çalışır (bkz. runner/__main__.py):
  * liste duruma göre gruplanır ve renklenir — önce çalışanlar (mavi, dönen halka: ui.JobSpinner), sonra sırada bekleyenler
  * (gri ⏳), en sonda bitenler (yeşil ✓ / kırmızı ✕ / turuncu ⚠); üst satırda sayıları. "Tümü"
- * görünümünde her satır [tahta] önekli; bir tahta bitmeden araya başkası girebildiğinden boş satırlı
- * ayraç yalnız önceki tahta bitmişse konur (sıralı görevlerde eskisi gibi tahta tahta okunur).
+ * görünümünde her satır [cihaz] önekli; bir cihaz bitmeden araya başkası girebildiğinden boş satırlı
+ * ayraç yalnız önceki cihaz bitmişse konur (sıralı görevlerde eskisi gibi cihaz cihaz okunur).
  */
 qx.Class.define("ankamon.ui.Jobs", {
   type: "static",
@@ -63,8 +63,8 @@ qx.Class.define("ankamon.ui.Jobs", {
      *   onDone: Function(res) — görev bitince BİR KEZ çağrılır (res: /api/jobs/{id} yanıtı; ör. ardışık görev zinciri).
      *   worker/ankamon/executor/backup.py); {downloads: url(jobId, name)} — "file" olaylarındaki dosyalar
      *   indirme listesine eklenir ve DOWNLOAD_GAP_MS aralıklarla sırayla otomatik indirilir;
-     *   {intro: "metin"} — çıktı kutusunun EN BAŞINDA (her görünümde, tahta seçiminden bağımsız) duran
-     *   sabit açıklama, ör. Uyandır'da "tahta açılmazsa neden" bilgisi (bkz. BoardOps.WOL_INTRO);
+     *   {intro: "metin"} — çıktı kutusunun EN BAŞINDA (her görünümde, cihaz seçiminden bağımsız) duran
+     *   sabit açıklama, ör. Uyandır'da "cihaz açılmazsa neden" bilgisi (bkz. BoardOps.WOL_INTRO);
      *   {footer: widget} — pencerenin en altına eklenir, ör. Uyandır'da "Bu pencereyi bir daha gösterme".
      */
     async show(jobOrPromise, caption, opts = {}) {
@@ -133,9 +133,9 @@ qx.Class.define("ankamon.ui.Jobs", {
       let selected = "all";
       let after = 0;
       let names = new Map();
-      let lastAllBoard; // "Tümü" görünümünde en son eklenen tahta — aralara boş satır koymak için
+      let lastAllBoard; // "Tümü" görünümünde en son eklenen cihaz — aralara boş satır koymak için
       let doneNotified = false; // opts.onDone yalnız bir kez
-      const finished = new Set();  // bitiş satırı ("ok"/"fail" olayı) gelmiş tahtalar — ayraç kararı için
+      const finished = new Set();  // bitiş satırı ("ok"/"fail" olayı) gelmiş cihazlar — ayraç kararı için
       const percent = new Map();   // board_id → son "progress" yüzdesi
       const files = [];            // [{board, name, size, note, url, auto, started}]
       const queue = [];            // otomatik indirilecekler (sırayla, aralıklı)
@@ -228,7 +228,7 @@ qx.Class.define("ankamon.ui.Jobs", {
           return;
         }
         names = new Map(res.targets.map(t => [t.board_id, t.board]));
-        // Tahta listesi + durum simgeleri.
+        // Cihaz listesi + durum simgeleri.
         res.targets.forEach(t => {
           let item = items.get(t.board_id);
           if (!item) {
@@ -254,7 +254,7 @@ qx.Class.define("ankamon.ui.Jobs", {
             list.addAt(item, i + 1); // 0: "Tümü"
           }
         });
-        // Tek tahtada liste gereksiz: doğrudan o tahtanın ayrıntısı gösterilir.
+        // Tek cihazda liste gereksiz: doğrudan o cihazın ayrıntısı gösterilir.
         const single = res.targets.length <= 1;
         list.setVisibility(single ? "excluded" : "visible");
         if (single && res.targets.length === 1 && selected === "all") {
@@ -295,10 +295,10 @@ qx.Class.define("ankamon.ui.Jobs", {
             lines.set("all", []);
           }
           if (key !== null && lastAllBoard !== undefined && key !== lastAllBoard && finished.has(lastAllBoard)) {
-            lines.get("all").push(""); // önceki tahta bitti, sıradakine geçildi: ayraç boş satır
+            lines.get("all").push(""); // önceki cihaz bitti, sıradakine geçildi: ayraç boş satır
           }
           if (key !== null && (ev.kind === "ok" || ev.kind === "fail")) {
-            finished.add(key); // tahtanın son satırı (bkz. runner stream.run: "Bitti"/"Bağlanılamadı")
+            finished.add(key); // cihazın son satırı (bkz. runner stream.run: "Bitti"/"Bağlanılamadı")
           }
           if (key !== null) {
             lastAllBoard = key;
@@ -319,7 +319,7 @@ qx.Class.define("ankamon.ui.Jobs", {
         const done = res.targets.filter(t => !["queued", "running"].includes(t.status)).length;
         const running = res.job.status === "queued" || res.job.status === "running";
         if (bar && res.targets.length) {
-          // Toplam: biten tahta %100, çalışan tahta kendi yüzdesiyle, bekleyen %0 — eşit ağırlıklı.
+          // Toplam: biten cihaz %100, çalışan cihaz kendi yüzdesiyle, bekleyen %0 — eşit ağırlıklı.
           const sum = res.targets.reduce((acc, t) =>
             acc + (["queued", "running"].includes(t.status) ? (percent.get(t.board_id) || 0) : 100), 0);
           const total = running ? Math.floor(sum / res.targets.length) : 100;
@@ -338,7 +338,7 @@ qx.Class.define("ankamon.ui.Jobs", {
             (count("skipped") ? ` · <span style="color:${C.skipped}" title="Bu işlevin o cihazların işletim sisteminde uygulaması yok">⤼ ${count("skipped")} atlandı (işletim sistemi)</span>` : "")
           : "";
         status.setValue(running
-          ? `<b>${title}</b> — ${F.jobStatus(res.job.status)}: ${done}/${res.targets.length} tahta bitti${counts}`
+          ? `<b>${title}</b> — ${F.jobStatus(res.job.status)}: ${done}/${res.targets.length} cihaz bitti${counts}`
           : `<b>${title}</b> — ${F.jobStatus(res.job.status)}. ${qx.bom.String.escape(res.job.summary || "")}${counts}`);
         if (!running && opts.onDone && !doneNotified) {
           doneNotified = true;

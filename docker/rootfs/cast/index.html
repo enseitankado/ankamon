@@ -11,17 +11,17 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 <title>Ankamon — Ekranımı yansıt</title>
 <link rel="icon" href="data:,">
 <!--
-  Ekran yansıtma: bu bilgisayarın ekranını (ya da bir pencereyi/sekmeyi) seçili tahtalarda tam ekran gösterir.
+  Ekran yansıtma: bu bilgisayarın ekranını (ya da bir pencereyi/sekmeyi) seçili cihazlarda tam ekran gösterir.
   Adres: /cast/#<base64(JSON {boards:[{id,name,online}], quality?, audio?})> — bilgi URL fragmanında taşınır
-  (bkz. ui/BoardOps.cast). quality ("text"|"video"|"low") verilirse (Tahtalar/Ekranlar sağ menüsü "Ekranımı
+  (bkz. ui/BoardOps.cast). quality ("text"|"video"|"low") verilirse (Cihazlar/Ekranlar sağ menüsü "Ekranımı
   yansıt ▸ <kalite>") ayar satırı yerine seçilen ayarların özeti görünür ve paylaşım kendiliğinden başlar.
   Akış:
     1) getDisplayMedia → RTCPeerConnection → WHIP: POST /cast/mtx/<yayın>/whip (nginx → MediaMTX, "cast" yetkisi).
-       Yayın adı "c-<32 rastgele karakter>": tahtaların okuma anahtarı da budur (bkz. services/mediamtx.sh).
-    2) Bağlantı kurulunca POST /api/jobs {type: cast_start} — runner her tahtada SSH ile ekranı uyandırır,
+       Yayın adı "c-<32 rastgele karakter>": cihazların okuma anahtarı da budur (bkz. services/mediamtx.sh).
+    2) Bağlantı kurulunca POST /api/jobs {type: cast_start} — runner her cihazda SSH ile ekranı uyandırır,
        ekran koruyucuyu kapatır ve mpv'yi tam ekran başlatır (bkz. worker/ankamon/executor/cast.py).
     3) Durdur / sekmeyi kapat / tarayıcının "Paylaşımı durdur"u: WHIP oturumu silinir, cast_stop görevi
-       gönderilir (tahtadaki oynatıcı yayın bitince zaten kendiliğinden kapanır; görev ekran koruyucuyu
+       gönderilir (cihazdaki oynatıcı yayın bitince zaten kendiliğinden kapanır; görev ekran koruyucuyu
        hemen geri kurar).
   Ekran yakalama yalnız güvenli bağlamda (HTTPS) çalışır — Ankamon HTTPS ile açılmalı (bkz. services/tls.sh).
 -->
@@ -63,7 +63,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   li.fail .dot { background: #e44; }
   li.off .dot { background: #444; }
   .stats { font-size: 12px; color: #889; }
-  /* Canlı tüketim tablosu (yalnız yayındayken): tahta başına bant genişliği + oynatıcı/tahta CPU-RAM. */
+  /* Canlı tüketim tablosu (yalnız yayındayken): cihaz başına bant genişliği + oynatıcı/cihaz CPU-RAM. */
   #usage { display: none; width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
   body.live #usage { display: table; }
   #usage th, #usage td { padding: 4px 6px; border-top: 1px solid #222a33; text-align: right; white-space: nowrap; }
@@ -73,7 +73,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   #usage td.na { color: #667; }
   #usage td.hot { color: #f6a; }
   .usage-title { display: none; font-size: 12px; color: #99a; margin-bottom: -6px; }
-  /* Yayın sırasında tahta ses düzeyi kaydırıcısı (yalnız sesli yansıtmada). */
+  /* Yayın sırasında cihaz ses düzeyi kaydırıcısı (yalnız sesli yansıtmada). */
   #volrow { display: none; }
   body.live.sound #volrow { display: flex; }
   #volslider { flex: 1; max-width: 320px; accent-color: #0067c0; }
@@ -97,7 +97,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
       </select>
     </label>
     <label><input type="checkbox" id="audio"> Ses</label>
-    <label title="Tahtadaki ses çıkışının yansıtma süresince düzeyi; yansıtma bitince her tahta eski düzeyine döner. Sessizdeki tahta da açılır.">Tahta ses düzeyi
+    <label title="Cihazdaki ses çıkışının yansıtma süresince düzeyi; yansıtma bitince her cihaz eski düzeyine döner. Sessizdeki cihaz da açılır.">Cihaz ses düzeyi
       <select id="volume">
         <option value="keep">Değiştirme</option>
         <option value="50">%50</option>
@@ -112,27 +112,27 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     <button id="stop" class="stop" disabled>Durdur</button>
     <span class="stats" id="stats"></span>
   </div>
-  <div class="row" id="volrow" title="Yansıtılan bütün tahtaların ses düzeyi; bırakınca uygulanır. Yansıtma bitince her tahta eski düzeyine döner.">
-    <label for="volslider">Tahta ses düzeyi</label>
+  <div class="row" id="volrow" title="Yansıtılan bütün cihazların ses düzeyi; bırakınca uygulanır. Yansıtma bitince her cihaz eski düzeyine döner.">
+    <label for="volslider">Cihaz ses düzeyi</label>
     <input type="range" id="volslider" min="0" max="100" step="5" value="75">
     <span id="volval">%75</span>
     <span class="stats" id="volstate"></span>
   </div>
   <video id="preview" muted playsinline autoplay></video>
   <ul id="boards"></ul>
-  <div class="usage-title" title="Bant genişliği: sunucunun o tahtaya gönderdiği yayın (MediaMTX). Oynatıcı: tahtadaki mpv sürecinin payı (tahtanın tüm çekirdekleri = %100). Saniyelik.">
-    Canlı tüketim (tahta başına)</div>
+  <div class="usage-title" title="Bant genişliği: sunucunun o cihaza gönderdiği yayın (MediaMTX). Oynatıcı: cihazdaki mpv sürecinin payı (cihazın tüm çekirdekleri = %100). Saniyelik.">
+    Canlı tüketim (cihaz başına)</div>
   <table id="usage">
     <thead><tr>
-      <th>Tahta</th><th title="Sunucunun bu tahtaya gönderdiği yayın hızı">Bant genişliği</th><th title="Yansıtma başından beri">Aktarılan</th>
-      <th title="Tahtadaki oynatıcı (mpv) — tahtanın tüm çekirdeklerine göre">Oynatıcı CPU</th><th>Oynatıcı RAM</th>
-      <th title="Tahtanın toplam işlemci kullanımı">Tahta CPU</th><th title="Tahtada kullanılan / toplam bellek">Tahta RAM</th>
+      <th>Cihaz</th><th title="Sunucunun bu cihaza gönderdiği yayın hızı">Bant genişliği</th><th title="Yansıtma başından beri">Aktarılan</th>
+      <th title="Cihazdaki oynatıcı (mpv) — cihazın tüm çekirdeklerine göre">Oynatıcı CPU</th><th>Oynatıcı RAM</th>
+      <th title="Cihazın toplam işlemci kullanımı">Cihaz CPU</th><th title="Cihazda kullanılan / toplam bellek">Cihaz RAM</th>
     </tr></thead>
     <tbody id="usage-rows"></tbody>
     <tfoot><tr id="usage-total"></tr></tfoot>
   </table>
   <div class="note">
-    Tahtada görüntü tam ekran açılır, gerekirse ekran uyandırılır ve ekran koruyucu kapatılır; yansıtma bitince
+    Cihazda görüntü tam ekran açılır, gerekirse ekran uyandırılır ve ekran koruyucu kapatılır; yansıtma bitince
     eski hâline döner. Bu pencereyi kapatmak ya da tarayıcının “Paylaşımı durdur” düğmesi yansıtmayı bitirir.
     Ses: Chrome/Edge'de sekme sesi her sistemde, tüm sistem sesi yalnız Windows'ta paylaşılabilir.
   </div>
@@ -158,7 +158,7 @@ let stream = null;      // yayın adı (c-…)
 let live = false;
 let statsTimer = null;
 let usageTimer = null;
-const usage = new Map();   // tahta id → {rx: {bytes, ts, mbps}, perf: son başarım mesajı, ws}
+const usage = new Map();   // cihaz id → {rx: {bytes, ts, mbps}, perf: son başarım mesajı, ws}
 
 function api(method, path, body) {
   return fetch("/api" + path, {
@@ -235,7 +235,7 @@ async function capture() {
   return m;
 }
 
-// Tahtalar H264'ü (Intel iGPU, vaapi) donanımsal çözer; tarayıcı varsayılanı VP8 olabilir.
+// Cihazlar H264'ü (Intel iGPU, vaapi) donanımsal çözer; tarayıcı varsayılanı VP8 olabilir.
 function preferH264(transceiver) {
   const caps = RTCRtpSender.getCapabilities?.("video");
   if (!caps || !transceiver.setCodecPreferences) return;
@@ -360,8 +360,8 @@ async function castTo(targets) {
   }
 }
 
-// ---- Tahta ses düzeyi (kullanıcı isteği) ------------------------------------------------------------------
-// Başlarken seçilen düzey (cast_start volume) her tahtanın çıkışına uygulanır; eski düzey tahtada saklanır ve
+// ---- Cihaz ses düzeyi (kullanıcı isteği) ------------------------------------------------------------------
+// Başlarken seçilen düzey (cast_start volume) her cihazın çıkışına uygulanır; eski düzey cihazda saklanır ve
 // yansıtma bitince geri yüklenir (bkz. worker executor/cast.py). Yayında kaydırıcı → cast_volume görevi.
 function startVolume() {
   const v = $("volume").value;
@@ -383,7 +383,7 @@ async function applyVolume(level) {
       const ok = (job.targets || []).filter(t => t.status === "ok").length;
       const total = (job.targets || []).length;
       if (mine === volJob) {
-        $("volstate").textContent = ok === total ? `${total} tahtaya uygulandı` : `${ok}/${total} tahtaya uygulandı`;
+        $("volstate").textContent = ok === total ? `${total} cihaza uygulandı` : `${ok}/${total} cihaza uygulandı`;
         $("volstate").title = (job.targets || []).filter(t => t.status !== "ok")
           .map(t => `${boards.find(b => b.id === t.board_id)?.name || t.board_id}: ${String(t.output || "").trim().split("\n").pop()}`).join("\n");
       }
@@ -426,7 +426,7 @@ async function start() {
   // Kaydırıcı başlangıçta seçilen düzeyden başlar ("Değiştirme" seçildiyse %75 — oynatınca uygulanır).
   $("volslider").value = String(startVolume() ?? 75);
   $("volval").textContent = "%" + $("volslider").value;
-  $("volstate").textContent = startVolume() === null ? "tahtaların kendi düzeyi" : "";
+  $("volstate").textContent = startVolume() === null ? "cihazların kendi düzeyi" : "";
   setState("● YAYINDA", true);
   startStats();
   startUsage();
@@ -465,8 +465,8 @@ function startStats() {
 }
 
 // ---- Canlı tüketim tablosu (kullanıcı isteği) -------------------------------------------------------------
-// Bant genişliği: /api/cast/stats (MediaMTX'in tahta başına RTSP oturumu, gönderilen bayt) → iki örnek farkı.
-// CPU/RAM: yansıtılan her tahtaya bir başarım akışı (/cast/ws/perf/<id>, saniyelik; bkz. screen/perf.py "cast").
+// Bant genişliği: /api/cast/stats (MediaMTX'in cihaz başına RTSP oturumu, gönderilen bayt) → iki örnek farkı.
+// CPU/RAM: yansıtılan her cihaza bir başarım akışı (/cast/ws/perf/<id>, saniyelik; bkz. screen/perf.py "cast").
 const fmt = {
   mbps: v => v == null ? "—" : `${v.toFixed(v < 10 ? 2 : 1)} Mbit/sn`,
   bytes: v => v == null ? "—" : v >= 1e9 ? `${(v / 1e9).toFixed(2)} GB` : `${(v / 1e6).toFixed(1)} MB`,
@@ -485,7 +485,7 @@ function openPerf(b) {
   const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/cast/ws/perf/${b.id}`);
   u.ws = ws;
   ws.onmessage = e => { try { u.perf = JSON.parse(e.data); } catch { /* yok say */ } };
-  // Kopunca (tahta yeniden başladı, ağ) bir sonraki turda yeniden açılır.
+  // Kopunca (cihaz yeniden başladı, ağ) bir sonraki turda yeniden açılır.
   ws.onclose = () => { if (u.ws === ws) { u.ws = null; u.perf = null; } };
 }
 
@@ -530,7 +530,7 @@ function renderUsage(casting) {
       Object.assign(cell(b.name), { title: b.name }),
       cell(fmt.mbps(u.rx?.mbps), u.rx ? "" : "na"),
       cell(fmt.bytes(u.rx?.bytes), u.rx ? "" : "na"),
-      // Akış var ama oynatıcı yok: tahtada mpv çalışmıyor (henüz başlamadı ya da kapandı).
+      // Akış var ama oynatıcı yok: cihazda mpv çalışmıyor (henüz başlamadı ya da kapandı).
       cell(p ? (c ? fmt.pct(c.cpu) : "oynatıcı yok") : "—", c ? (c.cpu > 50 ? "hot" : "") : "na"),
       cell(c ? fmt.kib(c.rss) : "—", c ? "" : "na"),
       cell(p ? fmt.pct(p.cpu) : "—", p ? (p.cpu > 85 ? "hot" : "") : "na"),
@@ -541,11 +541,11 @@ function renderUsage(casting) {
   $("usage-rows").replaceChildren(...rows);
   const avg = a => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
   $("usage-total").replaceChildren(
-    cell(`Toplam (${casting.length} tahta)`),
+    cell(`Toplam (${casting.length} cihaz)`),
     cell(fmt.mbps(sum.mbps)), cell(fmt.bytes(sum.bytes)),
-    Object.assign(cell(avg(sum.mpvCpu) == null ? "—" : "ort. " + fmt.pct(avg(sum.mpvCpu))), { title: "Tahtaların ortalaması" }),
+    Object.assign(cell(avg(sum.mpvCpu) == null ? "—" : "ort. " + fmt.pct(avg(sum.mpvCpu))), { title: "Cihazların ortalaması" }),
     cell(sum.rss ? fmt.kib(sum.rss) : "—"),
-    Object.assign(cell(avg(sum.cpu) == null ? "—" : "ort. " + fmt.pct(avg(sum.cpu))), { title: "Tahtaların ortalaması" }),
+    Object.assign(cell(avg(sum.cpu) == null ? "—" : "ort. " + fmt.pct(avg(sum.cpu))), { title: "Cihazların ortalaması" }),
     cell(sum.memTotal ? `${fmt.kib(sum.memUsed)} / ${fmt.kib(sum.memTotal)}` : "—"),
   );
 }
@@ -595,7 +595,7 @@ async function stop() {
     try {
       const { id } = await api("POST", "/jobs", { type: "cast_stop", board_ids: targets.map(b => b.id) });
       await pollJob(id, targets, () => "Durduruldu");
-    } catch { /* tahtadaki oynatıcı yayın bitince zaten kapanır */ }
+    } catch { /* cihazdaki oynatıcı yayın bitince zaten kapanır */ }
   }
   targets.forEach(b => { b.state = "idle"; b.msg = "Durduruldu"; });
   setState("Hazır");
@@ -606,7 +606,7 @@ $("start").addEventListener("click", start);
 $("stop").addEventListener("click", stop);
 $("switch").addEventListener("click", switchSource);
 window.addEventListener("beforeunload", e => { if (live) e.preventDefault(); });
-// Pencere kapanırken: WHIP oturumu ve tahtalardaki oynatıcılar (keepalive istekleri sayfa gittikten sonra da tamamlanır).
+// Pencere kapanırken: WHIP oturumu ve cihazlardaki oynatıcılar (keepalive istekleri sayfa gittikten sonra da tamamlanır).
 window.addEventListener("pagehide", () => {
   if (!live) return;
   live = false;
@@ -615,7 +615,7 @@ window.addEventListener("pagehide", () => {
   if (ids.length) api("POST", "/jobs", { type: "cast_stop", board_ids: ids }).catch(() => {});
 });
 
-if (!boards.length) showError("Tahta seçilmemiş. Tahtalar sayfasında tahtaları işaretleyip “Yansıt”ı kullanın.");
+if (!boards.length) showError("Cihaz seçilmemiş. Cihazlar sayfasında cihazları işaretleyip “Yansıt”ı kullanın.");
 
 // Ön ayar (sağ menü "Ekranımı yansıt ▸ <kalite>", ses menüdeki onay kutusundan): ayarlar sorulmaz, özetlenir.
 // getDisplayMedia bir kullanıcı hareketi (transient activation) ister ve menüdeki tıklama window.open ile
@@ -632,7 +632,7 @@ if (preset) {
   const label = quality.selectedOptions[0].textContent;
   $("options").replaceChildren(Object.assign(document.createElement("span"), {
     className: "note",
-    textContent: `Kalite: ${label} · Ses: ${audio.checked ? `açık (tahta ses düzeyi ${volume.selectedOptions[0].textContent})` : "kapalı"}`,
+    textContent: `Kalite: ${label} · Ses: ${audio.checked ? `açık (cihaz ses düzeyi ${volume.selectedOptions[0].textContent})` : "kapalı"}`,
   }));
   // Kontroller gizli olarak sayfaya geri eklenir: capture()/publish()/render() onları okumaya devam eder.
   document.body.append(Object.assign(quality, { hidden: true }), Object.assign(audio, { hidden: true }),

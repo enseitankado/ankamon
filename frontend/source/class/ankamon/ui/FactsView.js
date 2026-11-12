@@ -26,7 +26,7 @@
  */
 
 /**
- * "Bilgi kartı"nın içeriği: bir tahtanın facts'ini (bkz. worker/ankamon/executor/hwfacts.py _FIELDS)
+ * "Bilgi kartı"nın içeriği: bir cihazın facts'ini (bkz. worker/ankamon/executor/hwfacts.py _FIELDS)
  * bölümlere ayrılmış bir HTML tablosuna çevirir. Hem pencere (rich Label) hem "Yazdır" sayfası aynı
  * HTML'i kullanır — biri değişince öteki de değişsin diye tek kaynak.
  * Durum bilgileri (boş disk, wifi bağlantısı, açık kalma süresi, sıcaklık) toplandıkları ana aittir.
@@ -60,12 +60,12 @@ qx.Class.define("ankamon.ui.FactsView", {
     },
 
     /**
-     * RAM metni (Bilgi kartı, Tahtalar grid'i, Ekranlar donanım satırı ortak): TAKILI bellek (SMBIOS,
+     * RAM metni (Bilgi kartı, Cihazlar grid'i, Ekranlar donanım satırı ortak): TAKILI bellek (SMBIOS,
      * mem_installed_bytes — "8 GB DDR3"); henüz toplanmamışsa işletim sisteminin gördüğü MemTotal
      * (~7.2 GB). Takılı değer GiB tam sayıysa ondalıksız yazılır. Tümleşik (paylaşımlı) grafik
      * RAM'den pay ayırıyorsa (gpu_shared_bytes — bkz. worker executor/hwfacts.py) o da eklenir.
      * @param withType {Boolean?} bellek türü (DDR3…) ve paylaşımlı ekran belleği — varsayılan evet
-     *   (Tahtalar grid'inin dar RAM sütunu yalnız boyutu ister)
+     *   (Cihazlar grid'inin dar RAM sütunu yalnız boyutu ister)
      */
     ramText(f, withType = true) {
       if (f.mem_installed_bytes) {
@@ -86,7 +86,7 @@ qx.Class.define("ankamon.ui.FactsView", {
     WIFI_MONITOR_FRESH_S: 120,
 
     /**
-     * Wi-Fi kartının etkin olup olmadığı — Bilgi kartı ve Tahtalar grid'inin "Wi-Fi" sütunu aynı
+     * Wi-Fi kartının etkin olup olmadığı — Bilgi kartı ve Cihazlar grid'inin "Wi-Fi" sütunu aynı
      * kuralı kullanır. Etkin = kart var + NetworkManager radyosu açık + rfkill engeli yok (actions/
      * wifi-on, wifi-off radyoyu değiştirir; runner işlemden sonra facts'i günceller).
      * @return {Map|null} {text, kind} — kind: ok | idle | bad; bilgi hiç toplanmamışsa null
@@ -145,7 +145,7 @@ qx.Class.define("ankamon.ui.FactsView", {
       }
       const keys = Object.keys(sensors || {});
       if (!keys.length) {
-        row("Durum", "Sensör verisi yok (tahta kapalı ya da sensör portu okunamıyor)");
+        row("Durum", "Sensör verisi yok (cihaz kapalı ya da sensör portu okunamıyor)");
         return;
       }
       const F = ankamon.util.Format;
@@ -315,10 +315,10 @@ qx.Class.define("ankamon.ui.FactsView", {
     },
 
     /**
-     * Açılış girdisinin aygıt yolundaki disk/bölüm kimliğini tahtanın diskleriyle karşılaştırır.
+     * Açılış girdisinin aygıt yolundaki disk/bölüm kimliğini cihazın diskleriyle karşılaştırır.
      * HD(numara, GPT, <bölüm GUID'i>, başlangıç, boyut) — MBR'de üçüncü alan disk imzası. Firmware girdiyi
      * bu kimlikle bulur: bölüm GUID'i diskte yoksa, konumu/boyutu değiştiyse ya da File(…) önyükleyicisi EFI
-     * bölümünde yoksa girdi AÇILAMAZ (tahta açılışta "önyüklenebilir aygıt yok"a düşer ya da sonraki girdiye
+     * bölümünde yoksa girdi AÇILAMAZ (cihaz açılışta "önyüklenebilir aygıt yok"a düşer ya da sonraki girdiye
      * geçer). "uyuşmuyor" yalnız bu açılamama riskinde yazılır; uyuşuyorsa yeşil teyit.
      * @return {String|null} rozet HTML'i; yolda disk kimliği yoksa (BBS, ağ, kabuk) null
      */
@@ -342,7 +342,7 @@ qx.Class.define("ankamon.ui.FactsView", {
       }
       const what = kind === "GPT" ? "disk/bölüm GUID'i" : "disk imzası (MBR)";
       if (!hit) {
-        return this.__badge(`${what} ile uyuşmuyor — bu kimlik tahtanın hiçbir diskinde yok: firmware bu ` +
+        return this.__badge(`${what} ile uyuşmuyor — bu kimlik cihazın hiçbir diskinde yok: firmware bu ` +
           "girdiden açamaz (disk değişmiş ya da yeniden bölümlenmiş)", "bad");
       }
       const problems = [];

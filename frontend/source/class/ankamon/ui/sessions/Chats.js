@@ -74,7 +74,7 @@ qx.Class.define("ankamon.ui.sessions.Chats", {
         const data = await ankamon.io.Api.get("/chat/messages");
         this.__rows = data.messages.map(m => [
           m.id, F.dateTime(m.sent_at * 1000), m.board_name, m.session_username || "",
-          m.direction === "out" ? "Ankamon → tahta" : "Tahta → Ankamon", m.author, m.body
+          m.direction === "out" ? "Ankamon → cihaz" : "Cihaz → Ankamon", m.author, m.body
         ]);
         this.__apply();
         this.__status.setValue(`${data.messages.length} ileti`);

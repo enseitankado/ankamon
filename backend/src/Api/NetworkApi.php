@@ -77,7 +77,7 @@ final class NetworkApi
         ];
     }
 
-    /** ?network=<id> (0/boş: tüm ağlar), ?board=<id> (yalnız o tahtanın cihaz satırı — Bilgisayar ayrıntıları penceresi).
+    /** ?network=<id> (0/boş: tüm ağlar), ?board=<id> (yalnız o cihazın cihaz satırı — Bilgisayar ayrıntıları penceresi).
      * Her cihaz kendi servis listesiyle döner. */
     public function devices(Request $request): array
     {
@@ -93,7 +93,7 @@ final class NetworkApi
                     -- IP/maske ve sunucunun o ağa bağlı olduğu arabirim(ler) (kullanıcı isteği 2026-11-09: tek listede iki sütun).
                     CASE WHEN d.ip IS NULL THEN NULL ELSE host(d.ip) || '/' || masklen(n.cidr) END AS ip_mask,
                     array_to_string(n.ifaces, ', ') AS iface,
-                    -- Son log: cihazın IP'sinden (worker tasks/net_device_logs.py) ya da bağlı tahtanın kaydından (ad eşleşmesi).
+                    -- Son log: cihazın IP'sinden (worker tasks/net_device_logs.py) ya da bağlı cihazın kaydından (ad eşleşmesi).
                     extract(epoch FROM GREATEST(d.last_log_at, b.last_log_at))::bigint AS last_log_at,
                     extract(epoch FROM d.first_seen_at)::bigint AS first_seen_at,
                     extract(epoch FROM d.last_seen_at)::bigint AS last_seen_at,
@@ -106,11 +106,11 @@ final class NetworkApi
                     extract(epoch FROM d.flow_at)::bigint AS flow_at, d.flow_pps, d.flow_kbps, d.flow_proto,
                     b.id AS board_id, COALESCE(NULLIF(b.label, ''), b.hostname) AS board_name,
                     -- Keşif: satır listeye nasıl girdi (scan|syslog|manual|self). Taramayla açılmış ama cihaz daha önce
-                    -- Tahtalar'a loglarından (syslog) ya da elle (manual) girmişse o ilk yol.
+                    -- Cihazlar'a loglarından (syslog) ya da elle (manual) girmişse o ilk yol.
                     CASE WHEN d.source = 'scan' AND b.source IN ('syslog', 'manual') AND b.created_at < d.first_seen_at
                          THEN b.source ELSE d.source END AS discovery,
                     -- Bütün keşif kaynakları (Keşif sütunu — kullanıcı isteği 2026-11-09): sunucunun kendisi, ağ taraması
-                    -- (ARP'de görüldü), log gönderimi (cihaz IP'sinden ya da tahta kaydına log geldi), elle ekleme.
+                    -- (ARP'de görüldü), log gönderimi (cihaz IP'sinden ya da cihaz kaydına log geldi), elle ekleme.
                     array_to_json(array_remove(ARRAY[
                         CASE WHEN d.source = 'self' THEN 'self' END,
                         CASE WHEN d.source = 'scan' OR (d.source <> 'self' AND d.last_seen_at IS NOT NULL) THEN 'scan' END,
@@ -126,7 +126,7 @@ final class NetworkApi
                               FROM net_shares sh WHERE sh.device_id = d.id), '[]') AS shares
              FROM net_devices d
              JOIN net_networks n ON n.id = d.network_id
-             -- Cihaz bir tahtaya ait mi: kablolu MAC (boards.mac) ya da Wi-Fi kartının MAC'i (boards.wifi_mac, göç 043);
+             -- Cihaz bir cihaza ait mi: kablolu MAC (boards.mac) ya da Wi-Fi kartının MAC'i (boards.wifi_mac, göç 043);
              -- aynı adres iki kayıtta varsa kablolu eşleşme önce.
              LEFT JOIN boards b ON b.id = (SELECT x.id FROM boards x WHERE x.mac = d.mac OR x.wifi_mac = d.mac
                                            ORDER BY (x.mac = d.mac) IS TRUE DESC, x.id LIMIT 1)
@@ -142,7 +142,7 @@ final class NetworkApi
             $device['discoveries'] = json_decode((string) $device['discoveries'], true) ?: [];
         }
         unset($device);
-        // Sensörler sütunu: bağlı tahta kaydına son 24 saatte sensör verisi geldi mi (bkz. Core\BoardSensors::lastSeenAll).
+        // Sensörler sütunu: bağlı cihaz kaydına son 24 saatte sensör verisi geldi mi (bkz. Core\BoardSensors::lastSeenAll).
         $sensors = \Ankamon\Core\BoardSensors::lastSeenAll();
         foreach ($devices as &$device) {
             $device['sensors_at'] = $device['board_id'] !== null ? ($sensors[(int) $device['board_id']] ?? null) : null;

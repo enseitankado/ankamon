@@ -34,7 +34,7 @@
  * olayı odaktaki bileşenden köke kabarcıklanır; odak bir pencerenin içindeyse o pencere (ve yalnız ön plandaki
  * etkin pencere) kapanır. Açık menü, açılır liste (SelectBox/ComboBox) ve tarih seçici ESC'yi kendisi işleyip
  * durdurduğundan önce onlar kapanır, pencere kapanmaz. Uzak ekran ve web terminal iframe içinde olduğundan oradaki
- * ESC tahtaya/kabuğa gider. Kapatma win.close() ile — pencerenin kendi beforeClose korumaları (ör. süren toplu
+ * ESC cihaza/kabuğa gider. Kapatma win.close() ile — pencerenin kendi beforeClose korumaları (ör. süren toplu
  * işlem) geçerli kalır; kapatılamayan (allowClose: false) pencereye dokunulmaz.
  *
  * Kaydedilmemiş veri: kullanıcı bir form alanına (metin kutusu, onay kutusu, seçim listesi…) dokunduğu ANDA

@@ -38,7 +38,7 @@ use Ankamon\Core\Storage;
 /**
  * rsyslog'un disk kuyruğu (Disk kullanımı penceresinin "Log kuyruğu" sekmesi) ve kalıcı silme.
  *
- * Tahtalardan gelen loglar veritabanı yazılamadığında /data/rsyslog'daki disk kuyruğunda bekler
+ * Cihazlardan gelen loglar veritabanı yazılamadığında /data/rsyslog'daki disk kuyruğunda bekler
  * (ankamon_pg.<parça> + konum dosyası ankamon_pg.qi; bkz. docker/rsyslog/rsyslog.conf). Kuyruk
  * normalde boşa yakındır; büyüyorsa loglar Postgres'e ulaşmıyor demektir. Ayrıca rsyslog.sh açılışta
  * okunamayan (ör. elektrik kesintisinde yarım kalmış) kuyruğu bozuk-<zaman>/ klasörüne kenara alır.

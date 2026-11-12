@@ -31,17 +31,17 @@ yapılandırmasını, /etc/resolv.conf'u ve tarayıcı policy dosyalarını üre
 eta-kisit'e eklenen iki şey:
 - Sayım: eta-kisit smartdns.conf'u her seferinde yeniden ürettiğinden denetim (audit) satırları servis başlarken eklenir
   (smartdns-rs.service.d drop-in, ExecStartPre). smartdns root yetkisini bırakıp nobody olur: denetim dizini nobody'nin.
-- "ogrenci" hesabı olmayan tahta: eta-kisit bu hesap yoksa daha içe aktarılırken KeyError ile düşer (Arge 1'de görüldü).
+- "ogrenci" hesabı olmayan cihaz: eta-kisit bu hesap yoksa daha içe aktarılırken KeyError ile düşer (Arge 1'de görüldü).
   Etkinleştirici, yalnız pwd.getpwnam("ogrenci") nobody'ye düşecek biçimde çalıştırılır; hesap açılmaz.
-- "ogrenci" hesabı olan tahta: eta-kisit.service oturumu loginctl'den izler ve root SSH bağlantısını "oturum yok" sayar. Ankamon'un
+- "ogrenci" hesabı olan cihaz: eta-kisit.service oturumu loginctl'den izler ve root SSH bağlantısını "oturum yok" sayar. Ankamon'un
   her bağlantısı kapanınca `eta-kisit --user-login ogrenci` yeniden çalışır: öğrencinin tarayıcıları KILL ile kapanır, bildirim
   çıkar (Arge 1'de ölçüldü). Serviste PATH önüne konan küçük sarmalayıcı, aynı kullanıcı için tekrarlanan çağrıyı atlar.
 
-Filtre kapatılınca tahta ilk etkinleştirmeden önceki hâline döner: eta-kisit'in sildiği smartdns.conf ve biçimini değiştirdiği
+Filtre kapatılınca cihaz ilk etkinleştirmeden önceki hâline döner: eta-kisit'in sildiği smartdns.conf ve biçimini değiştirdiği
 Firefox policies.json geri konur, oluşturduğu boş policy dizinleri, drop-in ve denetim kayıtları silinir.
 
-Program tahtaya stdin ile gider, parametreler base64 JSON'dur: alan adı kabuğa ya da Python koduna metin olarak girmez.
-NetworkManager yeniden başlarken SSH kopabileceğinden değişiklik tahtada ayrı oturumda çalışır, sonuç dosyasından okunur.
+Program cihaza stdin ile gider, parametreler base64 JSON'dur: alan adı kabuğa ya da Python koduna metin olarak girmez.
+NetworkManager yeniden başlarken SSH kopabileceğinden değişiklik cihazda ayrı oturumda çalışır, sonuç dosyasından okunur.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ DOMAIN_RE = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.
 MODES = ("off", "denylist", "allowlist")
 MAX_DOMAINS = 500
 
-_APPLY_WAIT = 150  # tahtadaki işlemin üst sınırı (sn)
+_APPLY_WAIT = 150  # cihazdaki işlemin üst sınırı (sn)
 
 _BOARD_PROGRAM = r'''
 import base64, fcntl, glob, gzip, json, os, re, shutil, subprocess, sys, time
@@ -97,7 +97,7 @@ if [ "$1" = --user-login ]; then
 fi
 exec /usr/bin/eta-kisit "$@"
 """ % (LAST_LOGIN, LAST_LOGIN)
-# Tahtada en çok ~8 MB denetim kaydı: 2 MB'ta döner, audit-num 4 = geçerli + 3 eski (eskisi silinir, Arge 1'de görüldü).
+# Cihazda en çok ~8 MB denetim kaydı: 2 MB'ta döner, audit-num 4 = geçerli + 3 eski (eskisi silinir, Arge 1'de görüldü).
 AUDIT_CONF = """
 # Ankamon Web Filtre sayimi
 audit-enable yes
@@ -270,7 +270,7 @@ def first_missing_ancestor(path):
 
 
 def save_first_state():
-    """Tahtayı kapatınca geri dönülecek durum; yalnız ilk etkinleştirmede, filtre yokken alınır."""
+    """Cihazı kapatınca geri dönülecek durum; yalnız ilk etkinleştirmede, filtre yokken alınır."""
     if os.path.exists(STATE):
         return
     os.makedirs(STATE_DIR, exist_ok=True)
@@ -382,7 +382,7 @@ def edit_profile(mode):
 def apply_filter():
     reason = unsupported()
     if reason:
-        return {"ok": False, "lines": ["Bu tahta ETAP Pardus değil; Web Filtre uygulanmadı." if reason == "not_etap"
+        return {"ok": False, "lines": ["Bu cihaz ETAP Pardus değil; Web Filtre uygulanmadı." if reason == "not_etap"
                                        else "eta-kisit kurulu değil; Web Filtre uygulanmadı."]}
     mode = P["mode"]
     lines = []
@@ -430,7 +430,7 @@ def apply_filter():
         else:
             rc, out = 1, "smartdns yanıt vermiyor"
     if rc != 0:
-        # DNS tahtayı internetsiz bırakmasın: filtre geri alınır.
+        # DNS cihazı internetsiz bırakmasın: filtre geri alınır.
         activator("--unrestrict")
         wait_resolv(json.loads(read_text(STATE) or "{}"))
         return {"ok": False, "lines": ["Filtre devreye alınamadı, geri alındı: " + out.strip()[-300:]]}
@@ -480,9 +480,9 @@ else:
 
 
 def _send(board: dict, user: str, password: str, params: dict, timeout: int) -> dict:
-    """Programı stdin ile tahtadaki python3'e verir. Döner: {"status", "rc", "output"} (bkz. accounts._ssh)."""
+    """Programı stdin ile cihazdaki python3'e verir. Döner: {"status", "rc", "output"} (bkz. accounts._ssh)."""
     if not board.get("ip"):
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     encoded = base64.b64encode(json.dumps(params).encode()).decode()
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", "ConnectTimeout=8", f"{user}@{board['ip']}", "python3 -B -"]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
@@ -517,12 +517,12 @@ def clean_domains(domains) -> list[str] | None:
 
 
 def read_status(board: dict, user: str, password: str) -> dict:
-    """Tahtadaki profil, filtre durumu ve sayımlar; başarılıysa output JSON."""
+    """Cihazdaki profil, filtre durumu ve sayımlar; başarılıysa output JSON."""
     return _send(board, user, password, {"op": "status"}, timeout=40)
 
 
 def _reattach(board: dict, user: str, password: str, run_id: str) -> dict:
-    """SSH koptuysa tahtadaki işlem sürer: yeni bağlantıyla sonuç dosyası beklenir."""
+    """SSH koptuysa cihazdaki işlem sürer: yeni bağlantıyla sonuç dosyası beklenir."""
     path = f"/run/ankamon-webfilter-{run_id}.json"
     end = time.time() + _APPLY_WAIT
     last = None
@@ -532,14 +532,14 @@ def _reattach(board: dict, user: str, password: str, run_id: str) -> dict:
         if last["status"] == "ok" and last["output"]:
             return last
         unreachable = unreachable + 1 if last["status"] == "unreachable" else 0
-        if unreachable >= 3:  # NetworkManager'ın yeniden başlaması bu kadar sürmez: tahta kapalı
+        if unreachable >= 3:  # NetworkManager'ın yeniden başlaması bu kadar sürmez: cihaz kapalı
             return last
         time.sleep(3)
     return last or {"status": "failed", "rc": None, "output": "Sonuç okunamadı."}
 
 
 def apply(board: dict, user: str, password: str, mode: str, denylist, allowlist) -> dict:
-    """Modu ve listeleri uygular; output kullanıcıya gösterilen metin. Liste None ise tahtadaki liste korunur."""
+    """Modu ve listeleri uygular; output kullanıcıya gösterilen metin. Liste None ise cihazdaki liste korunur."""
     if mode not in MODES:
         return {"status": "failed", "rc": None, "output": "Geçersiz mod."}
     deny = None if denylist is None else clean_domains(denylist)
@@ -549,7 +549,7 @@ def apply(board: dict, user: str, password: str, mode: str, denylist, allowlist)
     if mode != "off" and not (deny if mode == "denylist" else allow):
         return {"status": "failed", "rc": None, "output": "Adres listesi boş."}
     if not board.get("ip"):
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     run_id = secrets.token_hex(8)
     res = _send(board, user, password, {"op": "apply", "mode": mode, "denylist": deny, "allowlist": allow,
                                         "run_id": run_id, "wait": _APPLY_WAIT}, timeout=_APPLY_WAIT + 20)

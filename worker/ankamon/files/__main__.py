@@ -39,7 +39,7 @@ POST /bulk/upload                                 → {token}   (dağıtılacak 
 PUT  /bulk/upload/<jeton>?path=<göreli yol>       ← dosya gövdesi (akış)
 POST /bulk/distribute {token, boards, users:{logged, names}, location:{kind, path}, conflict, relay} → {id}
 POST /bulk/collect    {boards, users, location, patterns:[…], excludes:[…], deep, skip_hidden, move, dry} → {id}
-GET  /bulk/<id>                                   → iş durumu (tahta/hedef satırları, olaylar)
+GET  /bulk/<id>                                   → iş durumu (cihaz/hedef satırları, olaylar)
 POST /bulk/<id>/cancel | /bulk/<id>/discard | /bulk/<id>/resume | /bulk/<id>/revert
 GET  /bulk/<id>/archive?fmt=zip|tgz | /bulk/<id>/manifest | /bulk/<id>/file?path=…   (toplananlar)
 
@@ -80,7 +80,7 @@ def _access(board_id: int) -> dict:
             " FROM boards WHERE id = %s", (board_id,),
         ).fetchone()
         if not board or not board["ip"]:
-            raise RemoteError("Tahta bulunamadı ya da IP adresi yok.")
+            raise RemoteError("Cihaz bulunamadı ya da IP adresi yok.")
         user, password = _board_access(conn)
     if not password:
         raise RemoteError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
@@ -125,7 +125,7 @@ class BoardFilesRequestHandler(tornado.web.RequestHandler):
         try:
             board_id = int(value)
         except (TypeError, ValueError):
-            raise RemoteError("Geçersiz tahta.")
+            raise RemoteError("Geçersiz cihaz.")
         return await asyncio.to_thread(_access, board_id)
 
     def write_error(self, status_code, **kwargs):
@@ -227,11 +227,11 @@ class CopyCancelHandler(BoardFilesRequestHandler):
 def _board_ids(data: dict) -> list[int]:
     ids = data.get("boards") or []
     if not isinstance(ids, list) or not ids or len(ids) > 2000:
-        raise RemoteError("Tahta seçilmedi.")
+        raise RemoteError("Cihaz seçilmedi.")
     try:
         return list(dict.fromkeys(int(i) for i in ids))
     except (TypeError, ValueError):
-        raise RemoteError("Geçersiz tahta.")
+        raise RemoteError("Geçersiz cihaz.")
 
 
 async def _accesses(ids: list[int]) -> list[dict]:
@@ -341,7 +341,7 @@ def _bulk_record(owner: str):
     def done(job: dict) -> None:
         opts = job["options"]
         if opts.get("dry"):
-            return   # önizleme: tahtada hiçbir şey değişmedi, kayda gerek yok
+            return   # önizleme: cihazda hiçbir şey değişmedi, kayda gerek yok
         for row in job["boards"]:
             if row["state"] in ("skipped", "cancelled") and not row["targets"]:
                 continue
@@ -414,7 +414,7 @@ class BulkCancelHandler(BulkJobHandler):
 
 
 class BulkResumeHandler(BulkJobHandler):
-    """İptal edilmiş dağıtmayı sürdürür (bitmemiş tahtalar; arşiv sunucuda)."""
+    """İptal edilmiş dağıtmayı sürdürür (bitmemiş cihazlar; arşiv sunucuda)."""
     async def post(self, job_id):
         self.job(job_id)
         try:

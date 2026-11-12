@@ -54,7 +54,7 @@ final class DiagnoseApi
                     (SELECT count(*) FROM job_targets t WHERE t.job_id = j.id) AS targets,
                     (SELECT count(*) FROM job_targets t WHERE t.job_id = j.id
                        AND t.status NOT IN ('ok', 'queued', 'running')) AS failed,
-                    -- Küçük taramalarda (otomatik tarama çoğu kez 1-2 tahtalık) seçicide tahta adları da yazılsın.
+                    -- Küçük taramalarda (otomatik tarama çoğu kez 1-2 cihazlık) seçicide cihaz adları da yazılsın.
                     (SELECT string_agg(COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)), ', ')
                        FROM (SELECT * FROM job_targets t WHERE t.job_id = j.id LIMIT 4) t
                        JOIN boards b ON b.id = t.board_id) AS names
@@ -65,8 +65,8 @@ final class DiagnoseApi
     }
 
     /**
-     * Art arda gelen, aynı tahta(lar)da tümüyle başarısız biten otomatik taramaları tek seçenekte toplar
-     * (repeat: kaç tarama, first_at: ilkinin zamanı; id en yenisinin). Eskiden denetlenemeyen tahta her dakika
+     * Art arda gelen, aynı cihaz(lar)da tümüyle başarısız biten otomatik taramaları tek seçenekte toplar
+     * (repeat: kaç tarama, first_at: ilkinin zamanı; id en yenisinin). Eskiden denetlenemeyen cihaz her dakika
      * yeniden taranıyordu (bkz. worker diagnose_schedule RETRY_SECONDS) — o kayıtlar silinmeden seçici dolmasın.
      */
     private static function collapseRepeats(array $runs, int $limit): array
@@ -97,11 +97,11 @@ final class DiagnoseApi
     }
 
     /**
-     * "Son durum": her tahtanın EN SON biten denetimi tek raporda (hangi taramada yapıldığından bağımsız).
-     * Otomatik zamanlayıcı yalnız vadesi gelen tahtaları tarar — tek bir otomatik tarama çoğu kez 1-2 tahtalıktır;
-     * sayfa açılışında o taramayı göstermek "yalnız bu tahta mı taranıyor?" karışıklığı yaratıyordu. Şu an
-     * kayıtlı olmayan tahtalar ve sürmekte olan denetimler (queued/running) katılmaz. Biçim show() ile aynı;
-     * tahta satırında ek olarak hangi taramadan geldiği (run_id, run_auto, run_by).
+     * "Son durum": her cihazın EN SON biten denetimi tek raporda (hangi taramada yapıldığından bağımsız).
+     * Otomatik zamanlayıcı yalnız vadesi gelen cihazları tarar — tek bir otomatik tarama çoğu kez 1-2 cihazlıktır;
+     * sayfa açılışında o taramayı göstermek "yalnız bu cihaz mı taranıyor?" karışıklığı yaratıyordu. Şu an
+     * kayıtlı olmayan cihazlar ve sürmekte olan denetimler (queued/running) katılmaz. Biçim show() ile aynı;
+     * cihaz satırında ek olarak hangi taramadan geldiği (run_id, run_auto, run_by).
      */
     public function latest(): array
     {
@@ -142,7 +142,7 @@ final class DiagnoseApi
     }
 
     /**
-     * Otomatik tarama takvimi: her tahtanın son BAŞARILI denetimi + aralık. Zamanlayıcı aralığın %85'i
+     * Otomatik tarama takvimi: her cihazın son BAŞARILI denetimi + aralık. Zamanlayıcı aralığın %85'i
      * dolunca kaynaklar müsait olan ilk anda tarar; aralık dolduğunda eşikleri gevşetir (bkz. worker).
      */
     private static function schedule(): array
@@ -156,7 +156,7 @@ final class DiagnoseApi
              GROUP BY b.id"
         );
         $lasts = array_map(fn($r) => $r['last'] === null ? null : (int) $r['last'], $rows);
-        // Son denemesi başarısız olan tahtalar (bağlanılamadı, parola reddedildi…): zamanlayıcı bunları
+        // Son denemesi başarısız olan cihazlar (bağlanılamadı, parola reddedildi…): zamanlayıcı bunları
         // DIAGNOSE_RETRY_HOURS'ta bir yeniden dener (bkz. worker diagnose_schedule RETRY_SECONDS).
         $failing = Db::all(
             "SELECT board FROM (
@@ -175,7 +175,7 @@ final class DiagnoseApi
             'retry_hours' => (float) (getenv('DIAGNOSE_RETRY_HOURS') ?: 6),
             'failing' => array_column($failing, 'board'),
             'never_scanned' => $never,
-            // En eski denetimli tahtanın "uygun an aranır" ve "en geç" zamanları.
+            // En eski denetimli cihazın "uygun an aranır" ve "en geç" zamanları.
             'next_from' => $known ? (int) (min($known) + $days * 86400 * 0.85) : null,
             'next_by' => $known ? (int) (min($known) + $days * 86400) : null,
         ];

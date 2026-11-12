@@ -75,7 +75,7 @@ final class ScreenshotsApi
         return ['ok' => true, 'deleted' => 1];
     }
 
-    /** Disk kullanımı: tahta (ad) başına adet, ilk/son ve gerçek dosya boyutu. */
+    /** Disk kullanımı: cihaz (ad) başına adet, ilk/son ve gerçek dosya boyutu. */
     public function stats(Request $request): array
     {
         $boards = Db::all(
@@ -97,7 +97,7 @@ final class ScreenshotsApi
         ];
     }
 
-    /** Kalıcı silme: name=<kayıttaki tahta adı> ya da all=1. Geri alınamaz; audit_log'a yazılır. */
+    /** Kalıcı silme: name=<kayıttaki cihaz adı> ya da all=1. Geri alınamaz; audit_log'a yazılır. */
     public function delete(Request $request, array $user): array
     {
         if ($request->query('all') === '1') {

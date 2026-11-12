@@ -50,4 +50,4 @@ if systemctl is-active --quiet prometheus-node-exporter 2>/dev/null; then
     echo "HATA: prometheus-node-exporter hâlâ çalışıyor." >&2
     exit 1
 fi
-echo "Metrik izleme kaldırıldı; Ankamon bu tahtadan sensör verisi okumaz."
+echo "Metrik izleme kaldırıldı; Ankamon bu cihazdan sensör verisi okumaz."

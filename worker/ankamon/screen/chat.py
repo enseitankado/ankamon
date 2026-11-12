@@ -23,16 +23,16 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Sağ menü "Sohbet": Ankamon kullanıcısı ile tahtadaki kişi arasında canlı yazışma (ws /screen/ws/chat/<tahta id>).
+"""Sağ menü "Sohbet": Ankamon kullanıcısı ile cihazdaki kişi arasında canlı yazışma (ws /screen/ws/chat/<cihaz id>).
 
-Tahta başına TEK sohbet merkezi: birden çok tarayıcı penceresi aynı sohbeti görür, tahtada tek pencere (chat_agent.py, tek
-SSH oturumu) açılır. Tahtaya port açılmaz, kurulum yapılmaz: ajan SSH üstünden stdin/stdout ile konuşur. Her ileti gönderilir
-gönderilmez `chat_messages`'a yazılır (Oturumlar ▸ Sohbet geçmişi). Son pencere kapanınca tahtadaki pencere de kapanır.
-Ajan düşerse (oturum değişti → 75, tahta kapandı) pencere açık kaldıkça birkaç saniyede bir yeniden başlatılır.
+Cihaz başına TEK sohbet merkezi: birden çok tarayıcı penceresi aynı sohbeti görür, cihazda tek pencere (chat_agent.py, tek
+SSH oturumu) açılır. Cihaza port açılmaz, kurulum yapılmaz: ajan SSH üstünden stdin/stdout ile konuşur. Her ileti gönderilir
+gönderilmez `chat_messages`'a yazılır (Oturumlar ▸ Sohbet geçmişi). Son pencere kapanınca cihazdaki pencere de kapanır.
+Ajan düşerse (oturum değişti → 75, cihaz kapandı) pencere açık kaldıkça birkaç saniyede bir yeniden başlatılır.
 
 Yetki: nginx /screen/ws/chat/ → "boards.chat". Tarayıcı iletileri: {"text": "..."}. Sunucu iletileri:
 {"t":"msg", id, direction, author, text, at} / {"t":"status", "state":"online|closed|offline", "detail"}.
-Kapanış kodları: 4001 tahta yok · 4029 sınır aşıldı.
+Kapanış kodları: 4001 cihaz yok · 4029 sınır aşıldı.
 """
 
 from __future__ import annotations
@@ -127,18 +127,18 @@ class Hub:
             if rc == EXIT_VT_CHANGED:
                 continue            # oturum değişti: hemen yeni ekranda
             if rc == EXIT_NO_GUI or "NO_GUI" in err:
-                self.set_status("offline", "Tahtada sohbet penceresi açılamıyor (python3-gi yok).")
+                self.set_status("offline", "Cihazda sohbet penceresi açılamıyor (python3-gi yok).")
             elif rc == 5:
                 self.set_status("offline", "SSH girişi reddedildi.")
             else:
-                self.set_status("offline", "Tahtaya ulaşılamıyor; yeniden deneniyor…")
+                self.set_status("offline", "Cihaza ulaşılamıyor; yeniden deneniyor…")
             await asyncio.sleep(RETRY_SECONDS)
         _hubs.pop(self.board_id, None)
 
     async def _run_agent(self) -> tuple[int | None, str]:
         found = await asyncio.to_thread(self._lookup, self.board_id)
         if found is None:
-            self.set_status("offline", "Tahta bulunamadı.")
+            self.set_status("offline", "Cihaz bulunamadı.")
             await asyncio.sleep(RETRY_SECONDS)
             return None, ""
         board, ssh_user, password = found
@@ -174,13 +174,13 @@ class Hub:
             return
         if msg.get("t") == "ready":
             who = f" — oturum: {self.session}" if self.session else " — giriş ekranı"
-            self.set_status("online", "Tahtada sohbet penceresi açık" + who)
+            self.set_status("online", "Cihazda sohbet penceresi açık" + who)
             for old in self.sent_now[-20:]:
                 self._write_agent({"t": "msg", "author": old["author"], "text": old["text"]})
         elif msg.get("t") == "closed":
-            self.set_status("closed", "Tahtadaki kişi pencereyi kapattı; yeni iletiyle yeniden açılır.")
+            self.set_status("closed", "Cihazdaki kişi pencereyi kapattı; yeni iletiyle yeniden açılır.")
         elif msg.get("t") == "msg" and msg.get("text"):
-            author = self.session or "Tahta"
+            author = self.session or "Cihaz"
             saved = await asyncio.to_thread(_save, self.board_id, self.name, self.session, "in", author, str(msg["text"])[:4000])
             self.sent_now.append(saved)
             self.broadcast(saved)

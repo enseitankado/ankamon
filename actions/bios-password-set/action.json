@@ -1,6 +1,6 @@
 {
   "title": "BIOS parolasını ayarla",
-  "description": "eta-112 aracıyla BIOS yönetici ve/veya kullanıcı parolasını ayarlar (flash'a yazar, geri-okuyarak doğrular). Yalnız desteklenen modellerde çalışır (Vestel 14MB24A, 14MB37C1, 14MB57 — Faz 1/Faz 2); diğerlerinde hiçbir şey yazılmaz. Parola yalnız BÜYÜK harf A-Z ve rakam 0-9 olabilir (küçük harf büyüğe çevrilir), 3-15/20 karakter (modele göre). Yönetici parolası yalnız BIOS ayarlarına girişi korur; kullanıcı parolası her açılışta sorulur. Etkili olması için tahta yeniden başlatılmalıdır. Araç sunucudan SFTP ile /opt/eta-112'ye kopyalanır; tahtada flashrom/dmidecode yoksa apt ile kurulur.",
+  "description": "eta-112 aracıyla BIOS yönetici ve/veya kullanıcı parolasını ayarlar (flash'a yazar, geri-okuyarak doğrular). Yalnız desteklenen modellerde çalışır (Vestel 14MB24A, 14MB37C1, 14MB57 — Faz 1/Faz 2); diğerlerinde hiçbir şey yazılmaz. Parola yalnız BÜYÜK harf A-Z ve rakam 0-9 olabilir (küçük harf büyüğe çevrilir), 3-15/20 karakter (modele göre). Yönetici parolası yalnız BIOS ayarlarına girişi korur; kullanıcı parolası her açılışta sorulur. Etkili olması için cihaz yeniden başlatılmalıdır. Araç sunucudan SFTP ile /opt/eta-112'ye kopyalanır; cihazda flashrom/dmidecode yoksa apt ile kurulur.",
   "category": "BIOS",
   "feature": "actions",
   "confirm": true,

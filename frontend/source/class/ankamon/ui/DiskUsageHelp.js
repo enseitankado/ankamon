@@ -156,9 +156,9 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
           return {
             verdict: ["mid", "Kontrolsüz büyüyüp diski doldurur mu? Süreyle sınırlı, boyutla değil.",
               `Üzerinden ${drop("logs", "90 days")} geçen loglar her gün kendiliğinden silinir; ama bu süre içinde ne kadar log geleceğine sınır yoktur. ` +
-              "Sürekli hata basan bir tahta o süre içinde çok yer tutabilir — aşağıdaki tahta satırlarından en büyükleri izleyin."],
+              "Sürekli hata basan bir cihaz o süre içinde çok yer tutabilir — aşağıdaki cihaz satırlarından en büyükleri izleyin."],
             rows: [
-              ["Ne?", "Tahtaların rsyslog ile gönderdiği sistem günlükleri (TiHA'nın merkezi log sunucusu ayarı). Her satır bir log mesajı."],
+              ["Ne?", "Cihazların rsyslog ile gönderdiği sistem günlükleri (TiHA'nın merkezi log sunucusu ayarı). Her satır bir log mesajı."],
               ["Nerede?", `${pg}, <code>logs</code> tablosu (1 günlük parçalara bölünmüş hypertable).`],
               ["Saklama", `${drop("logs", "90 days")} (<code>LOG_DAYS=${esc(env("LOG_DAYS", "90"))}</code>) — daha eski gün parçaları bütün olarak silinir ${run(pol("logs", "retention"))}`],
               ["Sıkıştırma", compress("logs").replace(/^ü/, "Ü")],
@@ -166,41 +166,41 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
               ["Dışlanan mesajlar", "Loglar sayfasında \"dışla\" denen mesajlar yalnız grid'de gizlenir; kaydedilmeye devam eder, yer açmaz."]
             ],
             todo: [
-              "Gürültülü tahtanın satırını seçip silin (yalnız o tahtanın logları gider).",
+              "Gürültülü cihazın satırını seçip silin (yalnız o cihazın logları gider).",
               "Daha kısa saklama için <code>LOG_DAYS</code> küçültülür (yeniden başlatmadan sonra en geç bir gün içinde eskiler silinir).",
-              "Kalıcı çözüm, log basan hatayı tahtada gidermektir (Sorun tespiti / Bakım)."
+              "Kalıcı çözüm, log basan hatayı cihazda gidermektir (Sorun tespiti / Bakım)."
             ]
           };
         case "command":
           return {
             rows: [
-              ["Ne?", "Ankamon üzerinden tahtalarda çalıştırılan komutların kaydı: görevler, hazır işlemler, web terminal, " +
-                "dosya yöneticisi ve ekran işlemleri — kim, ne zaman, hangi tahtada, ne çalıştırdı."],
+              ["Ne?", "Ankamon üzerinden cihazlarda çalıştırılan komutların kaydı: görevler, hazır işlemler, web terminal, " +
+                "dosya yöneticisi ve ekran işlemleri — kim, ne zaman, hangi cihazda, ne çalıştırdı."],
               ["Nerede?", `${pg}, <code>command_log</code> tablosu (sıradan tablo).`],
               ["Saklama", "<b>Süresiz</b> — otomatik silme politikası yok."],
               ["Sıkıştırma / özetleme", "Yok."],
-              ["Silme", "Yalnız elle, bu sekmeden (tahta başına ya da tümü)."]
+              ["Silme", "Yalnız elle, bu sekmeden (cihaz başına ya da tümü)."]
             ],
-            todo: ["Eski kayıtları tahta satırlarından silin (silinen kayıtlar denetim izinden de gider)."]
+            todo: ["Eski kayıtları cihaz satırlarından silin (silinen kayıtlar denetim izinden de gider)."]
           };
         case "queue": {
           const q = Object.assign({}, p.queue);
           // rsyslog boyut yazımı ("4g", "512m") → "4 GB"
           q.maxDiskSpace = String(q.maxDiskSpace || "4g").replace(/^(\d+)\s*([kmgt])b?$/i, (m, n, u) => `${n} ${u.toUpperCase()}B`);
           return {
-            intro: "Log kuyruğu, tahtalardan gelen logların veritabanı sunucusuna yazılmadan önce beklediği geçici konumdur: " +
+            intro: "Log kuyruğu, cihazlardan gelen logların veritabanı sunucusuna yazılmadan önce beklediği geçici konumdur: " +
               "rsyslog kabul ettiği her logu önce bu disk kuyruğuna yazar, veritabanına yazılan loglar da kuyruktan silinir. " +
               "Bu yüzden normalde boştur; yalnız veritabanı kapalı ya da yavaşken dolmaya başlar. " +
               `Canlı kuyruk en çok <b>${esc(q.maxDiskSpace || "4g")}</b> yer kaplayabilir. ` +
               "Açılışta okunamayan kuyruk ise <code>bozuk-…</code> klasörüne kenara alınır; bunlar bu sınırın dışındadır ve " +
               "otomatik silinmez — her bozuk açılışta bir tane eklenir.",
             rows: [
-              ["Ne?", "rsyslog'un tahtalardan kabul edip veritabanına henüz yazamadığı loglar (Postgres kapalı/yavaşken birikir)."],
+              ["Ne?", "rsyslog'un cihazlardan kabul edip veritabanına henüz yazamadığı loglar (Postgres kapalı/yavaşken birikir)."],
               ["Nerede?", "Sunucuda <code>data/rsyslog</code>: <code>ankamon_pg.*</code> parçaları + <code>ankamon_pg.qi</code> konum dosyası; " +
                 "bozuklar <code>bozuk-YYYYAAGG-SSddss/</code>."],
               ["Sınırlar", `En çok ${esc(q.maxDiskSpace || "4g")} disk / ${Number(q.size || 5000000).toLocaleString("tr-TR")} kayıt. ` +
-                `Dolarsa log atılmaz: gönderen tahta ${Math.round(Number(q.timeoutEnqueue || 600000) / 60000)} dk bekletilir ` +
-                "(tahtalar kendi kuyruklarında tamponlar); süre dolarsa yeni kayıt düşer."],
+                `Dolarsa log atılmaz: gönderen cihaz ${Math.round(Number(q.timeoutEnqueue || 600000) / 60000)} dk bekletilir ` +
+                "(cihazlar kendi kuyruklarında tamponlar); süre dolarsa yeni kayıt düşer."],
               ["Otomatik temizlik", "Canlı kuyruk: loglar veritabanına yazılınca silinir. Bozuk klasörler: <b>yok</b>."],
               ["Uyarı", "Genel bakışta bekleyen kuyruk 50 MB'ı aşınca uyarı çıkar — büyüyorsa loglar veritabanına ulaşmıyor demektir."]
             ],
@@ -214,10 +214,10 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
           return {
             verdict: ["ok", "",
               `Ham ölçümler ${drop("metrics", "30 days")} sonra silinir; grafikler daha eski dönemler için özetlerden çizilir. ` +
-              "Boyut tahta sayısı ve okuma aralığıyla orantılıdır, ham verinin süresi dolunca dengeye oturur; " +
+              "Boyut cihaz sayısı ve okuma aralığıyla orantılıdır, ham verinin süresi dolunca dengeye oturur; " +
               "yalnız saatlik özet süresi boyunca yavaşça büyür."],
             rows: [
-              ["Ne?", `Tahtaların sensör ölçümleri (işlemci, bellek, disk, ağ, sıcaklık, fan, pil…) — Telegraf her ` +
+              ["Ne?", `Cihazların sensör ölçümleri (işlemci, bellek, disk, ağ, sıcaklık, fan, pil…) — Telegraf her ` +
                 `<b>${esc(env("SCRAPE_INTERVAL", "60s"))}</b> okur.`],
               ["Nerede?", `${pg}: ham <code>metrics</code> (+ seri tanımları <code>metrics_tag</code>), özetler ` +
                 "<code>metrics_5m</code>, <code>metrics_1h</code>."],
@@ -227,20 +227,20 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
               ["Özetleme", "Her seri için ortalama/en düşük/en yüksek/son değer: 5 dk özeti " + run(pol("metrics_5m", "refresh_continuous_aggregate")) +
                 "<br>saatlik özet (5 dk özetinden) " + run(pol("metrics_1h", "refresh_continuous_aggregate"))],
               ["Sıkıştırma", `Ham veri: ${compress("metrics")}. Özetler sıkıştırılmaz.`],
-              ["Seri tanımları", "<code>metrics_tag</code> kendiliğinden silinmez (çok küçük); tahta silinince onunla gider."]
+              ["Seri tanımları", "<code>metrics_tag</code> kendiliğinden silinmez (çok küçük); cihaz silinince onunla gider."]
             ],
-            todo: ["Kaldırılmış/eski tahtaların satırlarını silin.", "Daha kısa saklama için <code>METRICS_*_DAYS</code> küçültülür."]
+            todo: ["Kaldırılmış/eski cihazların satırlarını silin.", "Daha kısa saklama için <code>METRICS_*_DAYS</code> küçültülür."]
           };
         case "jobs":
           return {
             verdict: ["note", "Zamanla yavaşça birikir.",
-              "Görevler ve tahta sonuçları kendiliğinden silinmez. En büyük kalem olan canlı çıktı satırları 30 günden eskiyse " +
+              "Görevler ve cihaz sonuçları kendiliğinden silinmez. En büyük kalem olan canlı çıktı satırları 30 günden eskiyse " +
               "görev yürütücüsü başlarken (konteyner yeniden başlatma/güncelleme) silinir. Ara sıra eski görevleri silmek yeterlidir."],
             rows: [
-              ["Ne?", "Ankamon'dan başlatılan işler (komut, hazır işlem, kapat/uyandır, oturum, yansıtma…): görev, tahta başına sonuç ve canlı çıktı satırları."],
+              ["Ne?", "Ankamon'dan başlatılan işler (komut, hazır işlem, kapat/uyandır, oturum, yansıtma…): görev, cihaz başına sonuç ve canlı çıktı satırları."],
               ["Nerede?", `${pg}: <code>jobs</code>, <code>job_targets</code>, <code>job_events</code>.`],
-              ["Sınırlar", "Tahta başına en çok 20 000 çıktı satırı saklanır (fazlası yalnız sayılır), satır başına 2 000 karakter; " +
-                "tahta sonucu özeti son 8 000 karakter."],
+              ["Sınırlar", "Cihaz başına en çok 20 000 çıktı satırı saklanır (fazlası yalnız sayılır), satır başına 2 000 karakter; " +
+                "cihaz sonucu özeti son 8 000 karakter."],
               ["Otomatik temizlik", "30 günden eski görevlerin çıktı satırları — yalnız yürütücü başlangıcında. Görev ve sonuçlar: <b>yok</b>."],
               ["Silme", "Bitmiş görevler buradan silinir; kuyrukta bekleyen/çalışan görev silinemez."]
             ],
@@ -249,13 +249,13 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
         case "diagnose":
           return {
             verdict: ["note", "Çok yavaş birikir.",
-              `Otomatik tarama tahta başına yaklaşık ${esc(env("DIAGNOSE_INTERVAL_DAYS", "7"))} günde bir küçük bir rapor üretir; ` +
+              `Otomatik tarama cihaz başına yaklaşık ${esc(env("DIAGNOSE_INTERVAL_DAYS", "7"))} günde bir küçük bir rapor üretir; ` +
               "raporlar kendiliğinden silinmez, eskileri ara sıra buradan silinebilir."],
             rows: [
               ["Ne?", "Sorun tespiti taramalarının raporları — haftalık otomatik tarama ve elle başlatılanlar."],
               ["Nerede?", `${pg}: <code>jobs</code> (tür <code>diagnose</code>), rapor <code>job_targets</code> içinde.`],
               ["Saklama", "<b>Süresiz</b>. Çıktı satırları görev kuyruğundaki 30 gün kuralına tabidir (yürütücü başlangıcında)."],
-              ["Silme", "Elle, bu sekmeden. Silinen tahtalar bir sonraki otomatik taramada yeniden denetlenir."]
+              ["Silme", "Elle, bu sekmeden. Silinen cihazlar bir sonraki otomatik taramada yeniden denetlenir."]
             ],
             todo: ["Eski taramaları \"Bitmiş tüm taramalar\" satırıyla silin; Bakım raporu yeni taramalarla dolar."]
           };
@@ -265,10 +265,10 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
               "Her görüntü yalnız sağ menüden elle alınır (bir görüntü genellikle birkaç yüz KB), bu yüzden yavaş birikir. Gerektiğinde buradan silin."],
             rows: [
               ["Ne?", "Sağ menü Ekran ▸ Ekran görüntüsü al ile çekilen görüntüler (JPEG). Bilgisayar, oturum, zaman ve çeken kişi dosyanın içine de gömülüdür: oturum kayıtları silinse de kaybolmaz."],
-              ["Nerede?", "Sunucuda <code>data/screenshots/&lt;tahta&gt;/</code>; dizin satırları veritabanında <code>screenshots</code> tablosunda."],
+              ["Nerede?", "Sunucuda <code>data/screenshots/&lt;cihaz&gt;/</code>; dizin satırları veritabanında <code>screenshots</code> tablosunda."],
               ["Saklama", "<b>Süresiz</b> — otomatik silme politikası yok."]
             ],
-            todo: ["Eski görüntüleri tahta satırını seçip silin; tek görüntü Oturumlar ▸ Zaman çizelgesi'nden de silinebilir."]
+            todo: ["Eski görüntüleri cihaz satırını seçip silin; tek görüntü Oturumlar ▸ Zaman çizelgesi'nden de silinebilir."]
           };
         case "movements":
           return {
@@ -280,7 +280,7 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
               ["Saklama", "<b>Süresiz</b> — ham loglar süresi dolup silinse de kalır; otomatik silme yok."],
               ["Üretim", "Log geldikçe worker dakikada bir ayıklar; ekranda süzmek ham logları taramaz. Silinen kayıtlar yeniden üretilmez."]
             ],
-            todo: ["Gereksiz tahtaların satırını seçip silin."]
+            todo: ["Gereksiz cihazların satırını seçip silin."]
           };
         case "ntfy":
           return {
@@ -294,11 +294,11 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
         case "chat":
           return {
             rows: [
-              ["Ne?", "Sağ menü Sohbet ile tahtadaki kişiyle yazışılan iletiler. Oturumlar ▸ Sohbet geçmişi'nde listelenir."],
+              ["Ne?", "Sağ menü Sohbet ile cihazdaki kişiyle yazışılan iletiler. Oturumlar ▸ Sohbet geçmişi'nde listelenir."],
               ["Nerede?", `${pg}, <code>chat_messages</code> tablosu (sıradan tablo).`],
               ["Saklama", "<b>Süresiz</b> — otomatik silme politikası yok; metin olduğundan çok az yer tutar."]
             ],
-            todo: ["Eski sohbetleri tahta satırını seçip silin."]
+            todo: ["Eski sohbetleri cihaz satırını seçip silin."]
           };
         case "backups":
           return {
@@ -307,7 +307,7 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
               "(ve Grafana) yedeği tutulur; yenisi alınınca en eskiler silinir. Ama tam yedek logları ve sensör verisini içerdiğinden " +
               "veriyle birlikte büyür; yer ≈ tam yedek sayısı × son tam yedek boyutu. Yedek almadan önce boş alan denetlenmez."],
             rows: [
-              ["Ne?", "Veritabanı yedekleri (<code>pg_dump</code>, sıkıştırılmış). Tam: loglar + sensör dahil; Yapılandırma: tahtalar, " +
+              ["Ne?", "Veritabanı yedekleri (<code>pg_dump</code>, sıkıştırılmış). Tam: loglar + sensör dahil; Yapılandırma: cihazlar, " +
                 "kullanıcılar, ayarlar (log/sensör hariç); Grafana: panolar."],
               ["Nerede?", "Sunucuda <code>data/backups</code>."],
               ["Ne zaman?", `Yapılandırma + Grafana her <b>${esc(env("BACKUP_CONFIG_EVERY_HOURS", "6"))} saatte</b>; ` +

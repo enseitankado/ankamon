@@ -1,6 +1,6 @@
 {
   "title": "Kullanıcı ekle",
-  "description": "Tahtaya yeni kullanıcı hesabı ekler. Hesap tahtada zaten varsa değiştirilmez. Yönetici yetkisi verilmez.",
+  "description": "Cihaza yeni kullanıcı hesabı ekler. Hesap cihazda zaten varsa değiştirilmez. Yönetici yetkisi verilmez.",
   "category": "Kullanıcılar",
   "feature": "boards.users",
   "confirm": true,

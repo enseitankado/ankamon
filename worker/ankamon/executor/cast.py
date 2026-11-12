@@ -23,24 +23,24 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Ekran yansıtma ("Ekranımı yansıt"): yöneticinin ekranını seçili tahtalarda tam ekran gösterir.
+"""Ekran yansıtma ("Ekranımı yansıt"): yöneticinin ekranını seçili cihazlarda tam ekran gösterir.
 
 Akış: tarayıcı ekranı WebRTC/WHIP ile Ankamon'daki MediaMTX'e yollar (bkz. docker/rootfs/cast/,
-services/mediamtx.sh); bu modül her tahtada SSH ile etkin X ekranında bir sarmalayıcı başlatır:
+services/mediamtx.sh); bu modül her cihazda SSH ile etkin X ekranında bir sarmalayıcı başlatır:
   1) ekranı uyandırır (DPMS "force on" + X ekran koruyucu sayacı sıfırlanır); oturumdaki
      cinnamon-screensaver etkinse kapatır, yayın bitince yeniden etkinleştirir. ETAP'ta ekran koruyucu
      "özel" kipte ve kilit `dm-tool lock`tur: oturum kendi VT'sinde kalır, giriş ekranı AYRI bir VT'de
-     açılır. Yayın her zaman ETKİN VT'deki ekrana gider — kilitli tahtada kilit ekranının üstünde görünür,
+     açılır. Yayın her zaman ETKİN VT'deki ekrana gider — kilitli cihazda kilit ekranının üstünde görünür,
      oturumun kilidi açılmaz, yayın bitince kilit yerinde kalır;
   2) mpv'yi RTSP ile (tcp, düşük gecikme profili, donanımsal kod çözme) tam ekran + her zaman üstte,
      klavye/fare kısayolları kapalı başlatır — mpv oynatırken DPMS/ekran koruyucuyu kendisi engeller;
   3) yayın biterse (yönetici paylaşımı durdurdu) mpv kendiliğinden çıkar; kısa ağ kesintilerinde
      sarmalayıcı yeniden bağlanır, art arda 3 kısa denemede vazgeçer ve ekranı eski hâline getirir.
-Tahtada kurulum gerekmez: ETAP 23'te mpv hazır gelir. Ses isteğe bağlıdır (oturum kullanıcısının
+Cihazda kurulum gerekmez: ETAP 23'te mpv hazır gelir. Ses isteğe bağlıdır (oturum kullanıcısının
 pipewire-pulse soketi üzerinden).
 
-Ses düzeyi (kullanıcı isteği): mpv'nin sesi tahtadaki oturumun varsayılan çıkışının (sink) düzeyiyle
-sınırlıdır ve her tahta farklı düzeyde/sessizde olabilir. Sesli yansıtmada `volume` verilirse çıkışın o
+Ses düzeyi (kullanıcı isteği): mpv'nin sesi cihazdaki oturumun varsayılan çıkışının (sink) düzeyiyle
+sınırlıdır ve her cihaz farklı düzeyde/sessizde olabilir. Sesli yansıtmada `volume` verilirse çıkışın o
 anki düzeyi + sessiz durumu $DIR/audio'ya kaydedilir (yalnız dosya yoksa — yeniden başlatmada asıl değer
 korunur), çıkış sessizden çıkarılıp o düzeye getirilir; yansıtma bitince (sarmalayıcının restore'u ya da
 cast_stop) kayıtlı değerler geri yüklenir. Yayın sırasında `volume()` (cast_volume görevi) düzeyi değiştirir.
@@ -55,7 +55,7 @@ import socket
 import subprocess
 
 RTSP_PORT = int(os.environ.get("CAST_RTSP_PORT", "8554"))
-# c-: "Ekranımı yansıt" (tarayıcıdan yayın); r-: ekran aktarımı (tahtadan yayın, bkz. executor/relay.py).
+# c-: "Ekranımı yansıt" (tarayıcıdan yayın); r-: ekran aktarımı (cihazdan yayın, bkz. executor/relay.py).
 STREAM_RE = re.compile(r"^[cr]-[A-Za-z0-9]{24,64}$")
 
 VOLUME_MAX = 100
@@ -69,7 +69,7 @@ if [ -s "$DIR/audio" ]; then
     PULSE_SERVER="unix:$AP" pactl set-sink-volume "$AS" "$AV%" 2>/dev/null
     [ "$AM" = yes ] && am=1 || am=0
     PULSE_SERVER="unix:$AP" pactl set-sink-mute "$AS" "$am" 2>/dev/null
-    echo "tahta ses düzeyi geri yüklendi: %$AV$([ "$AM" = yes ] && echo ' (sessiz)')"
+    echo "cihaz ses düzeyi geri yüklendi: %$AV$([ "$AM" = yes ] && echo ' (sessiz)')"
   fi
   rm -f "$DIR/audio"
 fi
@@ -89,7 +89,7 @@ if [ "$AUDIO" = 1 ] && [ -n "$VOL" ] && [ -n "$UI" ] && [ -S "$P" ] && command -
     [ $i -ge 10 ] && break
     sleep 0.5; i=$((i + 1))
   done
-  case "$S" in ''|auto_null) echo "Tahtada ses çıkışı bulunamadı — ses düzeyi değiştirilmedi."; S= ;; esac
+  case "$S" in ''|auto_null) echo "Cihazda ses çıkışı bulunamadı — ses düzeyi değiştirilmedi."; S= ;; esac
   if [ -n "$S" ]; then
     if [ ! -s "$DIR/audio" ]; then
       v=$(PULSE_SERVER="unix:$P" pactl get-sink-volume "$S" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d %)
@@ -99,18 +99,18 @@ if [ "$AUDIO" = 1 ] && [ -n "$VOL" ] && [ -n "$UI" ] && [ -S "$P" ] && command -
     { read -r AP; read -r AS; read -r AV; read -r AM; } < "$DIR/audio"
     PULSE_SERVER="unix:$P" pactl set-sink-mute "$S" 0 2>/dev/null
     PULSE_SERVER="unix:$P" pactl set-sink-volume "$S" "$VOL%" 2>/dev/null \
-      && echo "Tahta ses düzeyi: %$VOL (önceki: %$AV$([ "$AM" = yes ] && echo ', sessizdeydi'); bitince geri yüklenecek)"
+      && echo "Cihaz ses düzeyi: %$VOL (önceki: %$AV$([ "$AM" = yes ] && echo ', sessizdeydi'); bitince geri yüklenecek)"
   fi
 fi
 """
 
 _VOLUME = r"""
 DIR=/run/ankamon-cast
-[ -s "$DIR/audio" ] || { echo "Bu tahtada sesli yansıtma yok — ses düzeyi değiştirilmedi."; exit 0; }
+[ -s "$DIR/audio" ] || { echo "Bu cihazda sesli yansıtma yok — ses düzeyi değiştirilmedi."; exit 0; }
 { read -r AP; read -r AS; read -r AV; read -r AM; } < "$DIR/audio"
-[ -S "$AP" ] || { echo "Tahtanın ses sunucusu kapanmış (oturum değişti)." >&2; exit 3; }
+[ -S "$AP" ] || { echo "Cihazın ses sunucusu kapanmış (oturum değişti)." >&2; exit 3; }
 PULSE_SERVER="unix:$AP" pactl set-sink-mute "$AS" 0 2>/dev/null
-PULSE_SERVER="unix:$AP" pactl set-sink-volume "$AS" "$VOL%" && echo "Tahta ses düzeyi: %$VOL"
+PULSE_SERVER="unix:$AP" pactl set-sink-volume "$AS" "$VOL%" && echo "Cihaz ses düzeyi: %$VOL"
 """
 
 _SSH_OPTS = [
@@ -142,7 +142,7 @@ UI=
 [ -n "$U" ] && UI=$(id -u "$U" 2>/dev/null)
 """
 
-# Tahtada /run/ankamon-cast/run.sh olarak yazılan sarmalayıcı (setsid ile, oturumdan bağımsız çalışır).
+# Cihazda /run/ankamon-cast/run.sh olarak yazılan sarmalayıcı (setsid ile, oturumdan bağımsız çalışır).
 _WRAPPER = r"""#!/bin/sh
 D=__D__; A=__A__; U=__U__; UI=__UI__; URL=__URL__; AUDIO=__AUDIO__
 DIR=/run/ankamon-cast
@@ -194,7 +194,7 @@ done
 restore
 """
 
-# Tahtada /run/ankamon-cast/cover.py: mpv'yi override-redirect (POPUP) tam ekran bir pencereye gömer ve
+# Cihazda /run/ankamon-cast/cover.py: mpv'yi override-redirect (POPUP) tam ekran bir pencereye gömer ve
 # pencereyi saniyede bir en üste çıkarır. Pencere yöneticisinin "üstte" kipi, kendini her zaman üstte
 # tutan override-redirect pencereleri (giriş ekranındaki eta-keyboard, paneller, bildirimler) geçemiyordu.
 # POPUP pencere odak almaz; dokunma/tıklama yayının altındaki uygulamaya da gitmez.
@@ -241,7 +241,7 @@ sys.exit(proc.returncode or 0)
 
 _START = r"""
 __FIND__
-command -v mpv >/dev/null 2>&1 || { echo "Tahtada mpv kurulu değil." >&2; exit 3; }
+command -v mpv >/dev/null 2>&1 || { echo "Cihazda mpv kurulu değil." >&2; exit 3; }
 DIR=/run/ankamon-cast
 mkdir -p "$DIR"; chmod 700 "$DIR"
 # Önceki yansıtma sürüyorsa kapanır (dash'in kill'i negatif pid almaz: pkill -g).
@@ -263,7 +263,7 @@ while [ $i -lt 24 ]; do
   sleep 0.5; i=$((i + 1))
   if grep -q '^VO:' "$DIR/log" 2>/dev/null; then
     grep -E 'ekran koruyucu|^VO:|^AO:' "$DIR/log" | sed 's/^/  /'
-    echo "Görüntü tahtada."
+    echo "Görüntü cihazda."
     exit 0
   fi
   [ $i -gt 4 ] && ! kill -0 "$(cat "$DIR/pid" 2>/dev/null)" 2>/dev/null && break
@@ -289,13 +289,13 @@ pkill -f "^sh $DIR/run.sh" 2>/dev/null && stopped=1
 pkill -f "^python3 $DIR/cover.py" 2>/dev/null && stopped=1
 pkill -f "^mpv .*--x11-name=ankamon-cast" 2>/dev/null && stopped=1
 __AUDIO_RESTORE__
-if [ -n "$stopped" ]; then echo "Yansıtma durduruldu."; else echo "Tahtada yansıtma yoktu."; fi
+if [ -n "$stopped" ]; then echo "Yansıtma durduruldu."; else echo "Cihazda yansıtma yoktu."; fi
 """
 
 
 def server_address(board_ip: str) -> str:
-    """Tahtanın Ankamon'a hangi adresle ulaşacağı: çekirdeğin o tahtaya giden yolda seçtiği kaynak
-    adres (host ağındayız; birden çok arayüz/segment olsa da tahtanın gördüğü adres seçilir)."""
+    """Cihazın Ankamon'a hangi adresle ulaşacağı: çekirdeğin o cihaza giden yolda seçtiği kaynak
+    adres (host ağındayız; birden çok arayüz/segment olsa da cihazın gördüğü adres seçilir)."""
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.connect((board_ip, 9))  # UDP connect paket göndermez, yalnız yolu seçer
         return s.getsockname()[0]
@@ -307,7 +307,7 @@ def stream_url(board_ip: str, stream: str) -> str:
 
 def _ssh(board: dict, user: str, password: str, script: str, timeout: int) -> dict:
     if not board.get("ip"):
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, f"{user}@{board['ip']}", "sh -c " + shlex.quote(script)]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:
@@ -326,12 +326,12 @@ def _ssh(board: dict, user: str, password: str, script: str, timeout: int) -> di
 
 
 def start(board: dict, user: str, password: str, stream: str, audio: bool, volume: int | None = None) -> dict:
-    """Tahtada yansıtmayı başlatır; görüntü gerçekten gelene dek (en çok ~12 sn) bekler.
-    volume: sesli yansıtmada tahta çıkışının geçici düzeyi (0-100); None = tahtanın düzeyine dokunma."""
+    """Cihazda yansıtmayı başlatır; görüntü gerçekten gelene dek (en çok ~12 sn) bekler.
+    volume: sesli yansıtmada cihaz çıkışının geçici düzeyi (0-100); None = cihazın düzeyine dokunma."""
     if not STREAM_RE.match(stream):
         return {"status": "failed", "rc": None, "output": "Geçersiz yayın adı."}
     if not board.get("ip"):
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     vol = "" if volume is None else str(max(0, min(VOLUME_MAX, int(volume))))
     wrapper = (_WRAPPER.replace("__URL__", shlex.quote(stream_url(board["ip"], stream)))
                .replace("__AUDIO__", "1" if audio else "0")
@@ -347,6 +347,6 @@ def stop(board: dict, user: str, password: str) -> dict:
 
 
 def volume(board: dict, user: str, password: str, level: int) -> dict:
-    """Sesli yansıtma sürerken tahta çıkışının düzeyini değiştirir (kayıtlı asıl düzey korunur)."""
+    """Sesli yansıtma sürerken cihaz çıkışının düzeyini değiştirir (kayıtlı asıl düzey korunur)."""
     vol = str(max(0, min(VOLUME_MAX, int(level))))
     return _ssh(board, user, password, "VOL=" + vol + "\n" + _VOLUME, timeout=15)

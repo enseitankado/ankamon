@@ -26,26 +26,26 @@
  */
 
 /**
- * Tahta envanteri: durum, anlık göstergeler, satır başı onay kutularıyla çoklu seçim, durum + sütun
- * bazlı süzme ve tahta işlemleri. Eski "Uzaktan işlemler" sayfasının işlevi buraya taşındı
+ * Cihaz envanteri: durum, anlık göstergeler, satır başı onay kutularıyla çoklu seçim, durum + sütun
+ * bazlı süzme ve cihaz işlemleri. Eski "Uzaktan işlemler" sayfasının işlevi buraya taşındı
  * ("Komut çalıştır" — hazır işlem ve serbest komutu aynı pencerede sunar).
  *
  * Yenilenme: sayfa her açıldığında (activate) + arka planda REFRESH_MS'de bir kendiliğinden.
  *
  * "online" gecikmesi iki ayrı yoldan beslenir (bkz. BoardsApi::FROM):
- *   - Log: rsyslog bir satırı logs tablosuna yazdığı anda (worker'ı beklemeden) tahta "çevrimiçi"
+ *   - Log: rsyslog bir satırı logs tablosuna yazdığı anda (worker'ı beklemeden) cihaz "çevrimiçi"
  *     sayılır — API, son 2 dakikadaki logu burada canlı sorgular. Gecikme ≈ REFRESH_MS (bu sayfa).
  *   - Yoklama (SSH/sensör portu): worker/tasks/board_status, log göndermeyen ama erişilebilen
- *     tahtaları STATUS_TICK_SECONDS'ta bir (varsayılan 10 sn) yoklar; çevrimdışıya dönüş,
+ *     cihazları STATUS_TICK_SECONDS'ta bir (varsayılan 10 sn) yoklar; çevrimdışıya dönüş,
  *     titremeyi önlemek için üst üste 2 başarısız yoklama ister (bkz. board_status.py).
- * Yeni bir tahtanın burada görünmesi (henüz kayıtlı değilse) ayrıca tasks/boards_from_logs'un
+ * Yeni bir cihazın burada görünmesi (henüz kayıtlı değilse) ayrıca tasks/boards_from_logs'un
  * WORKER_TICK_SECONDS'ta (varsayılan 60 sn) bir çalışmasını gerektirir — bu yalnız ilk kayıt içindir,
- * var olan tahtanın çevrimiçi/çevrimdışı durumu yukarıdaki iki yoldan çok daha hızlı yansır.
+ * var olan cihazın çevrimiçi/çevrimdışı durumu yukarıdaki iki yoldan çok daha hızlı yansır.
  *
  * "Web terminal": üst araç çubuğunda düğmesi yok, yalnız satır sağ menüsünden açılır (bkz. __rowMenu).
  * O satır işaretli ÇOKLU seçimin bir parçasıysa hepsi için ortak bir pencerede yan yana
  * panolar (toplu komut yazılabilen) çoklu terminal açılır (BoardOps.webshellMulti — bkz. /multishell/);
- * değilse yalnız o tahtanın tekli terminali (BoardOps.webshell) açılır — ikisi de aynı pencere
+ * değilse yalnız o cihazın tekli terminali (BoardOps.webshell) açılır — ikisi de aynı pencere
  * deseniyle (BoardOps.__terminalWindow), yeni sekme YOKTUR.
  */
 qx.Class.define("ankamon.page.Boards", {
@@ -55,7 +55,7 @@ qx.Class.define("ankamon.page.Boards", {
     super(user, "Akıllı Tahtalar");
     // Üstteki düğme satırı (Yenile, Tümünü işaretle, İşaretleri kaldır, Ekle, Düzenle, Sil, Komut çalıştır,
     // Yansıt, Kapat, Uyandır) kaldırıldı (kullanıcı isteği): hepsi satır/kutucuk sağ menüsünde (bkz.
-    // __rowMenu — işaretleme ve "Tahta ekle…" de orada); sayfa REFRESH_MS'de bir kendiliğinden yenilenir.
+    // __rowMenu — işaretleme ve "Cihaz ekle…" de orada); sayfa REFRESH_MS'de bir kendiliğinden yenilenir.
     this._actions.exclude();
 
     // Sütun tanımları: hem tabloya hem de her sütunun altındaki süzgeç kutusuna aynı dizi verilir.
@@ -63,18 +63,18 @@ qx.Class.define("ankamon.page.Boards", {
     // gizleme menüsünde ve süzgeç ipucunda o görünür (bkz. Base _createTable/_addColumnFilters).
     this.__columns = [
       // KALICI KURAL (kullanıcı 2026-11-10): Durum = ağda canlı mı (Varlıklar'la aynı); SSH erişimi ayrı "Yönetilebilir".
-      { id: "status", label: "Durum", width: 100, hint: "Çevrimiçi: tahta ağda canlı (Varlıklar'daki durumla aynı — ağ taraması görüyor ya da SSH yanıt veriyor). Kapalı: ağda görülmüyor." },
-      { id: "manageable", label: "Yönetilebilir", width: 120, hint: "Tek ölçüt: tahtaya SSH ile root girişi başarılı mı. Evet: Ankamon son 3 dakikada tahtaya SSH ile root olarak girebildi — komut, ekran, web terminali, oturum işlemleri yapılabilir. Hayır (parola): SSH portu açık ama giriş reddediliyor — tahtanın root parolası Ayarlar ▸ SSH erişimi'ndekinden farklı (Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları'ndan tahtanın parolası girilir). Hayır: SSH yanıt vermiyor." },
+      { id: "status", label: "Durum", width: 100, hint: "Çevrimiçi: cihaz ağda canlı (Varlıklar'daki durumla aynı — ağ taraması görüyor ya da SSH yanıt veriyor). Kapalı: ağda görülmüyor." },
+      { id: "manageable", label: "Yönetilebilir", width: 120, hint: "Tek ölçüt: cihaza SSH ile root girişi başarılı mı. Evet: Ankamon son 3 dakikada cihaza SSH ile root olarak girebildi — komut, ekran, web terminali, oturum işlemleri yapılabilir. Hayır (parola): SSH portu açık ama giriş reddediliyor — cihazın root parolası Ayarlar ▸ SSH erişimi'ndekinden farklı (Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları'ndan cihazın parolası girilir). Hayır: SSH yanıt vermiyor." },
       { id: "name", label: "Takma ad / Ad" },
       { id: "hostname", label: "Bilgisayar adı", width: 150 },
       { id: "ip", label: "IP", width: 120 },
-      // Kablolu MAC: kablolu ağ kartının MAC'i (boards.mac — tahtanın kimliği, uzaktan uyandırma, ağ taraması).
+      // Kablolu MAC: kablolu ağ kartının MAC'i (boards.mac — cihazın kimliği, uzaktan uyandırma, ağ taraması).
       // Kablosuz MAC: Wi-Fi kartının kalıcı (fabrika) MAC'i (boards.wifi_mac, göç 043 — worker oturum yoklaması
       // yazar; NetworkManager'ın taramadaki rastgele adresi değil).
       { id: "mac", label: "Kablolu MAC", hint: "Kablolu ağ kartının MAC adresi (uzaktan uyandırma bununla)", width: 140 },
       { id: "wifi_mac", label: "Kablosuz MAC", hint: "Wi-Fi kartının kalıcı (fabrika) MAC adresi", width: 140 },
       // FATİH fazı (bkz. util.Format.etap — anakart modelinden, yoksa maskelenmiş MAC önekinden).
-      { id: "faz", label: "Faz", hint: "FATİH fazı ve tahta markası", width: 130 },
+      { id: "faz", label: "Faz", hint: "FATİH fazı ve cihaz markası", width: 130 },
       // İşletim sistemi ailesi + adı (göç 052; kullanıcı isteği 2026-11-12): işlevler buna göre seçilir (platforms/README.md).
       { id: "os", label: "İşletim sistemi", hint: "Cihazın işletim sistemi — sağ menü ve araç çubuğu işlevleri buna göre uygulanır (Düzenle ▸ İşletim sistemi ile değiştirilebilir)", width: 170 },
       // Anlık oturum (bkz. worker executor/session_probe.py — 30 sn'de bir SSH ile yoklanır; Oturum aç/
@@ -83,9 +83,9 @@ qx.Class.define("ankamon.page.Boards", {
       // Wi-Fi kartı etkin mi (bkz. ui.FactsView.wifiStatus — Bilgi kartıyla aynı kural). Donanım
       // bilgisiyle birlikte toplanır; Wi-Fi aç/kapat işlemi sonrası runner hemen günceller.
       { id: "wifi", label: "Wi-Fi", width: 110 },
-      // Tahta yerel ağa kablolu kartıyla bağlı mı (internet değil) — bkz. Boards.cableText.
+      // Cihaz yerel ağa kablolu kartıyla bağlı mı (internet değil) — bkz. Boards.cableText.
       { id: "cable", label: "Kablo", hint: "Yerel ağa kablolu ağ kartıyla bağlı mı", width: 100 },
-      // Donanım bilgisi (bkz. worker/ankamon/executor/hwfacts.py): tahta ilk kez tanınırken (MAC
+      // Donanım bilgisi (bkz. worker/ankamon/executor/hwfacts.py): cihaz ilk kez tanınırken (MAC
       // öğrenilirken) bir kez SSH ile toplanır; satır sağ menüsündeki "Bilgi kartı" bunu canlı
       // tazeler (60dk önbellekli). Değer yoksa (henüz toplanmadıysa) hücre boş kalır.
       { id: "disk_total", label: "Disk", hint: "Disk kapasitesi", width: 110 },
@@ -103,9 +103,9 @@ qx.Class.define("ankamon.page.Boards", {
       { id: "disk", label: "Disk", hint: "Disk doluluğu", width: 70 },
       // Ağ trafiği, Mbit/sn (bkz. backend MetricsApi::latest — node_exporter sayaçlarının son tarama aralığı).
       // Başlıkta birim (kullanıcı isteği: "D:/U:Mbit/sn", hücrede yalnız sayı); ne olduğu ipucunda açıkça.
-      { id: "net_rx", label: "D:Mbit/sn", hint: "D (download / indirme): tahtanın ağdan ALDIĞI trafik, Mbit/sn — son ölçüm aralığının ortalaması", width: 95 },
-      { id: "net_tx", label: "U:Mbit/sn", hint: "U (upload / yükleme): tahtanın ağa GÖNDERDİĞİ trafik, Mbit/sn — son ölçüm aralığının ortalaması", width: 95 },
-      // Sensörler (bkz. backend Core/BoardSensors.php). Fan/pil/anakart, tahtada Super I/O sürücüsü
+      { id: "net_rx", label: "D:Mbit/sn", hint: "D (download / indirme): cihazın ağdan ALDIĞI trafik, Mbit/sn — son ölçüm aralığının ortalaması", width: 95 },
+      { id: "net_tx", label: "U:Mbit/sn", hint: "U (upload / yükleme): cihazın ağa GÖNDERDİĞİ trafik, Mbit/sn — son ölçüm aralığının ortalaması", width: 95 },
+      // Sensörler (bkz. backend Core/BoardSensors.php). Fan/pil/anakart, cihazda Super I/O sürücüsü
       // yüklüyse gelir ("Metrik izlemeyi kur" işlemi); Kasa yoksa ACPI bölgesidir.
       { id: "temp", label: "CPU sıcaklığı", width: 100 },
       { id: "case_temp", label: "Kasa", hint: "Kasa sıcaklığı", width: 100 },
@@ -155,7 +155,7 @@ qx.Class.define("ankamon.page.Boards", {
         this.__edit(this.__boards.get(id));
       }
     });
-    // Satır sağ menüsü: ağaçtaki tahta düğümüyle aynı menü (Web terminal / Komut çalıştır / Kapat / WoL)
+    // Satır sağ menüsü: ağaçtaki cihaz düğümüyle aynı menü (Web terminal / Komut çalıştır / Kapat / WoL)
     // + bu sayfaya özgü kayıt işlemleri (Düzenle / Sil) — bkz. __rowMenu. Sağ tıklanan satır onay
     // kutusuyla işaretli ÇOKLU seçimin bir parçasıysa, "Web terminal" o seçimin TÜMÜ için açılır.
     this.__table.addListener("cellContextmenu", e => {
@@ -180,8 +180,8 @@ qx.Class.define("ankamon.page.Boards", {
     this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply,
       { rows: () => (this.__rows || []).map(r => r.cells), persist: true });
 
-    // Tek ekran, iki görünüm (sekme yok, kullanıcı isteği): grid'deki tahtaların canlı ekran önizlemeleri (varsayılan) ya da
-    // "Liste" seçiliyken grid (araç çubuğunun başındaki görünüm bölümü). Sağ menü işlemleri işaretli tahtalara ikisinden de uygulanır. "screen" yetkisi yoksa yalnız grid.
+    // Tek ekran, iki görünüm (sekme yok, kullanıcı isteği): grid'deki cihazların canlı ekran önizlemeleri (varsayılan) ya da
+    // "Liste" seçiliyken grid (araç çubuğunun başındaki görünüm bölümü). Sağ menü işlemleri işaretli cihazlara ikisinden de uygulanır. "screen" yetkisi yoksa yalnız grid.
     this.__views = new qx.ui.container.Stack();
     const listPage = new qx.ui.container.Composite(new qx.ui.layout.VBox(8)).set({ padding: [8, 8, 0, 8] });
     listPage.add(this.__table, { flex: 1 });
@@ -204,7 +204,7 @@ qx.Class.define("ankamon.page.Boards", {
 
     // Ctrl/⌘+A sayfa düzeyinde (kullanıcı isteği, 2026-11-05): odak tabloda ya da Ekranlar iframe'inde değilken
     // (ör. araç çubuğuna tıkladıktan sonra) tarayıcının kendi "tümünü seç"i Ekranlar alanını mavi saydam kutuyla
-    // kaplıyordu. Görünen (süzülmüş) bütün tahtalar işaretlenir; Ekranlar'da işaretler kutucukların seçim
+    // kaplıyordu. Görünen (süzülmüş) bütün cihazlar işaretlenir; Ekranlar'da işaretler kutucukların seçim
     // çerçevesine yansır (bkz. __pushSelection). Tablo odaktaysa Base'in kendi Ctrl+A'sı, iframe odaktaysa
     // screen/index.html'inki çalışır (ikisi de aç/kapa).
     this.__onSelectAllKey = e => {
@@ -237,7 +237,7 @@ qx.Class.define("ankamon.page.Boards", {
   },
 
   statics: {
-    /** Tahta ekle/düzenle MAC biçimi (BoardsApi::validatedBoardFields ile aynı): de:ad:de:ad:de:ad. */
+    /** Cihaz ekle/düzenle MAC biçimi (BoardsApi::validatedBoardFields ile aynı): de:ad:de:ad:de:ad. */
     MAC_RE: /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i,
 
     /** Alt bardaki göstergeler (sağ menüdeki sırayla) — anahtarlar screen/index.html Tile.setStats ile aynı. */
@@ -250,12 +250,12 @@ qx.Class.define("ankamon.page.Boards", {
     CABLE_FRESH_S: 300,
 
     /**
-     * "Kablo" sütununun metni: tahta yerel ağa KABLOLU kartıyla bağlı mı (internet değil; Wi-Fi ile de bağlı
+     * "Kablo" sütununun metni: cihaz yerel ağa KABLOLU kartıyla bağlı mı (internet değil; Wi-Fi ile de bağlı
      * olabilir). Asıl kaynak oturum yoklaması (30 sn, aynı SSH turu — bkz. worker executor/netif.py): kablolu
      * kartta kablo sinyali (carrier) + NetworkManager "bağlı" (100) + IPv4 → "Bağlı"; sinyal var ama bağlantı
      * yoksa "Bağlantı yok"; sinyal yoksa "Takılı değil"; kablolu kart yoksa "Kart yok". Yoklama eskiyse
-     * (CABLE_FRESH_S) logdan kanıt: son 2 dk'da tahtanın IP'sinden log geldi ve o IP'nin MAC'i kablolu kartınki
-     * (BoardsApi cable_log) → "Bağlı (log)". Kapalı tahtada boş (bilinmiyor).
+     * (CABLE_FRESH_S) logdan kanıt: son 2 dk'da cihazın IP'sinden log geldi ve o IP'nin MAC'i kablolu kartınki
+     * (BoardsApi cable_log) → "Bağlı (log)". Kapalı cihazda boş (bilinmiyor).
      */
     /** "Durum" sütunu: ağda canlı (BoardsApi alive — Varlıklar'la aynı ölçü) → "Çevrimiçi", değilse "Kapalı". SSH erişimi
      * ayrı "Yönetilebilir" sütununda (board.online) — bkz. bellek smart-boards-online-vs-manageable. */
@@ -274,7 +274,7 @@ qx.Class.define("ankamon.page.Boards", {
     /**
      * "Wi-Fi" sütunu (ui.FactsView.wifiStatus kuralı). Bağlı/bağlı değil ve ağ adı, oturum yoklaması tazeyse
      * (netifs, 30 sn — CABLE_FRESH_S) ondan alınır; donanım bilgisi (facts) yalnız ilk tanınmada/Bilgi kartında
-     * toplandığından günlerce eski kalabiliyor (bağlı görünüp bağlı olmayan tahta). Bağlıysa "Bağlı (Ağ adı)".
+     * toplandığından günlerce eski kalabiliyor (bağlı görünüp bağlı olmayan cihaz). Bağlıysa "Bağlı (Ağ adı)".
      */
     wifiText(board) {
       const f = board.facts || {};
@@ -307,7 +307,7 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * "Oturum" sütununun metni: çevrimdışı ya da henüz yoklanmamış tahtada boş (bilinmiyor), oturum
+     * "Oturum" sütununun metni: çevrimdışı ya da henüz yoklanmamış cihazda boş (bilinmiyor), oturum
      * yoksa "Oturum kapalı", varsa kullanıcı adı — oturum kilitliyse (dm-tool lock) "(kilitli)" ekiyle.
      * Ankamon ekran kilidi (Ekran ▸ Kilitle) ayrıca " / Kilitli" ile eklenir (bkz. worker executor/screenlock.py).
      */
@@ -326,7 +326,7 @@ qx.Class.define("ankamon.page.Boards", {
 
     // Kilit teyidinden sonra kutucuk akışının yenilenmesi için en uzun bekleme (bkz. __refreshTile).
     TILE_REFRESH_MS: 8000,
-    // "Kapanıyor…" yazısı (bkz. __sessionOps shutdownSent) tahta bu süre içinde kapanmadıysa kalkar.
+    // "Kapanıyor…" yazısı (bkz. __sessionOps shutdownSent) cihaz bu süre içinde kapanmadıysa kalkar.
     SHUTDOWN_NOTE_MS: 3 * 60 * 1000,
 
     // Ekran görünümü kapandıktan (Liste ya da başka sayfa) bu kadar sonra önizleme akışları duraklar
@@ -475,7 +475,7 @@ qx.Class.define("ankamon.page.Boards", {
       this.__apply();
       this.__actionBar.refresh();
       this.__note.setValue(boards.boards.length ? "" :
-        "Henüz kayıtlı tahta yok. Tahtalar log göndermeye başladığında kendiliğinden listelenir; elle de ekleyebilirsiniz.");
+        "Henüz kayıtlı cihaz yok. Cihazlar log göndermeye başladığında kendiliğinden listelenir; elle de ekleyebilirsiniz.");
       // Boş not yer kaplamasın: tablo pencerenin altına kadar uzansın (kullanıcı isteği).
       this.__note.setVisibility(boards.boards.length ? "excluded" : "visible");
     },
@@ -514,7 +514,7 @@ qx.Class.define("ankamon.page.Boards", {
 
     /**
      * Listenin sütunla sıralanmamış (varsayılan) sırası: kutucukların sürükle-bırakla kaydedilen sırası
-     * (bkz. __screenOrder, AuthApi::screenOrder) — o sıradakiler önce, sıralanmamışlar (yeni tahta) doğal
+     * (bkz. __screenOrder, AuthApi::screenOrder) — o sıradakiler önce, sıralanmamışlar (yeni cihaz) doğal
      * sırayla sona. Sütun başlığıyla sıralanınca o sıra geçerlidir (Base.keepSortOnReload).
      */
     __inScreenOrder(rows) {
@@ -524,7 +524,7 @@ qx.Class.define("ankamon.page.Boards", {
       return ranked.concat(rows.filter(r => !rank.has(r.board.id)));
     },
 
-    /** Gösterilen tahtalar, tablonun o anki satır sırasıyla; Ekranlar kutucukları aynı sırada çizilir. */
+    /** Gösterilen cihazlar, tablonun o anki satır sırasıyla; Ekranlar kutucukları aynı sırada çizilir. */
     __syncShownOrder() {
       if (!this.__rows || this.__settingRows) {
         return;
@@ -543,7 +543,7 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * Ekran görünümü: grid'de o an listelenen (süzülmüş) tahtaların canlı ekran önizlemeleri.
+     * Ekran görünümü: grid'de o an listelenen (süzülmüş) cihazların canlı ekran önizlemeleri.
      * Önizlemeler /screen/ sayfasının gömülü kipidir (spec.embed, q=thumb — küçük ve düşük kare hızlı;
      * komut loguna yazılmaz, bkz. ekran köprüsü nolog). Görünüm kapanınca (Liste işaretlendi ya da
      * başka bir sayfa) SCREENS_STOP_MS sonra akışlar duraklatılır (yük tasarrufu; bkz. __pausePreview) —
@@ -560,7 +560,7 @@ qx.Class.define("ankamon.page.Boards", {
      * Kutucuklar tıklanınca seçilir (Shift ile aralık, Ctrl ile tekli ekleme, boş alana basılı
      * tutup sürükleyerek dikdörtgenle çoklu seçim — hepsi iframe içinde, bkz. docker/rootfs/
      * screen/index.html). Çoklu seçimde sağ menünün toplu etki gösteren maddeleri (bkz. __rowMenu/
-     * BoardOps.menu) seçili TÜM tahtalara uygulanır. Kutucuklar sürükle-bırakla yeniden sıralanabilir;
+     * BoardOps.menu) seçili TÜM cihazlara uygulanır. Kutucuklar sürükle-bırakla yeniden sıralanabilir;
      * yeni sıra "tm-reorder" ile buraya iletilip kullanıcı başına kalıcı kaydedilir (bkz.
      * __saveScreenOrder, AuthApi::screenOrder) — __previewList bu sırayı uygular.
      */
@@ -571,7 +571,7 @@ qx.Class.define("ankamon.page.Boards", {
       // tıklama/sağ tığı yutuyordu (ölçüldü). Html bileşeninde böyle bir katman yok.
       this.__frame = new qx.ui.embed.Html("").set({ overflowX: "hidden", overflowY: "hidden" });
       page.add(this.__frame, { flex: 1 });
-      this.__screenRes = new Map(); // tahta id → ekran genişliği (px), bkz. "tm-res"
+      this.__screenRes = new Map(); // cihaz id → ekran genişliği (px), bkz. "tm-res"
       page.add(this.__createSizeRow());
       this.__screensPage = page;
       this.__screenOrder = (this._user && this._user.screen_order) || [];
@@ -608,7 +608,7 @@ qx.Class.define("ankamon.page.Boards", {
         } else if (e.data.type === "tm-statsmenu") {
           this.__openStatsMenu(e.data.id, e.data.x, e.data.y, e.data.ids);
         } else if (e.data.type === "tm-show") {
-          // Kutucuğun ekran alanına çift tıklama = sağ menüdeki "Ekranı göster" (yalnız o tahta).
+          // Kutucuğun ekran alanına çift tıklama = sağ menüdeki "Ekranı göster" (yalnız o cihaz).
           const board = this.__boards.get(e.data.id);
           if (board && board.online && this._can("screen")) {
             ankamon.ui.BoardOps.screen([board], this._user);
@@ -620,7 +620,7 @@ qx.Class.define("ankamon.page.Boards", {
             ankamon.ui.BoardOps.screen([board], this._user, true);
           }
         } else if (e.data.type === "tm-wake") {
-          // Güç tasarrufundaki kutucuğa basıldı = sağ menü Ekran ▸ Uyandır (yalnız o tahta).
+          // Güç tasarrufundaki kutucuğa basıldı = sağ menü Ekran ▸ Uyandır (yalnız o cihaz).
           const board = this.__boards.get(e.data.id);
           if (board && board.online && this._can("screen")) {
             this.__sessionOps().wake([board]);
@@ -634,20 +634,20 @@ qx.Class.define("ankamon.page.Boards", {
         } else if (e.data.type === "tm-fit") {
           this.__applyFit(e.data.px);
         } else if (e.data.type === "tm-res") {
-          // Tahtanın ekran çözünürlüğü (VNC çerçeve boyutu): slider'ın yanındaki % değeri buna göre.
+          // Cihazın ekran çözünürlüğü (VNC çerçeve boyutu): slider'ın yanındaki % değeri buna göre.
           this.__screenRes.set(e.data.id, e.data.w);
           this.__updateSizeLabel();
         }
       };
       window.addEventListener("message", this.__onMessage);
-      // Ayrı pencerede açık ekranlar (BoardOps.screen): o tahtaların önizlemesi durur, yerine not yazar.
+      // Ayrı pencerede açık ekranlar (BoardOps.screen): o cihazların önizlemesi durur, yerine not yazar.
       this.__onScreenWindows = () => this.__pushPopped();
       qx.event.message.Bus.subscribe(ankamon.ui.BoardOps.SCREEN_WINDOWS, this.__onScreenWindows, this);
-      // Sohbet açık tahtanın kutucuğu yüksek çözünürlükte akar: tahtadaki sohbet penceresi okunur.
+      // Sohbet açık cihazın kutucuğu yüksek çözünürlükte akar: cihazdaki sohbet penceresi okunur.
       this.__onChatWindows = () => this.__pushChat();
       qx.event.message.Bus.subscribe(ankamon.ui.chat.Window.CHANGED, this.__onChatWindows, this);
-      // Wi-Fi Monitör bir tahtanın kartını açtı/eski durumuna döndürdü: Wi-Fi sütunu anında güncellensin (kullanıcı isteği).
-      // Aynı anda birçok tahtadan gelebilir — tek tazelemede toplanır.
+      // Wi-Fi Monitör bir cihazın kartını açtı/eski durumuna döndürdü: Wi-Fi sütunu anında güncellensin (kullanıcı isteği).
+      // Aynı anda birçok cihazdan gelebilir — tek tazelemede toplanır.
       this.__onWifiRadio = () => {
         if (!this.__wifiRefreshQueued) {
           this.__wifiRefreshQueued = true;
@@ -671,7 +671,7 @@ qx.Class.define("ankamon.page.Boards", {
      *  - Ekranlar | Liste: iki durumlu; ekran kutucukları ya da grid (seçim kullanıcı başına kalıcı).
      *  - Sensörler (her açılışta açık): kutucukların altındaki CPU/RAM/HDD/fan/pil barı.
      *  - Başarım: kutucuğun ekran alanında htop'un üst panelleri, saniyelik (bkz. screen/index.html Tile.syncPerf,
-     *    worker/ankamon/screen/perf.py — yalnız açıkken ve görünen tahtalar için SSH açılır; seçim tarayıcıda kalıcı).
+     *    worker/ankamon/screen/perf.py — yalnız açıkken ve görünen cihazlar için SSH açılır; seçim tarayıcıda kalıcı).
      * Sensörler ve Başarım kutucuklara ait olduğundan Liste'deyken devre dışıdır.
      */
     __createViewControls() {
@@ -680,10 +680,10 @@ qx.Class.define("ankamon.page.Boards", {
       const list = (this._user.ui_prefs || {})["boards.listView"] !== false;
       this.__viewButtons = this.__actionBar.addViewControls([
         // Sıra (kullanıcı isteği 2026-11-12): Liste · Ekranlar · Sensörler · Başarım.
-        { id: "list", label: "Liste", icon: "list", group: true, tip: "Tahtaları tablo olarak gösterir" },
-        { id: "screens", label: "Ekranlar", icon: "layoutGrid", group: true, tip: "Tahtaların canlı ekran kutucukları" },
+        { id: "list", label: "Liste", icon: "list", group: true, tip: "Cihazları tablo olarak gösterir" },
+        { id: "screens", label: "Ekranlar", icon: "layoutGrid", group: true, tip: "Cihazların canlı ekran kutucukları" },
         { id: "stats", label: "Sensörler", icon: "temperature", tip: "Kutucukların altında işlemci, bellek, disk sıcaklığı, fan ve pil voltajı barı" },
-        { id: "perf", label: "Başarım", icon: "gauge", tip: "Ekran alanında tahtanın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)" }
+        { id: "perf", label: "Başarım", icon: "gauge", tip: "Ekran alanında cihazın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)" }
       ], (id, on) => {
         if (!this.__viewReady) {
           return;     // açılışta kayıtlı seçim uygulanıyor: yeniden kaydedilmez
@@ -792,7 +792,7 @@ qx.Class.define("ankamon.page.Boards", {
       row.add(new qx.ui.core.Spacer(), { flex: 1 });
       const help = new qx.ui.form.Button("?").set({
         width: 26, minWidth: 26, padding: [1, 0], font: "bold",
-        toolTipText: "Ekranlar ve veri toplama: tahtalara hangi bağlantılar açılır, kullanıcı sayısı yükü artırır mı?"
+        toolTipText: "Ekranlar ve veri toplama: cihazlara hangi bağlantılar açılır, kullanıcı sayısı yükü artırır mı?"
       });
       help.addListener("execute", () => ankamon.ui.boards.ScreenFeedHelp.open());
       row.add(help);
@@ -842,9 +842,9 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * Slider'ın yanındaki % değeri: kutucuk genişliğinin tahta ekranının gerçek genişliğine oranı (ör. 1920
-     * px'lik ekran 300 px'lik kutucukta %16). Tahtaların çözünürlüğü önizleme bağlanınca öğrenilir
-     * ("tm-res"); farklı çözünürlükte tahtalar varsa en yaygın olanınki, hiç bilinmiyorsa 1920 esas alınır.
+     * Slider'ın yanındaki % değeri: kutucuk genişliğinin cihaz ekranının gerçek genişliğine oranı (ör. 1920
+     * px'lik ekran 300 px'lik kutucukta %16). Cihazların çözünürlüğü önizleme bağlanınca öğrenilir
+     * ("tm-res"); farklı çözünürlükte cihazlar varsa en yaygın olanınki, hiç bilinmiyorsa 1920 esas alınır.
      */
     __updateSizeLabel() {
       if (!this.__sizeLabel) {
@@ -862,7 +862,7 @@ qx.Class.define("ankamon.page.Boards", {
       });
       const pct = Math.max(1, Math.round(this.__tileSize * 100 / width));
       this.__sizeLabel.setValue("%" + pct);
-      this.__sizeLabel.setToolTipText(`Kutucuk genişliği ${this.__tileSize} px, tahta ekranı ${width} px genişlikte (%${pct} oranında)` +
+      this.__sizeLabel.setToolTipText(`Kutucuk genişliği ${this.__tileSize} px, cihaz ekranı ${width} px genişlikte (%${pct} oranında)` +
         (this.__autoSize ? " · varsayılan boyut" : ` · çift tıklayın: varsayılan boyut (satırda ${this.__defaultColumns()} ekran)`));
     },
 
@@ -911,7 +911,7 @@ qx.Class.define("ankamon.page.Boards", {
       this.__updateActionState();
     },
 
-    /** Grid'deki işaretli tahtaları önizleme kutucuklarına seçili olarak bildirir (bkz. __checkFromPreview). */
+    /** Grid'deki işaretli cihazları önizleme kutucuklarına seçili olarak bildirir (bkz. __checkFromPreview). */
     __pushSelection() {
       if (this.__applyingPreview || !this.__screensRunning) {
         return;
@@ -923,7 +923,7 @@ qx.Class.define("ankamon.page.Boards", {
       }
     },
 
-    /** Ekran penceresi açık tahtaları iframe'e bildirir (kutucuk akışı keser, "Ayrı pencerede izleniyor"). */
+    /** Ekran penceresi açık cihazları iframe'e bildirir (kutucuk akışı keser, "Ayrı pencerede izleniyor"). */
     __pushPopped() {
       const el = this.__iframeEl();
       if (el && el.contentWindow) {
@@ -957,7 +957,7 @@ qx.Class.define("ankamon.page.Boards", {
      * __pushPreview'da uygular.
      */
     async __saveScreenOrder(shownOrder) {
-      // iframe yalnız GÖSTERİLEN (süzülmüş) kutucukların sırasını bilir; süzgeçle gizli tahtaların
+      // iframe yalnız GÖSTERİLEN (süzülmüş) kutucukların sırasını bilir; süzgeçle gizli cihazların
       // önceki kayıtlı sırası kaybolmasın diye onlar sona eklenir.
       const shown = new Set(shownOrder);
       const order = shownOrder.concat((this.__screenOrder || []).filter(id => !shown.has(id)));
@@ -1004,7 +1004,7 @@ qx.Class.define("ankamon.page.Boards", {
 
     /**
      * Ekranlar uzun süre görünmeyince akışlar durur ama önizleme sayfası (iframe) kaldırılmaz (kullanıcı
-     * isteği: sekme hiçbir zaman yeniden kurulmasın): kutucuklar son görüntüleriyle yerinde kalır; tahta
+     * isteği: sekme hiçbir zaman yeniden kurulmasın): kutucuklar son görüntüleriyle yerinde kalır; cihaz
      * listesi/oturum/durum/sensör güncellemeleri gizliyken de iletilir. Görününce akışlar kaldığı yerden sürer.
      */
     __pausePreview(paused) {
@@ -1024,7 +1024,7 @@ qx.Class.define("ankamon.page.Boards", {
     __wifiRefreshQueued: false,
 
     /**
-     * O an GÖSTERİLEN (süzülmüş) tahtalar, listenin satır sırasıyla (bkz. __syncShownOrder): liste
+     * O an GÖSTERİLEN (süzülmüş) cihazlar, listenin satır sırasıyla (bkz. __syncShownOrder): liste
      * sütunla sıralıysa o sıra, değilse kutucukların sürükle-bırak sırası (__inScreenOrder).
      */
     __orderedShown() {
@@ -1035,14 +1035,14 @@ qx.Class.define("ankamon.page.Boards", {
       const whoami = this.__whoamiState || new Map();
       const metrics = this.__metrics || {};
       return this.__orderedShown().map(b => {
-        // WoL yazısı (bkz. __sessionOps wolSent) tahta açılınca kalkar; "Kapanıyor…" (shutdownSent) tahta kapanınca
+        // WoL yazısı (bkz. __sessionOps wolSent) cihaz açılınca kalkar; "Kapanıyor…" (shutdownSent) cihaz kapanınca
         // ya da kapanmadıysa SHUTDOWN_NOTE_MS sonra.
         const w = whoami.get(b.id);
         if (w && ((w.wol && b.online) || (w.off && (!b.online || Date.now() - w.off > ankamon.page.Boards.SHUTDOWN_NOTE_MS)))) {
           whoami.delete(b.id);
         }
         // Kutucuğun alt barı (bkz. screen/index.html Tile.setStats): grid'in İşlemci/Bellek/sensör
-        // sütunlarıyla aynı son ölçümler — yalnız çevrimiçi tahtada (eski ölçüm kapalı tahtada yanıltır).
+        // sütunlarıyla aynı son ölçümler — yalnız çevrimiçi cihazda (eski ölçüm kapalı cihazda yanıltır).
         const m = b.online ? metrics[b.id] : null;
         return {
           id: b.id, name: b.label || b.hostname || b.ip || ("#" + b.id), online: !!b.online, alive: !!(b.alive ?? b.online),
@@ -1054,7 +1054,7 @@ qx.Class.define("ankamon.page.Boards", {
           // Monitör DPMS ile kapalı (bkz. 025_board_display_state.sql): kutucukta "Ekran güç tasarrufu kipinde".
           powersave: !!b.online && ["Off", "Standby", "Suspend"].includes(b.display_state),
           // Alt bardaki ağ simgeleri ve güç tasarrufu yazısının altındaki TiHA otomatik kapatma geri sayımı
-          // (bkz. migration 026, worker executor/netif.py + autoshutdown.py) — yalnız çevrimiçi tahtada.
+          // (bkz. migration 026, worker executor/netif.py + autoshutdown.py) — yalnız çevrimiçi cihazda.
           net: b.online ? b.netifs || null : null,
           autoshutdown: b.online ? b.autoshutdown || null : null,
           hide: this.__statsHidden()[b.id] || [],
@@ -1113,7 +1113,7 @@ qx.Class.define("ankamon.page.Boards", {
         `style="border:0;width:100%;height:100%;display:block"></iframe>`);
     },
 
-    /** Grid'in tahta listesi (süzgeç/yenileme) değiştiyse önizleme sayfasına bildirir; yalnız fark varsa. */
+    /** Grid'in cihaz listesi (süzgeç/yenileme) değiştiyse önizleme sayfasına bildirir; yalnız fark varsa. */
     __pushPreview() {
       if (!this.__frame || !this.__screensRunning) {
         return;
@@ -1135,7 +1135,7 @@ qx.Class.define("ankamon.page.Boards", {
      * durumuna yönlendirilir (bkz. __sessionOps). Çoklu seçim: iframe'de Shift/Ctrl ile seçilenler (bkz.
      * docker/rootfs/screen/index.html "tm-menu").
      * @param ids {Array?} iframe'deki o anki çoklu seçim (sağ tıklanan dahil); verilmezse/tek
-     *   elemanlıysa yalnız bu tek tahta — bkz. BoardOps.menu boards parametresiyle aynı desen.
+     *   elemanlıysa yalnız bu tek cihaz — bkz. BoardOps.menu boards parametresiyle aynı desen.
      */
     __openPreviewMenu(id, x, y, ids) {
       this.__openPreviewMenuAt(id, x, y, ids, this.__iframeEl());
@@ -1167,14 +1167,14 @@ qx.Class.define("ankamon.page.Boards", {
       menu.openAtPoint({ left: Math.round(rect.left + x), top: Math.round(rect.top + y) });
     },
 
-    /** Bu kullanıcının tahta başına gizlediği göstergeler: {"<tahta id>": ["fan", …]} (users.ui_prefs["screens.stats"]). */
+    /** Bu kullanıcının cihaz başına gizlediği göstergeler: {"<cihaz id>": ["fan", …]} (users.ui_prefs["screens.stats"]). */
     __statsHidden() {
       return ((this._user && this._user.ui_prefs) || {})["screens.stats"] || {};
     },
 
     /**
      * Kutucuğun alt barına sağ tık (bkz. screen/index.html "tm-statsmenu"): hangi göstergelerin görüneceği.
-     * İşaretler sağ tıklanan tahtanın durumunu gösterir; değişiklik o an seçili TÜM kutucuklara uygulanır
+     * İşaretler sağ tıklanan cihazın durumunu gösterir; değişiklik o an seçili TÜM kutucuklara uygulanır
      * (seçim dışına sağ tıklanınca seçim o kutucuğa iner). Seçim kullanıcının tercihi olarak sunucuda saklanır
      * (AuthApi::prefs, "screens.stats") — sekmeye her girişte ve başka tarayıcıda da aynı görünür.
      */
@@ -1183,7 +1183,7 @@ qx.Class.define("ankamon.page.Boards", {
       const hiddenOf = bid => new Set(this.__statsHidden()[bid] || []);
       const current = hiddenOf(String(id));
       const menu = new qx.ui.menu.Menu();
-      menu.add(new qx.ui.menu.Button(targets.length > 1 ? `Göstergeler — seçili ${targets.length} tahta` : "Göstergeler").set({ enabled: false }));
+      menu.add(new qx.ui.menu.Button(targets.length > 1 ? `Göstergeler — seçili ${targets.length} cihaz` : "Göstergeler").set({ enabled: false }));
       menu.add(new qx.ui.menu.Separator());
       const apply = mutate => {
         const map = Object.assign({}, this.__statsHidden());
@@ -1222,11 +1222,11 @@ qx.Class.define("ankamon.page.Boards", {
       }
     },
 
-    /** "Oturumları sorgula": seçili tahtalarda o an oturum açmış kullanıcıyı paralel sorgular;
+    /** "Oturumları sorgula": seçili cihazlarda o an oturum açmış kullanıcıyı paralel sorgular;
      * eşzamanlılık worker'da yüke göre dinamik (bkz. whoami.dynamic_concurrency). */
     __startWhoamiQuery(boardIds, quiet = false) {
       if (quiet) {
-        // Kendiliğinden sorgu (kutucuk canlıya geçti) "Kapanıyor…" yazan tahtayı atlar (bkz. __sessionOps shutdownSent).
+        // Kendiliğinden sorgu (kutucuk canlıya geçti) "Kapanıyor…" yazan cihazı atlar (bkz. __sessionOps shutdownSent).
         boardIds = boardIds.filter(id => !((this.__whoamiState && this.__whoamiState.get(id)) || {}).off);
       }
       this.__sessionJob(boardIds, { type: "whoami" }, () => "Oturum sorgulanıyor…",
@@ -1234,9 +1234,9 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * Ekranlar kutucuğu "Bağlanıyor…"dan canlıya geçti ("tm-live", bkz. screen/index.html connect): o tahtanın
+     * Ekranlar kutucuğu "Bağlanıyor…"dan canlıya geçti ("tm-live", bkz. screen/index.html connect): o cihazın
      * oturumu kendiliğinden sorgulanır. Aynı anda bağlanan kutucuklar 1,5 sn içinde TEK işte toplanır; zaten
-     * sorgulanan/işlem süren tahta atlanır; hata penceresi açılmaz (kutucukta "Başlatılamadı" görünür).
+     * sorgulanan/işlem süren cihaz atlanır; hata penceresi açılmaz (kutucukta "Başlatılamadı" görünür).
      */
     __queueLiveWhoami(id) {
       const board = this.__boards.get(id);
@@ -1268,7 +1268,7 @@ qx.Class.define("ankamon.page.Boards", {
       };
       return {
         // Bilgisayarı aç (WoL): görev başlayınca kapalı kutucuğun kullanıcı adı alanında "SS:DD:sn Magic paket
-        // gönderildi" (kullanıcı isteği). Tahta çevrimiçi olunca kalkar (bkz. __previewList).
+        // gönderildi" (kullanıcı isteği). Cihaz çevrimiçi olunca kalkar (bkz. __previewList).
         wolSent: boards => {
           if (!this.__whoamiState) {
             this.__whoamiState = new Map();
@@ -1277,9 +1277,9 @@ qx.Class.define("ankamon.page.Boards", {
           boards.forEach(b => this.__whoamiState.set(b.id, { status: "ok", text: `${at} Magic paket gönderildi`, wol: true }));
           this.__pushPreview();
         },
-        // Bilgisayarı kapat: komut tahtaya ulaşınca (iş hedefi "ok" — "Kapatma komutu verildi.") kutucuğun sol altında
+        // Bilgisayarı kapat: komut cihaza ulaşınca (iş hedefi "ok" — "Kapatma komutu verildi.") kutucuğun sol altında
         // "Kapanıyor…" (kullanıcı isteği 2026-11-10); ulaşamazsa kutucuk olduğu gibi kalır (hata çıktı penceresinde).
-        // Tahta kapanınca kalkar (bkz. __previewList).
+        // Cihaz kapanınca kalkar (bkz. __previewList).
         shutdownSent: (jobId, boards) => {
           if (!this.__whoamiState) {
             this.__whoamiState = new Map();
@@ -1304,7 +1304,7 @@ qx.Class.define("ankamon.page.Boards", {
               if (t.status !== "ok") {
                 return { status: "error", text: "Uyandırılamadı" };
               }
-              // "Güç tasarrufu" yazısı tahta listesinin bir sonraki tazelenmesini beklemeden kalksın.
+              // "Güç tasarrufu" yazısı cihaz listesinin bir sonraki tazelenmesini beklemeden kalksın.
               const board = this.__boards.get(t.board_id);
               if (board) {
                 board.display_state = "On";
@@ -1327,7 +1327,7 @@ qx.Class.define("ankamon.page.Boards", {
               return before.get(t.board_id) || { status: "ok", text: known(t.board_id) };
             });
         },
-        // Ekran ▸ Kilitle / Kilidi aç: tahta işi teyit edene dek kutucukta "Kilitleniyor…"; teyitten sonra akış
+        // Ekran ▸ Kilitle / Kilidi aç: cihaz işi teyit edene dek kutucukta "Kilitleniyor…"; teyitten sonra akış
         // yeniden kurulur (kilit görseli görünür), yeni görüntü gelince önceki oturum bilgisi geri döner (ekran
         // kilidi oturumu değiştirmez). Grid'in "Oturum" hücresi tazelemeyi beklemeden "/ Kilitli" alır/bırakır.
         screenLock: (boards, on) => {
@@ -1393,7 +1393,7 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * Tahta başına tek satırlık sonuç üreten bir görevi (whoami/login/logout) kuyruğa alır; tahtalar
+     * Cihaz başına tek satırlık sonuç üreten bir görevi (whoami/login/logout) kuyruğa alır; cihazlar
      * hemen `pendingText(id)` durumuna geçer, sonuçlar __pollSession ile bitirdikçe `resultOf(target)`
      * ile kutucuklara yansır (bkz. __whoamiState, __previewList).
      */
@@ -1420,7 +1420,7 @@ qx.Class.define("ankamon.page.Boards", {
       this.__pollSession(res.id, new Set(boardIds), resultOf);
     },
 
-    /** /api/jobs/{id}'yi kısa aralıkla okur; bitiren her tahtanın sonucunu ANINDA (en yavaşı
+    /** /api/jobs/{id}'yi kısa aralıkla okur; bitiren her cihazın sonucunu ANINDA (en yavaşı
      * beklemeden) yansıtır — hepsi bitince kendiliğinden durur (bkz. ui.Jobs'taki aynı desen). */
     __pollSession(jobId, pending, resultOf) {
       ankamon.io.Api.get(`/jobs/${jobId}`).then(res => {
@@ -1469,7 +1469,7 @@ qx.Class.define("ankamon.page.Boards", {
       }
     },
 
-    /** Tahta ekle / Düzenle penceresi — ortak (bkz. ui.BoardOps.editBoard; Bakım ▸ Ahenk sağ menüsü de kullanır). */
+    /** Cihaz ekle / Düzenle penceresi — ortak (bkz. ui.BoardOps.editBoard; Bakım ▸ Ahenk sağ menüsü de kullanır). */
     __edit(board) {
       ankamon.ui.BoardOps.editBoard(board, () => this.refresh(), this._user);
     },
@@ -1477,7 +1477,7 @@ qx.Class.define("ankamon.page.Boards", {
     /**
      * Satır sağ menüsü: BoardOps.menu() çevrimiçi/çevrimdışına göre Komut çalıştır / Ekran / … ve
      * yan yana Bilgisayarı aç (WoL) + Bilgisayarı kapat ekler (bkz. ui.BoardOps) — burada bu sayfaya
-     * özgü kayıt işlemleri (Düzenle / Sil), Logları göster (Loglar sayfasını bu tahtaya süzülmüş
+     * özgü kayıt işlemleri (Düzenle / Sil), Logları göster (Loglar sayfasını bu cihaza süzülmüş
      * açar — bkz. ui.Shell.OPEN_LOGS) ve hemen altında Bilgi kartı eklenir.
      */
     __rowMenu(board, boards = [board], sessionOps = null) {
@@ -1505,13 +1505,13 @@ qx.Class.define("ankamon.page.Boards", {
       // Bilgisayar ayrıntıları penceresindeki "Loglar" düğmesinde.
       const extra = ankamon.ui.BoardOps.logsAndInfo(board, this._user, boards, { noLogs: true }).map(item => () => menu.add(item));
       // Bilgisayarı aç (WoL) artık BoardOps.menu'de "Bilgisayarı kapat"ın hemen yanında (kullanıcı
-      // isteği: ikisi komşu); çevrimiçi tahtada orada devre dışı görünür.
+      // isteği: ikisi komşu); çevrimiçi cihazda orada devre dışı görünür.
       if (this._can("boards.manage")) {
         // Çoklu seçimde toplu düzenleme (ui.network.DeviceBulkEdit — kullanıcı isteği 2026-11-10).
-        extra.push(() => add(ICON.edit, "Düzenle" + (boards.length > 1 ? ` (${boards.length} tahta)` : ""), () => (boards.length > 1
+        extra.push(() => add(ICON.edit, "Düzenle" + (boards.length > 1 ? ` (${boards.length} cihaz)` : ""), () => (boards.length > 1
           ? ankamon.ui.network.DeviceBulkEdit.open({ boards, user: this._user, onSaved: () => this.refresh() })
           : this.__edit(board))));
-        extra.push(() => add(ICON.delete, "Sil" + (boards.length > 1 ? ` (${boards.length} tahta)` : ""),
+        extra.push(() => add(ICON.delete, "Sil" + (boards.length > 1 ? ` (${boards.length} cihaz)` : ""),
           () => this.__delete(boards)));
       }
       if (extra.length) {
@@ -1521,10 +1521,10 @@ qx.Class.define("ankamon.page.Boards", {
         extra.forEach(fn => fn());
       }
       // "Tümünü işaretle / İşaretleri kaldır" sağ menüden kalktı (kullanıcı isteği 2026-11-11): başlıktaki onay kutusu
-      // görünen satırların hepsini işaretler/kaldırır. Elle tahta ekleme kalır.
+      // görünen satırların hepsini işaretler/kaldırır. Elle cihaz ekleme kalır.
       if (this._can("boards.manage")) {
         menu.add(new qx.ui.menu.Separator());
-        add(ICON.add || "＋", "Tahta ekle…", () => this.__edit(null));
+        add(ICON.add || "＋", "Cihaz ekle…", () => this.__edit(null));
       }
       // İşletim sistemine göre (kullanıcı isteği 2026-11-12): seçili cihazların hiçbirinde uygulaması olmayan madde devre
       // dışı + ipucu (araç çubuğu aynı maddeleri kullanır) — bkz. ui.boards.Platforms, platforms/README.md.
@@ -1532,12 +1532,12 @@ qx.Class.define("ankamon.page.Boards", {
     },
 
     /**
-     * Bir ya da daha fazla tahtayı; loglarını ve sensör geçmişini de dahil ederek TAMAMEN siler
-     * (toolbar "Sil" düğmesi işaretli tüm tahtaları, satır sağ menüsü tek tahtayı [board] olarak
-     * gönderir) — bkz. backend BoardsApi::delete (logs + metrics). Silinen tahta engellenmez: hâlâ
+     * Bir ya da daha fazla cihazı; loglarını ve sensör geçmişini de dahil ederek TAMAMEN siler
+     * (toolbar "Sil" düğmesi işaretli tüm cihazları, satır sağ menüsü tek cihazı [board] olarak
+     * gönderir) — bkz. backend BoardsApi::delete (logs + metrics). Silinen cihaz engellenmez: hâlâ
      * log gönderiyorsa worker kaydı kendiliğinden yeniden açar.
      *
-     * İlerleme penceresi her tahta için ayrı bir satırla açılır ve kayıtlar SIRAYLA (paralel değil)
+     * İlerleme penceresi her cihaz için ayrı bir satırla açılır ve kayıtlar SIRAYLA (paralel değil)
      * silinir; her DELETE sonucu geldikçe o satır anlık "⏳ siliniyor…" → "✓/✕ ..." olarak güncellenir
      * — sessizce yalnız listeyi yenileyip tek bir özet göstermek yerine.
      */
@@ -1546,7 +1546,7 @@ qx.Class.define("ankamon.page.Boards", {
       const name = b => b.label || b.hostname || b.ip || ("#" + b.id);
       const question = boards.length === 1
         ? `<b>${esc(name(boards[0]))}</b> kaydı, logları ve sensör geçmişiyle birlikte TAMAMEN silinsin mi? Bu işlem geri alınamaz.`
-        : `Seçili <b>${boards.length}</b> tahta kaydı, logları ve sensör geçmişiyle birlikte TAMAMEN silinsin mi?<br>` +
+        : `Seçili <b>${boards.length}</b> cihaz kaydı, logları ve sensör geçmişiyle birlikte TAMAMEN silinsin mi?<br>` +
           `${boards.map(b => esc(name(b))).join(", ")}<br>Bu işlem geri alınamaz.`;
       const sure = await ankamon.ui.Dialog.confirm(question, "Sil");
       if (!sure) {

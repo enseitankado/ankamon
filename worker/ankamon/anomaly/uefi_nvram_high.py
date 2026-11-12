@@ -33,7 +33,7 @@ işletim sistemi güncellemesinde önyükleyici kaydı başarısız olur, bazı 
 
 Kural: yalnız boş alan FREE_MIN_PCT'nin altındaysa anomali sürer. Filo ortalamasıyla karşılaştırılmaz:
 AMI deposu log yapılıdır — her yazma değişkenin yeni kopyasını ekler, eskisi firmware açılışta toplayana
-(reclaim) dek yer kaplar. Canlı içerik her tahtada ~9-19 KB iken doluluk bu testere dişi yüzünden %9-96
+(reclaim) dek yer kaplar. Canlı içerik her cihazda ~9-19 KB iken doluluk bu testere dişi yüzünden %9-96
 arasında gezer ve açılış sayısıyla ilişkisizdir (2026-11-11 filo ölçümü); ortalamanın üstünde olmak sorun
 değildir. Ayrıntıya canlı içerik (uefi_vars boyutları toplamı) de yazılır: doluluğun kalanı eskimiş kopyadır.
 Durum ölçümüdür (sürekli değil): her turda son toplanan değere bakılır; boş alan açılınca kayıt o toplanma
@@ -111,7 +111,7 @@ def detect(conn, since):
             found.append({"host": r["host"], "board_id": r["id"], "board_name": r["name"],
                           "started_at": known["started_at"], "ended_at": max(at, known["started_at"]),
                           "detail": {**(known["detail"] or {}), "end_text": text}})
-    # Kapsam yok: geçmiş kayıtlar silinmez, yalnız güncellenir (verisi kalkan tahtanın kaydı açık kalır).
+    # Kapsam yok: geçmiş kayıtlar silinmez, yalnız güncellenir (verisi kalkan cihazın kaydı açık kalır).
     return found, []
 
 

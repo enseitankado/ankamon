@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Kayıtlı tahtaların erişilebilirliğini yoklar (SSH ve sensör portuna TCP bağlantısı).
+"""Kayıtlı cihazların erişilebilirliğini yoklar (SSH ve sensör portuna TCP bağlantısı).
 
 Çevrimiçiye dönüş ilk başarılı yoklamada hemen yansır. Çevrimdışıya dönüş ise bilerek geciktirilir:
 tek seferlik bir yoklama hatası (ağ sıçraması, Wi-Fi'de anlık kopma) grid'i titretmesin diye
@@ -33,8 +33,8 @@ görevlerden (TICK_SECONDS) ayrı, daha sık bir döngüde çalışır (STATUS_T
 
 exporter_ok AYNI histerezisi kendi başına da alır (online'dan bağımsız sayaçla): telegraf_targets.py
 Telegraf'ın tarama listesini doğrudan bu alana göre kurar (bkz. o dosya), tek bir başarısız sensör
-port yoklaması (geçici ağ sıçraması) tahtayı o turda listeden düşürüp, hâlâ gerçekten açıkken sensör
-kaydını kesmesin diye — "tahta açık olduğu sürece kesintisiz kayıt" garantisi burada kurulur.
+port yoklaması (geçici ağ sıçraması) cihazı o turda listeden düşürüp, hâlâ gerçekten açıkken sensör
+kaydını kesmesin diye — "cihaz açık olduğu sürece kesintisiz kayıt" garantisi burada kurulur.
 
 Üst üste başarısızlık sayaçları süreç belleğindedir (veritabanında değil): worker yeniden başlarsa
 sıfırlanır, bu da en kötü durumda bir yoklama turu daha gerektirir — yanlışlıkla "çevrimiçi"
@@ -50,9 +50,9 @@ SSH_PORT = 22
 # Çevrimdışı sayılmadan önce üst üste istenen başarısız yoklama sayısı (histerezis).
 FAILS_BEFORE_OFFLINE = 2
 
-# "Bilgisayarı kapat" komutundan (boards.shutdown_at) sonra tahta bu süre içinde SSH'te yeniden görünmediyse kapalı
+# "Bilgisayarı kapat" komutundan (boards.shutdown_at) sonra cihaz bu süre içinde SSH'te yeniden görünmediyse kapalı
 # sayılır: ilk başarısız yoklamada çevrim dışı (FAILS_BEFORE_OFFLINE beklenmez) ve ağ kaydı (Varlıklar) da çevrim dışı.
-# Kapanış birkaç saniye SSH'e yanıt verebilir; tahta yeniden açılırsa bu süreden sonra görülür ve kural düşer.
+# Kapanış birkaç saniye SSH'e yanıt verebilir; cihaz yeniden açılırsa bu süreden sonra görülür ve kural düşer.
 SHUTDOWN_GRACE = "3 minutes"
 
 _fails: dict[int, int] = {}
@@ -114,7 +114,7 @@ def run(conn) -> None:
             (ssh, exporter_ok, online, reachable, board_id),
         )
     _mark_shut_down_offline(conn)
-    # Artık yoklanmayan (silinmiş/elden çıkmış) tahtalar için sayaçlar süresiz birikmesin.
+    # Artık yoklanmayan (silinmiş/elden çıkmış) cihazlar için sayaçlar süresiz birikmesin.
     for stale_id in set(_fails) - seen_ids:
         _fails.pop(stale_id, None)
     for stale_id in set(_exporter_fails) - seen_ids:
@@ -122,10 +122,10 @@ def run(conn) -> None:
 
 
 def _mark_shut_down_offline(conn) -> None:
-    """Kapatma komutu verilmiş ve SSH'e ulaşılamayan tahtanın ağ kaydını (Varlıklar — net_devices) çevrim dışı yapar.
+    """Kapatma komutu verilmiş ve SSH'e ulaşılamayan cihazın ağ kaydını (Varlıklar — net_devices) çevrim dışı yapar.
 
     Ağ taraması kapanan cihazı ancak birkaç tur sonra düşürür (ARP önbelleği); Akıllı Tahtalar ve Varlıklar aynı durumu
-    göstersin diye burada hemen düşürülür. Tahta yeniden açılınca SSH yoklaması last_seen_at'i ilerletir, koşul düşer ve
+    göstersin diye burada hemen düşürülür. Cihaz yeniden açılınca SSH yoklaması last_seen_at'i ilerletir, koşul düşer ve
     ağ taraması cihazı yeniden çevrim içi yazar.
     """
     conn.execute(

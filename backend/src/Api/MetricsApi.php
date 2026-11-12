@@ -34,17 +34,17 @@ use Ankamon\Core\BoardSensors;
 use Ankamon\Core\Db;
 use Ankamon\Core\Request;
 
-/** Tahta listesindeki anlık göstergeler. Zaman serisi grafikleri Grafana'dadır. */
+/** Cihaz listesindeki anlık göstergeler. Zaman serisi grafikleri Grafana'dadır. */
 final class MetricsApi
 {
     /**
-     * GET /api/metrics/coverage — Bakım ▸ Sensörler bilgilendirmesi: tahta başına son 7 günde sensör verisi
+     * GET /api/metrics/coverage — Bakım ▸ Sensörler bilgilendirmesi: cihaz başına son 7 günde sensör verisi
      * (metrik izleme / node_exporter) gelmiş mi, fan ya da anakart (Super I/O) sensörü var mı. Verisi hiç
-     * olmayan tahtalarda sayfa "Metrik izlemeyi kur" hazır komutunu önerir. superio_done: anakart sensörü
-     * (Super I/O) adımı bu tahtada başarıyla denenmiş mi — "Metrik izlemeyi kur" (actions/node-exporter)
+     * olmayan cihazlarda sayfa "Metrik izlemeyi kur" hazır komutunu önerir. superio_done: anakart sensörü
+     * (Super I/O) adımı bu cihazda başarıyla denenmiş mi — "Metrik izlemeyi kur" (actions/node-exporter)
      * çıktısında "[Super I/O]" satırı olan başarılı iş ya da eski ayrı "Fan/pil/anakart sensörlerini
      * etkinleştir" (sensors-superio, artık node-exporter'ın içinde) işi. Yonga desteklenmiyorsa sensör hiç
-     * gelmez; bu tahtaya aynı komut yeniden önerilmez.
+     * gelmez; bu cihaza aynı komut yeniden önerilmez.
      */
     public function coverage(): array
     {
@@ -137,7 +137,7 @@ final class MetricsApi
         return ['latest' => $latest ?: new \stdClass()];
     }
 
-    /** Bilgi kartı: tek tahtanın sensörleri, saklanan geçmişteki en düşük/en yüksek değerleriyle. */
+    /** Bilgi kartı: tek cihazın sensörleri, saklanan geçmişteki en düşük/en yüksek değerleriyle. */
     public function sensors(Request $request): array
     {
         return ['sensors' => BoardSensors::withRange((int) $request->arg('id')) ?: new \stdClass()];

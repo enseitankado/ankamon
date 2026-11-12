@@ -23,15 +23,15 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahta oturumlarının "tahta çevrimdışı oldu" ('offline') kapanışlarını netleştirir (göç 023).
+"""Cihaz oturumlarının "cihaz çevrimdışı oldu" ('offline') kapanışlarını netleştirir (göç 023).
 
-Kapanış mesajı gelmeden tahta çevrimdışı olunca oturum 'offline' kapatılır (bkz. board_sessions.py) —
-ama bu tek etiket çok farklı durumları topluyordu (kullanıcı isteği). Tahta yeniden erişilebilir olunca
+Kapanış mesajı gelmeden cihaz çevrimdışı olunca oturum 'offline' kapatılır (bkz. board_sessions.py) —
+ama bu tek etiket çok farklı durumları topluyordu (kullanıcı isteği). Cihaz yeniden erişilebilir olunca
 SSH ile kendi açılış günlüğüne (journalctl, kalıcı) bakılır; oturumun açık olduğu açılışın nasıl bittiği:
 
   - systemd kapanış izi ("Journal stopped", systemd-shutdown, "System is powering down/rebooting") varsa:
     düzenli kapatma ('shutdown') ya da yeniden başlatma ('reboot') — menüden/komutla. Kapatmada kim:
-    Ankamon "Kapat" işi mi, tahtanın başındaki kullanıcı mı (bkz. attribute_shutdowns).
+    Ankamon "Kapat" işi mi, cihazın başındaki kullanıcı mı (bkz. attribute_shutdowns).
   - İz yoksa açılış ANİDEN bitmiştir. Pardus eta-shutdown (/etc/pardus/eta-shutdown.conf) da kapatmayı
     `poweroff -f` ile yapar (iz bırakmaz — elektrik kesintisiyle aynı görünür); ayrım ayarına göre yapılır:
       * [AUTO_SHUTDOWN] enabled ve kapanış o saatte (10 dk önce "1 saat ertele" uyarısı; ertelenirse saat
@@ -40,7 +40,7 @@ SSH ile kendi açılış günlüğüne (journalctl, kalıcı) bakılır; oturumu
         kaldıysa: 'auto_idle' (girişin kendisi bir etkinliktir; daha kısa oturum bununla kapanamaz);
       * aksi halde ya da sonraki açılışta dosya sistemi onarıldıysa (EXT4 recovery): 'power_loss' —
         elektrik kesintisi / güç düğmesine basılı tutarak zorla kapatma.
-  - Oturum tahtanın ŞU ANKİ açılışındaysa tahta kapanmamıştır: 'network' (yalnız ağ bağlantısı koptu).
+  - Oturum cihazın ŞU ANKİ açılışındaysa cihaz kapanmamıştır: 'network' (yalnız ağ bağlantısı koptu).
 
 Doğrulama (2026-10-19, "B Blok - Arge 1 (AMD)"): felsefe oturumu 09:28'de açıldı, 09:48:19'da açılış
 günlüğü aniden bitti, `last -x` "crash" — eta-shutdown 20 dk boşta kapatmasıydı (poweroff -f).
@@ -59,7 +59,7 @@ log = logging.getLogger(__name__)
 _LOOKBACK_DAYS = 30
 _BATCH = 200
 
-# Tahtada (salt okuma): son açılışların başı/sonu (epoch), kapanış izi, tür, sonraki açılışta EXT4 onarımı;
+# Cihazda (salt okuma): son açılışların başı/sonu (epoch), kapanış izi, tür, sonraki açılışta EXT4 onarımı;
 # eta-shutdown ayarı; şimdiki açılışın başı; saat dilimi.
 SCRIPT = r"""
 for b in $(journalctl --list-boots --no-pager -q 2>/dev/null | awk '$1 < 0 {print $1}' | tail -15); do
@@ -82,24 +82,24 @@ def run(conn) -> None:
     attribute_shutdowns(conn)
 
 
-# Düzenli kapatmayı ('shutdown') kimin yaptığı: kapanıştan önceki bu süre içinde o tahtayı kapsayan bir
-# Ankamon "Kapat" işi (audit_log job.create {action: shutdown}) varsa Ankamon'dan, yoksa tahtanın
+# Düzenli kapatmayı ('shutdown') kimin yaptığı: kapanıştan önceki bu süre içinde o cihazı kapsayan bir
+# Ankamon "Kapat" işi (audit_log job.create {action: shutdown}) varsa Ankamon'dan, yoksa cihazın
 # başındaki kullanıcı (menü / güç düğmesine kısa basma). eta-shutdown'ın otomatik kapatması buraya düşmez
-# (`poweroff -f` iz bırakmaz — bkz. üst not); tahtaya elle SSH ile verilen komut ayırt edilemez.
+# (`poweroff -f` iz bırakmaz — bkz. üst not); cihaza elle SSH ile verilen komut ayırt edilemez.
 _REMOTE_WINDOW = "10 minutes"
-_DETAIL_GENERIC = ("Tahta kapatıldı (menüden ya da komutla)",)   # eski kayıtlar da yeniden etiketlensin
+_DETAIL_GENERIC = ("Cihaz kapatıldı (menüden ya da komutla)",)   # eski kayıtlar da yeniden etiketlensin
 
 
 def attribute_shutdowns(conn) -> None:
     conn.execute(f"""
         UPDATE board_sessions s SET end_detail = COALESCE(
-            'Tahta Ankamon''dan kapatıldı (' || (
+            'Cihaz Ankamon''dan kapatıldı (' || (
                 SELECT a.username FROM audit_log a
                 WHERE a.action = 'job.create' AND a.detail->>'action' = 'shutdown'
                   AND a.detail->'boards' @> to_jsonb(s.board_id)
                   AND a.time BETWEEN s.ended_at - interval '{_REMOTE_WINDOW}' AND s.ended_at + interval '1 minute'
                 ORDER BY a.time DESC LIMIT 1) || ')',
-            'Tahta kullanıcı tarafından kapatıldı')
+            'Cihaz kullanıcı tarafından kapatıldı')
         WHERE s.end_reason = 'shutdown' AND s.ended_at IS NOT NULL
           AND (s.end_detail IS NULL OR s.end_detail = ANY(%s))
     """, (list(_DETAIL_GENERIC),))
@@ -124,7 +124,7 @@ def _check_offline(conn) -> None:
     for r in rows:
         res = results.get(r["board_id"]) or {}
         if res.get("status") != "ok":
-            continue  # bir sonraki turda yeniden denenir (tahta erişilebilirken)
+            continue  # bir sonraki turda yeniden denenir (cihaz erişilebilirken)
         reason, detail, end = classify(r["started"], *parse(res.get("output", "")))
         conn.execute(
             """UPDATE board_sessions SET end_reason = COALESCE(%s, end_reason), end_detail = %s,
@@ -169,15 +169,15 @@ def classify(started: int, boots: list[tuple], now_start: int | None, conf: dict
              ) -> tuple[str | None, str | None, int | None]:
     """Oturum başlangıcı (epoch) → (end_reason, end_detail, gerçek bitiş epoch). Bilinemezse (None, None, None)."""
     if now_start is not None and started >= now_start - 60:
-        return "network", "Tahta kapanmadı — yalnız ağ bağlantısı kesildi", None
+        return "network", "Cihaz kapanmadı — yalnız ağ bağlantısı kesildi", None
     boot = next((b for b in boots if b[0] - 60 <= started <= b[1] + 60), None)
     if boot is None:
         return None, None, None  # açılış günlüğü artık yok (eski/silinmiş): 'offline' kalır
     _start, end, clean, kind, repaired = boot
     if clean:
         if kind == "reboot":
-            return "reboot", "Tahta yeniden başlatıldı", end
-        return "shutdown", "Tahta kapatıldı (menüden ya da komutla)", end
+            return "reboot", "Cihaz yeniden başlatıldı", end
+        return "shutdown", "Cihaz kapatıldı (menüden ya da komutla)", end
     if repaired:
         return "power_loss", "Elektrik kesintisi ya da zorla kapatma (açılışta dosya sistemi onarıldı)", end
     # eta-shutdown sabit saatte kapanma: uyarı 10 dk önce; "1 saat ertele" her basışta saati 1 sa kaydırır.

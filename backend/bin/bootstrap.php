@@ -28,7 +28,7 @@
 
 declare(strict_types=1);
 
-// Konteyner her başladığında çalışır: etapadmin hesabını ve tahta erişim ayarını (yalnız yoksa) oluşturur.
+// Konteyner her başladığında çalışır: etapadmin hesabını ve cihaz erişim ayarını (yalnız yoksa) oluşturur.
 
 use Ankamon\Core\Auth;
 use Ankamon\Core\Db;

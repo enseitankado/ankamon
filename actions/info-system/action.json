@@ -1,6 +1,6 @@
 {
   "title": "Sistem bilgisi",
-  "description": "İşletim sistemi, donanım modeli, çalışma süresi, bellek, disk ve saat eşitleme durumunu gösterir. Tahtada değişiklik yapmaz.",
+  "description": "İşletim sistemi, donanım modeli, çalışma süresi, bellek, disk ve saat eşitleme durumunu gösterir. Cihazda değişiklik yapmaz.",
   "category": "Bilgi",
   "feature": "actions",
   "timeout": 30,

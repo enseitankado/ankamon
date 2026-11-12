@@ -27,7 +27,7 @@
 
 /**
  * Görev yöneticisinin ayrı pencereleri (ui.taskmgr.Window'u küçük tutmak için buradadır): Yeni görev çalıştır,
- * İşlemci benzeşimi, Özellikler. Her biri satırın / seçilen tahtanın bağına (ui.taskmgr.TaskBoardLink) komut
+ * İşlemci benzeşimi, Özellikler. Her biri satırın / seçilen cihazın bağına (ui.taskmgr.TaskBoardLink) komut
  * gönderir; pencere "her zaman üstte" ise diyaloglar da üstte açılır (win.dialog).
  */
 qx.Class.define("ankamon.ui.taskmgr.TaskDialogs", {
@@ -35,9 +35,9 @@ qx.Class.define("ankamon.ui.taskmgr.TaskDialogs", {
 
   statics: {
     /**
-     * Yeni görev çalıştır. Çok tahtada hangi tahtada çalışacağı seçilir: varsayılan, Bilgisayar süzgecinde tek
-     * tahta seçiliyse o (ya da süzgeçte tek bağlı tahta varsa o); değilse seçim istenir. "Süzgeçteki bütün bağlı
-     * tahtalar" da seçilebilir (her birine ayrı "run" komutu; başlatılamayanlar sonra listelenir).
+     * Yeni görev çalıştır. Çok cihazda hangi cihazda çalışacağı seçilir: varsayılan, Bilgisayar süzgecinde tek
+     * cihaz seçiliyse o (ya da süzgeçte tek bağlı cihaz varsa o); değilse seçim istenir. "Süzgeçteki bütün bağlı
+     * cihazlar" da seçilebilir (her birine ayrı "run" komutu; başlatılamayanlar sonra listelenir).
      * @param win {ankamon.ui.taskmgr.Window}
      */
     runTask(win) {
@@ -48,27 +48,27 @@ qx.Class.define("ankamon.ui.taskmgr.TaskDialogs", {
       dlg.add(info);
       let target = null;
       const describe = () => {
-        const intro = "Tahtada çalıştırmak istediğiniz programın ya da komutun adını yazın " +
+        const intro = "Cihazda çalıştırmak istediğiniz programın ya da komutun adını yazın " +
           "(ör. <i>firefox</i>, <i>nemo /home</i>, <i>xdg-open https://eba.gov.tr</i>). ";
         if (target === ALL) {
-          info.setValue(intro + "Program seçili her tahtanın ekranında, oturum açmış kullanıcı olarak açılır (oturum açık değilse root olarak).");
+          info.setValue(intro + "Program seçili her cihazın ekranında, oturum açmış kullanıcı olarak açılır (oturum açık değilse root olarak).");
           return;
         }
         const link = target ? win.getLink(target) : null;
         const s = link && link.getModel().session;
-        info.setValue(intro + (!link ? "Önce görevin çalışacağı tahtayı seçin."
-          : "Program tahtanın ekranında " + (s && s.user && s.user !== "lightdm" ? `<b>${F.esc(s.user)}</b> kullanıcısı olarak açılır.` : "açılır (oturum açık değil: root olarak).")));
+        info.setValue(intro + (!link ? "Önce görevin çalışacağı cihazı seçin."
+          : "Program cihazın ekranında " + (s && s.user && s.user !== "lightdm" ? `<b>${F.esc(s.user)}</b> kullanıcısı olarak açılır.` : "açılır (oturum açık değil: root olarak).")));
       };
       let picker = null;
       const targets = win.getVisibleLinks().filter(l => l.isOpen());
       if (win.isMulti()) {
         const pickRow = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-        pickRow.add(new qx.ui.basic.Label("Tahta:"));
+        pickRow.add(new qx.ui.basic.Label("Cihaz:"));
         picker = new qx.ui.form.SelectBox();
-        picker.add(new qx.ui.form.ListItem("— Tahta seçin —", null, ""));
+        picker.add(new qx.ui.form.ListItem("— Cihaz seçin —", null, ""));
         targets.forEach(l => picker.add(new qx.ui.form.ListItem(l.getDisplay(), null, String(l.getId()))));
         if (targets.length > 1) {
-          picker.add(new qx.ui.form.ListItem(`Süzgeçteki bütün bağlı tahtalar (${targets.length})`, null, ALL));
+          picker.add(new qx.ui.form.ListItem(`Süzgeçteki bütün bağlı cihazlar (${targets.length})`, null, ALL));
         }
         const single = win.getSingleChosen();
         const preset = single && single.isOpen() ? String(single.getId()) : (targets.length === 1 ? String(targets[0].getId()) : "");
@@ -105,7 +105,7 @@ qx.Class.define("ankamon.ui.taskmgr.TaskDialogs", {
           return;
         }
         if (!target) {
-          ankamon.ui.Dialog.alert("Görevin çalışacağı tahtayı seçin.");
+          ankamon.ui.Dialog.alert("Görevin çalışacağı cihazı seçin.");
           return;
         }
         const links = target === ALL ? targets.filter(l => l.isOpen()) : [win.getLink(target)].filter(Boolean);
@@ -117,7 +117,7 @@ qx.Class.define("ankamon.ui.taskmgr.TaskDialogs", {
           ankamon.ui.Dialog.error(results[0].reason);
         } else {
           dlg.close();
-          ankamon.ui.Dialog.alert(`${links.length - failed.length}/${links.length} tahtada başlatıldı. Başlatılamayanlar:<br><br>` +
+          ankamon.ui.Dialog.alert(`${links.length - failed.length}/${links.length} cihazda başlatıldı. Başlatılamayanlar:<br><br>` +
             failed.map(t => F.esc(t)).join("<br>"), "Yeni görev");
         }
       };

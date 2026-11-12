@@ -23,11 +23,11 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Çevrimiçi tahtaların anlık oturum durumunu (kullanıcı + kilit) SSH ile periyodik yoklar.
+"""Çevrimiçi cihazların anlık oturum durumunu (kullanıcı + kilit) SSH ile periyodik yoklar.
 
-Tahtalar grid'inin "Oturum" sütunu için (bkz. executor/session_probe.py). Worker'ın hızlı döngüsünde
-(STATUS_TICK_SECONDS) çağrılır ama yalnız INTERVAL_SECONDS'ta bir gerçekten çalışır — her tahtaya
-10 sn'de bir SSH açmak gereksiz yük olurdu. Tahtalar paralel yoklanır (eşzamanlılık konteynerin o
+Cihazlar grid'inin "Oturum" sütunu için (bkz. executor/session_probe.py). Worker'ın hızlı döngüsünde
+(STATUS_TICK_SECONDS) çağrılır ama yalnız INTERVAL_SECONDS'ta bir gerçekten çalışır — her cihaza
+10 sn'de bir SSH açmak gereksiz yük olurdu. Cihazlar paralel yoklanır (eşzamanlılık konteynerin o
 anki yüküne göre, bkz. whoami.dynamic_concurrency); veritabanına yazma ana iş parçacığında yapılır.
 """
 
@@ -54,8 +54,8 @@ def run(conn) -> None:
         return
     _last = now
     boards = conn.execute(
-        # Sensör toplaması kapalı tahtalar da (monitor_enabled): başarılı root girişi «Yönetilebilir»in tek ölçütü
-        # (BoardsApi manageable — kullanıcı isteği 2026-11-10); SSH portu kapalı tahtaya girilemez, yoklanmaz.
+        # Sensör toplaması kapalı cihazlar da (monitor_enabled): başarılı root girişi «Yönetilebilir»in tek ölçütü
+        # (BoardsApi manageable — kullanıcı isteği 2026-11-10); SSH portu kapalı cihaza girilemez, yoklanmaz.
         "SELECT id AS board_id, host(ip) AS ip FROM boards WHERE online AND ip IS NOT NULL"
     ).fetchall()
     if not boards:

@@ -26,8 +26,8 @@
  */
 
 /**
- * Tahta işlemleri (tek ya da çoklu): web terminal, kapatma, uyandırma (WoL), hazır işlem + serbest komut
- * (run — tek pencerede birleşik). Hem Tahtalar grid'i hem de sol ağaçtaki sağ menüler buradan çağırır.
+ * Cihaz işlemleri (tek ya da çoklu): web terminal, kapatma, uyandırma (WoL), hazır işlem + serbest komut
+ * (run — tek pencerede birleşik). Hem Cihazlar grid'i hem de sol ağaçtaki sağ menüler buradan çağırır.
  * Her işlem yetki ister; kullanıcıda yoksa düğme/menü zaten eklenmez, sunucu da ayrıca denetler.
  */
 qx.Class.define("ankamon.ui.BoardOps", {
@@ -35,10 +35,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
 
   statics: {
     /**
-     * Tahta ekle (board null) / Düzenle. Düzenle artık Bilgisayar ayrıntıları penceresi (kullanıcı isteği 2026-11-09):
-     * cihazın ağ envanteri satırı + "Tahta" sekmesinde tahtaya özel alanlar (bkz. ui.network.DeviceWindow, boardForm).
-     * Tahtalar'ın ve Bakım ▸ Ahenk'in sağ menüsündeki "Düzenle" buradan geçer (tek kaynak). Verilen satırda kayıt
-     * alanları yoksa (ör. Ahenk grid'i) tahta /api/boards/{id}'den okunur.
+     * Cihaz ekle (board null) / Düzenle. Düzenle artık Bilgisayar ayrıntıları penceresi (kullanıcı isteği 2026-11-09):
+     * cihazın ağ envanteri satırı + "Cihaz" sekmesinde cihaza özel alanlar (bkz. ui.network.DeviceWindow, boardForm).
+     * Cihazlar'ın ve Bakım ▸ Ahenk'in sağ menüsündeki "Düzenle" buradan geçer (tek kaynak). Verilen satırda kayıt
+     * alanları yoksa (ör. Ahenk grid'i) cihaz /api/boards/{id}'den okunur.
      * @param board {Map|null} @param onSaved {Function?} kayıttan sonra (grid'i tazelemek için) @param user {Map?}
      */
     async editBoard(board, onSaved, user = null) {
@@ -46,7 +46,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         ankamon.ui.network.DeviceWindow.open({ board, onSaved, user });
         return;
       }
-      const win = ankamon.ui.Dialog.window("Tahta ekle", 460);
+      const win = ankamon.ui.Dialog.window("Cihaz ekle", 460);
       const fields = this.boardForm(null);
       fields.form.softPlaceholders(); // örnek değerler ("ör. A Blok…", "de:ad:…") girilmiş değer sanılmasın
       win.add(fields.form);
@@ -73,10 +73,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
     },
 
     /**
-     * Tahta kaydının düzenlenebilir alanları (boards tablosu, PATCH /api/boards/{id}) — TEK liste: Tahta ekle penceresi
-     * ve Bilgisayar ayrıntıları ▸ Tahta sekmesi buradan kurulur; tahtaya yeni düzenlenebilir alan eklenince ikisinde de
+     * Cihaz kaydının düzenlenebilir alanları (boards tablosu, PATCH /api/boards/{id}) — TEK liste: Cihaz ekle penceresi
+     * ve Bilgisayar ayrıntıları ▸ Cihaz sekmesi buradan kurulur; cihaza yeni düzenlenebilir alan eklenince ikisinde de
      * kendiliğinden görünür (kullanıcı isteği 2026-11-09).
-     * @param board {Map|null} null: yeni tahta (takma ad ve kablolu MAC zorunlu)
+     * @param board {Map|null} null: yeni cihaz (takma ad ve kablolu MAC zorunlu)
      * @param opts {Map?} {noLabel: true} — takma ad alanı yok (Bilgisayar ayrıntıları'nda tek takma ad Genel sekmesinde)
      * @return {Map} {form, read()} — read(): doğrulanmış değerler ya da (hata gösterilip) null
      */
@@ -84,9 +84,9 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const form = new ankamon.ui.Form();
       const adding = !board;
       board = board || { monitor_enabled: true, exporter_port: 9100 };
-      // Yeni tahtada takma ad ve kablolu MAC zorunlu (bkz. BoardsApi::create): kablolu MAC tahtayı ağ taramasında
+      // Yeni cihazda takma ad ve kablolu MAC zorunlu (bkz. BoardsApi::create): kablolu MAC cihazı ağ taramasında
       // bulur (IP girilmezse oradan dolar), uzaktan uyandırmayı sağlar. Kablosuz MAC (Wi-Fi kartı) isteğe bağlı —
-      // tahta Wi-Fi'ye bağlanınca oturum yoklaması kendiliğinden doldurur. Bilgisayar adı elle girilmez — tahtanın
+      // cihaz Wi-Fi'ye bağlanınca oturum yoklaması kendiliğinden doldurur. Bilgisayar adı elle girilmez — cihazın
       // loglarından ve donanım bilgisinden öğrenilir.
       const mark = adding ? " *" : "";
       if (!opts.noLabel) {
@@ -94,14 +94,14 @@ qx.Class.define("ankamon.ui.BoardOps", {
       }
       form.text("location", "Konum", board.location, "ör. B blok, 2. kat");
       form.text("ip", "IP adresi", board.ip).setToolTipText(
-        "Tahtanın bilinen adresi. Ağ taraması tahtanın MAC'ini başka adreste görürse ya da tahta yeni adresinden log " +
+        "Cihazın bilinen adresi. Ağ taraması cihazın MAC'ini başka adreste görürse ya da cihaz yeni adresinden log " +
         "gönderirse kendiliğinden güncellenir.");
       form.text("mac", "Kablolu MAC" + mark, board.mac, "de:ad:de:ad:de:ad").setToolTipText(
         "Kablolu ağ kartının MAC adresi: iki nokta üst üste ile ayrılmış altı onaltılık çift (ör. de:ad:de:ad:de:ad). " +
-        "Uzaktan uyandırma ve ağ taramasında tahtayı bulmak için kullanılır.");
+        "Uzaktan uyandırma ve ağ taramasında cihazı bulmak için kullanılır.");
       form.text("wifi_mac", "Kablosuz MAC", board.wifi_mac, "de:ad:de:ad:de:ad").setToolTipText(
-        "Wi-Fi kartının kalıcı (fabrika) MAC adresi — isteğe bağlı. Tahta açıkken Ankamon karttan okuyup kendiliğinden " +
-        "doldurur. Tahta Wi-Fi ile bağlıyken ağ taramasında tanınmasını sağlar; uzaktan uyandırma kablolu MAC ile yapılır.");
+        "Wi-Fi kartının kalıcı (fabrika) MAC adresi — isteğe bağlı. Cihaz açıkken Ankamon karttan okuyup kendiliğinden " +
+        "doldurur. Cihaz Wi-Fi ile bağlıyken ağ taramasında tanınmasını sağlar; uzaktan uyandırma kablolu MAC ile yapılır.");
       form.text("exporter_port", "Sensör portu", String(board.exporter_port ?? 9100));
       // İşletim sistemi (kullanıcı isteği 2026-11-12): sağ menü / araç çubuğu / Komut çalıştır işlevleri buna göre seçilir
       // (platforms/README.md). Boş = kendiliğinden (SSH bilgisi, yoksa ağ taraması tahmini).
@@ -111,7 +111,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         .concat((P.catalog().family_order || ["linux"]).map(f => ({ value: f, label: P.label(f) }))), board.os_family_manual || "")
         .setToolTipText("Cihazın işletim sistemi ailesi: işlevler (ekran, kilit, komut, kapat…) bu sisteme göre uygulanır; " +
           "sistemde uygulaması olmayan işlev bu cihazda devre dışı olur. Kendiliğinden: SSH ile toplanan bilgi, yoksa ağ taraması tahmini.");
-      // Kayıtlı tahtada IP ve MAC'ler SALT OKUNUR (kullanıcı isteği 2026-11-11): ağ taramasından / tahtanın kendisinden
+      // Kayıtlı cihazda IP ve MAC'ler SALT OKUNUR (kullanıcı isteği 2026-11-11): ağ taramasından / cihazın kendisinden
       // öğrenilir; Kaydet bunları göndermez (pencere açıkken tarayıcının güncellediği değer eskisiyle ezilmesin).
       const locked = adding ? [] : ["ip", "mac", "wifi_mac"];
       locked.forEach(key => form.getField(key).set({ readOnly: true }));
@@ -141,13 +141,13 @@ qx.Class.define("ankamon.ui.BoardOps", {
       return { form, read };
     },
 
-    /** Tahtada açılışta parola sıfırlama servisi uyarısı: parola kutusunun yanındaki kısa not ve ipucu. */
+    /** Cihazda açılışta parola sıfırlama servisi uyarısı: parola kutusunun yanındaki kısa not ve ipucu. */
     BOOT_WIPE_NOTE: "⚠ Açılışta sıfırlanabilir",
-    BOOT_WIPE_HINT: "Tahtada açılışta parola sıfırlama servisi etkinse etapadmin dışındaki hesapların parolası her açılışta " +
+    BOOT_WIPE_HINT: "Cihazda açılışta parola sıfırlama servisi etkinse etapadmin dışındaki hesapların parolası her açılışta " +
       "rastgele bir değerle değişir: bu parola yalnız bir sonraki açılışa kadar geçerli olur, sonrasında giriş EBA-QR, PIN " +
-      "ya da USB ile yapılır. Servis tahtada etkinse işlem çıktısı da bunu söyler.",
+      "ya da USB ile yapılır. Servis cihazda etkinse işlem çıktısı da bunu söyler.",
 
-    /** Tahtanın ekranı güç tasarrufunda mı (uykuda; bkz. 025_board_display_state.sql). */
+    /** Cihazın ekranı güç tasarrufunda mı (uykuda; bkz. 025_board_display_state.sql). */
     isScreenAsleep(board) {
       return !!board.online && ["Off", "Standby", "Suspend"].includes(board.display_state);
     },
@@ -267,7 +267,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
     /**
      * Dosya yöneticisini (FileBrowser Quantum, SFTP, root) uygulama içinde büyük bir pencerede
      * açar (yeni sekme yerine — bkz. screen() ile aynı iframe/Window deseni). Açılış köprüsü
-     * (/filemanager-open/) önce tahtayı bu makineye bağlar (sshfs), sonra gezinmeye başlar.
+     * (/filemanager-open/) önce cihazı bu makineye bağlar (sshfs), sonra gezinmeye başlar.
      * @param board {Map} en az {id, label|hostname|ip}
      */
     async filemanager(board) {
@@ -303,19 +303,19 @@ qx.Class.define("ankamon.ui.BoardOps", {
     },
 
     /**
-     * Tahtanın canlı ekranını (salt izleme) yeniden boyutlanabilir, büyütülebilir bir pencerede gösterir;
-     * pencere içindeki sayfa ayrıca tarayıcı tam ekranına geçebilir. Birden fazla tahta verilirse aynı
+     * Cihazın canlı ekranını (salt izleme) yeniden boyutlanabilir, büyütülebilir bir pencerede gösterir;
+     * pencere içindeki sayfa ayrıca tarayıcı tam ekranına geçebilir. Birden fazla cihaz verilirse aynı
      * pencerede düşük kaliteli önizleme kutucukları (q=thumb) açılır. Görüntü /screen/ sayfasından
-     * (noVNC) gelir; tahta listesi URL fragmanında taşınır. Pencere kapanınca akış(lar) ve tahtadaki
+     * (noVNC) gelir; cihaz listesi URL fragmanında taşınır. Pencere kapanınca akış(lar) ve cihazdaki
      * x11vnc biter.
      * Kullanıcının "screen.control" yetkisi varsa sayfada "🖱 Müdahale" düğmesi çıkar (fare/klavye ile
      * yönetim); sunucu (ekran köprüsü) bu yetkiyi ayrıca oturumdan denetler.
      * @param boards {Array} [{id, label|hostname|ip}]
      * @param user {Map?} oturum sahibi
-     * @param manage {Boolean?} "Ekranı yönet" kipi (tek tahta)
-     * Tek tahtalık pencere tahta başına BİR tane açılır (kullanıcı isteği): aynı tahtanın penceresi zaten
+     * @param manage {Boolean?} "Ekranı yönet" kipi (tek cihaz)
+     * Tek cihazlık pencere cihaz başına BİR tane açılır (kullanıcı isteği): aynı cihazın penceresi zaten
      * açıksa yenisi açılmaz, o öne getirilir ("Ekranı yönet" istenmişse izleme penceresi yönetim kipiyle
-     * değiştirilir). Açık pencereler SCREEN_WINDOWS iletisiyle duyurulur — Ekranlar sekmesi o tahtanın
+     * değiştirilir). Açık pencereler SCREEN_WINDOWS iletisiyle duyurulur — Ekranlar sekmesi o cihazın
      * önizlemesini durdurup "Ayrı pencerede izleniyor" yazar (bkz. Boards.js, screen/index.html "tm-popped").
      */
     screen(boards, user, manage = false) {
@@ -324,7 +324,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         return;
       }
       const control = !!user && (user.is_admin || user.features.includes("screen.control"));
-      // manage ("Ekranı yönet"): tek tahta, sayfa doğrudan müdahale (fare/klavye) kipinde açılır.
+      // manage ("Ekranı yönet"): tek cihaz, sayfa doğrudan müdahale (fare/klavye) kipinde açılır.
       manage = manage && control && list.length === 1;
       const single = list.length === 1 ? list[0].id : null;
       const open = single !== null && this.__screenWins.get(single);
@@ -337,13 +337,13 @@ qx.Class.define("ankamon.ui.BoardOps", {
           open.win.focus();
           return;
         }
-        open.win.close(); // izleme → yönetim: aynı tahtaya iki akış açık kalmasın
+        open.win.close(); // izleme → yönetim: aynı cihaza iki akış açık kalmasın
       }
-      // input: başlıktaki klavye ve fare/dokunmatik kilidi düğmeleri. chat: sohbeti açık tahtalar yüksek çözünürlükte akar.
+      // input: başlıktaki klavye ve fare/dokunmatik kilidi düğmeleri. chat: sohbeti açık cihazlar yüksek çözünürlükte akar.
       const input = !!user && (user.is_admin || user.features.includes("screen.input"));
       const spec = { boards: list, q: list.length > 1 ? "thumb" : "view", control, manage, input, chat: ankamon.ui.chat.Window.openIds() };
       const hash = btoa(unescape(encodeURIComponent(JSON.stringify(spec))));
-      const caption = list.length > 1 ? `Ekranlar (${list.length} tahta)`
+      const caption = list.length > 1 ? `Ekranlar (${list.length} cihaz)`
         : (manage ? "Ekran yönetimi — " : "Ekran — ") + list[0].name;
 
       const root = qx.core.Init.getApplication().getRoot();
@@ -389,7 +389,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
             this.__lastFrames.set(single, shot);
           }
         }
-        frame.setSource("about:blank"); // WebSocket'ler hemen kapansın (tahtadaki x11vnc de biter)
+        frame.setSource("about:blank"); // WebSocket'ler hemen kapansın (cihazdaki x11vnc de biter)
         if (single !== null && this.__screenWins.get(single)?.win === win) {
           this.__screenWins.delete(single);
           this.__announceScreenWindows();
@@ -412,13 +412,13 @@ qx.Class.define("ankamon.ui.BoardOps", {
       }
     },
 
-    /** Tahta kimliği → {win, manage}: açık tek tahtalık ekran pencereleri (bkz. screen). */
+    /** Cihaz kimliği → {win, manage}: açık tek cihazlık ekran pencereleri (bkz. screen). */
     __screenWins: new Map(),
 
-    /** Message Bus konusu: açık ekran pencerelerinin tahta kimlikleri (veri: Array). */
+    /** Message Bus konusu: açık ekran pencerelerinin cihaz kimlikleri (veri: Array). */
     SCREEN_WINDOWS: "ankamon.screenWindows",
 
-    /** Ekran penceresi şu an açık olan tahtaların kimlikleri. */
+    /** Ekran penceresi şu an açık olan cihazların kimlikleri. */
     screenWindowIds() {
       return [...this.__screenWins.keys()];
     },
@@ -427,7 +427,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       qx.event.message.Bus.dispatchByName(this.SCREEN_WINDOWS, this.screenWindowIds());
     },
 
-    /** Kapanan ekran pencerelerinin son kareleri: tahta id → JPEG veri adresi. */
+    /** Kapanan ekran pencerelerinin son kareleri: cihaz id → JPEG veri adresi. */
     __lastFrames: new Map(),
 
     /** Bekleyen son kareleri verir ve unutur (bkz. page.Boards.__pushPopped). */
@@ -455,7 +455,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       }
     },
 
-    /** Tahta listesi tazelendi: açık ekran pencerelerindeki kilit düğmeleri güncel duruma gelsin. */
+    /** Cihaz listesi tazelendi: açık ekran pencerelerindeki kilit düğmeleri güncel duruma gelsin. */
     syncScreenLocks(boards) {
       this.__screenWins.forEach((open, id) => {
         const board = boards.find(b => b.id === id);
@@ -472,7 +472,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
      */
     async __toggleInputLock(id, device, lock, locks, frame) {
       const devices = !lock && device === "mouse" && locks.includes("touch") ? ["mouse", "touch"] : [device];
-      // İş bitti denince tahta listesi henüz eski olabilir: başarılı işin sonucu bilinen durumdur, listeden okunmaz.
+      // İş bitti denince cihaz listesi henüz eski olabilir: başarılı işin sonucu bilinen durumdur, listeden okunmaz.
       let result = null;
       try {
         for (const dev of devices) {
@@ -494,7 +494,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         result = lock ? [...new Set(locks.concat([device]))] : locks.filter(d => !devices.includes(d));
       } catch (e) {
         ankamon.ui.Dialog.error(e);
-        // Başarısız: hangi durumda kaldığı tahta listesinden okunur; okunamazsa eski durum gösterilir.
+        // Başarısız: hangi durumda kaldığı cihaz listesinden okunur; okunamazsa eski durum gösterilir.
         result = await ankamon.io.Api.get("/boards").then(res => {
           const board = res.boards.find(b => b.id === id);
           return board ? board.input_locks || [] : locks;
@@ -520,13 +520,13 @@ qx.Class.define("ankamon.ui.BoardOps", {
     },
 
     /**
-     * "Bilgi kartı": seçili tahta(lar)ın donanım ve durum bilgisini (sistem, işlemci, bellek, disk ve
+     * "Bilgi kartı": seçili cihaz(lar)ın donanım ve durum bilgisini (sistem, işlemci, bellek, disk ve
      * boş alan, disk/bölüm GUID'leri, kablolu ağ, Wi-Fi kartı ve bağlantı durumu, ekran, BIOS, UEFI açılış
      * girdileri ve tüm UEFI değişkenleri — bkz. ui.FactsView) gösterir.
-     * Worker tahtaya SSH ile canlı bağlanıp toplar; aynı tahtaya 60 dakika içinde tekrar bağlanmaz,
+     * Worker cihaza SSH ile canlı bağlanıp toplar; aynı cihaza 60 dakika içinde tekrar bağlanmaz,
      * son toplanan değeri döner (bkz. backend "facts" görev türü, worker/ankamon/executor/hwfacts.py
-     * CACHE_SECONDS). Birden fazla tahta seçiliyse hepsi aynı pencerede listelenir; "Yazdır" ayrı bir
-     * sekmede tahta başına bir kartlık yazdırılabilir sayfa açar.
+     * CACHE_SECONDS). Birden fazla cihaz seçiliyse hepsi aynı pencerede listelenir; "Yazdır" ayrı bir
+     * sekmede cihaz başına bir kartlık yazdırılabilir sayfa açar.
      * @param boards {Array} [{id, label|hostname|ip}]
      */
     async infoCard(boards) {
@@ -535,7 +535,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         return;
       }
       const name = b => b.label || b.hostname || b.ip || ("#" + b.id);
-      // Kart başlığındaki kimlik (kod adı, MAC…) için tahta kaydı: Tahtalar sayfası tam satırı verir, başka
+      // Kart başlığındaki kimlik (kod adı, MAC…) için cihaz kaydı: Cihazlar sayfası tam satırı verir, başka
       // girişler (ör. Bakım ▸ Ahenk) yalnız id/ad verebilir — MAC'i eksikse liste bir kez okunur.
       const boardById = new Map(boards.map(b => [b.id, b]));
       if (boards.some(b => !b.mac)) {
@@ -550,7 +550,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
           }
         }, () => {});
       }
-      const caption = boards.length > 1 ? `Bilgi kartı (${boards.length} tahta)` : "Bilgi kartı — " + name(boards[0]);
+      const caption = boards.length > 1 ? `Bilgi kartı (${boards.length} cihaz)` : "Bilgi kartı — " + name(boards[0]);
       // Geniş pencere: GUID'li satırlar, açılış girdisi denetimleri ve UEFI değişken değerleri tek satıra sığsın
       // (ekran darsa ekranın genişliğine iner, satırlar o zaman kırılır).
       const rootBounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 700 };
@@ -643,8 +643,8 @@ qx.Class.define("ankamon.ui.BoardOps", {
     },
 
     /**
-     * Bilgi kartı başlığındaki tahta kimliği: kod adı (takma ad), bilgisayar adı, kablolu/kablosuz MAC, IP, mimari, işlemci.
-     * @param board {Map|undefined} tahta kaydı (label, hostname, mac — kablolu kart, wifi_mac — Wi-Fi kartı, ip)
+     * Bilgi kartı başlığındaki cihaz kimliği: kod adı (takma ad), bilgisayar adı, kablolu/kablosuz MAC, IP, mimari, işlemci.
+     * @param board {Map|undefined} cihaz kaydı (label, hostname, mac — kablolu kart, wifi_mac — Wi-Fi kartı, ip)
      * @param facts {Map|null} facts (arch, cpu_model)
      * @return {String} kaçırılmış HTML
      */
@@ -662,7 +662,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
     /** "Bilgi kartı" penceresindeki "Yazdır": qx pencere ağacı yerine YENİ, sade bir sekmede
      * yazdırılabilir sayfa açar — qx'in mutlak konumlu kutuları tarayıcı yazdırmasında güvenilmez
      * kırpılıyor (bkz. diğer özel görünümler: /screen/, /webshell/ — aynı "ayrı sade sayfa" deseni).
-     * Her tahta yeni sayfadan başlar ve başlığında hangi tahta olduğu yazar. Kart sayfadan uzun olduğundan
+     * Her cihaz yeni sayfadan başlar ve başlığında hangi cihaz olduğu yazar. Kart sayfadan uzun olduğundan
      * bölünmesine izin verilir (eskiden "bölünmesin" kuralı kartı ikinci sayfaya itip ilk sayfayı boş
      * bırakıyordu); yalnız tablo satırları ve bölüm başlıkları sayfa sınırında bölünmez. */
     __printInfoCard(targets, sensors, boardById = new Map()) {
@@ -671,13 +671,13 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const cards = targets.map(t => {
         const facts = this.__parseFacts(t);
         const board = boardById.get(t.board_id) || {};
-        return `<section class="card"><h1>Tahta bilgi kartı — ${esc(board.label || t.board)}</h1>` +
+        return `<section class="card"><h1>Cihaz bilgi kartı — ${esc(board.label || t.board)}</h1>` +
           `<div class="id">${this.__infoCardIdentity(board, facts)}</div><div class="when">${when}</div>` +
           (facts ? ankamon.ui.FactsView.html(facts, sensors.get(t.board_id)) : `<p>${esc(t.output || "Okunamadı")}</p>`) +
           "</section>";
       }).join("");
       const title = targets.length === 1 ? `Bilgi kartı — ${esc((boardById.get(targets[0].board_id) || {}).label || targets[0].board)}`
-        : `Bilgi kartı (${targets.length} tahta)`;
+        : `Bilgi kartı (${targets.length} cihaz)`;
       const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
         <style>
           body{font-family:sans-serif;margin:16px;color:#111;font-size:12px}
@@ -699,7 +699,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
     },
 
     /**
-     * "Ekranımı yansıt": bu bilgisayarın ekranını seçili (çevrimiçi) tahtalarda tam ekran gösterir.
+     * "Ekranımı yansıt": bu bilgisayarın ekranını seçili (çevrimiçi) cihazlarda tam ekran gösterir.
      * Yayın sayfası (/cast/) AYRI bir tarayıcı penceresinde açılır: yayın sürerken Ankamon'da çalışmaya
      * devam edilebilir, pencereyi kapatmak yansıtmayı bitirir. Ekran yakalama HTTPS ister (nginx HTTP'yi
      * zaten HTTPS'e yönlendirir). Ayrıntı: docker/rootfs/cast/index.html, worker executor/cast.py.
@@ -707,7 +707,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
     cast(boards, preset = null) {
       const list = boards.map(b => ({ id: b.id, name: b.label || b.hostname || b.ip || "#" + b.id, online: !!b.online }));
       if (!list.length) {
-        ankamon.ui.Dialog.alert("Önce bir ya da daha fazla tahta işaretleyin.");
+        ankamon.ui.Dialog.alert("Önce bir ya da daha fazla cihaz işaretleyin.");
         return;
       }
       // preset {quality, audio}: sağ menüden seçilen ayarlar — sayfa ayar sormaz (bkz. cast/index.html).
@@ -736,7 +736,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
     __castMenu(boards) {
       const m = new qx.ui.menu.Menu();
       if (!boards.length) {
-        m.add(new qx.ui.menu.Button("Çevrimiçi tahta yok").set({ enabled: false }));
+        m.add(new qx.ui.menu.Button("Çevrimiçi cihaz yok").set({ enabled: false }));
         return m;
       }
       this.CAST_QUALITIES.forEach(([quality, label]) => {
@@ -752,11 +752,11 @@ qx.Class.define("ankamon.ui.BoardOps", {
     },
 
     /**
-     * Seçili tahtaları kapatır (SSH ile). Birden fazlaysa önce onay alır (onay her zaman sorulur; "bir
+     * Seçili cihazları kapatır (SSH ile). Birden fazlaysa önce onay alır (onay her zaman sorulur; "bir
      * daha gösterme" yalnız çıktı penceresi içindir — bkz. __powerJob).
      * @param user {Map?} oturum sahibi (pencere gizleme tercihi)
-     * @param sessionOps {Map?} Tahtalar sayfasının işleyicileri (bkz. Boards.__sessionOps): varsa kapatma komutu
-     *   tahtaya ulaşınca kutucuğun sol altında "Kapanıyor…" (shutdownSent; kullanıcı isteği 2026-11-10).
+     * @param sessionOps {Map?} Cihazlar sayfasının işleyicileri (bkz. Boards.__sessionOps): varsa kapatma komutu
+     *   cihaza ulaşınca kutucuğun sol altında "Kapanıyor…" (shutdownSent; kullanıcı isteği 2026-11-10).
      */
     async shutdown(boards, user, sessionOps) {
       const ids = boards.map(b => b.id);
@@ -765,7 +765,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       }
       if (ids.length > 1) {
         const ok = await ankamon.ui.Dialog.confirm(
-          `<b>${ids.length} tahta</b> kapatılsın mı? Her biri SSH ile tek tek kapatılacak.`, "Kapat");
+          `<b>${ids.length} cihaz</b> kapatılsın mı? Her biri SSH ile tek tek kapatılacak.`, "Kapat");
         if (!ok) {
           return;
         }
@@ -776,7 +776,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       }
     },
 
-    /** Seçili tahtaları yeniden başlatır (hazır işlem "reboot"). Birden fazlaysa önce onay alır. @param user {Map?} */
+    /** Seçili cihazları yeniden başlatır (hazır işlem "reboot"). Birden fazlaysa önce onay alır. @param user {Map?} */
     async reboot(boards, user) {
       const ids = boards.map(b => b.id);
       if (!ids.length) {
@@ -784,7 +784,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       }
       if (ids.length > 1) {
         const ok = await ankamon.ui.Dialog.confirm(
-          `<b>${ids.length} tahta</b> yeniden başlatılsın mı? Açık oturumlar kapanır.`, "Yeniden başlat");
+          `<b>${ids.length} cihaz</b> yeniden başlatılsın mı? Açık oturumlar kapanır.`, "Yeniden başlat");
         if (!ok) {
           return;
         }
@@ -799,10 +799,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
     POWER_HIDE_MS: 7 * 24 * 3600 * 1000,
 
     /**
-     * Seçili (kapalı) tahtaları ağdan uyandırır (WoL). Pencere gizlenmişse (bkz. POWER_HIDE_MS) uyandırma
+     * Seçili (kapalı) cihazları ağdan uyandırır (WoL). Pencere gizlenmişse (bkz. POWER_HIDE_MS) uyandırma
      * yine yapılır, yalnız çıktı penceresi açılmaz — başlatma hatası ise her durumda gösterilir.
      * @param user {Map?} oturum sahibi (pencere gizleme tercihi okunur/yazılır)
-     * @param sessionOps {Map?} Tahtalar sayfasının işleyicileri (bkz. Boards.__sessionOps): varsa görev
+     * @param sessionOps {Map?} Cihazlar sayfasının işleyicileri (bkz. Boards.__sessionOps): varsa görev
      *   başlayınca kutucuğun kullanıcı adı alanına "SS:DD:sn Magic paket gönderildi" yazılır (wolSent).
      */
     wol(boards, user, sessionOps) {
@@ -854,34 +854,34 @@ qx.Class.define("ankamon.ui.BoardOps", {
     },
 
     // Uyandırma penceresinin çıktı kutusunun başındaki sabit açıklama (bkz. ui.Jobs opts.intro):
-    // "paket gönderildi" görünse de tahtanın neden açılmayabileceği ve TiHA'nın WoL ön koşulları.
+    // "paket gönderildi" görünse de cihazın neden açılmayabileceği ve TiHA'nın WoL ön koşulları.
     // Kaynak: TiHA sihirbazının "Wake-on-LAN" adımı (m15, tiha-wake-on-lan.service) — bkz.
     // https://github.com/enseitankado/tiha
     WOL_INTRO: [
       "UYANDIRMA (Wake-on-LAN) HAKKINDA",
       "",
-      "Ankamon, tahtanın ağ kartına \"sihirli paket\" gönderir. Aşağıda \"gönderildi\" yazması paketin ağa",
-      "çıktığını gösterir; tahtanın açılacağını garanti etmez. Tahta açılmazsa nedeni çoğunlukla tahtadadır:",
+      "Ankamon, cihazın ağ kartına \"sihirli paket\" gönderir. Aşağıda \"gönderildi\" yazması paketin ağa",
+      "çıktığını gösterir; cihazın açılacağını garanti etmez. Cihaz açılmazsa nedeni çoğunlukla cihazdadır:",
       "",
-      "• Tahta düzgün kapatılmadıysa uyanmaz. Elektrik kesilmesi, güç düğmesine uzun basılması ya da",
+      "• Cihaz düzgün kapatılmadıysa uyanmaz. Elektrik kesilmesi, güç düğmesine uzun basılması ya da",
       "  donma gibi ANİ kapanışlarda ağ kartı uyandırmaya hazırlanmaz ya da kartta bekleme gücü kalmaz;",
-      "  sihirli paket ulaşsa bile tahta açılmaz. Böyle bir tahtayı bir kez elle açın; bundan sonra",
-      "  Ankamon'dan \"Bilgisayarı kapat\" ile ya da tahtanın kendi menüsünden kapatılınca yeniden uyandırılabilir.",
-      "• Tahtanın prizi, uzatma kablosu ya da sınıf sigortası kapalıysa uyanmaz (bekleme gücü yok).",
+      "  sihirli paket ulaşsa bile cihaz açılmaz. Böyle bir cihazı bir kez elle açın; bundan sonra",
+      "  Ankamon'dan \"Bilgisayarı kapat\" ile ya da cihazın kendi menüsünden kapatılınca yeniden uyandırılabilir.",
+      "• Cihazın prizi, uzatma kablosu ya da sınıf sigortası kapalıysa uyanmaz (bekleme gücü yok).",
       "",
       "ÖN KOŞULLAR — TiHA sihirbazının \"Wake-on-LAN\" adımı (github.com/enseitankado/tiha):",
-      "• TiHA'da bu adım uygulanmış olmalı: tahtaya tiha-wake-on-lan.service kurulur ve her açılışta",
+      "• TiHA'da bu adım uygulanmış olmalı: cihaza tiha-wake-on-lan.service kurulur ve her açılışta",
       "  ağ kartında uyandırmayı açar (ethtool -s <arayüz> wol g).",
-      "• Tahtanın BIOS'unda \"Wake on LAN\" AÇIK; \"ErP\" / \"Deep Sleep\" (derin uyku) KAPALI olmalı.",
-      "• Tahta ile Ankamon sunucusu AYNI ağda (aynı VLAN / yayın alanında) olmalı; sihirli paket bir",
+      "• Cihazın BIOS'unda \"Wake on LAN\" AÇIK; \"ErP\" / \"Deep Sleep\" (derin uyku) KAPALI olmalı.",
+      "• Cihaz ile Ankamon sunucusu AYNI ağda (aynı VLAN / yayın alanında) olmalı; sihirli paket bir",
       "  yayındır, yönlendiriciden (router) öteye geçmez.",
-      "• Tahtanın MAC adresi Ankamon'da kayıtlı olmalı (tahta bir kez açık görülünce kendiliğinden kaydedilir)."
+      "• Cihazın MAC adresi Ankamon'da kayıtlı olmalı (cihaz bir kez açık görülünce kendiliğinden kaydedilir)."
     ].join("\n"),
 
     /**
-     * Birden fazla tahtanın web terminalini, uygulama içinde tek pencerede yan yana panolar
+     * Birden fazla cihazın web terminalini, uygulama içinde tek pencerede yan yana panolar
      * hâlinde açar (bkz. /multishell/ — toplu komut yazma üstten yapılır). Her panonun bağlantı
-     * bilgisi (host/kullanıcı/parola) ayrı ayrı /shell ucundan alınır (tek tahtadaki ile aynı uç,
+     * bilgisi (host/kullanıcı/parola) ayrı ayrı /shell ucundan alınır (tek cihazdaki ile aynı uç,
      * aynı komut loguna işlenir), tarayıcıya hiç sunucuya gitmeyen URL fragmanıyla (#...) taşınır.
      */
     async webshellMulti(boards) {
@@ -902,17 +902,17 @@ qx.Class.define("ankamon.ui.BoardOps", {
         return;
       }
       const hash = btoa(unescape(encodeURIComponent(JSON.stringify(panes))));
-      this.__terminalWindow(`Web terminal (${boards.length} tahta)`, "/multishell/#" + hash);
+      this.__terminalWindow(`Web terminal (${boards.length} cihaz)`, "/multishell/#" + hash);
     },
 
     /**
-     * Tek tahta için sağ menü (ağaçtaki tahta düğümü ve Tahtalar grid'indeki satır ortak kullanır).
+     * Tek cihaz için sağ menü (ağaçtaki cihaz düğümü ve Cihazlar grid'indeki satır ortak kullanır).
      * Çevrimiçiyse: Web terminal, Komut çalıştır, …, Bilgisayarı aç/kapat. Çevrimdışıysa: yalnız
      * Bilgisayarı aç/kapat (kapat devre dışı).
      * @param boards {Array?} grid'de o satır işaretli ÇOKLU seçimin bir parçasıysa Web terminal
      *   (webshellMulti), Ekranı göster (screen — aynı pencerede önizleme kutucukları), Komut çalıştır,
-     *   Bilgisayarı kapat ve Bilgisayarı aç (WoL) seçili TÜM tahtalara uygulanır; verilmezse/tek elemanlıysa
-     *   yalnız bu tek tahtaya. Dosya yöneticisi (sshfs bağlama, tek seferde tek kök) doğası gereği tekildir.
+     *   Bilgisayarı kapat ve Bilgisayarı aç (WoL) seçili TÜM cihazlara uygulanır; verilmezse/tek elemanlıysa
+     *   yalnız bu tek cihaza. Dosya yöneticisi (sshfs bağlama, tek seferde tek kök) doğası gereği tekildir.
      * @param sessionOps {Map?} Ekranlar önizlemesinden açılınca verilir: {login(boards, acc), logout(boards)}
      *   — "Oturum aç"/"Oturumu kapat" onaydan sonra iş penceresi AÇMADAN bunlara devredilir; durum
      *   kutucukların sol altında gösterilir (bkz. page.Boards __sessionJob). Verilmezse (grid satırı)
@@ -931,8 +931,8 @@ qx.Class.define("ankamon.ui.BoardOps", {
         `<span style="display:inline-block;width:1.4em;text-align:center">${icon || ""}</span>` +
         qx.bom.String.escape(label), null, null, submenu);
       btn.getChildControl("label").setRich(true);
-      // Araç çubuğu maddeyi bu anahtarla tanır (etiket, tahta sayısı eki olmadan — bkz. ui.boards.ActionBar).
-      btn.setUserData("ankamon.menuKey", label.replace(/ \(\d+( tahta)?\)$/, ""));
+      // Araç çubuğu maddeyi bu anahtarla tanır (etiket, cihaz sayısı eki olmadan — bkz. ui.boards.ActionBar).
+      btn.setUserData("ankamon.menuKey", label.replace(/ \(\d+( cihaz)?\)$/, ""));
       btn.setUserData("ankamon.menuIcon", icon);
       if (handler) {
         btn.addListener("execute", handler, this);
@@ -946,10 +946,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
     },
 
     /**
-     * menu()'nün dışında kalan iki ortak madde (Tahtalar sağ menüsünde Düzenle/Sil'in üstünde, Bakım ▸ Ahenk'te
-     * de): Logları göster (Loglar sayfasını bu tahtaya süzülmüş açar — bkz. ui.Shell.OPEN_LOGS) ve hemen altında
-     * Bilgi kartı (kullanıcı isteği; yalnız çevrimiçi tahtada). Yetkiye göre boş dizi dönebilir.
-     * @param opts {Map?} {noLogs: true} — Logları göster eklenmez (Tahtalar/Varlıklar: Bilgisayar ayrıntıları ▸ Loglar
+     * menu()'nün dışında kalan iki ortak madde (Cihazlar sağ menüsünde Düzenle/Sil'in üstünde, Bakım ▸ Ahenk'te
+     * de): Logları göster (Loglar sayfasını bu cihaza süzülmüş açar — bkz. ui.Shell.OPEN_LOGS) ve hemen altında
+     * Bilgi kartı (kullanıcı isteği; yalnız çevrimiçi cihazda). Yetkiye göre boş dizi dönebilir.
+     * @param opts {Map?} {noLogs: true} — Logları göster eklenmez (Cihazlar/Varlıklar: Bilgisayar ayrıntıları ▸ Loglar
      *   düğmesine taşındı — kullanıcı isteği 2026-11-11)
      */
     logsAndInfo(board, user, boards = [board], opts = {}) {
@@ -961,7 +961,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
           qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_LOGS, board.id)));
       }
       if (board.online && (can("boards") || can("screen"))) {
-        const count = boards.length > 1 ? ` (${boards.length} tahta)` : "";
+        const count = boards.length > 1 ? ` (${boards.length} cihaz)` : "";
         items.push(this.menuButton(ICON.info, "Bilgi kartı" + count, () => this.infoCard(ankamon.ui.boards.Platforms.only("Bilgi kartı", boards))));
       }
       return items;
@@ -983,12 +983,12 @@ qx.Class.define("ankamon.ui.BoardOps", {
       // başındaki not (background-image tabanlı simgeler bu derlenmiş build'de güvenilmez).
       const ICON = ankamon.ui.Shell.ICON;
       const add = (icon, label, handler) => menu.add(this.menuButton(icon, label, handler));
-      // Çoklu seçimde toplu uygulanan maddelerin etiketinde tahta sayısı görünür.
-      const count = boards.length > 1 ? ` (${boards.length} tahta)` : "";
+      // Çoklu seçimde toplu uygulanan maddelerin etiketinde cihaz sayısı görünür.
+      const count = boards.length > 1 ? ` (${boards.length} cihaz)` : "";
       // Alt menü yardımcıları: madde yoksa grup hiç eklenmez (yetkiye göre boş alt menü görünmesin).
       const sub = () => new qx.ui.menu.Menu();
       const subAdd = (target, icon, label, handler) => target.add(this.menuButton(icon, label, handler));
-      // Tahtanın durumuna bağlı madde (Uyut, Kilitle, Kilidi aç): yalnız uygun tahtalara uygulanır; uygun tahta
+      // Cihazın durumuna bağlı madde (Uyut, Kilitle, Kilidi aç): yalnız uygun cihazlara uygulanır; uygun cihaz
       // yoksa (ör. zaten uykuda) görünür ama devre dışıdır.
       const stateAdd = (target, icon, label, list, handler) => {
         const button = this.menuButton(icon, label, () => handler(list));
@@ -996,10 +996,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
         target.add(button);
       };
       // Bilgisayarı aç (WoL) + Bilgisayarı kapat: her zaman yan yana (kullanıcı isteği), çevrimiçi/
-      // çevrimdışı tahtada da. Her biri seçimin yalnız uygun kısmına uygulanır (aç → kapalı olanlar,
-      // kapat → açık olanlar); uygulanacak tahta yoksa madde görünür ama devre dışıdır.
-      // "Kullanıcılar" ▸ Oturum geçmişi (kullanıcı isteği): Oturumlar sayfası o tahtaya süzülmüş açılır
-      // (bkz. page.Sessions.openWith, ui.sessions.List.showBoard). Tek tahta: sağ tıklanan. Sayfa 'logs' ister.
+      // çevrimdışı cihazda da. Her biri seçimin yalnız uygun kısmına uygulanır (aç → kapalı olanlar,
+      // kapat → açık olanlar); uygulanacak cihaz yoksa madde görünür ama devre dışıdır.
+      // "Kullanıcılar" ▸ Oturum geçmişi (kullanıcı isteği): Oturumlar sayfası o cihaza süzülmüş açılır
+      // (bkz. page.Sessions.openWith, ui.sessions.List.showBoard). Tek cihaz: sağ tıklanan. Sayfa 'logs' ister.
       const sessionHistory = target => {
         if (can("logs")) {
           const name = board.label || board.hostname || board.ip || "#" + board.id;
@@ -1013,7 +1013,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         const off = boards.filter(b => !b.online);
         const on = boards.filter(b => b.online);
-        const n = list => (list.length > 1 ? ` (${list.length} tahta)` : "");
+        const n = list => (list.length > 1 ? ` (${list.length} cihaz)` : "");
         add(ICON.wol, "Bilgisayarı aç (WoL)" + n(off), () => this.wol(off, user, sessionOps));
         menu.getChildren()[menu.getChildren().length - 1].setEnabled(off.length > 0);
         add(ICON.shutdown, "Bilgisayarı kapat" + n(on), () => this.shutdown(on, user, sessionOps));
@@ -1051,27 +1051,27 @@ qx.Class.define("ankamon.ui.BoardOps", {
           subAdd(screens, ICON.screen, "Ekranı göster" + count, () => this.screen(os("Ekranı göster", boards), user));
         }
         if (can("screen") && can("screen.control")) {
-          // Fare/klavye ile müdahale tek tahtada anlamlı: çoklu seçimde de yalnız sağ tıklanan tahta.
+          // Fare/klavye ile müdahale tek cihazda anlamlı: çoklu seçimde de yalnız sağ tıklanan cihaz.
           subAdd(screens, ICON.screenControl, "Bilgisayarı yönet", () => this.screen([board], user, true));
         }
         // Uyandır: güç tasarrufuna girmiş (önizlemede siyah) ekranı uyandırır — çoklu seçimde tüm açık
-        // tahtalar (bkz. worker executor/display.py). Ekranlar önizlemesinde iş penceresi açılmaz.
+        // cihazlar (bkz. worker executor/display.py). Ekranlar önizlemesinde iş penceresi açılmaz.
         if (can("screen")) {
           subAdd(screens, ICON.wakeScreen, "Uyandır" + count, () => (sessionOps && sessionOps.wake
             ? sessionOps.wake(online)
             : this.__job({ type: "wake", board_ids: online.map(b => b.id) }, "Ekranı uyandır")));
-          // Uyut: ekranı güç tasarrufuna sokar (DPMS kapalı; tahtaya dokunulunca açılır).
+          // Uyut: ekranı güç tasarrufuna sokar (DPMS kapalı; cihaza dokunulunca açılır).
           stateAdd(screens, ICON.sleepScreen, "Uyut" + count, online.filter(b => !this.isScreenAsleep(b)), list => (sessionOps && sessionOps.sleep
             ? sessionOps.sleep(list)
             : this.__job({ type: "sleep", board_ids: list.map(b => b.id) }, "Ekranı uyut")));
         }
-        // Ekranı kilitle: "Ekran kilidini aç"a dek tahtada tam ekran "Kilitli"; klavye, fare ve dokunmatik çalışmaz, yeniden
+        // Ekranı kilitle: "Ekran kilidini aç"a dek cihazda tam ekran "Kilitli"; klavye, fare ve dokunmatik çalışmaz, yeniden
         // açılışta da sürer (bkz. worker executor/screenlock.py). Oturumu kilitle'den (parolayla açılır) ayrı. Ekran grubunda
         // (kullanıcı isteği 2026-11-11: Yönet'e taşınınca "artık yok" sanılıyordu); araç çubuğunda Ekran ve Kilit düğmelerinde.
         if (can("screen.lock")) {
           // Kapat/yeniden başlat gibi çıktı penceresinin altında "Bu pencereyi bir daha gösterme" kutusu
           // (kullanıcı isteği; __powerJob ile — kutu işaretliyse kilitleme yine yapılır, pencere açılmaz).
-          // Durumu bilinmeyen tahta (screen_locked gelmeyen çağıran) iki maddede de sayılır.
+          // Durumu bilinmeyen cihaz (screen_locked gelmeyen çağıran) iki maddede de sayılır.
           stateAdd(display, ICON.screenLock, "Ekranı kilitle" + count, online.filter(b => b.screen_locked !== true), list => (sessionOps && sessionOps.screenLock
             ? sessionOps.screenLock(list, true)
             : this.__powerJob({ type: "screen_lock", board_ids: list.map(b => b.id) }, "Ekranı kilitle",
@@ -1088,20 +1088,20 @@ qx.Class.define("ankamon.ui.BoardOps", {
           subAdd(display, ICON.screenshot, "Ekran görüntüsü al" + count, () => this.__powerJob(
             { type: "screenshot", board_ids: online.map(b => b.id) }, "Ekran görüntüsü", "screenshot", "görüntü alma", user));
         }
-        // Ekran aktarımı: sağ tıklanan tahtanın ekranı başka tahtalarda (bkz. ui.boards.RelayDialog, executor/relay.py).
+        // Ekran aktarımı: sağ tıklanan cihazın ekranı başka cihazlarda (bkz. ui.boards.RelayDialog, executor/relay.py).
         if (can("screen.relay")) {
           subAdd(display, ICON.relay, "Ekranı başka bilgisayara aktar…", () => ankamon.ui.boards.RelayDialog.open(board, os("Ekranı başka bilgisayara aktar…", online), user));
           stateAdd(display, ICON.relayStop, "Ekran aktarımını durdur", online.filter(b => b.relay_source || b.relay_is_source || b.relay_source === undefined),
             list => this.__powerJob({ type: "relay_stop", board_ids: list.map(b => b.id) }, "Ekran aktarımını durdur", "relay_stop", "durdurma", user));
         }
-        // Klavye/fare/dokunmatik kilidi: seçili tahtaların yalnız uygun olanlarına (bkz. worker executor/inputlock.py). Klavye
-        // kilidi ekran klavyesini, fare kilidi dokunmayı da kapatır. Durumu bilinmeyen tahta iki maddede de sayılır.
+        // Klavye/fare/dokunmatik kilidi: seçili cihazların yalnız uygun olanlarına (bkz. worker executor/inputlock.py). Klavye
+        // kilidi ekran klavyesini, fare kilidi dokunmayı da kapatır. Durumu bilinmeyen cihaz iki maddede de sayılır.
         if (can("screen.input")) {
           const locks = b => b.input_locks || [];
           const known = b => b.input_locks !== undefined;
           // Fare kilidi dokunmayı da tuttuğundan dokunmatik "kilitli" sayılır; kendi kilidi yoksa açılacak bir şey de yoktur.
           const held = (b, d) => locks(b).includes(d) || (d === "touch" && locks(b).includes("mouse"));
-          const n = list => (list.length > 1 ? ` (${list.length} tahta)` : "");
+          const n = list => (list.length > 1 ? ` (${list.length} cihaz)` : "");
           [["keyboard", ICON.keyboard, "Klavyeyi kilitle", "Klavye kilidini aç", "Klavye kilitle"],
             ["mouse", ICON.mouse, "Fareyi kilitle", "Fare kilidini aç", "Fare kilitle"],
             ["touch", ICON.touch, "Dokunmatiği kilitle", "Dokunmatik kilidini aç", "Dokunmatik kilitle"]].forEach(([device, icon, on, off, caption]) => {
@@ -1131,7 +1131,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         group(ICON.screenControl, "Yönet" + count, screens);
         group(ICON.screen, "Ekran" + count, display);
 
-        // "Bilgi kartı" burada değil: Tahtalar sayfasındaki "Logları göster"in hemen altında (kullanıcı
+        // "Bilgi kartı" burada değil: Cihazlar sayfasındaki "Logları göster"in hemen altında (kullanıcı
         // isteği) — bkz. page.Boards __rowMenu.
 
         // Oturumlar (eski etiketi "Kullanıcılar" — kullanıcı isteği 2026-11-09) ▸ Oturum aç ▸ <hesap>, Oturumu kapat, Oturumu
@@ -1141,21 +1141,21 @@ qx.Class.define("ankamon.ui.BoardOps", {
           sessions.add(this.menuButton(ICON.sessions, "Oturum aç" + count, null,
             this.__accountMenu(os("Oturum aç", online), "açılır", (acc, label) => this.__login(os("Oturum aç", online), acc, label, sessionOps))));
           subAdd(sessions, ICON.logout, "Oturumu kapat" + count, () => this.sessionAction("logout", online, sessionOps));
-          // Yalnız açık (ve kilitli olmayan) oturumu olan tahtalar (kullanıcı isteği 2026-11-11: oturumsuz tahtada hiçbir
-          // şey yapılmasın, "bir şey yapılmadı" iletisi de çıkmasın). Oturum bilgisi gelmeyen çağıranda tahta uygun sayılır.
+          // Yalnız açık (ve kilitli olmayan) oturumu olan cihazlar (kullanıcı isteği 2026-11-11: oturumsuz cihazda hiçbir
+          // şey yapılmasın, "bir şey yapılmadı" iletisi de çıkmasın). Oturum bilgisi gelmeyen çağıranda cihaz uygun sayılır.
           const lockable = online.filter(b => (b.session_username === undefined || !!b.session_username) && b.session_locked !== true);
-          stateAdd(sessions, ICON.lock, "Oturumu kilitle" + (lockable.length > 1 ? ` (${lockable.length} tahta)` : ""), lockable,
+          stateAdd(sessions, ICON.lock, "Oturumu kilitle" + (lockable.length > 1 ? ` (${lockable.length} cihaz)` : ""), lockable,
             list => this.sessionAction("lock", list, sessionOps));
         }
         if (can("screen")) {
           // Ekranlar önizlemesinde sonuç kutucukların sol altında, grid'de iş penceresinde görünür; her
-          // iki durumda da Tahtalar grid'inin "Oturum" sütunu güncellenir (bkz. runner whoami dalı).
+          // iki durumda da Cihazlar grid'inin "Oturum" sütunu güncellenir (bkz. runner whoami dalı).
           subAdd(sessions, ICON.sessions, "Oturumları sorgula" + count, () =>
             (sessionOps ? sessionOps.query(online) : this.__job({ type: "whoami", board_ids: online.map(b => b.id) }, "Oturumları sorgula")));
         }
         sessionHistory(sessions);
         if (can("logs")) {
-          // Oturum hareketleri: Oturumlar ▸ Hareketler bu tahtaya süzülmüş açılır (bkz. ui.sessions.Movements).
+          // Oturum hareketleri: Oturumlar ▸ Hareketler bu cihaza süzülmüş açılır (bkz. ui.sessions.Movements).
           subAdd(sessions, ICON.movements, "Oturum hareketleri", () => qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, {
             page: "sessions", movements: { board_id: board.id, board_name: board.label || board.hostname || board.ip }
           }));
@@ -1182,10 +1182,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
         const files = sub();
         if (can("filemanager")) {
           subAdd(files, ICON.filemanager, "Dosya yöneticisi", () => this.filemanager(board));
-          // İki panelli gezgin: bu tahtanın kullanıcı dizinlerinden başka bir tahtaya kopyalama.
+          // İki panelli gezgin: bu cihazın kullanıcı dizinlerinden başka bir cihaza kopyalama.
           subAdd(files, ICON.copy, "Bilgisayarlar arasında kopyala", () => ankamon.ui.files.CopyWindow.open(board, user));
-          // Toplu: bu bilgisayardan seçili tahtalardaki kullanıcıların bir konumuna (varsayılan Masaüstü) ve
-          // tersi; tek pencerede "Dağıt" ve "Topla" sekmeleri (bkz. ui.files.BulkWindow). Tahta seçimi değiştirilebilir.
+          // Toplu: bu bilgisayardan seçili cihazlardaki kullanıcıların bir konumuna (varsayılan Masaüstü) ve
+          // tersi; tek pencerede "Dağıt" ve "Topla" sekmeleri (bkz. ui.files.BulkWindow). Cihaz seçimi değiştirilebilir.
           subAdd(files, ICON.bulk, "Dosyaları dağıt/topla" + count, () => ankamon.ui.files.BulkWindow.open(os("Dosyaları dağıt/topla", online), user));
         }
         if (can("boards.backup") || can("boards.restore")) {
@@ -1193,28 +1193,28 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         group(ICON.filemanager, "Dosyalar", files);
         // Görev yöneticisi (Windows'taki gibi; canlı SSH, pencere kapanınca biter — bkz. ui.taskmgr.Window):
-        // "Dosyalar"ın hemen altında (kullanıcı isteği). Çoklu seçimde seçili çevrim içi tahtaların HEPSİ tek pencerede
-        // (tahta başına ayrı pencere değil; Bilgisayar sütunu/süzgeciyle — bkz. ui.taskmgr.Window).
+        // "Dosyalar"ın hemen altında (kullanıcı isteği). Çoklu seçimde seçili çevrim içi cihazların HEPSİ tek pencerede
+        // (cihaz başına ayrı pencere değil; Bilgisayar sütunu/süzgeciyle — bkz. ui.taskmgr.Window).
         if (can("taskmgr")) {
           add(ICON.taskmgr, "Görev yöneticisi" + count, () => ankamon.ui.taskmgr.Window.open(os("Görev yöneticisi", online), user));
         }
-        // Web sitesi aç: seçili tahtalardan oturumu açık olanlarda varsayılan tarayıcıyla, tam ekran (bkz. worker executor/open_url.py).
+        // Web sitesi aç: seçili cihazlardan oturumu açık olanlarda varsayılan tarayıcıyla, tam ekran (bkz. worker executor/open_url.py).
         if (can("screen.web")) {
           const withSession = os("Web sitesi aç…", online).filter(b => b.session_username);
-          const webCount = withSession.length > 1 ? ` (${withSession.length} tahta)` : "";
+          const webCount = withSession.length > 1 ? ` (${withSession.length} cihaz)` : "";
           add(ICON.web, "Web sitesi aç…" + webCount, () => this.openWebsite(withSession));
           menu.getChildren()[menu.getChildren().length - 1].setEnabled(withSession.length > 0);
         }
-        // Wi-Fi Monitör: seçili çevrim içi tahtalar tek pencerede (sınıfta telefon arama; sabit/yabancı verici) — bkz. ui.boards.WifiMonitor.
+        // Wi-Fi Monitör: seçili çevrim içi cihazlar tek pencerede (sınıfta telefon arama; sabit/yabancı verici) — bkz. ui.boards.WifiMonitor.
         if (can("screen")) {
           add(ICON.wifi, "Wi-Fi Monitör" + count, () => ankamon.ui.boards.WifiMonitor.open(os("Wi-Fi Monitör", online), user));
         }
-        // Sohbet: her bilgisayar için ayrı pencere; çoklu seçimde sağ tıklanan tahta (bkz. ui.chat.Window).
+        // Sohbet: her bilgisayar için ayrı pencere; çoklu seçimde sağ tıklanan cihaz (bkz. ui.chat.Window).
         if (can("boards.chat")) {
           add(ICON.chat, "Sohbet", () => ankamon.ui.chat.Window.open(board));
         }
       } else {
-        // Kapalı tahtada en olası iş onu açmak: Bilgisayarı aç (WoL) ve güç seçenekleri EN ÜSTTE (kullanıcı
+        // Kapalı cihazda en olası iş onu açmak: Bilgisayarı aç (WoL) ve güç seçenekleri EN ÜSTTE (kullanıcı
         // isteği). Geçmiş yine anlamlı: "Kullanıcılar" yalnız "Oturum geçmişi" ile, altında.
         power();
         const sessions = sub();
@@ -1227,7 +1227,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       return menu.getChildren().length ? menu : null;
     },
 
-    /** Web sitesi aç: adres sorar, açık oturumlu tahtalarda iş başlatır. */
+    /** Web sitesi aç: adres sorar, açık oturumlu cihazlarda iş başlatır. */
     async openWebsite(boards) {
       const raw = await ankamon.ui.Dialog.prompt(
         `<b>${boards.length} bilgisayarda</b> varsayılan tarayıcıyla, ekranı kaplayarak açılacak site:`, "https://", "Aç", "Web sitesi aç");
@@ -1242,18 +1242,18 @@ qx.Class.define("ankamon.ui.BoardOps", {
     },
 
     /**
-     * Kullanıcılar ▸ Kullanıcı sil…: seçili (çevrimiçi) tahtalardaki hesaplar tek listede (çoklu seçimde
-     * birleşik; her hesabın kaç tahtada olduğu yazılır), silinecekler işaretlenir. "Tüm dosyaları sil"
+     * Kullanıcılar ▸ Kullanıcı sil…: seçili (çevrimiçi) cihazlardaki hesaplar tek listede (çoklu seçimde
+     * birleşik; her hesabın kaç cihazda olduğu yazılır), silinecekler işaretlenir. "Tüm dosyaları sil"
      * varsayılan açık (kullanıcı isteği). İşi hazır işlem "user-delete" yapar (bkz. actions/user-delete):
-     * hesabı olmayan tahtada o kullanıcı atlanır. Sonrasında hesap listesi önbellekleri düşürülür.
+     * hesabı olmayan cihazda o kullanıcı atlanır. Sonrasında hesap listesi önbellekleri düşürülür.
      */
     async deleteUsers(boards) {
       if (!boards.length) {
-        ankamon.ui.Dialog.alert("Çevrimiçi tahta yok.");
+        ankamon.ui.Dialog.alert("Çevrimiçi cihaz yok.");
         return;
       }
       const esc = qx.bom.String.escape;
-      const where = boards.length > 1 ? `${boards.length} tahta` : esc(boards[0].label || boards[0].hostname || boards[0].ip);
+      const where = boards.length > 1 ? `${boards.length} cihaz` : esc(boards[0].label || boards[0].hostname || boards[0].ip);
       const win = ankamon.ui.Dialog.window(`Kullanıcı sil — ${where}`, 480);
       const status = new qx.ui.basic.Label("Hesaplar yükleniyor…").set({ rich: true, wrap: true, textColor: "app-muted" });
       win.add(status);
@@ -1270,7 +1270,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       ankamon.ui.Dialog.buttons(win, [del]);
       win.open();
 
-      // Hesaplar: her tahtadan (önbellekten ya da "accounts" görevinden), ada göre birleştirilir.
+      // Hesaplar: her cihazdan (önbellekten ya da "accounts" görevinden), ada göre birleştirilir.
       const results = await Promise.allSettled(boards.map(b => this.__accounts(b)));
       const merged = new Map();
       results.forEach(r => (r.status === "fulfilled" ? r.value : []).forEach(acc => {
@@ -1281,10 +1281,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const failed = results.filter(r => r.status === "rejected").length;
       const boxes = [];
       const update = () => del.setEnabled(boxes.some(b => b.getValue()));
-      // Tahtanın yönetici hesabı listelenmez (sunucu da reddeder — bkz. JobsApi::UNDELETABLE_USERS).
+      // Cihazın yönetici hesabı listelenmez (sunucu da reddeder — bkz. JobsApi::UNDELETABLE_USERS).
       [...merged.values()].filter(({ acc }) => !["etapadmin", "root"].includes(acc.name)).forEach(({ acc, n }) => {
         const label = (acc.full_name && acc.full_name !== acc.name ? `${esc(acc.full_name)} (${esc(acc.name)})` : esc(acc.name)) +
-          (boards.length > 1 ? ` <span style="opacity:.7">— ${n}/${boards.length} tahtada</span>` : "");
+          (boards.length > 1 ? ` <span style="opacity:.7">— ${n}/${boards.length} cihazda</span>` : "");
         const box = new qx.ui.form.CheckBox(label).set({ model: acc.name, rich: true });
         box.addListener("changeValue", update);
         box.setUserData("search", `${acc.name} ${acc.full_name || ""}`.toLocaleLowerCase("tr"));
@@ -1302,7 +1302,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       qx.ui.core.queue.Manager.flush(); // yeni yükseklik uygulanmadan center() eski boyuta göre ortalar
       win.center();
       status.setValue(boxes.length
-        ? "Silinecek kullanıcıları işaretleyin." + (failed ? ` <span style="color:#c42b1c">${failed} tahtanın hesapları okunamadı.</span>` : "")
+        ? "Silinecek kullanıcıları işaretleyin." + (failed ? ` <span style="color:#c42b1c">${failed} cihazın hesapları okunamadı.</span>` : "")
         : "Silinebilecek kullanıcı hesabı bulunamadı" + (failed ? " (hesaplar okunamadı)." : "."));
 
       del.addListener("execute", async () => {
@@ -1313,7 +1313,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
           `<b>${where}</b> üzerinde ${names.length} kullanıcı <b>kalıcı olarak</b> silinsin mi?<br><br>${shown}<br><br>` +
           (files
             ? "Ev dizinleri ve sistemin başka yerlerindeki tüm dosyaları da <b>silinecek</b>; geri alınamaz."
-            : "Yalnız hesaplar silinecek; dosyaları tahtada kalacak.") +
+            : "Yalnız hesaplar silinecek; dosyaları cihazda kalacak.") +
           "<br>Açık oturumları ve çalışan programları önce kapatılır.", "Sil");
         if (!ok) {
           return;
@@ -1328,8 +1328,8 @@ qx.Class.define("ankamon.ui.BoardOps", {
     },
 
     /**
-     * Kullanıcılar ▸ Parola ayarla…: seçili (çevrimiçi) tahtalardaki hesaplar tek listede (bkz. deleteUsers);
-     * işaretlenen hesaplara ortak bir parola verilir. Tahtanın yönetici hesapları (etapadmin, root) bu
+     * Kullanıcılar ▸ Parola ayarla…: seçili (çevrimiçi) cihazlardaki hesaplar tek listede (bkz. deleteUsers);
+     * işaretlenen hesaplara ortak bir parola verilir. Cihazın yönetici hesapları (etapadmin, root) bu
      * listede YOKTUR — gözden kaçıp öğrenci hesaplarıyla aynı parolayı almasınlar diye ayrı bir bölümde,
      * varsayılan kapalı, her biri kendi parolasıyla ve kendi yetkisiyle ("boards.passwords.<hesap>")
      * ayarlanır. Her parola iki kutuya yazılır; sonunda onay alınır. Her parola grubu ayrı bir görevdir
@@ -1338,13 +1338,13 @@ qx.Class.define("ankamon.ui.BoardOps", {
      */
     async setPasswords(boards, user) {
       if (!boards.length) {
-        ankamon.ui.Dialog.alert("Çevrimiçi tahta yok.");
+        ankamon.ui.Dialog.alert("Çevrimiçi cihaz yok.");
         return;
       }
       const esc = qx.bom.String.escape;
       const can = feature => user.is_admin || user.features.includes(feature);
       const ADMIN = ["etapadmin", "root"];
-      const where = boards.length > 1 ? `${boards.length} tahta` : esc(boards[0].label || boards[0].hostname || boards[0].ip);
+      const where = boards.length > 1 ? `${boards.length} cihaz` : esc(boards[0].label || boards[0].hostname || boards[0].ip);
       const win = ankamon.ui.Dialog.window(`Parola ayarla — ${where}`, 560);
       // İki sekme: "Kullanıcılar" (toplu) ve yönetici hesapları (tek bilgisayarda, bkz. ui.boards.AdminPasswordPanel).
       const tabs = new qx.ui.tabview.TabView().set({ contentPadding: 0 });
@@ -1428,12 +1428,12 @@ qx.Class.define("ankamon.ui.BoardOps", {
 
       // 2) Yönetici hesapları: yalnız yetkisi olanlar; her biri ayrı onay kutusu ve ayrı çift kutulu parola.
       const admins = ADMIN.filter(name => can("boards.passwords." + name)).map(name => {
-        const group = new qx.ui.groupbox.GroupBox(name === "root" ? "⚠ root (sistem yöneticisi)" : "⚠ etapadmin (tahtanın yönetici hesabı)")
+        const group = new qx.ui.groupbox.GroupBox(name === "root" ? "⚠ root (sistem yöneticisi)" : "⚠ etapadmin (cihazın yönetici hesabı)")
           .set({ layout: new qx.ui.layout.VBox(6) });
         const box = new qx.ui.form.CheckBox(`<b>${name}</b> parolasını da ayarla (ayrı parola)`).set({ rich: true });
         group.add(box);
         if (name === "root") {
-          group.add(new qx.ui.basic.Label('<span style="color:#c42b1c">Ankamon tahtalara root ile bağlanır: yeni parola bu tahtalar ' +
+          group.add(new qx.ui.basic.Label('<span style="color:#c42b1c">Ankamon cihazlara root ile bağlanır: yeni parola bu cihazlar ' +
             "için kaydedilir, bağlantı onunla sürer. Genel parola (Ayarlar ▸ SSH erişimi) değişmez.</span>")
             .set({ rich: true, wrap: true }));
         }
@@ -1496,7 +1496,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const failed = results.filter(r => r.status === "rejected").length;
       [...merged.values()].filter(({ acc }) => !ADMIN.includes(acc.name)).forEach(({ acc, n }) => {
         const label = (acc.full_name && acc.full_name !== acc.name ? `${esc(acc.full_name)} (${esc(acc.name)})` : esc(acc.name)) +
-          (boards.length > 1 ? ` <span style="opacity:.7">— ${n}/${boards.length} tahtada</span>` : "");
+          (boards.length > 1 ? ` <span style="opacity:.7">— ${n}/${boards.length} cihazda</span>` : "");
         const box = new qx.ui.form.CheckBox(label).set({ model: acc.name, rich: true });
         box.addListener("changeValue", update);
         box.setUserData("search", `${acc.name} ${acc.full_name || ""}`.toLocaleLowerCase("tr"));
@@ -1520,7 +1520,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       status.setValue((boxes.length
         ? "Parolası ayarlanacak kullanıcıları işaretleyin; işaretlenenlerin hepsine aynı parola verilir."
         : "Listelenecek kullanıcı hesabı bulunamadı" + (failed ? " (hesaplar okunamadı)." : ".")) +
-        (failed && boxes.length ? ` <span style="color:#c42b1c">${failed} tahtanın hesapları okunamadı.</span>` : ""));
+        (failed && boxes.length ? ` <span style="color:#c42b1c">${failed} cihazın hesapları okunamadı.</span>` : ""));
       update();
 
       apply.addListener("execute", async () => {
@@ -1536,7 +1536,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
           lines.push(`${names.length} kullanıcı (aynı parola): ` + names.map(esc).join(", "));
         }
         picked.forEach(a => lines.push(`<b style="color:#c42b1c">${a.name}</b> — ayrı parola` +
-          (a.name === "root" ? ' <span style="color:#c42b1c">(Ankamon bu tahtalara yeni parolayla bağlanır)</span>' : "")));
+          (a.name === "root" ? ' <span style="color:#c42b1c">(Ankamon bu cihazlara yeni parolayla bağlanır)</span>' : "")));
         const ok = await ankamon.ui.Dialog.confirm(
           `<b>${where}</b> üzerinde şu hesapların parolası değiştirilsin mi?<br><br>${lines.map(l => "• " + l).join("<br>")}` +
           "<br><br>Açık oturumlar kapanmaz; yeni parola bir sonraki girişte geçerli olur.", "Parolayı ayarla");
@@ -1559,7 +1559,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
      * Tek pencerede hem hazır işlem kataloğunu hem serbest komutu sunar (eski ayrı "Uzaktan işlemler" /
      * "Toplu komut" birleştirildi). Seçim kutusunun ilk satırı "— Serbest komut —"; o seçiliyken bir
      * komut kutusu, bir hazır işlem seçiliyken onun açıklaması + parametre formu gösterilir.
-     * @param boards {Array} hedef tahtalar
+     * @param boards {Array} hedef cihazlar
      * @param user {Map} oturum sahibi — hangi seçeneklerin sunulacağını (actions/shell yetkisi) belirler
      * @param preselect {String?} pencere bu hazır işlem (actions/<id>) seçili açılır — ör. Bakım ▸ Sensörler
      *   uyarısındaki kurulum bağlantıları; işlem listede yoksa (yetki) ilk satır kalır
@@ -1567,7 +1567,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
     async run(boards, user, preselect = null) {
       const ids = boards.map(b => b.id);
       if (!ids.length) {
-        ankamon.ui.Dialog.alert("Önce bir ya da daha fazla tahta işaretleyin.");
+        ankamon.ui.Dialog.alert("Önce bir ya da daha fazla cihaz işaretleyin.");
         return;
       }
       const canActions = user.is_admin || user.features.includes("actions");
@@ -1589,7 +1589,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const P = ankamon.ui.boards.Platforms;
       await P.load().catch(() => {});
       const present = P.counts(boards).map(([f]) => f);
-      const win = ankamon.ui.Dialog.window(`Komut çalıştır — ${ids.length} tahta`, 620);
+      const win = ankamon.ui.Dialog.window(`Komut çalıştır — ${ids.length} cihaz`, 620);
       win.add(new qx.ui.basic.Label(`<b>Hedefler:</b> ${qx.bom.String.escape(P.summary(boards))}`)
         .set({ rich: true, toolTipText: "Cihazların işletim sistemi ailesi: komutlar ve hazır işlemler her cihaza kendi sistemine göre gönderilir." }));
       const select = new qx.ui.form.SelectBox();
@@ -1713,14 +1713,14 @@ qx.Class.define("ankamon.ui.BoardOps", {
       ankamon.ui.Jobs.show(ankamon.io.Api.post("/jobs", body).then(res => res.id), caption);
     },
 
-    // "Oturum aç" hesap listesi, tahta başına (tarayıcı tarafı; sunucu da 24 sa önbellekler —
+    // "Oturum aç" hesap listesi, cihaz başına (tarayıcı tarafı; sunucu da 24 sa önbellekler —
     // bkz. worker executor/accounts.py). Her sağ tıkta yeni bir görev kaydı açılmasın diye.
     __accountsCache: {},
     ACCOUNTS_TTL_MS: 24 * 3600 * 1000,
 
     /**
-     * Sağ menünün hesap alt menüsü ("Oturum aç"): tahtadaki hesaplar (çoklu seçimde İLK
-     * tahtadan alınır), birine tıklanınca onPick(hesap, etiket) çağrılır — işlem seçili TÜM tahtalara
+     * Sağ menünün hesap alt menüsü ("Oturum aç"): cihazdaki hesaplar (çoklu seçimde İLK
+     * cihazdan alınır), birine tıklanınca onPick(hesap, etiket) çağrılır — işlem seçili TÜM cihazlara
      * uygulanır. Liste alt menü ilk kez açılınca yüklenir (menü açılışını SSH beklemesiyle geciktirmemek için).
      * @param verb {String} çoklu seçim bilgi satırı için ("açılır")
      */
@@ -1728,7 +1728,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const sub = new qx.ui.menu.Menu();
       const info = text => sub.add(new qx.ui.menu.Button(text).set({ enabled: false }));
       if (!boards.length) {
-        info("Çevrimiçi tahta yok");
+        info("Çevrimiçi cihaz yok");
         return sub;
       }
       info("Hesaplar yükleniyor…");
@@ -1749,11 +1749,11 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         sub.removeAll().forEach(w => w.dispose());
         if (!list.length) {
-          info("Tahtada kullanıcı hesabı yok");
+          info("Cihazda kullanıcı hesabı yok");
           return;
         }
         if (boards.length > 1) {
-          info(`Liste: ${boards[0].label || boards[0].hostname || boards[0].ip} · ${boards.length} tahtada ${verb}`);
+          info(`Liste: ${boards[0].label || boards[0].hostname || boards[0].ip} · ${boards.length} cihazda ${verb}`);
         }
         list.forEach(acc => {
           const label = acc.full_name && acc.full_name !== acc.name ? `${acc.full_name} (${acc.name})` : acc.name;
@@ -1777,7 +1777,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         const t = ((res.job && res.job.targets) || [])[0];
         if (t && !["queued", "running"].includes(t.status)) {
           if (t.status !== "ok") {
-            throw new Error(t.output || "tahtaya bağlanılamadı");
+            throw new Error(t.output || "cihaza bağlanılamadı");
           }
           const list = JSON.parse(t.output || "[]");
           this.__accountsCache[board.id] = { at: Date.now(), list };
@@ -1788,22 +1788,22 @@ qx.Class.define("ankamon.ui.BoardOps", {
       throw new Error("zaman aşımı");
     },
 
-    /** Tahtanın hesap listesi (önbellekli — bkz. __accounts); Yedekle/Geri al penceresi de kullanır. */
+    /** Cihazın hesap listesi (önbellekli — bkz. __accounts); Yedekle/Geri al penceresi de kullanır. */
     accountsOf(board) {
       return this.__accounts(board);
     },
 
-    /** Tahtaların hesap listesi önbelleğini düşürür (hesap eklenip silinince). */
+    /** Cihazların hesap listesi önbelleğini düşürür (hesap eklenip silinince). */
     forgetAccounts(boards) {
       boards.forEach(b => delete this.__accountsCache[b.id]);
     },
 
     async __login(boards, acc, label, sessionOps) {
       const esc = qx.bom.String.escape;
-      const where = boards.length > 1 ? `<b>${boards.length} tahtada</b>` : `<b>${esc(boards[0].label || boards[0].hostname || boards[0].ip)}</b> tahtasında`;
+      const where = boards.length > 1 ? `<b>${boards.length} cihazda</b>` : `<b>${esc(boards[0].label || boards[0].hostname || boards[0].ip)}</b> cihazında`;
       const ok = await ankamon.ui.Dialog.confirm(
         `${where} <b>${esc(label)}</b> hesabıyla oturum açılsın mı?<br><br>` +
-        "Tahtada açık bir oturum varsa <b>kullanıcı değiştirilir</b>: mevcut oturum kapanmaz, programları arka planda çalışmaya devam eder.",
+        "Cihazda açık bir oturum varsa <b>kullanıcı değiştirilir</b>: mevcut oturum kapanmaz, programları arka planda çalışmaya devam eder.",
         "Oturum aç");
       if (!ok) {
         return;
@@ -1817,10 +1817,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
 
     /**
      * "Oturumu kapat" / "Oturumu kilitle" (bkz. worker executor/accounts.py logout/lock). Kilitlemede
-     * oturum ve süreçleri açık kalır, tahta giriş ekranına (greeter) geçer.
+     * oturum ve süreçleri açık kalır, cihaz giriş ekranına (greeter) geçer.
      * @param type {String} "logout" | "lock"
      * @param sessionOps {Map?} Ekranlar önizlemesinden: iş penceresi açmadan kutucuklarda gösterilir
-     * @param username {String?} belirli kullanıcının oturumu (Oturumlar grid'i); yoksa tahtadaki etkin oturum
+     * @param username {String?} belirli kullanıcının oturumu (Oturumlar grid'i); yoksa cihazdaki etkin oturum
      */
     async sessionAction(type, boards, sessionOps = null, username = null) {
       if (!boards.length) {
@@ -1830,10 +1830,10 @@ qx.Class.define("ankamon.ui.BoardOps", {
       const lock = type === "lock";
       const title = lock ? "Oturumu kilitle" : "Oturumu kapat";
       const owner = username ? `<b>${esc(username)}</b> kullanıcısının oturumu` : "açık oturum";
-      const where = boards.length > 1 ? `<b>${boards.length} tahtadaki</b> açık oturumlar` : `<b>${esc(boards[0].label || boards[0].hostname || boards[0].ip)}</b> tahtasındaki ${owner}`;
+      const where = boards.length > 1 ? `<b>${boards.length} cihazdaki</b> açık oturumlar` : `<b>${esc(boards[0].label || boards[0].hostname || boards[0].ip)}</b> cihazındaki ${owner}`;
       const ok = await ankamon.ui.Dialog.confirm(lock
-        ? `${where} kilitlensin mi?<br><br>Oturum kapanmaz, açık programlar çalışmaya devam eder; tahta giriş ekranına geçer ve kilidi açmak için kullanıcının parolası gerekir.`
-        : `${where} kapatılsın mı?<br><br>Kaydedilmemiş işler kaybolur; tahta giriş ekranına döner.`, title);
+        ? `${where} kilitlensin mi?<br><br>Oturum kapanmaz, açık programlar çalışmaya devam eder; cihaz giriş ekranına geçer ve kilidi açmak için kullanıcının parolası gerekir.`
+        : `${where} kapatılsın mı?<br><br>Kaydedilmemiş işler kaybolur; cihaz giriş ekranına döner.`, title);
       if (!ok) {
         return;
       }

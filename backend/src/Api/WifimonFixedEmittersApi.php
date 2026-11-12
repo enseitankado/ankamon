@@ -38,7 +38,7 @@ use Ankamon\Core\Request;
 /**
  * Wi-Fi Monitör "sabit" vericileri (wifimon_fixed_emitters — bkz. göç 040). Sınıfta telefon ararken okulun/sınıfın olağan
  * ağları ve cihazları bu listeye alınır; arayüz (ui.boards.WifiMonitor) gerisini "yabancı" olarak öne çıkarır.
- * kind: ssid (ağ adı, bütün erişim noktaları) | bssid | bt | probe; board_id NULL = bütün tahtalar.
+ * kind: ssid (ağ adı, bütün erişim noktaları) | bssid | bt | probe; board_id NULL = bütün cihazlar.
  * Okuma ve değiştirme "screen" yetkisi ister (Wi-Fi Monitör'ü açabilen herkes; bkz. routes.php).
  */
 final class WifimonFixedEmittersApi
@@ -101,7 +101,7 @@ final class WifimonFixedEmittersApi
     }
 
     /**
-     * Toplu kapsam değişikliği (kullanıcı isteği 2026-11-10): ids [..], board_id null = okul geneli, sayı = o tahtanın sınıfı.
+     * Toplu kapsam değişikliği (kullanıcı isteği 2026-11-10): ids [..], board_id null = okul geneli, sayı = o cihazın sınıfı.
      * Hedef kapsamda aynı verici zaten kayıtlıysa taşınan kayıt fazlalıktır, silinir (UNIQUE kind+value+kapsam).
      */
     public function rescope(Request $request, array $user): array
@@ -116,7 +116,7 @@ final class WifimonFixedEmittersApi
         $raw = $request->input('board_id');
         $boardId = $raw === null || $raw === '' ? null : (int) $raw;
         if ($boardId !== null && !Db::value('SELECT 1 FROM boards WHERE id = ?', [$boardId])) {
-            throw ApiError::badRequest('Tahta bulunamadı.');
+            throw ApiError::badRequest('Cihaz bulunamadı.');
         }
         [$moved, $merged] = Db::transaction(static function () use ($ids, $boardId): array {
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
@@ -167,7 +167,7 @@ final class WifimonFixedEmittersApi
         }
         $boardId = isset($item['board_id']) && $item['board_id'] !== null && $item['board_id'] !== '' ? (int) $item['board_id'] : null;
         if ($boardId !== null && !Db::value('SELECT 1 FROM boards WHERE id = ?', [$boardId])) {
-            throw ApiError::badRequest('Tahta bulunamadı.');
+            throw ApiError::badRequest('Cihaz bulunamadı.');
         }
         $label = mb_substr(trim((string) ($item['label'] ?? '')), 0, 120);
         return [$kind, $value, $boardId, $label];

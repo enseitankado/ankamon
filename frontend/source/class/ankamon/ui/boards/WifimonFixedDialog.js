@@ -28,7 +28,7 @@
 /**
  * Wi-Fi Monitör "Güvenilir listesi…": güvenilir (sabit) işaretlenmiş vericiler — erişim noktası ya da Wi-Fi cihazı, MAC adresiyle —,
  * kapsamı (tesis geneli / salon) ve işaretleyen; seçilenler listeden çıkarılır ya da kapsamları topluca değiştirilir (tesis geneli ya da
- * seçilen tahtanın salonu — kullanıcı isteği 2026-11-10; "okul"/"sınıf" yerine "tesis"/"salon" 2026-11-12; PUT /api/wifimon/fixed).
+ * seçilen cihazın salonu — kullanıcı isteği 2026-11-10; "okul"/"sınıf" yerine "tesis"/"salon" 2026-11-12; PUT /api/wifimon/fixed).
  * Bütün hücre ve başlıklarda açıklayıcı ipucu (kullanıcı isteği 2026-11-12: lise öğrencisinin anlayacağı dil). Eski "ağ adı" ve "Bluetooth" kayıtları artık
  * uygulanmaz (güven yalnız MAC ile — kullanıcı isteği 2026-11-06), silinebilsinler diye listelenir (bkz. ui.boards.WifiMonitor, backend
  * WifimonFixedEmittersApi).
@@ -88,7 +88,7 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
       const del = new qx.ui.form.Button("Seçilenleri listeden çıkar");
       const close = new qx.ui.form.Button("Kapat");
       close.addListener("execute", () => win.close());
-      // Toplu kapsam: hedef (tesis geneli ya da bir tahtanın salonu) + uygula.
+      // Toplu kapsam: hedef (tesis geneli ya da bir cihazın salonu) + uygula.
       const scope = new qx.ui.form.SelectBox().set({ width: 240, toolTipText: "İşaretli kayıtların yeni kapsamı. Tesis geneli: cihaz bütün " +
         "salonlardaki sensörlerde güvenilir sayılır. Salon: yalnız o salonun sensöründe güvenilir sayılır, başka yerde duyulursa yabancı görünür." });
       scope.add(new qx.ui.form.ListItem("Tesis geneli", null, ""));
@@ -124,7 +124,7 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
         (res.boards || []).slice().sort((a, b) => name(a).localeCompare(name(b), "tr")).forEach(b =>
           scope.add(new qx.ui.form.ListItem(`Salon: ${name(b)}`, null, String(b.id))));
       }).catch(() => {
-        // Tahta listesi alınamazsa yalnız "Tesis geneli" seçilebilir.
+        // Cihaz listesi alınamazsa yalnız "Tesis geneli" seçilebilir.
       });
 
       const draw = () => {
@@ -192,7 +192,7 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
             "Sensörlerin ölçümlerine göre cihazın büyük olasılıkla yanında durduğu sensör (akıllı tahta). En güçlü ortalama sinyali alan " +
             "sensör seçilir; 5 GHz zaten daha zayıf geldiği için 5 GHz ölçümüne 7 dB eklenerek karşılaştırılır. Parantezde güven derecesi " +
             "ve ikinci en iyi sensörden kaç dB önde olduğu yazar (fark büyükse öneri daha güvenilirdir)." + (sug ? "\n\n" + sug.tip :
-              "\n\nHenüz ölçüm yok: Wi-Fi Monitör'ü bu cihazın yakınındaki tahtalarla açık tutun."));
+              "\n\nHenüz ölçüm yok: Wi-Fi Monitör'ü bu cihazın yakınındaki cihazlarla açık tutun."));
           const here = placed.get(f.value.toUpperCase());
           const select = `<select data-addr="${attr(f.value.toUpperCase())}" data-kind="${attr(f.kind)}" style="max-width:240px">` +
             `<option value="">— belirlenmedi —</option>` +

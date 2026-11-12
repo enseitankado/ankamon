@@ -23,12 +23,12 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Ağ rolleri — KALDIRILDI (kullanıcı isteği 2026-11-10): tahta ağı / idari ağ ayrımı yok.
+"""Ağ rolleri — KALDIRILDI (kullanıcı isteği 2026-11-10): cihaz ağı / idari ağ ayrımı yok.
 
-Ankamon bütün giriş/çıkış hizmetlerini (ağ taraması ve akış gözlemi, servis/paylaşım/etkinlik taramaları, loglardan tahta
+Ankamon bütün giriş/çıkış hizmetlerini (ağ taraması ve akış gözlemi, servis/paylaşım/etkinlik taramaları, loglardan cihaz
 kaydı, syslog alımı, WoL, ekran yansıtma, panel) sunucunun BÜTÜN ağ arabirimleri üzerinden yürütür (Ayarlar ▸ Ağ
 arabirimleri yalnız listeler). Eski settings.network_roles kaydı göç 048'de silindi. Arayüz (roles / is_board_net /
-scan_iface / board_net_sql / board_cidrs) çağıranlar değişmesin diye korunur: her ağ "tahta ağı" sayılır. Tahta olup
+scan_iface / board_net_sql / board_cidrs) çağıranlar değişmesin diye korunur: her ağ "cihaz ağı" sayılır. Cihaz olup
 olmadığına yine MAC karar verir (netscan/boardmac.py); ağlar arası IP yönlendirmesi engeli (install.sh ankamon-netguard)
 bir Ankamon hizmeti değildir, sürer.
 """
@@ -52,7 +52,7 @@ def scan_iface(net: dict, role: dict) -> str:
 
 
 def board_net_sql(alias: str = "n") -> str:
-    """net_networks satırı (alias) tahta ağı mı — her ağ (SQL koşulu)."""
+    """net_networks satırı (alias) cihaz ağı mı — her ağ (SQL koşulu)."""
     return "true"
 
 

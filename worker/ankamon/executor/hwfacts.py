@@ -23,12 +23,12 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtanın donanım/sistem bilgisini (disk, RAM, işlemci, wifi, ağ, ekran, işletim sistemi…) SSH ile toplar.
+"""Cihazın donanım/sistem bilgisini (disk, RAM, işlemci, wifi, ağ, ekran, işletim sistemi…) SSH ile toplar.
 
 İki yol bu modülü paylaşır:
-  - board_identity.py: tahta ilk kez tanınırken (MAC öğrenilirken) aynı SSH turunda bir kez toplar.
-  - runner "facts" görev türü (Tahtalar/Ekranlar sağ menüsü "Bilgi kartı"): istenince CANLI toplar;
-    aynı tahtaya CACHE_SECONDS içinde tekrar bağlanmaz, boards.facts'teki son değeri döner.
+  - board_identity.py: cihaz ilk kez tanınırken (MAC öğrenilirken) aynı SSH turunda bir kez toplar.
+  - runner "facts" görev türü (Cihazlar/Ekranlar sağ menüsü "Bilgi kartı"): istenince CANLI toplar;
+    aynı cihaza CACHE_SECONDS içinde tekrar bağlanmaz, boards.facts'teki son değeri döner.
 
 Sonuç boards.facts (jsonb) içinde _FIELDS'in değerleri + hw_collected_at (unix saniye) olarak saklanır.
 Durum bilgileri (boş disk, wifi bağlantısı, açık kalma süresi, sıcaklık) toplandığı ANA aittir —
@@ -44,10 +44,10 @@ import subprocess
 
 from . import netif
 
-CACHE_SECONDS = 3600  # "Bilgi kartı" aynı tahtaya bu süre içinde tekrar bağlanmaz.
+CACHE_SECONDS = 3600  # "Bilgi kartı" aynı cihaza bu süre içinde tekrar bağlanmaz.
 
-# Kurallar (gerçek ETAP tahtalarında gözlenenler):
-# - awk'ta "print" yerine "printf %.0f": tahtalardaki awk büyük sayıları (GB mertebesi bayt) üstel
+# Kurallar (gerçek ETAP cihazlarında gözlenenler):
+# - awk'ta "print" yerine "printf %.0f": cihazlardaki awk büyük sayıları (GB mertebesi bayt) üstel
 #   gösterimde (ör. "2,59942e+11", yerel ayara göre VİRGÜLLÜ) basıyordu; "%.0f" düz tamsayı zorlar.
 # - Yerel ayar Türkçe: df başlıkları, nmcli'nin ACTIVE sütunu ("hayır") vb. çevriliyor — ayrıştırılan
 #   komutlar LC_ALL=C ile çalışır.
@@ -177,7 +177,7 @@ if [ -n "$sdev" ] && command -v smartctl >/dev/null 2>&1; then
     echo "SMART_JSON=$(smartctl -j -H -A "/dev/$sdev" 2>/dev/null | tr -d '\n')"
 fi
 # --- Bilgi kartı "Diskler ve bölümler", "UEFI / önyükleme", "UEFI değişkenleri" (ayrıştırma: _disk_layout,
-# _firmware_boot, _uefi_vars). Tümü salt okunur; gerçek ETAP tahtasında bu blok ~1,5 sn sürüyor.
+# _firmware_boot, _uefi_vars). Tümü salt okunur; gerçek ETAP cihazında bu blok ~1,5 sn sürüyor.
 # Disk ağacı (bölümler, GUID'ler, dosya sistemi boyut/boş alanı) lsblk JSON'u; bölüm tablosunun kendi
 # kaydı (disk kimliği, ilk/son LBA, bölüm öznitelikleri, MBR'de etkin bölüm) sfdisk JSON'u. Bölümlenmemiş
 # alan sfdisk -F'nin ilk satırındaki bayt; GPT'de sgdisk -v başlık/yedek tablo/çakışma denetimi yapar.
@@ -321,8 +321,8 @@ _SMART_FIELDS = [
     "smart_uncorrectable",   # düzeltilemeyen hata (ATA 187/198, NVMe media_errors)
     "smart_failing",         # eşiğin altına düşmüş öznitelik adları (virgüllü) ya da None
 ]
-# Çok değerli/yapılı alanlar (bkz. _disk_layout, _firmware_boot, _uefi_vars). Tahta başına ~10-15 KB:
-# Tahtalar listesi (backend BoardsApi::COLUMNS) bunları facts'ten çıkarır, yalnız Bilgi kartı ("facts"
+# Çok değerli/yapılı alanlar (bkz. _disk_layout, _firmware_boot, _uefi_vars). Cihaz başına ~10-15 KB:
+# Cihazlar listesi (backend BoardsApi::COLUMNS) bunları facts'ten çıkarır, yalnız Bilgi kartı ("facts"
 # görevinin çıktısı) taşır.
 _DETAIL_FIELDS = ["disk_layout", "firmware_boot", "uefi_vars"]
 _ALL_FIELDS = list(_FIELDS.values()) + _SMART_FIELDS + _DETAIL_FIELDS
@@ -545,7 +545,7 @@ def _efi_path(rest: str) -> str:
 
 def _firmware_boot(values: dict, bootmgr: list, disks: list, uefi_vars: list, esp_files: list = ()) -> dict:
     """Firmware kipi, EFI sürüm/üretici, Secure Boot, değişken deposu, açılış sırası ve girdileri
-    (aygıt yolundaki GPT bölüm GUID'i tahtadaki bölüme eşlenir), EFI bölümündeki önyükleyici dizinleri,
+    (aygıt yolundaki GPT bölüm GUID'i cihazdaki bölüme eşlenir), EFI bölümündeki önyükleyici dizinleri,
     TPM."""
     mode = (values.get("FW_MODE") or "").strip() or None
     fw: dict = {"mode": mode}
@@ -658,11 +658,11 @@ _SSH_OPTS = [
 
 
 def query(board: dict, user: str, password: str, timeout: int = 25) -> dict:
-    """Tek tahtaya bağlanıp donanım bilgisini okur (whoami.query ile aynı hafif ssh+sshpass deseni —
+    """Tek cihaza bağlanıp donanım bilgisini okur (whoami.query ile aynı hafif ssh+sshpass deseni —
     tek, sabit betik olduğundan ansible gerekmez). Döner: {"status","rc","output"} — başarılıysa
     output, ayrıştırılmış facts'in JSON metni (job_targets.output, frontend bunu ayrıştırır)."""
     if not board.get("ip"):
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     target = f"{user}@{board['ip']}"
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", f"ConnectTimeout={min(timeout, 8)}", target, SCRIPT]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
@@ -696,7 +696,7 @@ def store(conn, board_id: int, facts: dict, ts: int) -> None:
     yazar. Yalnız _FIELDS alanları yazılır; eski sürümden kalan, artık toplanmayan anahtar yoktur."""
     data = {field: facts.get(field) for field in _ALL_FIELDS}
     data["hw_collected_at"] = ts
-    # Wi-Fi kartının kalıcı MAC'i Tahtalar ▸ Kablosuz MAC'e de (boards.wifi_mac, göç 043; rastgele adres yazılmaz).
+    # Wi-Fi kartının kalıcı MAC'i Cihazlar ▸ Kablosuz MAC'e de (boards.wifi_mac, göç 043; rastgele adres yazılmaz).
     conn.execute("UPDATE boards SET facts = facts || %s::jsonb, wifi_mac = COALESCE(%s::macaddr, wifi_mac) WHERE id = %s",
                  (json.dumps(data, ensure_ascii=False), netif.permanent_mac(data.get("wifi_mac")), board_id))
 
@@ -706,10 +706,10 @@ WIFI_ACTIONS = {"wifi-on": "enabled", "wifi-off": "disabled"}
 
 
 def mark_wifi_radio(conn, board_id: int, radio: str) -> None:
-    """wifi-on/wifi-off işlemi bir tahtada başarıyla bitince boards.facts'teki Wi-Fi durumunu hemen
+    """wifi-on/wifi-off işlemi bir cihazda başarıyla bitince boards.facts'teki Wi-Fi durumunu hemen
     günceller: grid ve önbellekli "Bilgi kartı" bir sonraki tam toplamaya (CACHE_SECONDS) kadar eski
     durumu göstermesin. Kapatınca bağlantı bilgileri de silinir; açınca bağlantı birkaç saniye sonra
-    kurulacağından durum bilinmiyor (None) sayılır. Kartı olmayan tahtada (wifi_iface yok) dokunulmaz."""
+    kurulacağından durum bilinmiyor (None) sayılır. Kartı olmayan cihazda (wifi_iface yok) dokunulmaz."""
     conn.execute(
         """UPDATE boards SET facts = facts || jsonb_build_object(
                'wifi_radio', %s::text, 'wifi_state', %s::text, 'wifi_ssid', NULL, 'wifi_signal', NULL,

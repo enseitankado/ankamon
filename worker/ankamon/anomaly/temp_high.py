@@ -23,17 +23,17 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Anomali: işlemci / disk sıcaklığı tahtanın kendi ortalamasının %30 üzerinde.
+"""Anomali: işlemci / disk sıcaklığı cihazın kendi ortalamasının %30 üzerinde.
 
 Yeni veri tutulmaz: ortalamalar zaten sürekli hesaplanan metrics_1h (5 yıl), izleme metrics_5m (180 gün)
 özetlerinden okunur. Diske yalnız bulunan anomali kaydı yazılır.
 
-Ortalama: tahtanın son BASE_WINDOW içindeki saatlik ortalamaları (yalnız tahta açıkken ölçüm olur; bir saatte
-birden çok seri varsa — çekirdekler, diskler — en sıcağı). BASE_MIN_HOURS'tan az geçmişi olan tahta
+Ortalama: cihazın son BASE_WINDOW içindeki saatlik ortalamaları (yalnız cihaz açıkken ölçüm olur; bir saatte
+birden çok seri varsa — çekirdekler, diskler — en sıcağı). BASE_MIN_HOURS'tan az geçmişi olan cihaz
 değerlendirilmez: birkaç saatlik ortalama yanıltır.
 
 Anomali: 5 dakikalık ortalama RATIO × ortalamayı THRESHOLD kadar kesintisiz aşıyor (kısa yük tepeleri normaldir).
-GAP'ten uzun ölçüm boşluğu (tahta kapalı) aralığı bitirir.
+GAP'ten uzun ölçüm boşluğu (cihaz kapalı) aralığı bitirir.
 """
 
 import datetime
@@ -102,7 +102,7 @@ def _baselines(conn, tags: str, boards: list[str]) -> dict:
 
 
 def _islands(rows: list, limit: float) -> list[dict]:
-    """Bir tahtanın sıralı ölçümleri → limit üstünde kesintisiz aralıklar."""
+    """Bir cihazın sıralı ölçümleri → limit üstünde kesintisiz aralıklar."""
     found, current, prev_time = [], None, None
     for r in rows:
         broken = prev_time is not None and r["time"] - prev_time > GAP

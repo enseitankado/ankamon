@@ -48,8 +48,8 @@ qx.Class.define("ankamon.ui.Login", {
 
     card.add(new qx.ui.basic.Label(ankamon.ui.Logo.svg(60)).set({ rich: true, textColor: "text", alignX: "center" }));
     card.add(new qx.ui.basic.Label(ankamon.ui.Login.SLOGAN).set({ textColor: "app-muted", alignX: "center" }));
-    // Oturum açmadan görülen durum şeridi: çevrim içi / çevrim dışı tahta ve son otomatik taramalarda
-    // acil sorunlu tahta sayısı (yalnız sayılar — bkz. backend LoginStatusApi).
+    // Oturum açmadan görülen durum şeridi: çevrim içi / çevrim dışı cihaz ve son otomatik taramalarda
+    // acil sorunlu cihaz sayısı (yalnız sayılar — bkz. backend LoginStatusApi).
     this.__status = new qx.ui.basic.Label("").set({
       rich: true, wrap: true, allowGrowX: true, visibility: "excluded", textColor: "text", marginBottom: 6
     });
@@ -161,10 +161,10 @@ qx.Class.define("ankamon.ui.Login", {
       const when = d.scanned_at ? "son otomatik tarama: " + ankamon.util.Format.dateTime(d.scanned_at * 1000) : "";
       const urgent = d.urgent > 0;
       this.__status.setValue(S.statusStrip([
-        S.statusCell("#1e8e3e", d.online, "çevrim içi tahta", "Şu an açık ve yanıt veren tahtalar"),
-        S.statusCell("#9aa0a6", d.offline, "çevrim dışı tahta", "Kapalı ya da yanıt vermeyen tahtalar"),
-        S.statusCell(urgent ? "#d93025" : "#1e8e3e", urgent ? d.urgent : null, urgent ? "acil sorunlu tahta" : "acil sorun yok",
-          "Son otomatik sorun tespiti taramasında acil sorun bulunan tahta sayısı", urgent ? S.ICON.urgent : S.ICON.ok)
+        S.statusCell("#1e8e3e", d.online, "çevrim içi cihaz", "Şu an açık ve yanıt veren cihazlar"),
+        S.statusCell("#9aa0a6", d.offline, "çevrim dışı cihaz", "Kapalı ya da yanıt vermeyen cihazlar"),
+        S.statusCell(urgent ? "#d93025" : "#1e8e3e", urgent ? d.urgent : null, urgent ? "acil sorunlu cihaz" : "acil sorun yok",
+          "Son otomatik sorun tespiti taramasında acil sorun bulunan cihaz sayısı", urgent ? S.ICON.urgent : S.ICON.ok)
       ], when));
       this.__status.show();
     },

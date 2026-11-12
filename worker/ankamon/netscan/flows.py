@@ -27,7 +27,7 @@
 
 Anahtarlı ağda sunucu, başka iki cihaz arasındaki unicast'i GÖRMEZ (switch öğrenir); ama şunları görür
 ve bunlardan bir yoğunluk sinyali çıkarırız: broadcast (ARP, DHCP, NetBIOS, SSDP…), multicast (mDNS,
-SSDP, ONVIF…) ve sunucunun KENDİSİYLE konuşan trafik (tahta logları, node_exporter kazıması…). Bu, IP ID
+SSDP, ONVIF…) ve sunucunun KENDİSİYLE konuşan trafik (cihaz logları, node_exporter kazıması…). Bu, IP ID
 örneklemesinin (yalnız Windows) aksine tüm cihazlarda çalışır; kaynak MAC ile net_devices'a eşlenir.
 
 AF_PACKET (SOCK_RAW) kullanılır; promiscuous AÇILMAZ — amaç "görülebilir" akışlar, switch'i taşırmak değil.

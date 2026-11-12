@@ -160,7 +160,7 @@ final class AuthApi
     }
 
     /**
-     * "Ekranlar" sekmesindeki önizleme kutucuklarının sürükle-bırakla değiştirilen sırası (tahta
+     * "Ekranlar" sekmesindeki önizleme kutucuklarının sürükle-bırakla değiştirilen sırası (cihaz
      * id'leri; bkz. frontend page/Boards.js __previewList + docker/rootfs/screen/index.html).
      * nav_order ile aynı mantık: kullanıcı başına, oturum bağımsız kalıcı.
      */
@@ -231,8 +231,8 @@ final class AuthApi
     }
 
     /**
-     * nginx auth_request ucu: /screen/ (canlı tahta ekranı) için oturum + "screen" yetkisi denetimi.
-     * Kullanıcı adı ekran köprüsüne iletilir (kim hangi tahtayı izledi, etkinlik günlüğüne yazılır).
+     * nginx auth_request ucu: /screen/ (canlı cihaz ekranı) için oturum + "screen" yetkisi denetimi.
+     * Kullanıcı adı ekran köprüsüne iletilir (kim hangi cihazı izledi, etkinlik günlüğüne yazılır).
      */
     public function screen(): array
     {
@@ -250,7 +250,7 @@ final class AuthApi
     }
 
     /**
-     * nginx auth_request ucu: /screen/ws/taskmgr/ (Görev yöneticisi — canlı SSH + tahta ajanı) için oturum +
+     * nginx auth_request ucu: /screen/ws/taskmgr/ (Görev yöneticisi — canlı SSH + cihaz ajanı) için oturum +
      * "taskmgr" yetkisi. Kullanıcı adı X-Auth-User ile ekran köprüsüne geçer (değişiklikler audit_log'a yazılır).
      */
     public function taskmgr(): array
@@ -282,7 +282,7 @@ final class AuthApi
 
     /**
      * nginx auth_request ucu: /cast/ (ekran yansıtma sayfası) ve /cast/mtx/ (WHIP → MediaMTX) için
-     * oturum + "cast" yetkisi denetimi. Tahtalarda oynatıcıyı başlatmak ayrıca cast_start görevidir.
+     * oturum + "cast" yetkisi denetimi. Cihazlarda oynatıcıyı başlatmak ayrıca cast_start görevidir.
      */
     public function cast(): array
     {
@@ -298,7 +298,7 @@ final class AuthApi
 
     /**
      * nginx auth_request ucu: /filemanager-open/, /filemanager-mount ve /filemanager/ için oturum +
-     * "filemanager" yetkisi denetimi — tahtanın tüm dosya sistemine root erişim demektir.
+     * "filemanager" yetkisi denetimi — cihazın tüm dosya sistemine root erişim demektir.
      */
     public function filemanager(): array
     {

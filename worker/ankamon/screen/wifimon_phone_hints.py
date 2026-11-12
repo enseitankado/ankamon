@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Wi-Fi Monitör: tahtanın duyduğu verici (Wi-Fi ağı, Wi-Fi arayan ya da Wi-Fi'ye bağlı cihaz) telefon olabilir mi? (bkz. wifi.py)
+"""Wi-Fi Monitör: cihazın duyduğu verici (Wi-Fi ağı, Wi-Fi arayan ya da Wi-Fi'ye bağlı cihaz) telefon olabilir mi? (bkz. wifi.py)
 
 Kesin tanıma yoktur; kanıtlar satıra `hints` (kısa Türkçe gerekçeler) ve `phone` ("yes" güçlü kanıt, "maybe" zayıf, "" yok)
 olarak eklenir. Kullanılan işaretler:
@@ -34,7 +34,7 @@ olarak eklenir. Kullanılan işaretler:
   sabit adresin üreticisi telefon üreticisiyse güçlü kanıt.
 - Wi-Fi'ye bağlı cihaz: bir erişim noktasına bağlı, veri gönderen cihaz. Rastgele adres (telefonların ağ başına "özel adresi")
   zayıf kanıt; telefon üreticisi güçlü kanıt; bağlandığı ağ adı telefon paylaşım noktasına benziyorsa (öğrencinin
-  arkadaşının hotspot'u) zayıf kanıt. Tahta, yazıcı gibi kalıcı adresli altyapı cihazları kanıtsız kalır (sabit işaretlenir).
+  arkadaşının hotspot'u) zayıf kanıt. Cihaz, yazıcı gibi kalıcı adresli altyapı cihazları kanıtsız kalır (sabit işaretlenir).
 """
 
 from __future__ import annotations

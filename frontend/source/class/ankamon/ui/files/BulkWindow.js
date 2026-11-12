@@ -27,7 +27,7 @@
 
 /**
  * "Dosyaları dağıt/topla" (sağ menü → Dosyalar): iki sekmeli pencere — "Dağıt" (bu bilgisayardan
- * tahtalara) ve "Topla" (tahtalardan bu bilgisayara). Her sekme kendi tahta/kullanıcı/konum seçimini ve
+ * cihazlara) ve "Topla" (cihazlardan bu bilgisayara). Her sekme kendi cihaz/kullanıcı/konum seçimini ve
  * işini taşır (bkz. ui.files.BulkPanel); iki sekmede aynı anda birer iş yürüyebilir.
  */
 qx.Class.define("ankamon.ui.files.BulkWindow", {
@@ -35,7 +35,7 @@ qx.Class.define("ankamon.ui.files.BulkWindow", {
 
   statics: {
     /**
-     * @param boards {Array} sağ menünün uygulandığı tahtalar (çoklu seçim) — iki sekmede de işaretli gelir
+     * @param boards {Array} sağ menünün uygulandığı cihazlar (çoklu seçim) — iki sekmede de işaretli gelir
      * @param user {Map} oturum sahibi
      */
     async open(boards, user) {
@@ -46,7 +46,7 @@ qx.Class.define("ankamon.ui.files.BulkWindow", {
         const online = res.boards.filter(b => b.online).map(b => ({ id: b.id, name: name(b) }));
         all = online.concat(all.filter(b => !online.some(o => o.id === b.id)));
       } catch (e) {
-        // Tahta listesi okunamadı (ör. "boards" yetkisi yok): yalnız seçili tahtalar sunulur.
+        // Cihaz listesi okunamadı (ör. "boards" yetkisi yok): yalnız seçili cihazlar sunulur.
       }
       all.sort((a, b) => a.name.localeCompare(b.name, "tr", { numeric: true }));
       const win = new ankamon.ui.files.BulkWindow(all, boards.filter(b => b.online).map(b => b.id), user);

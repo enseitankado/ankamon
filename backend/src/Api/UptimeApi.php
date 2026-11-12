@@ -34,12 +34,12 @@ use Ankamon\Core\Db;
 use Ankamon\Core\Request;
 
 /**
- * Tahtaların açık olduğu aralıklar (Oturumlar > Kullanıcılar zaman çizelgesi; aralıkların tümleyeni
+ * Cihazların açık olduğu aralıklar (Oturumlar > Kullanıcılar zaman çizelgesi; aralıkların tümleyeni
  * "kapalı" gölgesi olarak çizilir). Veri worker'ın loglardan önceden hesapladığı board_uptime
  * tablosundan gelir (bkz. db/migrations/014_board_uptime.sql) — istek başına log taranmaz.
  *
  * Yanıt: {"boards":[{"board_id", "host", "since", "up":[[başlangıç, bitiş|null], …]}], "computed_until"}
- * (epoch saniye, artan sırada; bitiş null = tahta hâlâ açık). board_id silinmiş tahtada null olabilir.
+ * (epoch saniye, artan sırada; bitiş null = cihaz hâlâ açık). board_id silinmiş cihazda null olabilir.
  */
 final class UptimeApi
 {
@@ -65,7 +65,7 @@ final class UptimeApi
         );
 
         // since: o host hakkında bilginin başladığı an (tablodaki en erken aralık) — öncesi "bilinmiyor",
-        // istemci onu kapalı diye taramaz. Aralıkta hiç açık olmamış ama daha önceden bilinen tahtalar da
+        // istemci onu kapalı diye taramaz. Aralıkta hiç açık olmamış ama daha önceden bilinen cihazlar da
         // (up boş = tüm aralık boyunca kapalı) listelenir.
         $boards = [];
         foreach (Db::all(

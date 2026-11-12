@@ -23,15 +23,15 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtanın kalıcı kimliğini (kablolu MAC) ve güncel bilgisayar adını SSH ile okur.
+"""Cihazın kalıcı kimliğini (kablolu MAC) ve güncel bilgisayar adını SSH ile okur.
 
 Bilgisayar adı değişebilir: kurulumda "etap", imaj hazırlığında "etap-image", TiHA'nın dinamik adıyla
-"etap-<MAC son 6 hane>". Tahta kuyruğunda bekleyen eski loglar da eski adla gelir. Bu yüzden logdan açılan
+"etap-<MAC son 6 hane>". Cihaz kuyruğunda bekleyen eski loglar da eski adla gelir. Bu yüzden logdan açılan
 her kayıt burada MAC'e bağlanır; aynı MAC'li bir kayıt zaten varsa ikisi birleştirilir. Takma ad, konum
-ve notlar MAC'e bağlı kayıtta kalır, bilgisayar adı ve IP tahtanın o anki değerleriyle güncellenir.
+ve notlar MAC'e bağlı kayıtta kalır, bilgisayar adı ve IP cihazın o anki değerleriyle güncellenir.
 
 Aynı SSH turunda donanım bilgisi de (disk/RAM/BIOS/çekirdek/anakart) bir kez toplanır — bkz.
-executor.hwfacts: tahtalar grid'indeki sütunları besler, "Bilgi kartı" bu ilk kaydı önbellek olarak kullanır.
+executor.hwfacts: cihazlar grid'indeki sütunları besler, "Bilgi kartı" bu ilk kaydı önbellek olarak kullanır.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ from ..executor.jobs import _board_access
 
 log = logging.getLogger(__name__)
 
-# Başarısız okumadan sonra aynı tahta için yeniden deneme aralığı (saniye).
+# Başarısız okumadan sonra aynı cihaz için yeniden deneme aralığı (saniye).
 RETRY_SECONDS = 1800
 
 # Önce kablolu fiziksel arayüz (TiHA'nın dinamik adı da bunun MAC'inden üretilir), yoksa varsayılan rota.
@@ -109,8 +109,8 @@ def _assign(conn, board_id: int, mac: str, hostname: str | None, facts: dict) ->
             (owner["id"], board_id, owner["id"]))
         conn.execute("DELETE FROM boards WHERE id = %s", (board_id,))
         hwfacts.store(conn, owner["id"], facts, now_ts)
-    log.info("tahta #%s, aynı MAC'li #%s ile birleştirildi (%s, %s)", board_id, owner["id"], mac, hostname)
-    activity.record(conn, f"Tahta kaydı birleştirildi: {dup['hostname']} → {hostname or dup['hostname']} ({mac})")
+    log.info("cihaz #%s, aynı MAC'li #%s ile birleştirildi (%s, %s)", board_id, owner["id"], mac, hostname)
+    activity.record(conn, f"Cihaz kaydı birleştirildi: {dup['hostname']} → {hostname or dup['hostname']} ({mac})")
 
 
 def run(conn) -> None:
@@ -133,7 +133,7 @@ def run(conn) -> None:
             conn.execute(
                 "UPDATE boards SET facts = facts || jsonb_build_object('identity_failed_at', %s::bigint) WHERE id = %s",
                 (int(time.time()), board["id"]))
-            log.warning("tahta #%s (%s) MAC okunamadı: %s", board["id"], board["ip"], res.get("output", "")[:200])
+            log.warning("cihaz #%s (%s) MAC okunamadı: %s", board["id"], board["ip"], res.get("output", "")[:200])
             continue
         facts = hwfacts.parse(res.get("output", ""))
         # Önceki turda başka bir kayıtla birleşmiş olabilir.

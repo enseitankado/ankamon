@@ -35,20 +35,20 @@ from . import diagnose_schedule, board_identity, board_sessions, board_uptime, b
 #
 # board_status, board_sessions VE telegraf_targets ayrıca kendi başlarına, burada listelenenden daha
 # sık çalışır (bkz. __main__.py, STATUS_TICK_SECONDS) — çevrimdışı tespiti, oturum açma/kapama VE bir
-# tahtanın sensör kaydına başlaması TICK_SECONDS'ı beklemesin diye. Listede de kalmalarının sebebi:
+# cihazın sensör kaydına başlaması TICK_SECONDS'ı beklemesin diye. Listede de kalmalarının sebebi:
 # her TICK_SECONDS turunda diğer görevlerle aynı sırada en az bir kez daha çalışsınlar (board_identity
 # 'nin o turda ssh_ok'u güncel bulması garanti olsun; diğerlerinin de her ihtimale karşı aynı turda
 # tekrar tetiklenmesi zararsızdır).
-# board_uptime: tahtaların açık aralıklarını loglardan artımlı çıkarır (Oturumlar zaman çizelgesindeki
+# board_uptime: cihazların açık aralıklarını loglardan artımlı çıkarır (Oturumlar zaman çizelgesindeki
 # kapalı saat gölgeleri için; dakikalık doğruluk yeter, hızlı döngüde değil).
-# anomaly: anomali kuralları (Tahtalar ▸ Anomaliler) — board_uptime ve session_end'in ardından (onların
+# anomaly: anomali kuralları (Cihazlar ▸ Anomaliler) — board_uptime ve session_end'in ardından (onların
 # güncellediği aralıklar/oturumlar üzerinden hesaplar; bkz. ankamon/anomaly).
 # diagnose_schedule: haftalık otomatik sorun tespiti — kaynaklar müsaitken görev kuyruğa yazar (bkz. o dosya).
-# session_end: tahtası yeniden erişilebilir olan "tahta çevrimdışı oldu" kapanışlarını tahtanın açılış günlüğüne
+# session_end: cihazı yeniden erişilebilir olan "cihaz çevrimdışı oldu" kapanışlarını cihazın açılış günlüğüne
 # bakıp netleştirir (düzenli kapatma / ETAP otomatik kapanma / elektrik kesintisi …; bkz. o dosya).
 # session_activity: Oturumlar ▸ Hareketler verisi (oturumlardan sonra); ntfy_notify: Anomaliler ▸ Bildirimler (anomaly'den sonra).
 # session_league: Oturumlar ▸ Şampiyonlar Ligi — oturumların gün parçaları (session_end kapanışları netleştirdikten sonra).
-# break_league: Oturumlar ▸ Teneffüs Ligi — ders aralarında açık kalan tahtalar (board_uptime ve oturumlardan sonra).
+# break_league: Oturumlar ▸ Teneffüs Ligi — ders aralarında açık kalan cihazlar (board_uptime ve oturumlardan sonra).
 # net_device_logs: Ağ ▸ "Son log" sütunu (cihaz IP'sinden son log; logs tablosu arayüz sorgusunda taranmasın diye).
 TASKS = [boards_from_logs, board_status, board_sessions, board_identity, telegraf_targets, board_uptime, session_end,
          anomaly, diagnose_schedule, session_activity, ntfy_notify, session_league, break_league, net_device_logs]

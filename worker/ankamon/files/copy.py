@@ -23,9 +23,9 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtadan tahtaya (ya da aynı tahtada) dosya/dizin kopyalama, ilerlemeli.
+"""Cihazdan cihaza (ya da aynı cihazda) dosya/dizin kopyalama, ilerlemeli.
 
-Kaynak tahtada `tar -c` ile seçilen öğeler akıtılır, hedef tahtada `tar -x` ile açılır; baytlar bu
+Kaynak cihazda `tar -c` ile seçilen öğeler akıtılır, hedef cihazda `tar -x` ile açılır; baytlar bu
 süreçten geçer (iki SSH borusu arasında), sayılarak ilerleme hesaplanır. Toplam önceden kaynakta
 `du -sb` ile ölçülür. Arşiv akışı başlık/dolgu içerdiğinden sayaç toplamı biraz aşabilir; iş bitene
 dek ilerleme %99'da tutulur.
@@ -181,6 +181,6 @@ async def _relay(job: dict, src: dict, dst: dict) -> None:
 
 def _fail(side: str, rc: int, err: str) -> RemoteError:
     if rc == 255:
-        return RemoteError(f"{side} tahtaya SSH ile ulaşılamadı.")
+        return RemoteError(f"{side} cihaza SSH ile ulaşılamadı.")
     lines = [line for line in err.strip().splitlines() if line.strip()]
     return RemoteError(f"{side}: " + (lines[-1][:250] if lines else f"çıkış {rc}"))

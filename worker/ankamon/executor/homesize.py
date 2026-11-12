@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-"""Yedekle/Geri al penceresi: tahtadaki hesapların ev dizini boyutu (MB, du). Önbelleksiz: yedek kararı güncel boyutla verilir."""
+"""Yedekle/Geri al penceresi: cihazdaki hesapların ev dizini boyutu (MB, du). Önbelleksiz: yedek kararı güncel boyutla verilir."""
 
 from __future__ import annotations
 

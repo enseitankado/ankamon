@@ -26,7 +26,7 @@
 """Cihaz türü ve model tahmini.
 
 Kanıtlar, güvenilirlik sırasıyla:
-  1. Sunucunun kendisi / Ankamon'da kayıtlı tahta (MAC eşleşmesi) / ağ geçidi IP'si
+  1. Sunucunun kendisi / Ankamon'da kayıtlı cihaz (MAC eşleşmesi) / ağ geçidi IP'si
   2. nmap servis taramasının cihaz türü (service devicetype, osclass type) ve açık portlar
   3. MAC üreticisi (Wireshark manuf) — tek başına çoğu zaman yeterli (yazıcı, kamera, ağ cihazı…)
   4. Rastgele (yerel yönetimli) MAC → telefon/tablet (Android/iOS "özel Wi-Fi adresi")
@@ -68,7 +68,7 @@ _VENDOR_RULES: list[tuple[tuple[str, ...], str]] = [
     (("samsung", "xiaomi", "oppo", "vivo mobile", "oneplus", "realme", "honor device", "motorola mobility",
       "huawei device", "nokia", "zte", "tecno", "infinix", "general mobile", "google"), PHONE),
     # MEB okullarındaki ETAP akıllı tahtaların ana kartı Vestel (00:09:df…) — Ankamon'a henüz
-    # kaydolmamış (log göndermeyen) tahtalar da böyle tanınır.
+    # kaydolmamış (log göndermeyen) cihazlar da böyle tanınır.
     (("vestel",), BOARD),
     (("arcelik", "arçelik", "lg electronics", "sony", "tcl", "hisense", "philips", "roku",
       "amazon technologies", "chromecast"), TV),
@@ -92,7 +92,7 @@ _NMAP_TYPES = {
     "terminal": PC, "power-device": IOT, "voip phone": "IP telefon", "voip adapter": "IP telefon",
 }
 
-# 9100 tek başına yazıcı kanıtı değildir: tahtalardaki node_exporter (sensör) de 9100'dedir ve nmap
+# 9100 tek başına yazıcı kanıtı değildir: cihazlardaki node_exporter (sensör) de 9100'dedir ve nmap
 # onu "jetdirect" sanar — SSH'ı olmayan cihazda 9100 yazıcı sayılır.
 _PRINTER_PORTS = {515, 631}
 _OS_TYPES_TRUSTED = {"printer", "print server", "webcam", "phone", "pda", "media device", "game console",
@@ -110,7 +110,7 @@ def guess_type(*, vendor: str, mac_random: bool, is_board: bool, is_gateway: boo
     if is_gateway:
         return ROUTER
     low = vendor.lower()
-    if "vestel" in low:  # bkz. _VENDOR_RULES — porttan önce: tahtanın 9100'ü yazıcı sanılmasın
+    if "vestel" in low:  # bkz. _VENDOR_RULES — porttan önce: cihazın 9100'ü yazıcı sanılmasın
         return BOARD
     ports = {p["port"] for p in (scan or {}).get("ports", [])}
     # nmap'in kendi cihaz türü (servis bazlı daha kesin, sonra OS sınıfı) — "general purpose" türsüzdür.
@@ -140,7 +140,7 @@ def guess_type(*, vendor: str, mac_random: bool, is_board: bool, is_gateway: boo
 
 
 def guess_model(scan: dict | None, board_model: str = "") -> str:
-    """Tahtada Ankamon'un donanım bilgisi; yoksa nmap'in en belirgin ürün adı ya da OS eşleşmesi."""
+    """Cihazda Ankamon'un donanım bilgisi; yoksa nmap'in en belirgin ürün adı ya da OS eşleşmesi."""
     if board_model:
         return board_model
     if not scan:

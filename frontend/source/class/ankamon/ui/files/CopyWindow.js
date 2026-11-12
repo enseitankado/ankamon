@@ -27,11 +27,11 @@
 
 /**
  * "Bilgisayarlar arasında kopyala" (sağ menü → Dosyalar): iki panelli dosya gezgini. Sol panel sağ tıklanan
- * tahtanın /home'u (kullanıcıların dizinleri), sağ panel hedef tahta + dizin. Soldaki seçili öğeler
- * "Kopyala →" ile sağdaki dizine (dolayısıyla hedef tahtaya) kopyalanır; ters yön de var. Her iki
+ * cihazın /home'u (kullanıcıların dizinleri), sağ panel hedef cihaz + dizin. Soldaki seçili öğeler
+ * "Kopyala →" ile sağdaki dizine (dolayısıyla hedef cihaza) kopyalanır; ters yön de var. Her iki
  * panelde silme, ad değiştirme, klasör oluşturma; sahip/grup/izin/boyut sütunları (bkz. ui.files.Pane).
  *
- * Kopyalama sunucuda sürer (worker/ankamon/files/copy.py): tahtadan tahtaya tar akışı, ilerleme
+ * Kopyalama sunucuda sürer (worker/ankamon/files/copy.py): cihazdan cihaza tar akışı, ilerleme
  * yarım saniyede bir okunur. Hedef dizin bir kullanıcıya aitse kopyalananlar o kullanıcıya verilir;
  * root'a aitse (ör. /home) özgün sahiplik korunur. Pencere kapatılırsa kopyalama sunucuda sürer.
  */
@@ -40,7 +40,7 @@ qx.Class.define("ankamon.ui.files.CopyWindow", {
 
   statics: {
     /**
-     * @param board {Map} sağ tıklanan tahta {id, label|hostname|ip}
+     * @param board {Map} sağ tıklanan cihaz {id, label|hostname|ip}
      * @param user {Map?} oturum sahibi (tablo sütun sırası/gizleme tercihleri için)
      */
     async open(board, user) {
@@ -50,7 +50,7 @@ qx.Class.define("ankamon.ui.files.CopyWindow", {
         const res = await ankamon.io.Api.get("/boards");
         boards = res.boards.filter(b => b.online || b.id === board.id).map(b => ({ id: b.id, name: name(b) }));
       } catch (e) {
-        // Tahta listesi okunamadı (ör. "boards" yetkisi yok): yalnız bu tahta arasında kopyalanır.
+        // Cihaz listesi okunamadı (ör. "boards" yetkisi yok): yalnız bu cihaz arasında kopyalanır.
       }
       const win = new ankamon.ui.files.CopyWindow(boards, board.id, user);
       qx.core.Init.getApplication().getRoot().add(win);
@@ -68,7 +68,7 @@ qx.Class.define("ankamon.ui.files.CopyWindow", {
       width: Math.min(1500, bounds.width - 30),
       height: Math.min(820, bounds.height - 30)
     });
-    // Hedef: kaynaktan farklı ilk tahta (yoksa aynı tahta — tahta içinde dizinler arası kopyalama).
+    // Hedef: kaynaktan farklı ilk cihaz (yoksa aynı cihaz — cihaz içinde dizinler arası kopyalama).
     const other = boards.find(b => b.id !== sourceId) || boards[0];
     this.__left = new ankamon.ui.files.Pane("Kaynak", boards, sourceId, "/home", user);
     this.__right = new ankamon.ui.files.Pane("Hedef", boards, other.id, "/home", user);
@@ -82,7 +82,7 @@ qx.Class.define("ankamon.ui.files.CopyWindow", {
     middle.add(this.__toLeft);
 
     // İki panel her zaman eşit genişlikte: HBox flex yalnız ARTAN alanı paylaştırır, tercih edilen genişlik
-    // ise içerikten (durum satırındaki yol, tahta adı) gelir ve her dizin yüklenişinde değişir — paneller
+    // ise içerikten (durum satırındaki yol, cihaz adı) gelir ve her dizin yüklenişinde değişir — paneller
     // eşit olmuyor, ayırma noktası kayıyordu. Aynı sabit tercih genişliğiyle kalan alan yarı yarıya bölünür.
     [this.__left, this.__right].forEach(p => p.set({ width: 300, minWidth: 300 }));
     const panes = new qx.ui.container.Composite(new qx.ui.layout.HBox(10));

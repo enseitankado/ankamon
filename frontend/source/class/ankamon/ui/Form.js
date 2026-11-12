@@ -78,7 +78,7 @@ qx.Class.define("ankamon.ui.Form", {
 
     /**
      * Metin alanlarının ipucu (placeholder) yazısı temanın ipucu renginden daha açık/soluk (kullanıcı isteği 2026-11-10,
-     * Tahta ekle: örnek değerler girilmiş değer sanılmasın). Renk temanın "text-placeholder"ının yarı saydamı — açık
+     * Cihaz ekle: örnek değerler girilmiş değer sanılmasın). Renk temanın "text-placeholder"ının yarı saydamı — açık
      * temada açılır, koyu temada söner; tema değişince pencere yeniden açıldığında yeni renk. Firefox'un ::placeholder
      * opacity'si (0.54) sıfırlanır ki iki tarayıcıda aynı görünsün.
      */

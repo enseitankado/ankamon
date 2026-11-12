@@ -29,18 +29,18 @@
  * Görev yöneticisi sekmelerinin tabanı: tablo kurma (gizli kimlik sütunu + sütun sırası/gizleme tercihleri
  * kullanıcı başına sunucuda — bkz. page.Base.setupColumnLayout), saniyelik yenilemede seçimi ve kaydırmayı
  * koruyan satır yükleme, satır sağ menüsü. Alt sınıflar update() ile tazelenir; verilerini pencerenin
- * "Bilgisayar" süzgecine uyan tahta bağlarından (win.getVisibleLinks(), her birinin getModel()'i) alır.
+ * "Bilgisayar" süzgecine uyan cihaz bağlarından (win.getVisibleLinks(), her birinin getModel()'i) alır.
  *
- * Çok tahta: tablonun SONUNA "Bilgisayar" sütunu eklenir (satırın son hücresi = link.getDisplay()); satır
- * kimlikleri tahtayla birleşiktir — _rowId(link, kimlik) → "<tahta id>:<kimlik>", _parseId ile geri ayrılır.
- * Tek tahtalı pencerede de aynı biçim kullanılır, yalnız sütun gizlidir ve sütun menüsünde yoktur.
+ * Çok cihaz: tablonun SONUNA "Bilgisayar" sütunu eklenir (satırın son hücresi = link.getDisplay()); satır
+ * kimlikleri cihazla birleşiktir — _rowId(link, kimlik) → "<cihaz id>:<kimlik>", _parseId ile geri ayrılır.
+ * Tek cihazlı pencerede de aynı biçim kullanılır, yalnız sütun gizlidir ve sütun menüsünde yoktur.
  */
 qx.Class.define("ankamon.ui.taskmgr.Tab", {
   extend: qx.ui.tabview.Page,
   type: "abstract",
 
   statics: {
-    /** Çok tahtalı pencerede bütün tablolarda "Bilgisayar" sütunu (modelde son sütun — bkz. _table). */
+    /** Çok cihazlı pencerede bütün tablolarda "Bilgisayar" sütunu (modelde son sütun — bkz. _table). */
     BOARD_COLUMN: { id: "board", label: "Bilgisayar", width: 180 }
   },
 
@@ -67,19 +67,19 @@ qx.Class.define("ankamon.ui.taskmgr.Tab", {
     /** "Bilgisayar" süzgeci değişti (pencere ardından görünen sekmeyi update() eder). */
     onBoardFilter() {},
 
-    /** Tahtayla birleşik satır kimliği: "<tahta id>:<kimlik>". */
+    /** Cihazla birleşik satır kimliği: "<cihaz id>:<kimlik>". */
     _rowId(link, id) {
       return link.getId() + ":" + id;
     },
 
-    /** _rowId'nin tersi: {link, id} (id metin) ya da null (grup satırı gibi tahtasız kimlik). */
+    /** _rowId'nin tersi: {link, id} (id metin) ya da null (grup satırı gibi cihazsız kimlik). */
     _parseId(rowId) {
       const m = /^(\d+):(.*)$/.exec(String(rowId ?? ""));
       const link = m && this._win.getLink(m[1]);
       return link ? { link, id: m[2] } : null;
     },
 
-    /** Süzgece uyan ve verisi (modelde `part`, ör. "snap", "services") gelmiş tahta bağları. */
+    /** Süzgece uyan ve verisi (modelde `part`, ör. "snap", "services") gelmiş cihaz bağları. */
     _links(part = "snap") {
       return this._win.getVisibleLinks().filter(l => l.getModel()[part]);
     },
@@ -109,15 +109,15 @@ qx.Class.define("ankamon.ui.taskmgr.Tab", {
       // Varsayılan: TÜM sütunlar görünür (kullanıcı isteği). Kullanıcının gizlediği sütunlar ve sütun sırası
       // (başlık sürükleme) kullanıcı başına sunucuda saklanır, pencere her açıldığında uygulanır
       // (users.ui_prefs["taskmgr.<sekme>.columns.hidden/.order"], bkz. page.Base.setupColumnLayout).
-      // "Bilgisayar" (son sütun): çok tahtada kullanıcı sütunu, varsayılan yeri ilk sütunun (Ad) hemen yanı
-      // (kayıtlı sütun sırası varsa o geçerli; kayıtta yoksa sona eklenir). Tek tahtada gizli iç sütun (sütun
+      // "Bilgisayar" (son sütun): çok cihazda kullanıcı sütunu, varsayılan yeri ilk sütunun (Ad) hemen yanı
+      // (kayıtlı sütun sırası varsa o geçerli; kayıtta yoksa sona eklenir). Tek cihazda gizli iç sütun (sütun
       // menüsünde yok, tercihlere yazılmaz).
       const boardIndex = columns.length + 1;
       behavior.setWidth(boardIndex, boardCol.width);
       if (this._win.isMulti()) {
         // Sıra, setupColumnLayout'tan ÖNCE: henüz dinleyici yok, bu varsayılan sıra tercihlere yazılmaz.
         cm.setColumnsOrder([0, 1, boardIndex].concat(columns.slice(1).map((c, i) => i + 2)));
-        // Kayıtlı sıra (tek tahtalı pencerede sürüklenmiş) "Bilgisayar"ı bilmiyorsa sona değil, kayıttaki ilk
+        // Kayıtlı sıra (tek cihazlı pencerede sürüklenmiş) "Bilgisayar"ı bilmiyorsa sona değil, kayıttaki ilk
         // sütunun yanına girsin: kayıt yalnız bellekte, kurulum süresince genişletilir (sunucuya yazılmaz).
         const prefs = this._win.getUser().ui_prefs || {};
         const orderKey = `${key}.columns.order`;
@@ -176,8 +176,8 @@ qx.Class.define("ankamon.ui.taskmgr.Tab", {
     },
 
     /**
-     * Satıra sağ tıklayınca `build(id)` menüsü (null → menü yok); tıklanan satır seçilir. Çok tahtada satırın
-     * tahtası için "Yalnız bu bilgisayarı göster" / "Bütün bilgisayarları göster" (Bilgisayar süzgeci) eklenir.
+     * Satıra sağ tıklayınca `build(id)` menüsü (null → menü yok); tıklanan satır seçilir. Çok cihazda satırın
+     * cihazı için "Yalnız bu bilgisayarı göster" / "Bütün bilgisayarları göster" (Bilgisayar süzgeci) eklenir.
      */
     _rowMenu(table, build) {
       table.addListener("cellContextmenu", e => {

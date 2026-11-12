@@ -15,7 +15,7 @@ use Ankamon\Core\Request;
  * "Ankamon logs" akışı (arayüzün alt çubuğu). `after` ile yalnız yeni kayıtlar istenir.
  * Kaynağı (source) olan kayıtlar Ankamon'un iç işleyişidir (servis hataları, traceback, SQL, darboğazlar —
  * bkz. worker/ankamon/logwatch): Sistem sayfası gibi yalnız yöneticiye. Diğer kullanıcılar yalnız kaynaksız
- * genel olayları (yeni tahta, ağ değişiklikleri …) görür.
+ * genel olayları (yeni cihaz, ağ değişiklikleri …) görür.
  */
 final class ActivityApi
 {

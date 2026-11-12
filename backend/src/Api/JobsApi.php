@@ -37,7 +37,7 @@ use Ankamon\Core\Auth;
 use Ankamon\Core\Db;
 use Ankamon\Core\Request;
 
-/** Görev kuyruğu: API yalnız kuyruğa yazar; tahtalara bağlanan worker'dır. */
+/** Görev kuyruğu: API yalnız kuyruğa yazar; cihazlara bağlanan worker'dır. */
 final class JobsApi
 {
     private const COLUMNS = "j.id, j.type, j.title, j.status, j.summary, u.username AS created_by,
@@ -87,7 +87,7 @@ final class JobsApi
     }
 
     /**
-     * Canlı çıktı penceresi için artımlı okuma: görev durumu + tahta başına durum + `after`'dan sonraki
+     * Canlı çıktı penceresi için artımlı okuma: görev durumu + cihaz başına durum + `after`'dan sonraki
      * olaylar (bağlanılıyor/bağlandı/çıktı satırları/çıkış kodu — bkz. worker/ankamon/runner).
      * Pencere bunu kısa aralıkla çağırır; yalnız yeni olaylar döner.
      */
@@ -126,18 +126,18 @@ final class JobsApi
             'command' => $this->commandJob($request),
             'wol' => ['power', 'Uyandır (Wake-on-LAN)', [], true],
             // "screen" yetkisiyle: Ekranlar sekmesindeki önizlemelerin sağ menüsünden tetiklenir
-            // (bkz. worker/ankamon/executor/whoami.py) — tahtada o an oturum açmış GERÇEK kullanıcıyı
+            // (bkz. worker/ankamon/executor/whoami.py) — cihazda o an oturum açmış GERÇEK kullanıcıyı
             // SSH ile anlık sorgular (board_sessions'ın log tabanlı, bazen bayat kaydına güvenmez).
             'whoami' => ['screen', 'Oturumları sorgula', [], true],
-            // "Bilgi kartı" (Tahtalar grid'i VE Ekranlar sekmesi sağ menüsü — bkz. frontend
+            // "Bilgi kartı" (Cihazlar grid'i VE Ekranlar sekmesi sağ menüsü — bkz. frontend
             // ui/BoardOps.js infoCard): donanım bilgisini (disk/RAM/BIOS/çekirdek/anakart) SSH ile
             // canlı toplar, 60dk önbellek (bkz. worker/ankamon/executor/hwfacts.py). Her iki girişten
             // de erişilebildiğinden yetki denetimi aşağıda özel: 'boards' YA DA 'screen' yeterli.
             'facts' => ['boards', 'Donanım bilgisi', [], true],
             // Sağ menü "Oturum aç" (bkz. frontend ui/BoardOps.js loginMenu, worker executor/accounts.py):
-            // hesap listesi (24 sa önbellek, çoklu seçimde ilk tahtadan) ve seçilen hesapla oturum açma.
+            // hesap listesi (24 sa önbellek, çoklu seçimde ilk cihazdan) ve seçilen hesapla oturum açma.
             // Hesap listesi hem "Oturum aç" hem "Yedekle" alt menüsünü besler: yetki aşağıda özel.
-            'accounts' => ['boards.login', 'Tahtadaki hesaplar', [], true],
+            'accounts' => ['boards.login', 'Cihazdaki hesaplar', [], true],
             // "Sorun tespiti" sayfası (bkz. frontend page/Diagnose.js, worker executor/diagnose.py).
             'diagnose' => ['diagnose', 'Sorun tespiti', [], true],
             'login' => $this->loginJob($request),
@@ -151,7 +151,7 @@ final class JobsApi
             'wake' => ['screen', 'Ekranı uyandır', [], true],
             // Sağ menü Ekran ▸ "Uyut": ekranı DPMS ile kapatır (dokunulunca açılır) — Uyandır'ın eşi.
             'sleep' => ['screen', 'Ekranı uyut', [], true],
-            // Sağ menü Ekran ▸ "Kilitle" / "Kilidi aç" (bkz. worker executor/screenlock.py): "Kilidi aç"a dek tahtada
+            // Sağ menü Ekran ▸ "Kilitle" / "Kilidi aç" (bkz. worker executor/screenlock.py): "Kilidi aç"a dek cihazda
             // tam ekran "Kilitli", klavye/fare/dokunmatik yakalanır; yeniden açılışta da sürer.
             'screen_lock' => ['screen.lock', 'Ekranı kilitle', [], true],
             'screen_unlock' => ['screen.lock', 'Ekran kilidini aç', [], true],
@@ -161,10 +161,10 @@ final class JobsApi
             // Aynı pencerenin Geri al sekmesi (bkz. worker executor/home_restore.py): yüklenen yedekten hesap.
             'restore_home' => $this->restoreJob($request),
             // "Ekranımı yansıt" (bkz. docker/rootfs/cast/, worker executor/cast.py): yayın sayfası önce
-            // ekranı MediaMTX'e yollar, sonra seçili tahtalarda oynatıcıyı başlatır / durdurur.
+            // ekranı MediaMTX'e yollar, sonra seçili cihazlarda oynatıcıyı başlatır / durdurur.
             'cast_start' => $this->castJob($request),
             'cast_stop' => ['cast', 'Yansıtmayı durdur', [], true],
-            // Yansıtma penceresindeki "Tahta ses düzeyi" kaydırıcısı: sesli yansıtma sürerken tahta çıkışının
+            // Yansıtma penceresindeki "Cihaz ses düzeyi" kaydırıcısı: sesli yansıtma sürerken cihaz çıkışının
             // düzeyi (asıl düzey cast_start'ta kaydedildi, cast_stop geri yükler — bkz. executor/cast.py).
             'cast_volume' => $this->castVolumeJob($request),
             // Sağ menü Ekran ▸ Ekran görüntüsü al (bkz. worker executor/screenshot.py).
@@ -185,9 +185,9 @@ final class JobsApi
             // Sağ menü "Web Filtre" (bkz. worker executor/eta_kisit_webfilter.py, frontend ui/boards/EtaKisitWebFilter.js).
             'webfilter_status' => ['boards.webfilter', 'Web Filtre durumu', [], true],
             'webfilter_apply' => $this->webFilterJob($request),
-            // Anomaliler ▸ Bildirimler ▸ Deneme gönder (tahtasız; bkz. worker executor/ntfy.py).
+            // Anomaliler ▸ Bildirimler ▸ Deneme gönder (cihazsız; bkz. worker executor/ntfy.py).
             'ntfy_test' => ['anomalies.notify', 'ntfy deneme bildirimi', [], false],
-            // Anomaliler ▸ Tarama (bkz. worker/ankamon/anomaly/scan.py): seçilen kurallar seçilen tahtalarda anlık.
+            // Anomaliler ▸ Tarama (bkz. worker/ankamon/anomaly/scan.py): seçilen kurallar seçilen cihazlarda anlık.
             'anomaly_scan' => $this->anomalyScanJob($request),
             default => throw ApiError::badRequest('Bilinmeyen görev türü.'),
         };
@@ -205,7 +205,7 @@ final class JobsApi
         } elseif (!Auth::can($user, $feature)) {
             throw ApiError::forbidden();
         }
-        // Parola ayarlama: tahtanın yönetici hesapları (etapadmin, root) ayrı yetki ister — sağ menü penceresi,
+        // Parola ayarlama: cihazın yönetici hesapları (etapadmin, root) ayrı yetki ister — sağ menü penceresi,
         // Komut çalıştır listesi ya da doğrudan API, hangi yoldan gelirse gelsin (bkz. actions/user-password).
         if ($type === 'action' && $params['action'] === 'user-password') {
             $names = preg_split('/[\s,]+/', strtolower((string) $params['values']['KULLANICILAR']), -1, PREG_SPLIT_NO_EMPTY);
@@ -222,25 +222,25 @@ final class JobsApi
         }
 
         $boardIds = array_values(array_unique(array_map('intval', (array) $request->input('board_ids', []))));
-        // Sorun tespiti sayfasının "Şimdi tara"sı tahta seçmez: o an çevrimiçi TÜM tahtalar.
+        // Sorun tespiti sayfasının "Şimdi tara"sı cihaz seçmez: o an çevrimiçi TÜM cihazlar.
         if ($type === 'diagnose' && !$boardIds && $request->input('all_online')) {
             $boardIds = array_map('intval', array_column(
                 Db::all('SELECT id FROM boards WHERE online AND ip IS NOT NULL'), 'id'));
             if (!$boardIds) {
-                throw ApiError::badRequest('Şu an çevrimiçi tahta yok; denetim için tahtaların açık olması gerekir.');
+                throw ApiError::badRequest('Şu an çevrimiçi cihaz yok; denetim için cihazların açık olması gerekir.');
             }
         }
         if ($needsBoards && !$boardIds) {
-            throw ApiError::badRequest('En az bir tahta seçin.');
+            throw ApiError::badRequest('En az bir cihaz seçin.');
         }
         if (in_array($type, ['password_verify', 'password_change'], true) && count($boardIds) !== 1) {
-            throw ApiError::badRequest('Yönetici parolası tahta başına ayrı ayarlanır: tek tahta seçin.');
+            throw ApiError::badRequest('Yönetici parolası cihaz başına ayrı ayarlanır: tek cihaz seçin.');
         }
         if ($type === 'relay_start') {
-            // Kaynak tahta hedef olamaz: kendi ekranını kendine aktarmak anlamsız (görüntü döngüye girer).
+            // Kaynak cihaz hedef olamaz: kendi ekranını kendine aktarmak anlamsız (görüntü döngüye girer).
             $boardIds = array_values(array_diff($boardIds, [$params['source_board_id']]));
             if (!$boardIds) {
-                throw ApiError::badRequest('Kaynak tahtadan başka en az bir hedef tahta seçin.');
+                throw ApiError::badRequest('Kaynak cihazdan başka en az bir hedef cihaz seçin.');
             }
         }
 
@@ -257,7 +257,7 @@ final class JobsApi
             );
             if ($added === 0) {
                 $pdo->rollBack();
-                throw ApiError::badRequest('Seçilen tahtalar bulunamadı.');
+                throw ApiError::badRequest('Seçilen cihazlar bulunamadı.');
             }
         }
         Db::exec("SELECT pg_notify('ankamon_jobs', ?)", [(string) $jobId]);
@@ -269,10 +269,10 @@ final class JobsApi
         return ['id' => $jobId];
     }
 
-    /** "Kullanıcı sil" ile asla silinmeyen tahta hesapları (bkz. actionJob, actions/user-delete/run.sh). */
+    /** "Kullanıcı sil" ile asla silinmeyen cihaz hesapları (bkz. actionJob, actions/user-delete/run.sh). */
     private const UNDELETABLE_USERS = ['etapadmin', 'root'];
 
-    /** Parolası ayrı yetkiyle ("boards.passwords.<hesap>") ayarlanabilen tahta hesapları (bkz. create). */
+    /** Parolası ayrı yetkiyle ("boards.passwords.<hesap>") ayarlanabilen cihaz hesapları (bkz. create). */
     private const ADMIN_ACCOUNTS = ['etapadmin', 'root'];
 
     private function actionJob(Request $request): array
@@ -281,12 +281,12 @@ final class JobsApi
             ?? throw ApiError::badRequest('Bilinmeyen işlem.');
         $values = Actions::values($action, (array) $request->input('values', []));
         if ($action['id'] === 'user-delete') {
-            // Barikat: tahtanın yönetici hesabı (ve root) hiçbir yoldan (sağ menü, Komut çalıştır listesi,
-            // doğrudan API) silinemez — tahtada actions/user-delete/run.sh de aynı listeyi ayrıca reddeder.
+            // Barikat: cihazın yönetici hesabı (ve root) hiçbir yoldan (sağ menü, Komut çalıştır listesi,
+            // doğrudan API) silinemez — cihazda actions/user-delete/run.sh de aynı listeyi ayrıca reddeder.
             $names = preg_split('/[\s,]+/', strtolower((string) ($values['KULLANICILAR'] ?? '')), -1, PREG_SPLIT_NO_EMPTY);
             $blocked = array_values(array_intersect($names, self::UNDELETABLE_USERS));
             if ($blocked) {
-                throw ApiError::badRequest(implode(', ', $blocked) . ' hesabı silinemez (tahta yönetimi için korunur).');
+                throw ApiError::badRequest(implode(', ', $blocked) . ' hesabı silinemez (cihaz yönetimi için korunur).');
             }
         }
         return [$action['feature'], $action['title'], ['action' => $action['id'], 'values' => $values], true];
@@ -328,7 +328,7 @@ final class JobsApi
         return ['shell', mb_strimwidth($title, 0, 80, '…'), $params, true];
     }
 
-    /** Kullanıcı adı tahtada betiğe gömülür: worker'daki accounts.USERNAME_RE ile AYNI kural. */
+    /** Kullanıcı adı cihazda betiğe gömülür: worker'daki accounts.USERNAME_RE ile AYNI kural. */
     private function loginJob(Request $request): array
     {
         $username = (string) $request->input('username', '');
@@ -338,7 +338,7 @@ final class JobsApi
         return ['boards.login', "Oturum aç: $username", ['username' => $username], true];
     }
 
-    /** logout/lock: kullanıcı adı boş (= tahtadaki etkin oturum) ya da loginJob ile AYNI kurala uyan bir ad. */
+    /** logout/lock: kullanıcı adı boş (= cihazdaki etkin oturum) ya da loginJob ile AYNI kurala uyan bir ad. */
     private function sessionJob(Request $request, string $title): array
     {
         $username = (string) $request->input('username', '');
@@ -351,7 +351,7 @@ final class JobsApi
         return ['boards.login', "$title: $username", ['username' => $username], true];
     }
 
-    /** Yayın adı tahtadaki RTSP adresine girer: worker executor/cast.STREAM_RE ve MediaMTX okuma kuralıyla AYNI. */
+    /** Yayın adı cihazdaki RTSP adresine girer: worker executor/cast.STREAM_RE ve MediaMTX okuma kuralıyla AYNI. */
     private function castJob(Request $request): array
     {
         $stream = (string) $request->input('stream', '');
@@ -359,7 +359,7 @@ final class JobsApi
             throw ApiError::badRequest('Geçersiz yayın adı.');
         }
         $audio = (bool) $request->input('audio', false);
-        // Sesli yansıtmada tahta çıkışının geçici düzeyi (0-100); boş/null = tahtanın düzeyine dokunma.
+        // Sesli yansıtmada cihaz çıkışının geçici düzeyi (0-100); boş/null = cihazın düzeyine dokunma.
         $volume = $request->input('volume');
         $volume = $audio && $volume !== null && $volume !== '' ? max(0, min(100, (int) $volume)) : null;
         $title = 'Ekranı yansıt' . ($audio ? ' (sesli' . ($volume !== null ? ", ses %$volume" : '') . ')' : '');
@@ -386,7 +386,7 @@ final class JobsApi
         return ['screen.web', 'Web sitesi aç: ' . mb_strimwidth($url, 0, 80, '…'), ['url' => $url], true];
     }
 
-    /** Alan adları tahtaya gider: worker eta_kisit_webfilter.DOMAIN_RE ile AYNI kural. Verilmeyen liste tahtada korunur. */
+    /** Alan adları cihaza gider: worker eta_kisit_webfilter.DOMAIN_RE ile AYNI kural. Verilmeyen liste cihazda korunur. */
     private function webFilterJob(Request $request): array
     {
         $mode = (string) $request->input('mode', '');
@@ -435,21 +435,21 @@ final class JobsApi
         return ['screen.input', $names[$device] . ($lock ? ' kilitle' : ' kilidini aç'), ['device' => $device, 'lock' => $lock], true];
     }
 
-    /** Ekran aktarımı: görev hedefleri gösterecek tahtalar; yayın adı burada üretilir (MediaMTX okuma/yazma kuralı r-…). */
+    /** Ekran aktarımı: görev hedefleri gösterecek cihazlar; yayın adı burada üretilir (MediaMTX okuma/yazma kuralı r-…). */
     private function relayJob(Request $request): array
     {
         $source = (int) $request->input('source_board_id', 0);
         $board = Db::one("SELECT id, COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name, online FROM boards WHERE id = ?", [$source])
-            ?? throw ApiError::badRequest('Kaynak tahta bulunamadı.');
+            ?? throw ApiError::badRequest('Kaynak cihaz bulunamadı.');
         if (!$board['online']) {
-            throw ApiError::badRequest('Kaynak tahta çevrimdışı.');
+            throw ApiError::badRequest('Kaynak cihaz çevrimdışı.');
         }
         return ['screen.relay', 'Ekranı aktar: ' . $board['name'],
             ['source_board_id' => $source, 'stream' => 'r-' . bin2hex(random_bytes(16))], true];
     }
 
     /**
-     * Tahtaya özel yönetici parolası: doğrulama ya da değiştirme. Parolalar görev parametresinde yalnız görev bitene
+     * Cihaza özel yönetici parolası: doğrulama ya da değiştirme. Parolalar görev parametresinde yalnız görev bitene
      * dek durur (runner siler), denetim kaydına ve görev okumasına girmez.
      */
     private function adminPasswordJob(Request $request, bool $change): array
@@ -490,7 +490,7 @@ final class JobsApi
         return ['anomalies', "Anomali taraması: $labels", ['kinds' => $kinds], true];
     }
 
-    /** Kullanıcı adı tahtada betiğe gömülür: loginJob ve worker accounts.USERNAME_RE ile AYNI kural. */
+    /** Kullanıcı adı cihazda betiğe gömülür: loginJob ve worker accounts.USERNAME_RE ile AYNI kural. */
     private function backupJob(Request $request): array
     {
         $usernames = $request->input('usernames', []);

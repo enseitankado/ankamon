@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Sağ menü "Web sitesi aç": oturumu açık tahtada varsayılan tarayıcıyla siteyi ekranı kaplayacak biçimde açar.
+"""Sağ menü "Web sitesi aç": oturumu açık cihazda varsayılan tarayıcıyla siteyi ekranı kaplayacak biçimde açar.
 
 Tarayıcı oturum kullanıcısı olarak `xdg-open` ile başlatılır (kullanıcının varsayılanı), yeni pencere gelince tarayıcının kendi
 tam ekranına geçilir (XTEST ile F11). Pencere yöneticisinin tam ekranı (EWMH) yetmez: Chrome'da sekme ve adres çubuğu kalır
@@ -72,7 +72,7 @@ print((w.get_wm_class() or ("", "tarayıcı"))[-1])
 
 _SCRIPT = _FIND_DISPLAY + r"""
 URL=__URL__
-case "$U" in ''|lightdm) echo "Bu tahtada açık oturum yok; site açılmadı."; exit 0 ;; esac
+case "$U" in ''|lightdm) echo "Bu cihazda açık oturum yok; site açılmadı."; exit 0 ;; esac
 export DISPLAY="$D"
 [ -n "$A" ] && export XAUTHORITY="$A"
 before=$(python3 -c '

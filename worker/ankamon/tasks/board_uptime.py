@@ -23,10 +23,10 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtaların açık olduğu aralıkları logs tablosundan çıkarıp board_uptime'a işler.
+"""Cihazların açık olduğu aralıkları logs tablosundan çıkarıp board_uptime'a işler.
 
-Bkz. db/migrations/014_board_uptime.sql. Açık bir tahta sürekli log gönderir (ölçülen en uzun olağan
-boşluk ~7 dk); GAP'ten uzun sessizlik tahtanın kapalı olduğu (ya da ağdan düştüğü) anlamına gelir.
+Bkz. db/migrations/014_board_uptime.sql. Açık bir cihaz sürekli log gönderir (ölçülen en uzun olağan
+boşluk ~7 dk); GAP'ten uzun sessizlik cihazın kapalı olduğu (ya da ağdan düştüğü) anlamına gelir.
 Ayrıca yeni bir açılış izi ("Startup finished in … (firmware) …" — systemd'nin sistem açılışı özeti;
 kullanıcı oturumunun "Startup finished in 200ms." satırı firmware içermez) boşluk kısa olsa da
 (hızlı yeniden başlatma) yeni aralık başlatır.

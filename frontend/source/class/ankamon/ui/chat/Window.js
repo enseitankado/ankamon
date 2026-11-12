@@ -26,9 +26,9 @@
  */
 
 /**
- * Sağ menü "Sohbet": tahtadaki kişiyle canlı yazışma penceresi. Tahta başına bir pencere; aynı tahtaya yeniden açılınca var
- * olan öne gelir. Akış WebSocket'tedir (/screen/ws/chat/<id>, bkz. worker screen/chat.py); tahtada pencere açılır, kapanınca
- * tahtadaki pencere de kapanır. Geçmiş sunucuda: Oturumlar ▸ Sohbet geçmişi.
+ * Sağ menü "Sohbet": cihazdaki kişiyle canlı yazışma penceresi. Cihaz başına bir pencere; aynı cihaza yeniden açılınca var
+ * olan öne gelir. Akış WebSocket'tedir (/screen/ws/chat/<id>, bkz. worker screen/chat.py); cihazda pencere açılır, kapanınca
+ * cihazdaki pencere de kapanır. Geçmiş sunucuda: Oturumlar ▸ Sohbet geçmişi.
  */
 qx.Class.define("ankamon.ui.chat.Window", {
   extend: qx.ui.window.Window,
@@ -36,10 +36,10 @@ qx.Class.define("ankamon.ui.chat.Window", {
   statics: {
     __open: new Map(),
 
-    /** Message Bus konusu: açık sohbetler değişti (Ekranlar o tahtaların akışını yüksek çözünürlüğe alır). */
+    /** Message Bus konusu: açık sohbetler değişti (Ekranlar o cihazların akışını yüksek çözünürlüğe alır). */
     CHANGED: "ankamon.chatWindows",
 
-    /** Sohbet penceresi açık tahtaların kimlikleri. */
+    /** Sohbet penceresi açık cihazların kimlikleri. */
     openIds() {
       return [...this.__open.keys()];
     },
@@ -127,7 +127,7 @@ qx.Class.define("ankamon.ui.chat.Window", {
         if (this.__closed || this.isDisposed()) {
           return;
         }
-        this.__setStatus(e.code === 4001 ? "Tahta bulunamadı." : "Sunucuyla bağlantı koptu; yeniden deneniyor…", "app-error");
+        this.__setStatus(e.code === 4001 ? "Cihaz bulunamadı." : "Sunucuyla bağlantı koptu; yeniden deneniyor…", "app-error");
         if (e.code !== 4001) {
           qx.event.Timer.once(() => !this.__closed && !this.isDisposed() && this.__connect(), this, 3000);
         }

@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tek bir tahtada kabuk betiğini SSH ile çalıştırır ve olup biteni satır satır olay olarak bildirir."""
+"""Tek bir cihazda kabuk betiğini SSH ile çalıştırır ve olup biteni satır satır olay olarak bildirir."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ import threading
 import time
 
 _READY = "__ANKAMON_READY__"
-_MAX_LINES = 20000          # tahta başına saklanan en çok çıktı satırı (sonrası sayılır, saklanmaz)
+_MAX_LINES = 20000          # cihaz başına saklanan en çok çıktı satırı (sonrası sayılır, saklanmaz)
 _MAX_LINE = 2000            # tek satırın en çok uzunluğu
 _FLUSH_SECONDS = 0.3        # olaylar en geç bu kadar bekletilip topluca yazılır (veritabanı yükü)
 _FLUSH_LINES = 200
@@ -49,11 +49,11 @@ _SSH_OPTS = [
 
 
 class Events:
-    """Bir tahtanın (ya da görevin genelinin) olaylarını tamponlayıp topluca job_events'e yazar.
-    Bir bağlantı aynı anda yalnız TEK iş parçacığınca kullanılmalıdır: paralel çalışan tahtalar
+    """Bir cihazın (ya da görevin genelinin) olaylarını tamponlayıp topluca job_events'e yazar.
+    Bir bağlantı aynı anda yalnız TEK iş parçacığınca kullanılmalıdır: paralel çalışan cihazlar
     (komut/hazır işlem — bkz. runner/__main__.py) her biri kendi bağlantısıyla kendi Events'ini açar.
     (Önceden tek bağlantı iş parçacıkları arasında eşzamanlı paylaşılıyordu; bu güvenli değildi ve
-    birden fazla tahta seçilince pratikte yalnız biri gerçekten tamamlanıyordu.)"""
+    birden fazla cihaz seçilince pratikte yalnız biri gerçekten tamamlanıyordu.)"""
 
     def __init__(self, conn, job_id: int, board_id: int | None):
         self.job_id = job_id

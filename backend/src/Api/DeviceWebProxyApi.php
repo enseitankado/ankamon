@@ -38,7 +38,7 @@ use Ankamon\Core\Request;
 
 /**
  * Varlıklar ▸ "Web arayüzünü aç" (kullanıcı isteği 2026-11-10): arayüzü kullanan tarayıcı varlıkla AYNI ağdaysa (istemcinin
- * IP'si varlığın ağının CIDR'ında) varlığın adresi doğrudan yeni sekmede açılır; değilse (ör. idari ağdaki yönetici, tahta
+ * IP'si varlığın ağının CIDR'ında) varlığın adresi doğrudan yeni sekmede açılır; değilse (ör. idari ağdaki yönetici, cihaz
  * ağındaki yazıcı) konteynerdeki nginx'in ayrı portundaki ters vekil üzerinden, arayüz içindeki pencerede gösterilir.
  *
  * Vekil (docker/rootfs/nginx-devproxy.conf, port DEVPROXY_PORT, vars. 8444): sayfanın KÖKÜNDEN yayın yapar — cihaz

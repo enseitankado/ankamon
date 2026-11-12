@@ -24,7 +24,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-# Dosya yöneticisi (FileBrowser Quantum): tahtaların (sshfs ile bağlanan, bkz. filemanager-bridge.sh)
+# Dosya yöneticisi (FileBrowser Quantum): cihazların (sshfs ile bağlanan, bkz. filemanager-bridge.sh)
 # kök dizin ağacını sunar. Yalnız 127.0.0.1:8893 dinler; nginx /filemanager/ ile oturum + "filemanager"
 # yetkisiyle vekiller ve sabit bir X-Auth-User başlığı geçirir — kimlik/yetki zaten nginx'te denetlendi,
 # bu uygulamanın kendi oturum açma ekranına hiç gerek yok (proxy kimlik doğrulaması, ilk istekte
@@ -67,7 +67,7 @@ server:
   numImageProcessors: 1
   sources:
     - path: "/run/ankamon/filemanager"
-      name: "tahtalar"
+      name: "cihazlar"
       config:
         private: true
         defaultPermissions:

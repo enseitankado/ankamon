@@ -1,6 +1,6 @@
 {
   "uid": "ankamon-genel",
-  "title": "Tahta genel bakış",
+  "title": "Cihaz genel bakış",
   "tags": [
     "ankamon"
   ],
@@ -17,7 +17,7 @@
     "list": [
       {
         "name": "board",
-        "label": "Tahta",
+        "label": "Cihaz",
         "type": "query",
         "datasource": {
           "type": "grafana-postgresql-datasource",

@@ -27,8 +27,8 @@
 
 board_status (erişilebilirlik yoklaması), board_sessions (oturum açma/kapama) ve telegraf_targets
 (Telegraf'ın tarama listesi) STATUS_TICK_SECONDS'ta bir çalışır — çevrimdışı tespiti, kullanıcı
-oturumları VE bir tahtanın sensör kaydına başlaması "anında" yansısın diye (telegraf_targets ucuzdur:
-içerik değişmediyse dosyaya dokunmaz, bkz. o dosya). Diğer görevler (tahta keşfi, MAC/kimlik) daha
+oturumları VE bir cihazın sensör kaydına başlaması "anında" yansısın diye (telegraf_targets ucuzdur:
+içerik değişmediyse dosyaya dokunmaz, bkz. o dosya). Diğer görevler (cihaz keşfi, MAC/kimlik) daha
 ağır olduğundan TICK_SECONDS'ta bir araya girer. STATUS_TICK_SECONDS, TICK_SECONDS'ı tam bölmek
 zorunda değildir — diğer görevler yalnızca üzerinden TICK_SECONDS kadar zaman geçtiğinde çalışır,
 bir sonraki fırsatta değil.

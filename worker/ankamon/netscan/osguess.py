@@ -26,7 +26,7 @@
 """Ağ envanteri: cihazın işletim sistemi tahmini (servis taramasının sonucundan).
 
 Kanıtlar, güvenilirlik sırasıyla (ilk bulunan kazanır):
-  0. Ankamon'da kayıtlı ETAP tahtası → Pardus (ETAP) (kesin bilgi; nmap yalnız "Linux 4.x" der)
+  0. Ankamon'da kayıtlı ETAP cihazı → Pardus (ETAP) (kesin bilgi; nmap yalnız "Linux 4.x" der)
   1. nmap -O eşleşmesi, doğruluk ≥ %85 (TCP/IP parmak izi)
   2. SMB keşfi (smb-os-discovery betiği; Windows ve Samba sürümünü adıyla verir)
   3. Servis imzaları: servisin bildirdiği ostype (ör. "Windows", "Linux"), Microsoft'a özgü servisler

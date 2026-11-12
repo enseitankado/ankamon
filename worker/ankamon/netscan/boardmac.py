@@ -24,14 +24,14 @@
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
 """Bir cihazın akıllı tahta olup olmadığını MAC adresinden belirleme ve IP → MAC eşlemesi (kullanıcı isteği 2026-11-09:
-tahtalar sunucunun BÜTÜN ağ bağdaştırıcılarından algılanır; tahta olup olmadığına MAC karar verir).
+cihazlar sunucunun BÜTÜN ağ bağdaştırıcılarından algılanır; cihaz olup olmadığına MAC karar verir).
 
-Tahta MAC'i:
-  - ETAP faz veritabanında bir akıllı tahta modeline düşen önek (bkz. etap_phase — "tahta" alanı), ya da
-  - MEB tahtalarına AYRILMIŞ bir OUI'deki MAC (ulusal ETAP envanterinin üretici özeti — etap_vendors.json "ayrik",
+Cihaz MAC'i:
+  - ETAP faz veritabanında bir akıllı tahta modeline düşen önek (bkz. etap_phase — "cihaz" alanı), ya da
+  - MEB cihazlarına AYRILMIŞ bir OUI'deki MAC (ulusal ETAP envanterinin üretici özeti — etap_vendors.json "ayrik",
     scripts/build-etap-vendors.py: Vestel 00:09:DF, Decenta / Shiyuan(MAINBRD) / Cultraview OPS blokları …; kullanıcı
     isteği 2026-11-10). Genel PC üreticisi OUI'lerinde (GIGABYTE OPS vb.) yalnız önek bloğu karar verir.
-Bunlara uymayan bir cihaz, Tahtalar'da "Bu bir akıllı tahtadır" işaretiyle (boards.smart_board, göç 046) tahta sayılır.
+Bunlara uymayan bir cihaz, Cihazlar'da "Bu bir akıllı tahtadır" işaretiyle (boards.smart_board, göç 046) cihaz sayılır.
 
 IP → MAC: sunucunun ARP tablosu (/proc/net/arp — konteyner ana makinenin ağını kullanır; gerçek L2 bilgisi)
 öncelikli, yoksa ağ taramasının son gördüğü (net_devices, 15 dk içinde çevrim içi).
@@ -48,7 +48,7 @@ def is_board_mac(mac: str | None) -> bool:
     if not mac or mac == _ZERO:
         return False
     info = etap_phase.lookup(mac)
-    if info and info.get("tahta"):
+    if info and info.get("cihaz"):
         return True
     return etap_phase.dedicated_oui(mac)
 

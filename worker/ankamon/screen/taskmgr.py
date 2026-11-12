@@ -23,16 +23,16 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Görev yöneticisi: ws://127.0.0.1:8890/screen/ws/taskmgr/<tahta id> (nginx /screen/ws/taskmgr/, yetki "taskmgr").
+"""Görev yöneticisi: ws://127.0.0.1:8890/screen/ws/taskmgr/<cihaz id> (nginx /screen/ws/taskmgr/, yetki "taskmgr").
 
-Tahtalar/Ekranlar sağ menüsündeki "Görev yöneticisi" penceresi (frontend ui/taskmgr/) bu WebSocket'i açar.
-Pencere açık kaldıkça tahtaya TEK bir canlı SSH bağlantısı tutulur ve tahtada taskmgr_agent.py (yalnız standart
+Cihazlar/Ekranlar sağ menüsündeki "Görev yöneticisi" penceresi (frontend ui/taskmgr/) bu WebSocket'i açar.
+Pencere açık kaldıkça cihaza TEK bir canlı SSH bağlantısı tutulur ve cihazda taskmgr_agent.py (yalnız standart
 kitaplık; kurulum yok) çalışır: her `interval` sn bir ölçüm çerçevesi (süreçler, CPU/bellek/disk/ağ/GPU,
 pencereler, oturumlar) basar, komutları (sonlandır, öncelik, hizmet, başlangıç…) stdin'den alır. Pencere
 kapanınca / sayfa yenilenince WebSocket kapanır → SSH süreci öldürülür → ajanın stdin'i kapanır, ajan çıkar.
 
-Komutlar burada süzülür (izinli işlemler) ve değişiklik yapanlar audit_log'a yazılır (kim, hangi tahtada, ne).
-Kapanış kodları: 4001 tahta yok · 4002 SSH ile ulaşılamadı · 4003 SSH girişi reddedildi · 4004 tahtada python3 yok
+Komutlar burada süzülür (izinli işlemler) ve değişiklik yapanlar audit_log'a yazılır (kim, hangi cihazda, ne).
+Kapanış kodları: 4001 cihaz yok · 4002 SSH ile ulaşılamadı · 4003 SSH girişi reddedildi · 4004 cihazda python3 yok
 · 4029 eşzamanlı görev yöneticisi sınırı.
 """
 
@@ -50,8 +50,8 @@ from .. import db
 
 log = logging.getLogger("ankamon.screen.taskmgr")
 
-# Eşzamanlı tahta bağlantısı (bütün kullanıcılar): çoklu seçimle açılan TEK pencere seçili her tahtaya bir
-# bağlantı açar (ör. 30 tahta = 30 SSH); sunucuda bağlantı başına bir ssh süreci (~birkaç MB).
+# Eşzamanlı cihaz bağlantısı (bütün kullanıcılar): çoklu seçimle açılan TEK pencere seçili her cihaza bir
+# bağlantı açar (ör. 30 cihaz = 30 SSH); sunucuda bağlantı başına bir ssh süreci (~birkaç MB).
 MAX_SESSIONS = int(os.environ.get("TASKMGR_MAX_SESSIONS", "64"))
 _AGENT = open(os.path.join(os.path.dirname(__file__), "taskmgr_agent.py"), encoding="utf-8").read()
 _REMOTE = ("command -v python3 >/dev/null 2>&1 || { echo NO_PYTHON >&2; exit 44; }; "
@@ -180,6 +180,6 @@ class TaskMgrSocket(tornado.websocket.WebSocketHandler):
             _sessions -= 1
         proc = self.proc
         if proc and proc.returncode is None:
-            proc.kill()  # SSH kapanınca tahtadaki ajanın stdin'i kapanır, ajan çıkar
+            proc.kill()  # SSH kapanınca cihazdaki ajanın stdin'i kapanır, ajan çıkar
         if self.board:
             log.info("görev yöneticisi kapandı: %s → %s", self.user, self.board["name"])

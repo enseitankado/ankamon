@@ -102,7 +102,7 @@ qx.Class.define("ankamon.ui.ssh.ActivityStore", {
         .sort((a, b) => b.start - a.start || String(b.pid).localeCompare(String(a.pid)));
     },
 
-    /** Hedef IP → tahta/varlık adı. */
+    /** Hedef IP → cihaz/varlık adı. */
     nameOf(target) {
       const ip = String(target || "").split("@").pop();
       return this.__names[ip] || "";

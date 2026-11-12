@@ -7,7 +7,7 @@
 declare(strict_types=1);
 
 // Özellikler arası bağımlılık (alt özellik => üst özellik): alt özellik yalnız üstüyle birlikte
-// kullanılabilir — ör. "shell" Tahtalar sayfasının sağ menüsünden açılır, sayfa ise "boards" ister.
+// kullanılabilir — ör. "shell" Cihazlar sayfasının sağ menüsünden açılır, sayfa ise "boards" ister.
 // UsersApi kaydederken üst özelliği kendiliğinden ekler; Kullanıcılar penceresi alt özellikleri
 // üstünün altında girintili gösterir ve üstü kapalıyken devre dışı bırakır.
 $ozellikBagimliliklari = [

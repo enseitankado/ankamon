@@ -3,7 +3,7 @@
 
 set -u
 
-# ETAP'ın hesap açma adımlarının aynısı — kaynak (tahtada): /usr/share/eta/eta-usb-login/user.py create_user,
+# ETAP'ın hesap açma adımlarının aynısı — kaynak (cihazda): /usr/share/eta/eta-usb-login/user.py create_user,
 # /usr/share/eta/eta-qr-login/service.py gen_username ve user_create_login (expire-uid). Fark: parola özeti
 # useradd -p ile komut satırına yazılmaz (ps'te görünür), hesap açıldıktan sonra stdin'den "chpasswd -e" ile
 # verilir — düz chpasswd ETAP'ın PAM zincirinde reddedilir (bkz. actions/user-password). GECOS'un ",,,,"
@@ -32,7 +32,7 @@ sifirlama_uyarisi() {
     esac
     [ ! -e "$SIFIRLAMA_KAPALI" ] || return 0
     echo
-    echo "⚠ UYARI: Bu tahtada açılışta parola sıfırlama servisi ($SIFIRLAMA_SERVISI) etkin."
+    echo "⚠ UYARI: Bu cihazda açılışta parola sıfırlama servisi ($SIFIRLAMA_SERVISI) etkin."
     echo "  Servis her açılışta etapadmin dışındaki hesapların parolasını rastgele bir değerle ezer: verilen"
     echo "  parola yalnız bir sonraki açılışa kadar geçerlidir, sonrasında giriş EBA-QR, PIN ya da USB ile yapılır."
     hatali=$(journalctl -b -t tiha-boot-wipe --no-pager -q 2>/dev/null | grep -c 'HATA')
@@ -53,7 +53,7 @@ if ! printf '%s' "$U" | grep -Eq '^[a-z_][a-z0-9_-]{0,30}$'; then
 fi
 
 if id -u -- "$U" >/dev/null 2>&1; then
-    echo "– $U: bu tahtada zaten var, dokunulmadı (parola değiştirilmedi)."
+    echo "– $U: bu cihazda zaten var, dokunulmadı (parola değiştirilmedi)."
     sifirlama_uyarisi
     exit 0
 fi
@@ -65,7 +65,7 @@ elif command -v mkpasswd >/dev/null 2>&1; then
 fi
 case "${OZET:-}" in
     '$6$'*) ;;
-    *) echo "Parola özetlenemedi (tahtada openssl ya da mkpasswd yok)." >&2; exit 3 ;;
+    *) echo "Parola özetlenemedi (cihazda openssl ya da mkpasswd yok)." >&2; exit 3 ;;
 esac
 
 if ! out=$(useradd -s /bin/bash -c "$AD,,,,ankamon" -m -- "$U" 2>&1); then
@@ -78,7 +78,7 @@ if ! out=$(printf '%s:%s\n' "$U" "$OZET" | chpasswd -e 2>&1); then
     echo "✗ $U: parola yazılamadı, hesap geri alındı — $(printf '%s' "$out" | tr '\n' ' ')" >&2
     exit 1
 fi
-# ETAP gibi: gruplar tek tek; tahtada olmayan grup hesabı engellemez.
+# ETAP gibi: gruplar tek tek; cihazda olmayan grup hesabı engellemez.
 eksik=""
 for G in $ETAP_GRUPLARI; do
     usermod -a -G "$G" -- "$U" >/dev/null 2>&1 || eksik="$eksik $G"
@@ -91,7 +91,7 @@ if [ "${ILK_GIRIS:-evet}" = evet ]; then
         printf '%s' "$U" > "/var/lib/eta/expire-uid/$(id -u -- "$U")"
         ilk_giris=" · ilk girişte parola değiştirme penceresi açılır"
     else
-        ilk_giris=" · ilk girişte parola değiştirme bu tahtada yok (eta-password-changer)"
+        ilk_giris=" · ilk girişte parola değiştirme bu cihazda yok (eta-password-changer)"
     fi
 fi
 
@@ -99,6 +99,6 @@ fi
 sleep 2
 echo "✓ $U: hesap açıldı — $AD$ilk_giris"
 echo "  $(id -- "$U")"
-[ -z "$eksik" ] || echo "  Tahtada olmayan gruplar atlandı:$eksik"
+[ -z "$eksik" ] || echo "  Cihazda olmayan gruplar atlandı:$eksik"
 sifirlama_uyarisi
 exit 0

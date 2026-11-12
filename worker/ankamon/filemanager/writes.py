@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""FileBrowser yazma işlemlerinden sonra tahtadaki sahipliğin düzeltilmesi (bkz. ownership.py).
+"""FileBrowser yazma işlemlerinden sonra cihazdaki sahipliğin düzeltilmesi (bkz. ownership.py).
 
 İki yol:
 - Küçük gövdeli istekler (PATCH /api/resources: kopyala/taşı; PUT: düzenleyiciyle kaydet;
@@ -32,7 +32,7 @@
 - Yüklemeler (POST /api/resources — gövde GB'larca olabilir) köprüden GEÇMEZ, nginx'ten doğrudan akar;
   nginx biten her yüklemeyi bir satırla (durum, kaynak, yol) yerel bir syslog soketine (SOCKET) bildirir.
 
-locate(fb_yolu) → (tahta id, tahtadaki yol, bu makinedeki bağlama yolu) ya da None.
+locate(fb_yolu) → (cihaz id, cihazdaki yol, bu makinedeki bağlama yolu) ya da None.
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ import tornado.web
 log = logging.getLogger("ankamon.filemanager.writes")
 
 UPSTREAM = "http://127.0.0.1:8893"
-SOURCE = "tahtalar"  # filemanager.sh'deki tek kaynak
+SOURCE = "cihazlar"  # filemanager.sh'deki tek kaynak
 SOCKET = "/run/ankamon/filemanager-writes.sock"
 
 # İletilmeyen (köprünün/tornado'nun kendisinin yeniden yazdığı) başlıklar.
@@ -86,7 +86,7 @@ class ResourcesProxy(tornado.web.RequestHandler):
             if not to:
                 continue
             if action == "move":
-                # Aynı tahtada taşıma yeniden adlandırmadır, sahiplik korunur; tahtalar arası taşıma
+                # Aynı cihazda taşıma yeniden adlandırmadır, sahiplik korunur; cihazlar arası taşıma
                 # ise kopyala+sil (yeni dosyalar root olur).
                 src = self._where(item.get("fromSource"), item.get("fromPath"))
                 if src and src[0] == to[0]:

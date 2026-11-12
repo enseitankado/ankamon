@@ -38,9 +38,9 @@ use Ankamon\Core\Settings;
 use DateTimeImmutable;
 
 /**
- * Lig dışı bırakılanlar (league_exclusions — bkz. göç 042): görev gereği sürekli açık/oturumlu kalan tahtalar ve
- * kullanıcılar Şampiyonlar Ligi (league 'session': kullanıcı ve tahta sıralaması) ile Teneffüs Ligi'nden (league
- * 'break': tahta ve kullanıcı sıralaması) çıkarılır. Veri silinmez; lig API'leri listeyi leagueExcludedValues() ile
+ * Lig dışı bırakılanlar (league_exclusions — bkz. göç 042): görev gereği sürekli açık/oturumlu kalan cihazlar ve
+ * kullanıcılar Şampiyonlar Ligi (league 'session': kullanıcı ve cihaz sıralaması) ile Teneffüs Ligi'nden (league
+ * 'break': cihaz ve kullanıcı sıralaması) çıkarılır. Veri silinmez; lig API'leri listeyi leagueExcludedValues() ile
  * okur, varsayılan olarak saymaz. Listeleme 'logs', düzenleme 'leagues.exclude' yetkisi ister (bkz. routes.php).
  */
 final class LeagueExclusionsApi
@@ -48,7 +48,7 @@ final class LeagueExclusionsApi
     /** Lig → dışlanabilen türler. */
     private const LEAGUE_EXCLUSION_KINDS = ['session' => ['user', 'board'], 'break' => ['user', 'board']];
 
-    /** Ligin o türden dışlanan değerleri (kullanıcı adı küçük harf / tahta host adı). */
+    /** Ligin o türden dışlanan değerleri (kullanıcı adı küçük harf / cihaz host adı). */
     public static function leagueExcludedValues(string $league, string $kind): array
     {
         return array_column(
@@ -59,7 +59,7 @@ final class LeagueExclusionsApi
 
     /**
      * Pencere için: ligin dışlananları ve seçilebilecek adaylar — bu eğitim-öğretim yılında ligde süresi olanlar (yıl
-     * toplamı çoktan aza) ve Tahtalar'daki bütün tahtalar. Dışlanan ama adaylarda olmayan değer de listelenir.
+     * toplamı çoktan aza) ve Cihazlar'daki bütün cihazlar. Dışlanan ama adaylarda olmayan değer de listelenir.
      */
     public function index(Request $request): array
     {

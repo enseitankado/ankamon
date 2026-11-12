@@ -7,7 +7,7 @@
 set -eu
 
 CONF=/etc/rsyslog.d/89-ankamon-pam-noise.conf
-command -v rsyslogd >/dev/null 2>&1 || { echo "Tahtada rsyslog yok; süzülecek bir şey yok."; exit 0; }
+command -v rsyslogd >/dev/null 2>&1 || { echo "Cihazda rsyslog yok; süzülecek bir şey yok."; exit 0; }
 
 if [ "${MODE:-on}" = off ]; then
     [ -f "$CONF" ] || { echo "Süzgeç zaten yok."; exit 0; }

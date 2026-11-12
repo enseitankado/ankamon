@@ -23,19 +23,19 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtadaki kullanıcı hesaplarını listeler ve seçilen hesapla tahtada grafik oturum açar.
+"""Cihazdaki kullanıcı hesaplarını listeler ve seçilen hesapla cihazda grafik oturum açar.
 
-Tahtalar/Ekranlar sağ menüsü "Oturum aç" (bkz. frontend ui/BoardOps.js loginMenu) iki görev türü kullanır:
-  - "accounts": tek tahtadan hesap listesi (UID 1000-59999, kabuğu nologin/false olmayan yerel
+Cihazlar/Ekranlar sağ menüsü "Oturum aç" (bkz. frontend ui/BoardOps.js loginMenu) iki görev türü kullanır:
+  - "accounts": tek cihazdan hesap listesi (UID 1000-59999, kabuğu nologin/false olmayan yerel
     hesaplar; GECOS'un ilk alanı tam ad). Sonuç boards.facts'e (accounts + accounts_at) yazılır,
-    CACHE_SECONDS boyunca aynı tahtaya tekrar bağlanılmaz. Çoklu seçimde menü listeyi ilk tahtadan alır.
+    CACHE_SECONDS boyunca aynı cihaza tekrar bağlanılmaz. Çoklu seçimde menü listeyi ilk cihazdan alır.
   - "logout" ("Oturumu kapat"): seat0'daki kullanıcı oturumunu loginctl ile sonlandırır (kullanıcı adı
     verilirse o kullanıcının oturumunu — Oturumlar grid'i; verilmezse etkin olanı).
   - "lock" ("Oturumu kilitle"): LightDM'in Seat.Lock'u (= ETAP'ın `dm-tool lock`'u): kullanıcı oturumu
     ve süreçleri kendi VT'sinde AÇIK kalır, seat0'da giriş ekranı (greeter) açılır.
   - "login": LightDM'in tek seferlik otomatik oturumuyla (autologin) hesabı parolasız açar:
     /etc/lightdm/lightdm.conf.d'ye geçici bir autologin dosyası yazılır, lightdm yeniden başlatılır
-    (yalnız seat0'da kullanıcı oturumu yokken), oturum görünür görünmez dosya silinir — tahta sonraki
+    (yalnız seat0'da kullanıcı oturumu yokken), oturum görünür görünmez dosya silinir — cihaz sonraki
     açılışında yine normal giriş ekranıyla gelir. Açık oturum varsa onun yerine kullanıcı değiştirilir
     (bkz. _LOGIN_SCRIPT notu) — mevcut oturum kapanmaz. ETAP'ta /etc/pam.d/lightdm-autologin
     yalnız root'u reddeder, parola istemez.
@@ -96,7 +96,7 @@ active_of() {
     done
 }
 if [ -n "$(active_of "$U")" ]; then
-    echo "$U zaten bu tahtada oturum açmış ve ekranda — bir şey yapılmadı."
+    echo "$U zaten bu cihazda oturum açmış ve ekranda — bir şey yapılmadı."
     exit 0
 fi
 sess=$(awk -F= '/^(XSession|Session)=/ && $2 != "" {print $2; exit}' "/var/lib/AccountsService/users/$U" 2>/dev/null)
@@ -180,7 +180,7 @@ exit 1
 # "Oturumu kilitle": LightDM Seat.Lock (ETAP'ta `dm-tool lock` ile aynı; dm-tool XDG_SEAT_PATH ister,
 # SSH'de yok — doğrudan D-Bus). Oturum AÇIK kalır, seat0'da greeter etkinleşir. Çıktının İLK satırı
 # kilitlenen kullanıcının adıdır (yoksa boş). Açık oturum yoksa hiçbir şey yapılmaz ve ileti de yazılmaz (kullanıcı isteği
-# 2026-11-11: oturumsuz tahtada "bir şey yapılmadı" iletisi istenmiyor; arayüz bu tahtaları zaten göndermez).
+# 2026-11-11: oturumsuz cihazda "bir şey yapılmadı" iletisi istenmiyor; arayüz bu cihazları zaten göndermez).
 _LOCK_SCRIPT = _PICK_SESSION + r"""
 set -u
 line=$(pick_session '{user}')
@@ -201,7 +201,7 @@ busctl --system call org.freedesktop.DisplayManager "$seat" org.freedesktop.Disp
     || { echo "Kilitlenemedi (LightDM Seat.Lock)."; exit 1; }
 for i in $(seq 1 15); do
     if [ "$(loginctl show-session "$s" -p Active --value 2>/dev/null)" != yes ]; then
-        echo "Oturum kilitlendi: $u (oturum açık kalır, tahta giriş ekranında; ${i} sn)."
+        echo "Oturum kilitlendi: $u (oturum açık kalır, cihaz giriş ekranında; ${i} sn)."
         exit 0
     fi
     sleep 1
@@ -219,7 +219,7 @@ _SSH_OPTS = [
 
 def _ssh(board: dict, user: str, password: str, script: str, timeout: int) -> dict:
     if not board.get("ip"):
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", f"ConnectTimeout={min(timeout, 8)}",
            f"{user}@{board['ip']}", script]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
@@ -259,7 +259,7 @@ def cached(conn, board_id: int, cutoff_ts: int) -> list | None:
 
 
 def invalidate(conn, board_id: int) -> None:
-    """Hesap listesi önbelleğini düşürür (ör. "Kullanıcı sil" sonrası): sonraki istek tahtadan yeniden okur."""
+    """Hesap listesi önbelleğini düşürür (ör. "Kullanıcı sil" sonrası): sonraki istek cihazdan yeniden okur."""
     conn.execute("UPDATE boards SET facts = facts - 'accounts' - 'accounts_at' WHERE id = %s", (board_id,))
 
 

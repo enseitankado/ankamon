@@ -23,19 +23,19 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Anomali: tahta açık ama oturum açılmamış (en az THRESHOLD boyunca).
+"""Anomali: cihaz açık ama oturum açılmamış (en az THRESHOLD boyunca).
 
-Tahtanın açık aralıkları (board_uptime, loglardan) eksi kullanıcı oturumları (board_sessions) = tahtanın
+Cihazın açık aralıkları (board_uptime, loglardan) eksi kullanıcı oturumları (board_sessions) = cihazın
 kimse oturum açmadan çalıştığı süreler; THRESHOLD'dan uzun olanlar anomalidir. İki biçimi vardır
-(detail.reason): "boot" — açılıştan beri oturum açılmadı; "logout" — son oturum kapandı, tahta açık kaldı.
+(detail.reason): "boot" — açılıştan beri oturum açılmadı; "logout" — son oturum kapandı, cihaz açık kaldı.
 Ekran kilidindeki oturum açık sayılır (kullanıcı oradadır).
 
-Sürüyor (ended_at None): tahtanın son açık aralığı hâlâ açıksa (board_uptime işlenmiş en yeni log
+Sürüyor (ended_at None): cihazın son açık aralığı hâlâ açıksa (board_uptime işlenmiş en yeni log
 zamanına GAP'ten yakın; UptimeApi ile aynı ölçüt) ve SSH yoklaması (boards.session_username, 30 sn'de
 bir) o an oturum görmüyorsa. Yoklama oturum görüp log henüz işlenmediyse anomali şimdilik "bitti"
 sayılır; oturum kaydı gelince bitiş, oturumun başlangıcına çekilir.
 
-Yalnız Tahtalar'a kayıtlı bilgisayarlar (hostname eşleşmesi) değerlendirilir: oturum kaydı tutulmayan
+Yalnız Cihazlar'a kayıtlı bilgisayarlar (hostname eşleşmesi) değerlendirilir: oturum kaydı tutulmayan
 sunucu/PC'ler sürekli "oturumsuz" görünürdü.
 """
 

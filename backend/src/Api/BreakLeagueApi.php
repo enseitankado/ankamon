@@ -37,17 +37,17 @@ use DateTimeImmutable;
 
 /**
  * Oturumlar ▸ Teneffüs Ligi: ders aralarında (teneffüsler ve öğle arası — Ayarlar ▸ Ders saatleri'ndeki ardışık dersler
- * arası) en çok açık kalan tahtalar; günün, haftanın, ayın, dönemin ve eğitim-öğretim yılının sıralaması (dönem sınırları
+ * arası) en çok açık kalan cihazlar; günün, haftanın, ayın, dönemin ve eğitim-öğretim yılının sıralaması (dönem sınırları
  * Şampiyonlar Ligi ile aynı, bkz. SessionLeagueApi::leaguePeriods). Açık kalınan süre oturum AÇIKKEN ve oturum KAPALIYKEN
  * (giriş ekranında) diye ikiye ayrılır; sıralama ölçütü seçilebilir. Veri worker'ın doldurduğu break_league_days'ten
- * (bkz. worker/ankamon/tasks/break_league.py, db/migrations/041_break_league.sql). Lig dışı bırakılan tahtalar
+ * (bkz. worker/ankamon/tasks/break_league.py, db/migrations/041_break_league.sql). Lig dışı bırakılan cihazlar
  * (league_exclusions, league 'break' — bkz. LeagueExclusionsApi) varsayılan olarak sayılmaz; with_excluded=1 ile
  * işaretli (excluded: true) katılır.
  *
  * by=users: aynı üç ölçü kullanıcı adı bazında (break_league_user_days, göç 044): oturum açıkken = kullanıcının kendi
- * oturumu; oturum kapalıyken = tahtayı o açılışta giriş ekranında açık bırakan, yani parçadan önce oturumu son kapanan
+ * oturumu; oturum kapalıyken = cihazı o açılışta giriş ekranında açık bırakan, yani parçadan önce oturumu son kapanan
  * kullanıcıya yazılan süre (açılıştan beri kimse oturum açmadıysa kimseye yazılmaz). Şampiyonlar Ligi'ndeki gibi
- * etapadmin/root sayılmaz; lig dışı kullanıcılar (league 'break', kind 'user') tahta dışlamasından bağımsızdır.
+ * etapadmin/root sayılmaz; lig dışı kullanıcılar (league 'break', kind 'user') cihaz dışlamasından bağımsızdır.
  */
 final class BreakLeagueApi
 {
@@ -102,9 +102,9 @@ final class BreakLeagueApi
     }
 
     /**
-     * [from, to) aralığında tahta başına teneffüste açık kalınan süre (oturum açık/kapalı ayrımıyla), seçilen ölçüte göre
-     * çoktan aza ilk $limit; teneffüs süresine oranı, gün sayısı. Ayrıca katılan tahta sayısı, toplamlar ve dönemde
-     * süresi olan lig dışı tahta sayısı (excluded_count). Lig dışılar $withOut değilse ne sıralamaya ne toplamlara girer.
+     * [from, to) aralığında cihaz başına teneffüste açık kalınan süre (oturum açık/kapalı ayrımıyla), seçilen ölçüte göre
+     * çoktan aza ilk $limit; teneffüs süresine oranı, gün sayısı. Ayrıca katılan cihaz sayısı, toplamlar ve dönemde
+     * süresi olan lig dışı cihaz sayısı (excluded_count). Lig dışılar $withOut değilse ne sıralamaya ne toplamlara girer.
      */
     private static function breakStandings(string $from, string $to, string $column, int $limit, array $leagueOut, bool $withOut): array
     {
@@ -159,7 +159,7 @@ final class BreakLeagueApi
     /**
      * [from, to) aralığında kullanıcı başına teneffüs süresi (by=users): oturum açıkken (session_seconds), oturum
      * kapalıyken açık bıraktığı (idle_seconds) ve toplamı (on_seconds), seçilen ölçüte göre çoktan aza ilk $limit; gün ve
-     * tahta sayısı, en çok süre biriktirdiği tahta (takma adıyla). Toplamlar ve lig dışı sayısı breakStandings gibi.
+     * cihaz sayısı, en çok süre biriktirdiği cihaz (takma adıyla). Toplamlar ve lig dışı sayısı breakStandings gibi.
      * etapadmin/root hiç sayılmaz (SessionLeagueApi::LEAGUE_EXCLUDED_USERS).
      */
     private static function breakUserStandings(string $from, string $to, string $column, int $limit, array $leagueOut, bool $withOut): array
@@ -200,7 +200,7 @@ final class BreakLeagueApi
                AND lower(username) = ANY(?::text[])) p",
             [$from, $to, $system, $out]
         ) : 0;
-        // Kimseye yazılamayan oturumsuz süre (tahta açıldığından beri kimse oturum açmamış): tahta bazındaki toplamdan
+        // Kimseye yazılamayan oturumsuz süre (cihaz açıldığından beri kimse oturum açmamış): cihaz bazındaki toplamdan
         // kullanıcılara (etapadmin/root dahil) yazılan kısım düşülür; lig dışılardan bağımsız, yalnız bilgi.
         $unassigned = (int) Db::value(
             'SELECT GREATEST(0, (SELECT COALESCE(sum(on_seconds - session_seconds), 0) FROM break_league_days

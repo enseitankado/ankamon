@@ -86,7 +86,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
 
     __scopeColumns(countLabel) {
       return [
-        { id: "name", label: "Tahta", choices: true },
+        { id: "name", label: "Cihaz", choices: true },
         { id: "n", label: countLabel, width: 120 },
         { id: "first", label: "İlk kayıt", width: 160 },
         { id: "last", label: "Son kayıt", width: 160 },
@@ -98,7 +98,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
       return (estimated ? "~" : "") + ankamon.util.Format.bytes(bytes);
     },
 
-    /** Sistem / komut logları: tahta başına (+ eşleşmeyen + tümü), /api/logs/stats. */
+    /** Sistem / komut logları: cihaz başına (+ eşleşmeyen + tümü), /api/logs/stats. */
     __logSpec(type, label, noun) {
       const F = ankamon.util.Format;
       const spec = this.__withDisk({
@@ -107,11 +107,11 @@ qx.Class.define("ankamon.ui.DiskUsage", {
         load: async () => {
           const data = await ankamon.io.Api.get("/logs/stats", { type });
           const rows = [{
-            all: true, scope: {}, name: "— Tüm tahtalar —",
+            all: true, scope: {}, name: "— Tüm cihazlar —",
             n: data.total.n, first: data.total.first, last: data.total.last, bytes: data.total.bytes, estimated: false
           }];
           if (data.unmatched) {
-            rows.push({ scope: { board: "unmatched" }, name: "— Tahtasız / eşleşmeyen —", ...data.unmatched, bytes: data.unmatched.est_bytes, estimated: true });
+            rows.push({ scope: { board: "unmatched" }, name: "— Cihazsız / eşleşmeyen —", ...data.unmatched, bytes: data.unmatched.est_bytes, estimated: true });
           }
           data.boards.forEach(b => rows.push({ scope: { board: b.board_id }, ...b, bytes: b.est_bytes, estimated: true }));
           rows.forEach(r => {
@@ -128,13 +128,13 @@ qx.Class.define("ankamon.ui.DiskUsage", {
       return spec;
     },
 
-    /** Sensör verileri: tahta başına ham ölçüm + 5 dk/1 sa özetleri, /api/storage/metrics. */
+    /** Sensör verileri: cihaz başına ham ölçüm + 5 dk/1 sa özetleri, /api/storage/metrics. */
     __metricSpec() {
       const F = ankamon.util.Format;
       const spec = this.__withDisk({
         mode: "metrics", size: this.__sizer("/storage/metrics"), label: "Sensör verileri", noun: "sensör ölçümü (ham + özet)",
         columns: [
-          { id: "name", label: "Tahta", choices: true },
+          { id: "name", label: "Cihaz", choices: true },
           { id: "series", label: "Seri", width: 70 },
           { id: "n", label: "Ham ölçüm", width: 110 },
           { id: "agg", label: "Özet (5 dk/1 sa)", width: 130 },
@@ -144,9 +144,9 @@ qx.Class.define("ankamon.ui.DiskUsage", {
         ],
         load: async () => {
           const data = await ankamon.io.Api.get("/storage/metrics");
-          const rows = [{ all: true, scope: {}, ...data.total, name: "— Tüm tahtalar —", bytes: data.total.bytes, estimated: false }];
+          const rows = [{ all: true, scope: {}, ...data.total, name: "— Tüm cihazlar —", bytes: data.total.bytes, estimated: false }];
           if (data.unmatched) {
-            rows.push({ scope: { board: "unmatched" }, ...data.unmatched, name: "— Tahtasız / eşleşmeyen —", bytes: data.unmatched.est_bytes, estimated: true });
+            rows.push({ scope: { board: "unmatched" }, ...data.unmatched, name: "— Cihazsız / eşleşmeyen —", bytes: data.unmatched.est_bytes, estimated: true });
           }
           data.boards.forEach(b => rows.push({ scope: { board: b.board_id }, ...b, bytes: b.est_bytes, estimated: true }));
           rows.forEach(r => {
@@ -168,7 +168,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
       return spec;
     },
 
-    /** Ekran görüntüleri: tahta başına, gerçek dosya boyutu, /api/storage/screenshots. */
+    /** Ekran görüntüleri: cihaz başına, gerçek dosya boyutu, /api/storage/screenshots. */
     __shotSpec() {
       const F = ankamon.util.Format;
       const spec = this.__withDisk({
@@ -176,7 +176,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
         columns: this.__scopeColumns("Görüntü sayısı").map(c => (c.id === "size" ? { id: "size", label: "Boyut", width: 140 } : c)),
         load: async () => {
           const data = await ankamon.io.Api.get("/storage/screenshots");
-          const rows = [{ all: true, scope: { all: "1" }, ...data.total, name: "— Tüm tahtalar —" }];
+          const rows = [{ all: true, scope: { all: "1" }, ...data.total, name: "— Tüm cihazlar —" }];
           data.boards.forEach(b => rows.push({ scope: { name: b.name }, ...b }));
           rows.forEach(r => {
             r.deletable = true;
@@ -214,7 +214,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
       return spec;
     },
 
-    /** Sohbet geçmişi: tahta başına ileti, /api/storage/chat. */
+    /** Sohbet geçmişi: cihaz başına ileti, /api/storage/chat. */
     __chatSpec() {
       const F = ankamon.util.Format;
       const spec = this.__withDisk({
@@ -222,7 +222,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
         columns: this.__scopeColumns("İleti sayısı"),
         load: async () => {
           const data = await ankamon.io.Api.get("/storage/chat");
-          const rows = [{ all: true, scope: { all: "1" }, ...data.total, name: "— Tüm tahtalar —", estimated: false }];
+          const rows = [{ all: true, scope: { all: "1" }, ...data.total, name: "— Tüm cihazlar —", estimated: false }];
           data.boards.forEach(b => rows.push({ scope: { name: b.name }, ...b, bytes: b.est_bytes, estimated: true }));
           rows.forEach(r => {
             r.deletable = true;
@@ -241,7 +241,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
       const F = ankamon.util.Format;
       const status = ankamon.ui.DiskUsage.JOB_STATUS;
       const spec = this.__withDisk({
-        mode: "jobs", size: this.__sizer("/storage/jobs"), label: "Görev kuyruğu", noun: "görev kaydı (tahta sonuçları ve çıktı akışıyla birlikte)",
+        mode: "jobs", size: this.__sizer("/storage/jobs"), label: "Görev kuyruğu", noun: "görev kaydı (cihaz sonuçları ve çıktı akışıyla birlikte)",
         columns: [
           { id: "name", label: "Görev" },
           { id: "type", label: "Tür", width: 90 },
@@ -261,7 +261,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
           }];
           data.jobs.forEach(j => {
             const names = j.target_names.join(", ");
-            const targets = j.targets > j.target_names.length ? `${j.targets} tahta (${names}…)` : names;
+            const targets = j.targets > j.target_names.length ? `${j.targets} cihaz (${names}…)` : names;
             const name = `#${j.id} ${j.title || j.type}`;
             rows.push({
               scope: { ids: String(j.id) }, name, n: 1, bytes: j.est_bytes, estimated: true,
@@ -288,7 +288,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
 
     /**
      * Bakım raporları (eski adı "Sorun tespiti"): tarama ("diagnose" görevi) başına, /api/storage/diagnose. Görev kuyruğu
-     * sekmesi bunları saymaz. Yalnız bitmiş taramalar silinir; silinen tahtalar otomatik zamanlayıcıca
+     * sekmesi bunları saymaz. Yalnız bitmiş taramalar silinir; silinen cihazlar otomatik zamanlayıcıca
      * (bkz. worker tasks/diagnose_schedule.py) bir sonraki uygun anda yeniden taranır.
      */
     __diagnoseSpec() {
@@ -296,12 +296,12 @@ qx.Class.define("ankamon.ui.DiskUsage", {
       const status = ankamon.ui.DiskUsage.JOB_STATUS;
       const spec = this.__withDisk({
         mode: "diagnose", size: this.__sizer("/storage/diagnose"), label: "Bakım raporları",
-        noun: "bakım raporu (tahta sonuçlarıyla birlikte; silinen tahtalar otomatik taramada yeniden denetlenir)",
+        noun: "bakım raporu (cihaz sonuçlarıyla birlikte; silinen cihazlar otomatik taramada yeniden denetlenir)",
         columns: [
           { id: "name", label: "Tarama" },
           { id: "kind", label: "Başlatan", width: 120 },
           { id: "status", label: "Durum", width: 100 },
-          { id: "targets", label: "Tahtalar", width: 220 },
+          { id: "targets", label: "Cihazlar", width: 220 },
           { id: "created", label: "Tarih", width: 150 },
           { id: "events", label: "Çıktı satırı", width: 95 },
           { id: "size", label: "Tahmini boyut (~)", width: 130 }
@@ -315,7 +315,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
           }];
           data.jobs.forEach(j => {
             const names = j.target_names.join(", ");
-            const targets = j.targets > j.target_names.length ? `${j.targets} tahta (${names}…)` : names;
+            const targets = j.targets > j.target_names.length ? `${j.targets} cihaz (${names}…)` : names;
             const name = `#${j.id} Bakım raporu`;
             rows.push({
               scope: { ids: String(j.id) }, name, n: 1, bytes: j.est_bytes, estimated: true, deletable: j.deletable,

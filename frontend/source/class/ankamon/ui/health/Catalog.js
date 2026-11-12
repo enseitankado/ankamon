@@ -27,7 +27,7 @@
 
 /**
  * Sağlık ▸ Yardım ▸ Denetim türleri (eski ayrı "Denetimler" sekmesi; kullanıcı isteğiyle Yardım'ın içinde): Ankamon'un
- * tahtalara baktığı BÜTÜN denetimler tek tabloda — hangi yoldan (sürekli izleme / SSH denetimi), hangi kaynaktan, nasıl ve
+ * cihazlara baktığı BÜTÜN denetimler tek tabloda — hangi yoldan (sürekli izleme / SSH denetimi), hangi kaynaktan, nasıl ve
  * ne sıklıkla bakıldığı, bulgu düzeyi ve anlık taranıp taranamadığı. Metinler uzun: satıra çift tıklayınca hepsi bir
  * pencerede okunur ve yönetici sıklık / bulgu düzeyi / anlık taranır ayarlarını değiştirir (bkz. ui.health.CheckTypeWindow).
  *
@@ -47,9 +47,9 @@ qx.Class.define("ankamon.ui.health.Catalog", {
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
     this.add(new qx.ui.basic.Label(
-      "Ankamon'un tahtalara baktığı bütün denetimler. <b>Sürekli izleme</b> tahtaya bağlanmaz: tahtanın gönderdiği " +
-      "loglardan, Ankamon'un tahtadan okuduğu ölçümlerden ya da daha önce toplanmış verilerden kendiliğinden çıkarılır. " +
-      "<b>SSH denetimi</b> tahtaya SSH ile girip yalnız okuma yapan komutlarla ölçer (tahtada hiçbir şey değiştirilmez). " +
+      "Ankamon'un cihazlara baktığı bütün denetimler. <b>Sürekli izleme</b> cihaza bağlanmaz: cihazın gönderdiği " +
+      "loglardan, Ankamon'un cihazdan okuduğu ölçümlerden ya da daha önce toplanmış verilerden kendiliğinden çıkarılır. " +
+      "<b>SSH denetimi</b> cihaza SSH ile girip yalnız okuma yapan komutlarla ölçer (cihazda hiçbir şey değiştirilmez). " +
       "<b>Satıra çift tıklayın</b>: bütün ayrıntı" + (page._user.is_admin ? " ve ayarlar (sıklık, bulgu düzeyi, anlık taranır)." : ".")
     ).set({ rich: true, wrap: true, allowGrowX: true }));
     this.__columns = [
@@ -81,15 +81,15 @@ qx.Class.define("ankamon.ui.health.Catalog", {
   statics: {
     /** SSH denetiminin başlıkları (bkz. worker executor/diagnose.py — g = "…" grupları). */
     SSH_GROUPS: [
-      ["Donanım kapasitesi", "Dikkat", "RAM ve disk boyutu, tahtaların ortalamasıyla kıyas."],
-      ["Disk sağlığı (SMART)", "Acil / Dikkat / Bilgi", "Diskin kendi sağlık testi, okunamayan sektörler, yıpranma işaretleri, eşiği aşan öznitelikler (Acil), SSD kalan ömrü, disk sıcaklığı, son 7 günde çekirdeğin bildirdiği disk hataları (tahtaya takılan USB bellek / harici diskteki hatalar ayrı ve yalnız Bilgi düzeyinde: çoğu, bellek düzgün çıkarılmadan sökülünce olur)."],
+      ["Donanım kapasitesi", "Dikkat", "RAM ve disk boyutu, cihazların ortalamasıyla kıyas."],
+      ["Disk sağlığı (SMART)", "Acil / Dikkat / Bilgi", "Diskin kendi sağlık testi, okunamayan sektörler, yıpranma işaretleri, eşiği aşan öznitelikler (Acil), SSD kalan ömrü, disk sıcaklığı, son 7 günde çekirdeğin bildirdiği disk hataları (cihaza takılan USB bellek / harici diskteki hatalar ayrı ve yalnız Bilgi düzeyinde: çoğu, bellek düzgün çıkarılmadan sökülünce olur)."],
       ["İşlemci sıcaklığı", "Acil / Dikkat", "Son 24 saatin sıcaklık ölçümleri filonun geri kalanıyla kıyaslanır; ısı yüzünden işlemcinin yavaşlatılması. (Ani yükselmeler ayrıca sürekli izlemede: İşlemci sıcaklığı yüksek.)"],
       ["Soğutma ve kasa", "Acil / Dikkat", "İşlemci fanı dönüyor mu, kasa içi sıcaklık."],
       ["Boş disk alanı", "Acil / Dikkat", "Kök dosya sistemi doluluğu, dosya sayısı sınırı (inode)."],
       ["Yazılım güncellemeleri", "Dikkat", "Bekleyen (güvenlik dahil) güncellemeler, paket listesinin yaşı."],
       ["Sistem çalışma koşulları", "Acil / Dikkat", "Düşük RAM, takas alanı yok, mekanik disk, salt-okunur dosya sistemi, bellek yetersizliğinden kapatılan uygulamalar, başarısız servisler, yarım kalmış paket kurulumu, sürekli yüksek yük, yeniden başlatma bekliyor, uzun süredir açık."]
     ],
-    SSH_HOW: "Ankamon tahtaya root olarak tek SSH bağlantısı açar, yalnız okuma yapan komutlar çalıştırır (tahta başına 1-2 sn)."
+    SSH_HOW: "Ankamon cihaza root olarak tek SSH bağlantısı açar, yalnız okuma yapan komutlar çalıştırır (cihaz başına 1-2 sn)."
   },
 
   members: {

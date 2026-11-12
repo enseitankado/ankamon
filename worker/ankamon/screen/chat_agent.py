@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtada çalışan sohbet penceresi (python3-gi, Gtk 3; kurulum yok, SSH oturumuyla yaşar).
+"""Cihazda çalışan sohbet penceresi (python3-gi, Gtk 3; kurulum yok, SSH oturumuyla yaşar).
 
 Satır başına JSON: stdin'den {"t":"msg","author","text"} / {"t":"end"}; stdout'a {"t":"ready"} / {"t":"msg","text"} /
 {"t":"closed"}. Yeni ileti gelince pencere öne çıkar. Etkin VT değişirse (oturum açıldı, kullanıcı değişti) 75 koduyla çıkar:
@@ -146,7 +146,7 @@ def on_stdin(_fd, _cond):
         win.show_all()
         win.present()
     elif msg.get("t") == "end":
-        # Yönetici penceresini kapattı: tahtadaki pencere de hemen kapanır.
+        # Yönetici penceresini kapattı: cihazdaki pencere de hemen kapanır.
         finish()
     return True
 

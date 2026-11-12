@@ -23,10 +23,10 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Anomali tespiti (Tahtalar ▸ Anomaliler; bkz. db/migrations/033_anomalies.sql).
+"""Anomali tespiti (Cihazlar ▸ Anomaliler; bkz. db/migrations/033_anomalies.sql).
 
 Her kural ayrı bir modüldür: KIND (anomalies.kind) ve detect(conn, since) tanımlar. detect, `since`ten
-sonra süren/biten kaynak aralıklarını (ör. tahtanın açık aralıkları) baştan hesaplar ve
+sonra süren/biten kaynak aralıklarını (ör. cihazın açık aralıkları) baştan hesaplar ve
 (bulunanlar, kapsamlar) döndürür:
   bulunanlar: [{host, board_id, board_name, started_at, ended_at|None, detail}] — ended_at None = sürüyor
   kapsamlar:  [(host, başlangıç, bitiş)] — yeniden hesaplanan aralıklar; bu aralıklarda başlayıp artık
@@ -36,8 +36,8 @@ Kapsam dışındaki eski kayıtlara dokunulmaz: kaynak veriler (loglar) silinse 
 İlk çalışmada (imleç yok) tüm geçmiş taranır (geçmişe dönük rapor); sonra her turda son gün ve
 sürmekte olan anomalilerin başından itibaren. Yeni kural: modülü yazıp RULES'a ekleyin.
 
-Kural ayrıca PROBE (tahtada çalışan kabuk parçası) ve evaluate(values, ctx) tanımlarsa Anomaliler ▸ Tarama'da
-seçilen tahtalarda anlık taranabilir (bkz. anomaly.scan).
+Kural ayrıca PROBE (cihazda çalışan kabuk parçası) ve evaluate(values, ctx) tanımlarsa Anomaliler ▸ Tarama'da
+seçilen cihazlarda anlık taranabilir (bkz. anomaly.scan).
 
 Eklentiler de kural ekleyebilir (çekirdek eklentiyi adıyla bilmez): /opt/ankamon/ext/<ad>/worker/anomaly_rules.py
 içindeki RULES listesi, burada aynı sözleşmeyle çalışır; tür adları ext/<ad>/anomaly_kinds.json'dan (bkz. backend
@@ -93,7 +93,7 @@ def run(conn) -> None:
 
 
 def _overrides(conn) -> dict:
-    """Yöneticinin tür ayarları (Tahta sağlığı ▸ Yardım ▸ Denetim türleri; bkz. backend AnomaliesApi::updateKind)."""
+    """Yöneticinin tür ayarları (Cihaz sağlığı ▸ Yardım ▸ Denetim türleri; bkz. backend AnomaliesApi::updateKind)."""
     try:
         row = conn.execute("SELECT value FROM settings WHERE key = 'anomaly_kind_overrides'").fetchone()
     except Exception:  # noqa: BLE001 — ayar okunamazsa varsayılanlarla devam

@@ -26,27 +26,27 @@
  */
 
 /**
- * Oturumlar sayfasının "Zaman çizelgesi" sekmesi (eski adı "Kullanıcılar"): kullanıcıların hangi tahtada, ne zaman, ne kadar
+ * Oturumlar sayfasının "Zaman çizelgesi" sekmesi (eski adı "Kullanıcılar"): kullanıcıların hangi cihazda, ne zaman, ne kadar
  * süre oturum açtığını (ve hangilerinin düzgün kapanmadığını) zaman çizelgesinde gösterir.
  *
  * Veri, Oturumlar sekmesiyle aynı (/board-sessions — page.Sessions çeker, setData ile verir);
  * süzme ve özetleme tamamen istemcide yapılır.
- *  - Üstteki tablo (kullanıcı isteği 2026-11-06: eski Kullanıcı/Tahta/Tür seçicileri tabloya girdi): her satır bir
- *    tahta × kullanıcı × tür (tahta oturumu / web terminal) birleşimi. Tahta, Kullanıcı ve Tür sütunları hazır listeyle
+ *  - Üstteki tablo (kullanıcı isteği 2026-11-06: eski Kullanıcı/Cihaz/Tür seçicileri tabloya girdi): her satır bir
+ *    cihaz × kullanıcı × tür (cihaz oturumu / web terminal) birleşimi. Cihaz, Kullanıcı ve Tür sütunları hazır listeyle
  *    ya da elle yazarak süzülür ve bu süzgeç ZAMAN ÇİZELGESİNİ de süzer; öteki sütun süzgeçleri yalnız tabloyu.
  *    Sütunlar sıralanır, genişlikler içeriğe göre ayarlanır (storageKey), her başlık ve hücre ipuçlu.
- *  - "Satırlar" (çizelgede tahtalar / kullanıcılar) ve "Yalnız düzgün kapanmayanlar" tablonun üstünde yer kaplamasın diye
+ *  - "Satırlar" (çizelgede cihazlar / kullanıcılar) ve "Yalnız düzgün kapanmayanlar" tablonun üstünde yer kaplamasın diye
  *    alttaki aralık düğmelerinin satırında.
  *  - Aralık: hazır düğmeler + çizelgede sürükleme; tekerlek dikey kaydırır, Ctrl+tekerlek yakınlaştırır (bkz. Timeline).
  *    Özet ve tablo HER ZAMAN görünen aralığa göre hesaplanır (aralığı taşan oturumların yalnız aralık içindeki süresi).
- *  - "Satırlar: Tahtalar" görünümünde tahtanın KAPALI olduğu aralıklar satırda gri taralı arka plan
+ *  - "Satırlar: Cihazlar" görünümünde cihazın KAPALI olduğu aralıklar satırda gri taralı arka plan
  *    olarak görünür (kurum kapalıyken boşluk ile "kimse oturum açmadı"yı ayırır — bkz. __loadUptime).
- *  - Tablo satırına çift tıklama o tahtayı ve kullanıcıyı süzgece alır; çubuğa sağ tıklama süzme
- *    ve (açık tahta oturumunda, "boards.login" yetkisiyle) oturumu kapat/kilitle menüsü açar.
- *  - Satır (tablo satırı ya da çizelgedeki satır adı) sağ menüsü: süzgece alma; Tahtalar'a kayıtlı olmayan
+ *  - Tablo satırına çift tıklama o cihazı ve kullanıcıyı süzgece alır; çubuğa sağ tıklama süzme
+ *    ve (açık cihaz oturumunda, "boards.login" yetkisiyle) oturumu kapat/kilitle menüsü açar.
+ *  - Satır (tablo satırı ya da çizelgedeki satır adı) sağ menüsü: süzgece alma; Cihazlar'a kayıtlı olmayan
  *    bilgisayarda ("sessions.hosts" yetkisiyle) onaylı "Bu bilgisayarın kayıtlarını sil".
  *
- * "Düzgün kapanmadı": kapanış mesajı gelmeden tahta çevrimdışı oldu (offline — elektrik kesintisi,
+ * "Düzgün kapanmadı": kapanış mesajı gelmeden cihaz çevrimdışı oldu (offline — elektrik kesintisi,
  * güç düğmesiyle kapatma) ya da kapanmadan yeni oturum açıldı (superseded) ya da web terminal
  * hizmeti yeniden başladı (restart) — bkz. worker/ankamon/tasks/board_sessions.py.
  */
@@ -63,7 +63,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     this.setPadding(8);
 
     // Çizelge satırları ve "yalnız düzgün kapanmayanlar": alttaki aralık satırında (tablonun üstünde ayrı satır yok).
-    this.__groupBy = this.__select([["board", "Tahtalar"], ["user", "Kullanıcılar"]]).set({ width: 120 });
+    this.__groupBy = this.__select([["board", "Cihazlar"], ["user", "Kullanıcılar"]]).set({ width: 120 });
     this.__groupBy.addListener("changeSelection", () => this.__changed());
     this.__badOnly = new qx.ui.form.CheckBox("Yalnız düzgün kapanmayanlar").set({ alignY: "middle" });
     this.__badOnly.addListener("changeValue", () => this.__changed());
@@ -93,7 +93,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     const chip = cls => `<span class="tm-legend ${cls}" style="display:inline-block;width:12px;height:12px;` +
       "box-sizing:border-box;border:1px solid;border-radius:2px;vertical-align:-2px;margin:0 4px 0 10px\"></span>";
     // Renk açıklamaları satırda çok yer kaplıyordu (kullanıcı bildirimi): üzerine gelince ipucunda, alt alta.
-    const legend = Object.keys(S).map(k => chip("tm-s-" + k) + S[k]).concat(chip("tm-off") + "Tahta kapalı")
+    const legend = Object.keys(S).map(k => chip("tm-s-" + k) + S[k]).concat(chip("tm-off") + "Cihaz kapalı")
       .map(line => `<div style="margin:2px 0">${line}</div>`).join("");
     const legendTip = new qx.ui.tooltip.ToolTip(legend).set({ rich: true, showTimeout: 100 });
     ranges.add(new qx.ui.basic.Label("ⓘ Renkler").set({
@@ -102,7 +102,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
 
     this.__summary = new qx.ui.basic.Label("").set({ rich: true });
 
-    // Yerleşim (kullanıcı isteği): süzgeç barı → tahta grid'i → aralık düğmeleri + özet + zaman
+    // Yerleşim (kullanıcı isteği): süzgeç barı → cihaz grid'i → aralık düğmeleri + özet + zaman
     // çizelgesi (aralık düğmeleri çizelgeyi yönettiği için onunla aynı bölümde). Grid ile alt bölüm
     // arasındaki ayraç sürüklenebilir.
     const split = new qx.ui.splitpane.Pane("vertical");
@@ -139,9 +139,9 @@ qx.Class.define("ankamon.ui.sessions.Users", {
 
     const C = ankamon.ui.sessions.Users.COL;
     this.__columns = [
-      { id: "board", label: "Tahta", choices: true, hint: "Oturumun açıldığı tahta (Tahtalar'a kayıtlı değilse bilgisayar adı). Süzgeç zaman çizelgesini de süzer." },
-      { id: "user", label: "Kullanıcı", choices: true, hint: "Oturumu açan kullanıcı: tahtada giriş ekranından oturum açan kişi ya da web terminal açan Ankamon kullanıcısı. Süzgeç zaman çizelgesini de süzer." },
-      { id: "kind", label: "Tür", choices: true, hint: "Tahta oturumu: tahtanın giriş ekranından açılan oturum · Web terminal: Ankamon üzerinden açılan uzak terminal. Süzgeç zaman çizelgesini de süzer." },
+      { id: "board", label: "Cihaz", choices: true, hint: "Oturumun açıldığı cihaz (Cihazlar'a kayıtlı değilse bilgisayar adı). Süzgeç zaman çizelgesini de süzer." },
+      { id: "user", label: "Kullanıcı", choices: true, hint: "Oturumu açan kullanıcı: cihazda giriş ekranından oturum açan kişi ya da web terminal açan Ankamon kullanıcısı. Süzgeç zaman çizelgesini de süzer." },
+      { id: "kind", label: "Tür", choices: true, hint: "Cihaz oturumu: cihazın giriş ekranından açılan oturum · Web terminal: Ankamon üzerinden açılan uzak terminal. Süzgeç zaman çizelgesini de süzer." },
       { id: "count", label: "Oturum", hint: "Görünen aralıktaki oturum sayısı" },
       { id: "total", label: "Toplam süre", hint: "Görünen aralıkta toplam açık kalma süresi (aralığı taşan oturumların yalnız aralık içindeki kısmı)" },
       { id: "avg", label: "Ortalama", hint: "Oturum başına ortalama süre (görünen aralıkta)" },
@@ -153,7 +153,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     this.__table = page._createTable(this.__columns, { storageKey: "timeline.grid.columns" });
     this.__filters = page._addColumnFilters(this.__table, this.__columns, () => this.__filtersChanged(),
       { rows: () => this.__allRows || [] });
-    // Varsayılan (eski "Tür: Tahta oturumu" seçimi gibi): yalnız tahta oturumları.
+    // Varsayılan (eski "Tür: Cihaz oturumu" seçimi gibi): yalnız cihaz oturumları.
     this.__filters.kind.setValue(`"${ankamon.ui.sessions.Users.KIND.board}"`);
     // Süre/tarih sütunları ekranda metin; sıralama satır sonundaki ham sayılarla yapılır (bkz. __summarize).
     const model = this.__table.getTableModel();
@@ -168,7 +168,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const row = e.getRow() === null ? null : this.__table.getTableModel().getRowData(e.getRow());
       this.__table.setContextMenu(row ? this.__tableMenu(row) : null);
     });
-    this.__table.setToolTipText("Çift tıklayınca o tahta ve kullanıcı süzgece alınır");
+    this.__table.setToolTipText("Çift tıklayınca o cihaz ve kullanıcı süzgece alınır");
     // SplitPane.add() ÇIPLAK SAYI flex bekler (genel Widget.add'in aksine — bkz. ankamon-architecture notu).
     split.add(this.__table, 2);
     split.add(lower, 3);
@@ -180,7 +180,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     COL: { board: 1, user: 2, kind: 3, count: 4, total: 5, avg: 6, bad: 7, first: 8, last: 9,
       rawTotal: 10, rawAvg: 11, rawFirst: 12, rawLast: 13, boardKey: 14, kindKey: 15, username: 16 },
     /** Tür sütununun metinleri. */
-    KIND: { board: "Tahta oturumu", webshell: "Web terminal" },
+    KIND: { board: "Cihaz oturumu", webshell: "Web terminal" },
 
     /** Tablo ile çizelge arasındaki sürüklenebilir ayracın kalınlığı (px). */
     SPLITTER_HEIGHT: 8,
@@ -193,7 +193,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       ok: "Düzgün kapandı",
       open: "Açık",
       locked: "Açık (kilitli)",
-      offline: "Kapanmadı: tahta çevrimdışı oldu",
+      offline: "Kapanmadı: cihaz çevrimdışı oldu",
       superseded: "Kapanmadı: yeni oturum açıldı",
       web: "Web terminal"
     },
@@ -256,7 +256,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       }
     },
 
-    /** Süzgece uyan görüntülerin çizelge öğeleri; satırlar `groups`a eklenir (oturumu olmayan tahta/kişi de görünsün). */
+    /** Süzgece uyan görüntülerin çizelge öğeleri; satırlar `groups`a eklenir (oturumu olmayan cihaz/kişi de görünsün). */
     __shotItems(groups, byBoard, badOnly) {
       const f = this.__textFilters();
       if (badOnly || !ankamon.page.Base.filterMatch(ankamon.ui.sessions.Users.KIND.board, f.kind)) {
@@ -373,7 +373,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     },
 
     /**
-     * "Oturum geçmişi" (Oturumlar sekmesindeki sağ menü): o kullanıcıyı süzer, satırları tahtalara
+     * "Oturum geçmişi" (Oturumlar sekmesindeki sağ menü): o kullanıcıyı süzer, satırları cihazlara
      * göre gruplar ve aralığı kullanıcının bütün oturumlarını kapsayacak şekilde ayarlar.
      */
     showUser(username, kind) {
@@ -392,8 +392,8 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     },
 
     /**
-     * Tahtalar/Ekranlar sağ menüsü "Oturum geçmişi" (bkz. page.Sessions.openWith): yalnız o tahta — tür süzgeci boş
-     * (web terminal dahil), satırlar kullanıcılara göre, aralık tahtanın bütün oturumlarını kapsar. Veri henüz
+     * Cihazlar/Ekranlar sağ menüsü "Oturum geçmişi" (bkz. page.Sessions.openWith): yalnız o cihaz — tür süzgeci boş
+     * (web terminal dahil), satırlar kullanıcılara göre, aralık cihazın bütün oturumlarını kapsar. Veri henüz
      * gelmediyse (sayfa ilk açılıyor) setData'da uygulanır.
      * @param board {Map} {id, name}
      */
@@ -448,7 +448,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       this.__filters[id].setValue(value ? `"${value}"` : "");
     },
 
-    /** Tablonun Tahta / Kullanıcı / Tür süzgeç metinleri (çizelgeyi de süzenler). */
+    /** Tablonun Cihaz / Kullanıcı / Tür süzgeç metinleri (çizelgeyi de süzenler). */
     __textFilters() {
       const get = id => (this.__filters[id].getValue() || "").trim();
       return { board: get("board"), user: get("user"), kind: get("kind") };
@@ -466,7 +466,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         M(ankamon.ui.sessions.Users.KIND[s.kind] || s.kind, f.kind);
     },
 
-    /** Tablo süzgeci değişti: Tahta/Kullanıcı/Tür çizelgeyi de süzer, öteki sütunlar yalnız tabloyu. */
+    /** Tablo süzgeci değişti: Cihaz/Kullanıcı/Tür çizelgeyi de süzer, öteki sütunlar yalnız tabloyu. */
     __filtersChanged() {
       if (this.__updatingOptions) {
         return;
@@ -503,14 +503,14 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const badOnly = this.__badOnly.getValue();
       const now = Date.now() / 1000;
 
-      // Tablo satırları (ve hazır listeler) için süzgeçsiz oturumlar; çizelge için Tahta/Kullanıcı/Tür süzgeçlileri.
+      // Tablo satırları (ve hazır listeler) için süzgeçsiz oturumlar; çizelge için Cihaz/Kullanıcı/Tür süzgeçlileri.
       this.__base = this.__sessions.filter(s => !badOnly || S.isBad(s));
       this.__shown = this.__base.filter(s => this.__sessionMatches(s, f));
 
       const groups = new Map();
       const items = this.__shown.map(s => {
         const boardName = s.board || s.host || "?";
-        // Aynı ad iki türde (tahta kullanıcısı / Ankamon kullanıcısı) farklı kişiler olabilir.
+        // Aynı ad iki türde (cihaz kullanıcısı / Ankamon kullanıcısı) farklı kişiler olabilir.
         const userKey = s.kind + ":" + s.username;
         const userName = s.kind === "webshell" && !kind ? `${s.username} (web terminal)` : s.username;
         const group = byBoard ? this.__boardKey(s) : userKey;
@@ -536,8 +536,8 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         items.push(...this.__offItems(new Set(groups.keys())));
       }
       this.__timeline.setData([...groups.entries()].map(([id, content]) => ({ id, content: esc(content) })), items);
-      // Satır adları sütununun başlığı: tahta satırlarında kayıtlı tahtalar dışında, log gönderen ama
-      // tahta olarak eklenmemiş makineler (bilgisayar adıyla) de bulunabildiğinden "Bilgisayar".
+      // Satır adları sütununun başlığı: cihaz satırlarında kayıtlı cihazlar dışında, log gönderen ama
+      // cihaz olarak eklenmemiş makineler (bilgisayar adıyla) de bulunabildiğinden "Bilgisayar".
       this.__timeline.setGroupHeader(byBoard ? "Bilgisayar" : "Kullanıcı");
       if (!this.__framed) {
         this.__framed = true;
@@ -564,7 +564,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     },
 
     /**
-     * Görünen aralıktaki oturumların özeti (üst satır) ve satır başına (tahta/kullanıcı) tablo.
+     * Görünen aralıktaki oturumların özeti (üst satır) ve satır başına (cihaz/kullanıcı) tablo.
      * @param range {Map|null} {start, end: Date}
      */
     __summarize(range) {
@@ -597,7 +597,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         row.last = Math.max(row.last, s.started_at);
         per.set(key, row);
       });
-      // Özet: çizelgede görünenler (Tahta/Kullanıcı/Tür süzgeçli).
+      // Özet: çizelgede görünenler (Cihaz/Kullanıcı/Tür süzgeçli).
       let count = 0, total = 0, bad = 0;
       const groupsSeen = new Set();
       this.__shown.filter(inRange).forEach(s => {
@@ -611,7 +611,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       this.__summary.setValue(count
         ? `<b>${count}</b> oturum · toplam <b>${F.duration(total)}</b> · ortalama <b>${F.duration(total / count)}</b> · ` +
           `<b style="color:${bad ? "#d93025" : "inherit"}">${bad}</b> düzgün kapanmadı · ` +
-          `<b>${groupsSeen.size}</b> ${byBoard ? "tahta" : "kullanıcı"} <span style="color:#5f6368">(${span})</span>`
+          `<b>${groupsSeen.size}</b> ${byBoard ? "cihaz" : "kullanıcı"} <span style="color:#5f6368">(${span})</span>`
         : `<span style="color:#5f6368">Bu aralıkta süzgece uyan oturum yok (${span}). "Tümü" ile bütün kayıtları görebilirsiniz.</span>`);
 
       this.__allRows = [...per.values()].sort((a, b) => b.total - a.total).map(r => [
@@ -640,11 +640,11 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const F = ankamon.util.Format;
       const C = ankamon.ui.sessions.Users.COL;
       return {
-        board: r => `${r[C.board]} — çift tık: yalnız bu tahta ve ${r[C.user]}`,
+        board: r => `${r[C.board]} — çift tık: yalnız bu cihaz ve ${r[C.user]}`,
         user: r => r[C.kindKey] === "webshell" ? `${r[C.user]}: web terminal açan Ankamon kullanıcısı`
-          : `${r[C.user]}: tahtada giriş ekranından oturum açan kullanıcı`,
-        kind: r => r[C.kindKey] === "webshell" ? "Web terminal: Ankamon üzerinden tahtaya açılan uzak terminal"
-          : "Tahta oturumu: tahtanın giriş ekranından açılan oturum",
+          : `${r[C.user]}: cihazda giriş ekranından oturum açan kullanıcı`,
+        kind: r => r[C.kindKey] === "webshell" ? "Web terminal: Ankamon üzerinden cihaza açılan uzak terminal"
+          : "Cihaz oturumu: cihazın giriş ekranından açılan oturum",
         count: r => `Görünen aralıkta ${r[C.count]} oturum`,
         total: r => `Görünen aralıkta toplam ${F.duration(r[C.rawTotal])} açık kaldı (aralığı taşan oturumların yalnız aralık içindeki kısmı)`,
         avg: r => `Oturum başına ortalama ${F.duration(r[C.rawAvg])}`,
@@ -656,7 +656,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     },
 
     /**
-     * Tahtaların açık aralıkları (GET /board-uptime — worker'ın loglardan ARTIMLI doldurduğu tablo,
+     * Cihazların açık aralıkları (GET /board-uptime — worker'ın loglardan ARTIMLI doldurduğu tablo,
      * her istekte yeniden hesaplanmaz). Görünen aralığın iki yanına birer aralık boyu pay eklenerek
      * çekilir; önbellek görünen aralığı kapsıyor ve 60 sn'den yeniyse yeniden istenmez. Uç yoksa
      * ya da hata verirse çizelge kapalı gölgesi olmadan çalışmaya devam eder.
@@ -689,8 +689,8 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     },
 
     /**
-     * Tahta satırlarına "kapalı" arka plan çubukları: açık aralıkların, çekilen [from, to] (ve
-     * şimdi) içindeki tümleyeni. @param groups {Set} çizelgedeki tahta satır anahtarları
+     * Cihaz satırlarına "kapalı" arka plan çubukları: açık aralıkların, çekilen [from, to] (ve
+     * şimdi) içindeki tümleyeni. @param groups {Set} çizelgedeki cihaz satır anahtarları
      */
     __offItems(groups) {
       const c = this.__uptime;
@@ -705,7 +705,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         if (!groups.has(group)) {
           return;
         }
-        // Tahtanın ilk log kaydından (since) öncesi bilinmiyor: "kapalı" diye taranmaz.
+        // Cihazın ilk log kaydından (since) öncesi bilinmiyor: "kapalı" diye taranmaz.
         let cursor = Math.max(c.from, b.since || 0);
         const gap = (start, end, i) => {
           if (end - start >= 60) {
@@ -724,7 +724,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       return out;
     },
 
-    /** Tablo satırına çift tıklama: o tahtayı ve kullanıcıyı (ve türü) süzgece al. */
+    /** Tablo satırına çift tıklama: o cihazı ve kullanıcıyı (ve türü) süzgece al. */
     __pickRow(rowIndex) {
       const row = this.__table.getTableModel().getRowData(rowIndex);
       if (!row) {
@@ -762,7 +762,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       }
     },
 
-    /** Tablo satırı sağ menüsü: tahta (bilgisayar) menüsü + kullanıcı süzgeci. */
+    /** Tablo satırı sağ menüsü: cihaz (bilgisayar) menüsü + kullanıcı süzgeci. */
     __tableMenu(row) {
       const C = ankamon.ui.sessions.Users.COL;
       const menu = this.__groupMenu(row[C.boardKey], true);
@@ -787,7 +787,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const icon = ankamon.ui.Shell.ICON;
       const menu = new qx.ui.menu.Menu();
       menu.add(ops.menuButton(icon.sessions, `Yalnız bu kullanıcı (${s.username})`, () => this.__pickKey(s.kind + ":" + s.username)));
-      menu.add(ops.menuButton(icon.boards, `Yalnız bu tahta (${s.board || s.host})`, () => this.__setFilter("board", s.board || s.host)));
+      menu.add(ops.menuButton(icon.boards, `Yalnız bu cihaz (${s.board || s.host})`, () => this.__setFilter("board", s.board || s.host)));
       if (s.kind === "board") {
         menu.add(new qx.ui.menu.Separator());
         menu.add(ops.menuButton(icon.movements, "Oturum hareketleri", () => this.__page.showMovements({
@@ -797,7 +797,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         menu.add(ops.menuButton(icon.movements, `Bu kullanıcının tüm hareketleri (${s.username})`,
           () => this.__page.showMovements({ username: s.username })));
       }
-      // Açık tahta oturumu: o tahtanın canlı ekranı (Ekran ▸ Ekranı göster ile aynı işlev).
+      // Açık cihaz oturumu: o cihazın canlı ekranı (Ekran ▸ Ekranı göster ile aynı işlev).
       if (s.kind === "board" && !s.ended_at && s.board_id && this.__page._can("screen")) {
         menu.add(new qx.ui.menu.Separator());
         menu.add(ops.menuButton(icon.screen, `Ekranı göster (${s.board || s.host})`,
@@ -824,8 +824,8 @@ qx.Class.define("ankamon.ui.sessions.Users", {
 
     /**
      * Satır (zaman çizelgesindeki satır adı ya da üstteki tablonun satırı) sağ menüsü: süzgece alma ve —
-     * Tahtalar'a kayıtlı olmayan bilgisayarda (anahtar "h<ad>"), "sessions.hosts" yetkisiyle — kayıtlarını
-     * silme. @param key {String} satır anahtarı (tahta satırlarında "b<id>"/"h<ad>", kullanıcıda "<tür>:<ad>")
+     * Cihazlar'a kayıtlı olmayan bilgisayarda (anahtar "h<ad>"), "sessions.hosts" yetkisiyle — kayıtlarını
+     * silme. @param key {String} satır anahtarı (cihaz satırlarında "b<id>"/"h<ad>", kullanıcıda "<tür>:<ad>")
      * @return {qx.ui.menu.Menu|null}
      */
     __groupMenu(key, forceBoard) {
@@ -855,7 +855,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
           menu.add(ops.menuButton(icon.movements, "Oturumsuz hareketler", () => this.__page.showMovements({ username: "-" })));
         }
         if (key.startsWith("board:") && key.slice(i + 1)) {
-          // Tahta süzgecinde tek kayıtlı tahta seçiliyse o tahtadaki, değilse bütün tahtalardaki hareketleri.
+          // Cihaz süzgecinde tek kayıtlı cihaz seçiliyse o cihazdaki, değilse bütün cihazlardaki hareketleri.
           const name = this.__single("board");
           const s = name && (this.__sessions || []).find(x => x.board_id && x.board === name);
           menu.add(ops.menuButton(icon.movements, "Oturum hareketleri", () => this.__page.showMovements({
@@ -875,7 +875,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const count = (this.__sessions || []).filter(s => !s.board_id && s.host === host).length;
       const win = ankamon.ui.Dialog.window("Bilgisayarın kayıtlarını sil", 480);
       win.add(new qx.ui.basic.Label(
-        `<b>${esc(host)}</b> Tahtalar'a kayıtlı değil. Bu bilgisayarın <b>${count} oturum kaydı</b> ve açık/kapalı ` +
+        `<b>${esc(host)}</b> Cihazlar'a kayıtlı değil. Bu bilgisayarın <b>${count} oturum kaydı</b> ve açık/kapalı ` +
         "aralıkları kalıcı olarak silinecek; geri alınamaz.<br><br>Bilgisayar hâlâ log gönderiyorsa yalnız bundan " +
         "sonraki oturumları yeniden görünür.").set({ rich: true, wrap: true }));
       const logs = new qx.ui.form.CheckBox("Ham sistem loglarını da sil (Loglar ▸ Sistem logları)");

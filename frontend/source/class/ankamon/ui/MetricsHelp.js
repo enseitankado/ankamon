@@ -64,7 +64,7 @@ qx.Class.define("ankamon.ui.MetricsHelp", {
       smartmon_airflow_temperature_cel_raw_value: ["Sıcaklık", "disk sıcaklığı (SMART 190, hava akışı)"],
       nvme_temperature_celsius: ["Sıcaklık", "NVMe disk sıcaklığı"],
       node_boot_time_seconds: ["Sistem", "açılış zamanı — çalışma süresi buradan"],
-      node_time_seconds: ["Sistem", "tahtanın saati"],
+      node_time_seconds: ["Sistem", "cihazın saati"],
       node_timex_offset_seconds: ["Sistem", "saat (NTP) sapması"]
     },
 
@@ -194,14 +194,14 @@ qx.Class.define("ankamon.ui.MetricsHelp", {
       // --- Özet
       const perBoardCpu = tg && tg.cpu_percent !== null && scanned.length ? tg.cpu_percent / scanned.length : null;
       h += "<h3>Şu an</h3><table>";
-      h += `<tr><th>Kayıtlı tahta</th><td>${n(d.boards.length)}</td><th>Şu an taranan</th><td>${n(scanned.length)}</td></tr>`;
+      h += `<tr><th>Kayıtlı cihaz</th><td>${n(d.boards.length)}</td><th>Şu an taranan</th><td>${n(scanned.length)}</td></tr>`;
       h += `<tr><th>Son 10 dk yazılan satır</th><td>${n(r.rows_10m)}</td><th>Bu hızla günde</th><td>~${n(r.rows_per_day)} satır</td></tr>`;
       h += `<tr><th>Günlük büyüme (ham)</th><td>~${r.bytes_per_day !== null ? F.bytes(r.bytes_per_day) : "—"}</td>` +
         `<th>Sıkıştırıldıktan sonra</th><td>~${r.bytes_per_day_compressed !== null ? F.bytes(r.bytes_per_day_compressed) : "—"}` +
         (r.compression_ratio ? ` <span class="muted">(oran ~${Math.round(1 / r.compression_ratio)}×)</span>` : "") + "</td></tr>";
       if (tg) {
         h += `<tr><th>Telegraf işlemci (ort.)</th><td>%${tg.cpu_percent} tek çekirdek` +
-          (perBoardCpu !== null ? ` <span class="muted">(~%${perBoardCpu.toFixed(3)} / tahta)</span>` : "") +
+          (perBoardCpu !== null ? ` <span class="muted">(~%${perBoardCpu.toFixed(3)} / cihaz)</span>` : "") +
           `</td><th>Telegraf bellek</th><td>${tg.rss_bytes ? F.bytes(tg.rss_bytes) : "—"}</td></tr>`;
         h += `<tr><td colspan="4" class="muted">Telegraf ${esc(F.duration(tg.uptime))} önce başladı (PID ${tg.pid}); ` +
           `o zamandan beri toplam ${tg.cpu_seconds} işlemci-saniyesi harcadı. Makinede ${tg.cores} çekirdek var. İşlemci ortalaması ` +
@@ -217,25 +217,25 @@ qx.Class.define("ankamon.ui.MetricsHelp", {
 
       // --- Kim, ne sıklıkla
       h += "<h3>Kim, ne sıklıkla topluyor?</h3>";
-      h += `<p>Veriyi tahta <b>göndermez</b>; Ankamon konteynerindeki <b>Telegraf</b> her tahtanın ` +
+      h += `<p>Veriyi cihaz <b>göndermez</b>; Ankamon konteynerindeki <b>Telegraf</b> her cihazın ` +
         `<code>node_exporter</code> ucunu (<code>http://&lt;ip&gt;:9100/metrics</code>) kendisi okur.</p>`;
       h += `<div class="flow">` +
-        `worker (board_status)  ─ her ${c.status_tick} sn ─►  tahtaya TCP yoklama (SSH 22 + sensör portu, ${c.probe_timeout ?? "?"} sn zaman aşımı)\n` +
+        `worker (board_status)  ─ her ${c.status_tick} sn ─►  cihaza TCP yoklama (SSH 22 + sensör portu, ${c.probe_timeout ?? "?"} sn zaman aşımı)\n` +
         `      │  sensör portu ${c.fails_before_offline ?? "?"} kez üst üste yanıt vermezse "erişilemez" sayılır (tek sıçrama kaydı kesmez)\n` +
         `      ▼\n` +
-        `worker (telegraf_targets) ─ her ${c.status_tick} sn ─►  /data/telegraf/targets.conf  (izlenen + erişilebilir tahtalar)\n` +
+        `worker (telegraf_targets) ─ her ${c.status_tick} sn ─►  /data/telegraf/targets.conf  (izlenen + erişilebilir cihazlar)\n` +
         `      │  dosya değişince Telegraf kendini yeniden yükler (son değişiklik: ${when(c.targets_mtime)})\n` +
         `      ▼\n` +
         `Telegraf ─ her ${esc(c.scrape_interval)} (±${esc(c.collection_jitter)}) ─►  node_exporter (${esc(c.scrape_timeout)} zaman aşımı)\n` +
         `      │  reshape.star süzgeci: ~2300 satırlık yanıttan yalnız aşağıdaki ölçümler kalır\n` +
         `      ▼  her ${esc(c.flush_interval)} toplu yazım (bağlantı koparsa ${n(c.metric_buffer_limit)} ölçüme kadar bellekte bekler)\n` +
         `PostgreSQL/TimescaleDB  metrics  ─►  5 dk özet  ─►  saatlik özet</div>`;
-      h += `<p>Bir tahta: <b>izleme açık</b> + <b>sensör portu erişilebilir</b> + IP biliniyorsa taranır. ` +
-        `Açılan tahta ~${c.status_tick}-${c.status_tick * 2 + scrape} sn içinde kayda girer, kapandıktan ` +
+      h += `<p>Bir cihaz: <b>izleme açık</b> + <b>sensör portu erişilebilir</b> + IP biliniyorsa taranır. ` +
+        `Açılan cihaz ~${c.status_tick}-${c.status_tick * 2 + scrape} sn içinde kayda girer, kapandıktan ` +
         `~${c.status_tick * (c.fails_before_offline || 2)} sn sonra listeden çıkar.</p>`;
 
-      // --- Tahtalar
-      h += "<h3>Tahtalar (son 10 dakika, ölçülen)</h3><table><tr><th>Tahta</th><th>Adres</th><th>Durum</th>" +
+      // --- Cihazlar
+      h += "<h3>Cihazlar (son 10 dakika, ölçülen)</h3><table><tr><th>Cihaz</th><th>Adres</th><th>Durum</th>" +
         "<th>Taranıyor</th><th class=\"r\">Seri</th><th class=\"r\">Satır (10 dk)</th><th class=\"r\">Beklenen</th><th>Son ölçüm</th></tr>";
       d.boards.forEach(b => {
         const inT = targets.has(b.id);
@@ -249,7 +249,7 @@ qx.Class.define("ankamon.ui.MetricsHelp", {
           `<td class="r">${inT ? n(expected) + (pct !== null ? ` <span class="${pct >= 90 ? "ok" : "bad"}">%${pct}</span>` : "") : "—"}</td>` +
           `<td>${b.last ? esc(F.ago(b.last)) : "—"}</td></tr>`;
       });
-      h += "</table><p class=\"muted\">Beklenen = seri sayısı × (600 sn / tarama aralığı). %90'ın altı: tahta bu 10 dakikanın " +
+      h += "</table><p class=\"muted\">Beklenen = seri sayısı × (600 sn / tarama aralığı). %90'ın altı: cihaz bu 10 dakikanın " +
         "bir kısmında kapalıydı, yeni açıldı ya da taramalar zaman aşımına uğruyor.</p>";
 
       // --- Ne toplanıyor
@@ -261,7 +261,7 @@ qx.Class.define("ankamon.ui.MetricsHelp", {
         (groups[group] = groups[group] || []).push({ name, desc });
       });
       h += `<h3>Hangi sensör verileri toplanıyor? (${d.filter.keep.length} ölçüm)</h3>`;
-      h += "<table><tr><th>Grup</th><th>Ölçüm</th><th>Açıklama</th><th class=\"r\">Seri (tüm tahtalar)</th></tr>";
+      h += "<table><tr><th>Grup</th><th>Ölçüm</th><th>Açıklama</th><th class=\"r\">Seri (tüm cihazlar)</th></tr>";
       Object.keys(groups).forEach(group => {
         groups[group].forEach((m, i) => {
           const s = counts[m.name];
@@ -276,8 +276,8 @@ qx.Class.define("ankamon.ui.MetricsHelp", {
         `<li>Atlanan dosya sistemi türleri: ${d.filter.skip_fstypes.map(x => `<code>${esc(x)}</code>`).join(" ")}</li>` +
         `<li>Atlanan disk/ağ cihaz önekleri: ${d.filter.skip_dev_prefixes.map(x => `<code>${esc(x)}</code>`).join(" ")}</li>` +
         `<li>Saklanan etiketler: ${d.filter.keep_tags.map(x => `<code>${esc(x)}</code>`).join(" ")}</li></ul>`;
-      h += "<p class=\"muted\">Seri = tahta + ölçüm + etiket (ör. çekirdek, disk) birleşimi; her taramada seri başına bir satır yazılır. " +
-        "Tahta başına seri sayısı donanıma göre değişir (çekirdek, disk, sıcaklık algılayıcısı sayısı).</p>";
+      h += "<p class=\"muted\">Seri = cihaz + ölçüm + etiket (ör. çekirdek, disk) birleşimi; her taramada seri başına bir satır yazılır. " +
+        "Cihaz başına seri sayısı donanıma göre değişir (çekirdek, disk, sıcaklık algılayıcısı sayısı).</p>";
 
       // --- Saklama
       const layerName = { raw: "Ham (ayrıntılı)", "5m": "5 dakikalık özet", "1h": "Saatlik özet" };
@@ -318,10 +318,10 @@ qx.Class.define("ankamon.ui.MetricsHelp", {
         return ret ? this.__interval(ret.config.drop_after) : "süresiz";
       })();
       h += "<h3>Nerede sunuluyor?</h3><ul>" +
-        "<li><b>Tahtalar</b> grid'i: İşlemci, Bellek, Disk, Sıcaklık sütunları — ham verinin son 5 dakikasından, 5 sn'de bir.</li>" +
+        "<li><b>Cihazlar</b> grid'i: İşlemci, Bellek, Disk, Sıcaklık sütunları — ham verinin son 5 dakikasından, 5 sn'de bir.</li>" +
         "<li><b>Genel bakış</b>: Sensör kaydı (satır sayısı + boyut) kartı.</li>" +
         "<li><b>Sensörler</b> (bu sayfa, Grafana): zaman serisi grafikleri; sağ üstten zaman aralığı seçilir.</li>" +
-        "<li><b>Loglar → Disk kullanımı</b> (yetkiliye): tahta başına sensör verisi boyutu ve kalıcı silme.</li></ul>";
+        "<li><b>Loglar → Disk kullanımı</b> (yetkiliye): cihaz başına sensör verisi boyutu ve kalıcı silme.</li></ul>";
       const g = d.grafana;
       if (g.raw && !g["5m"] && !g["1h"]) {
         h += `<div class="warn"><b>Dikkat:</b> Grafana panoları şu an yalnız <b>ham</b> katmanı sorguluyor. Ham veri ` +

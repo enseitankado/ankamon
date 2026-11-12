@@ -26,21 +26,21 @@
  */
 
 /**
- * Sağ menü / araç çubuğu "Wi-Fi Monitör": seçili bütün tahtalar (sensörler) TEK pencerede, iki sekmede (kullanıcı isteği
+ * Sağ menü / araç çubuğu "Wi-Fi Monitör": seçili bütün cihazlar (sensörler) TEK pencerede, iki sekmede (kullanıcı isteği
  * 2026-11-10): "Tespitler" (varsayılan) bütün sensörlerin bulguları — satır başındaki onay kutusuyla işaretlenen satırlara güven
  * işlemleri uygulanır; "Sensörler" her sensörün tarama/izleme durumu, kipi, kartı ve sayıları. İki grid'de de sütunlar süzülür
  * (hazır değer listesiyle), sıralanır, sırası değiştirilir. Amaç sınıfa getirilmiş telefonları bulmak: sensörlerin duyduğu
  * Wi-Fi ağları, Wi-Fi arayan ve Wi-Fi'ye bağlı cihazlar "güvenilir" listesine (MAC adresiyle, sunucuda — /api/wifimon/fixed)
  * göre ayrılır; güvenilir olmayanlar telefon kanıtına göre öne çıkarılır (bkz. ui.boards.WifimonClassify, ui.boards.WifimonRender).
- * Bluetooth kullanılmaz. Pencere zaten açıksa yeni tahtalar ona eklenir.
+ * Bluetooth kullanılmaz. Pencere zaten açıksa yeni cihazlar ona eklenir.
  *
  * Her sensör için ayrı WebSocket (worker screen/wifi.py). "Sürekli izle" varsayılan açık (kullanıcı isteği). Kapalı Wi-Fi tarama
- * süresince geçici açılır (kayıtlı ağa bağlanmaz), pencere kapanınca eski durumuna döner; Tahtalar grid'inin Wi-Fi sütunu dinleme
+ * süresince geçici açılır (kayıtlı ağa bağlanmaz), pencere kapanınca eski durumuna döner; Cihazlar grid'inin Wi-Fi sütunu dinleme
  * sürerken "Monitör modu" gösterir, kapanışta tazelenir.
  *
- * SSH güvenliği (kullanıcı isteği): tahta ağa yalnız Wi-Fi ile bağlıysa kart monitör kipine alınmaz (SSH erişimi kopardı) — yalnız
- * ağ taraması yapılır; hem kabloyla hem Wi-Fi ile bağlı tahtalar ancak kullanıcı onaylarsa dinlenir (Wi-Fi bağlantıları pencere
- * açık kaldıkça kesilir, kapanınca yeniden kurulur). Tahtadaki program da SSH'nin Wi-Fi'den gelip gelmediğini ayrıca denetler.
+ * SSH güvenliği (kullanıcı isteği): cihaz ağa yalnız Wi-Fi ile bağlıysa kart monitör kipine alınmaz (SSH erişimi kopardı) — yalnız
+ * ağ taraması yapılır; hem kabloyla hem Wi-Fi ile bağlı cihazlar ancak kullanıcı onaylarsa dinlenir (Wi-Fi bağlantıları pencere
+ * açık kaldıkça kesilir, kapanınca yeniden kurulur). Cihazdaki program da SSH'nin Wi-Fi'den gelip gelmediğini ayrıca denetler.
  */
 qx.Class.define("ankamon.ui.boards.WifiMonitor", {
   type: "static",
@@ -49,7 +49,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
     /** Sürekli izlemede yoklama ve bağlı cihaz satırı son duyuluşundan bu kadar sonra listeden düşer. */
     PROBE_KEEP_MS: 5 * 60 * 1000,
 
-    HELP: "Bu pencere seçili tahtaların (<b>sensörlerin</b>) çevresindeki Wi-Fi vericilerini gösterir: <b>Tespitler</b> sekmesinde bulgular, " +
+    HELP: "Bu pencere seçili cihazların (<b>sensörlerin</b>) çevresindeki Wi-Fi vericilerini gösterir: <b>Tespitler</b> sekmesinde bulgular, " +
       "<b>Sensörler</b> sekmesinde her sensörün durumu (<i>İzleniyor</i> = sürekli izleme sürüyor; çift tık: o sensörün " +
       "tespitleri). Sınıfın/okulun olağan erişim noktalarını ve cihazlarını <b>güvenilir</b> işaretleyin — satır başındaki kutuyla " +
       "işaretleyip <i>Bu sınıfta güvenilir</i> / <i>Okul genelinde güvenilir</i> (Tespitler sekmesindeki düğmeler ya da sağ tık) ya da toptan (sınıflar boşken) <i>Görünenleri güvenilir yap</i>; güven " +
@@ -60,8 +60,8 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       "sayılan adresler tek satırda toplanır (Kanıt sütununda <i>N adres</i>; ölçütler: aynı WPS kimliği, aynı aranan ağ listesi, " +
       "802.11 sıra numarası sürekliliği, aynı yetenek parmak izi ve yakın sinyal — kestirimdir); bir Wi-Fi ağına bağlıysa gönderdiği veri çerçeveleriyle <b>Wi-Fi'ye bağlı cihaz</b> olarak " +
       "(içerik şifreli, yalnız adresler görülür). Bu ikisi Wi-Fi trafiği dinlenerek bulunur: sensörün Wi-Fi kartı dinleme " +
-      "süresince monitör kipine alınır (Tahtalar listesinin Wi-Fi sütununda <i>Monitör modu</i>). Ağa yalnız Wi-Fi ile bağlı " +
-      "tahta monitör kipine alınmaz (SSH erişimi kopardı); hem kablo hem Wi-Fi ile bağlı tahtalar onayınızla dinlenir (Wi-Fi " +
+      "süresince monitör kipine alınır (Cihazlar listesinin Wi-Fi sütununda <i>Monitör modu</i>). Ağa yalnız Wi-Fi ile bağlı " +
+      "cihaz monitör kipine alınmaz (SSH erişimi kopardı); hem kablo hem Wi-Fi ile bağlı cihazlar onayınızla dinlenir (Wi-Fi " +
       "bağlantıları pencere kapanana dek kesilir). Kanıttaki <i>N sensörde</i>: aynı MAC adresini duyan sensör sayısı. " +
       "<b>Sınırlar:</b> ekranı kapalı telefon seyrek yoklar, bağlı telefon yalnız dinlenen kanalda ve o anda bir şey " +
       "gönderiyorsa görülür — <i>Sürekli izle</i> açık kalsın; uçak kipindeki ya da Wi-Fi'si kapalı telefon görülemez; sinyal " +
@@ -70,17 +70,17 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
     __win: null,
 
     /**
-     * Message Bus konusu (veri: tahta kimliği): bir tahtanın Wi-Fi kartının durumu değişti (geçici açıldı, monitör kipine
-     * girdi, kapanınca eski durumuna döndü). Sunucu yeni durumu boards.facts'e yazmıştır; Tahtalar listesi kendini tazeler.
+     * Message Bus konusu (veri: cihaz kimliği): bir cihazın Wi-Fi kartının durumu değişti (geçici açıldı, monitör kipine
+     * girdi, kapanınca eski durumuna döndü). Sunucu yeni durumu boards.facts'e yazmıştır; Cihazlar listesi kendini tazeler.
      */
     RADIO_CHANGED: "ankamon.wifimon.radio",
 
     /**
-     * Tahta başına dinleme planı: {force} (kablo + Wi-Fi bağlı, kullanıcı onayladı: Wi-Fi bağlantısı kesilip dinlenir),
-     * {exclude} (kablo + Wi-Fi bağlı, kullanıcı "Dahil etmeden tara" dedi: tahta sensör olarak HİÇ kullanılmaz, öteki seçili
-     * tahtalarla taranır — kullanıcı bildirimi 2026-11-12: önce yalnız dinleme kapanıyor, tahta yine sensör oluyordu) ya da
-     * {noSniff: "wifionly"} (yalnız Wi-Fi ile bağlı: yalnız ağ taraması). Kablo bilgisi Tahtalar listesinin Kablo sütunuyla aynı kaynaktan
-     * (page.Boards.cableText); kesin koruma tahtadadır (SSH Wi-Fi'den geliyorsa asla monitör kipi — worker wifi_remote_scan.py).
+     * Cihaz başına dinleme planı: {force} (kablo + Wi-Fi bağlı, kullanıcı onayladı: Wi-Fi bağlantısı kesilip dinlenir),
+     * {exclude} (kablo + Wi-Fi bağlı, kullanıcı "Dahil etmeden tara" dedi: cihaz sensör olarak HİÇ kullanılmaz, öteki seçili
+     * cihazlarla taranır — kullanıcı bildirimi 2026-11-12: önce yalnız dinleme kapanıyor, cihaz yine sensör oluyordu) ya da
+     * {noSniff: "wifionly"} (yalnız Wi-Fi ile bağlı: yalnız ağ taraması). Kablo bilgisi Cihazlar listesinin Kablo sütunuyla aynı kaynaktan
+     * (page.Boards.cableText); kesin koruma cihazdadır (SSH Wi-Fi'den geliyorsa asla monitör kipi — worker wifi_remote_scan.py).
      */
     async __wifimonPlan(boards) {
       const plan = new Map();
@@ -95,10 +95,10 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         // ağ taraması / hiç açma.
         const answer = await this.__askBoth(
           `<b>${both.map(b => esc(name(b))).join(", ")}</b> hem kabloyla hem Wi-Fi ile bağlı.<br><br>Wi-Fi trafiğini dinlemek için ` +
-          `${both.length > 1 ? "bu tahtaların" : "bu tahtanın"} <b>Wi-Fi bağlantısı kopacak</b> ve pencere açık kaldıkça kopuk ` +
+          `${both.length > 1 ? "bu cihazların" : "bu cihazın"} <b>Wi-Fi bağlantısı kopacak</b> ve pencere açık kaldıkça kopuk ` +
           "kalacak (kablo bağlantısı ve uzaktan erişim sürer); pencere kapanınca Wi-Fi yeniden bağlanır.<br><br>" +
-          `<b>Dahil etmeden tara</b>: ${both.length > 1 ? "bu tahtalar" : "bu tahta"} sensör olarak kullanılmaz (Wi-Fi bağlantısına ` +
-          "dokunulmaz); tarama öteki seçili tahtalarla yapılır.");
+          `<b>Dahil etmeden tara</b>: ${both.length > 1 ? "bu cihazlar" : "bu cihaz"} sensör olarak kullanılmaz (Wi-Fi bağlantısına ` +
+          "dokunulmaz); tarama öteki seçili cihazlarla yapılır.");
         if (answer === null) {
           return null;
         }
@@ -115,7 +115,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         win.add(new qx.ui.basic.Label(message).set({ rich: true, wrap: true }));
         const cancel = new qx.ui.form.Button("Vazgeç").set({ toolTipText: "Wi-Fi Monitör açılmaz" });
         const scan = new qx.ui.form.Button("Dahil etmeden tara").set({
-          toolTipText: "Bu tahtalar sensör olarak kullanılmaz (Wi-Fi bağlantılarına dokunulmaz); öteki seçili tahtalarla taranır" });
+          toolTipText: "Bu cihazlar sensör olarak kullanılmaz (Wi-Fi bağlantılarına dokunulmaz); öteki seçili cihazlarla taranır" });
         const ok = new qx.ui.form.Button("Dahil et (Wi-Fi kopacak)");
         cancel.addListener("execute", () => win.close());
         scan.addListener("execute", () => {
@@ -134,7 +134,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
     },
 
     /**
-     * @param boards {Array} tahtalar (çevrim içi olanlar)
+     * @param boards {Array} cihazlar (çevrim içi olanlar)
      * @param user {Map?} oturumdaki kullanıcı (grid sütun tercihleri için)
      */
     async open(boards, user) {
@@ -157,11 +157,11 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       if (!plan) {
         return; // Vazgeç: pencere açılmaz
       }
-      // "Dahil etmeden tara": o tahtalar sensör olmaz; hiç tahta kalmazsa pencere açılmaz.
+      // "Dahil etmeden tara": o cihazlar sensör olmaz; hiç cihaz kalmazsa pencere açılmaz.
       boards = boards.filter(b => !(plan.get(b.id) || {}).exclude);
       if (!boards.length) {
-        ankamon.ui.Dialog.alert("Taranacak sensör kalmadı: seçili tahtaların hepsi dahil edilmedi. Wi-Fi Monitör'ü başka tahtalarla " +
-          "açın ya da bu tahtaları dahil edin (Wi-Fi bağlantıları pencere açıkken kopar).", "Wi-Fi Monitör");
+        ankamon.ui.Dialog.alert("Taranacak sensör kalmadı: seçili cihazların hepsi dahil edilmedi. Wi-Fi Monitör'ü başka cihazlarla " +
+          "açın ya da bu cihazları dahil edin (Wi-Fi bağlantıları pencere açıkken kopar).", "Wi-Fi Monitör");
         return;
       }
       const bounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280 };
@@ -191,12 +191,12 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       const refresh = new qx.ui.form.Button("Yenile");
       const watchBox = new qx.ui.form.CheckBox("Sürekli izle").set({
         value: true,
-        toolTipText: "Açıkken liste sürekli tazelenir (Sensörler sekmesinde 'İzleniyor'); tahtada geçici açılan radyo izleme bitene kadar açık kalır."
+        toolTipText: "Açıkken liste sürekli tazelenir (Sensörler sekmesinde 'İzleniyor'); cihazda geçici açılan radyo izleme bitene kadar açık kalır."
       });
       const probeBox = new qx.ui.form.CheckBox("Wi-Fi trafiğini dinle").set({
         value: true,
         toolTipText: "Ağ arayan cihazların yoklamalarını ve bir ağa bağlı cihazların veri çerçevelerini dinler (sensörün Wi-Fi kartı " +
-          "dinleme süresince monitör kipine alınır; ağa yalnız Wi-Fi ile bağlı tahtada yapılmaz)."
+          "dinleme süresince monitör kipine alınır; ağa yalnız Wi-Fi ile bağlı cihazda yapılmaz)."
       });
       const fixedBox = new qx.ui.form.CheckBox("Güvenilirleri göster");
       const help = new qx.ui.form.Button("?").set({ toolTipText: "Neler görülebilir, sınırlar" });
@@ -370,7 +370,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           toolTipText: "İşaretli güvenilir satırları güvenilir listesinden çıkarır (güvenilirler 'Güvenilirleri göster' açıkken listelenir)." });
         const skipped = list.length - can - out;
         checkedInfo.setValue(!list.length ? "Satır başındaki kutuyla işaretleyin."
-          : `${list.length} işaretli` + (skipped > 0 ? ` · ${skipped} işaretlenemez (rastgele adresli arayan cihaz, tahta ya da sensörün ağı)` : ""));
+          : `${list.length} işaretli` + (skipped > 0 ? ` · ${skipped} işaretlenemez (rastgele adresli arayan cihaz, cihaz ya da sensörün ağı)` : ""));
       };
 
       const loadFixed = async () => {
@@ -499,7 +499,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         return watching ? "Wi-Fi izleme için geçici açık; izleme bitince kapatılacak." : "Wi-Fi geçici açık, tarama sonrası kapatılacak.";
       };
       const PLAN_NOTE = {
-        wifionly: "Tahta ağa yalnız Wi-Fi ile bağlı görünüyor: SSH erişimi kopmasın diye monitör kipine alınmıyor (yalnız ağ taraması)."
+        wifionly: "Cihaz ağa yalnız Wi-Fi ile bağlı görünüyor: SSH erişimi kopmasın diye monitör kipine alınmıyor (yalnız ağ taraması)."
       };
       const planNote = feed => (feed.plan.noSniff && probeBox.getValue() ? PLAN_NOTE[feed.plan.noSniff] : "");
       const discard = sock => {
@@ -520,7 +520,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           feed.data = d;
           feed.at = d.at * 1000;
           feed.forced = (d.info || {}).forced === "1";
-          // Kartın o anki durumu Tahtalar listesinin Wi-Fi sütununa anında geçer: sunucu bu iletiyi göndermeden önce
+          // Kartın o anki durumu Cihazlar listesinin Wi-Fi sütununa anında geçer: sunucu bu iletiyi göndermeden önce
           // boards.facts'e yazdı (bkz. worker screen/wifi.py _store_radio).
           const radioKey = `${d.radio}|${d.state}`;
           if (radioKey !== feed.radioKey) {
@@ -577,15 +577,15 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           const parts = [];
           if (d.result === "fail" || d.result === "lock") {
             feed.error = true;
-            parts.push("Tahtadaki kartın eski durumuna dönmesi doğrulanamadı; lütfen denetleyin.");
+            parts.push("Cihazdaki kartın eski durumuna dönmesi doğrulanamadı; lütfen denetleyin.");
           } else if (d.wifi_fail) {
             parts.push(wifiNote(d, false));
           } else if (d.wifi_temp === "1") {
-            parts.push(d.result === "shared" ? "Wi-Fi geçici açıldı; bu tahtadaki başka bir tarama bitince kapatılacak."
+            parts.push(d.result === "shared" ? "Wi-Fi geçici açıldı; bu cihazdaki başka bir tarama bitince kapatılacak."
               : "Wi-Fi geçici açıldı, tarama sonrası kapatıldı.");
           }
           if (d.policy === "off" && d.radio === "disabled" && d.result !== "shared") {
-            parts.push("Bu tahtada Wi-Fi kapalı tutuluyor (Wi-Fi'yi kapat); kart kapalı bırakıldı.");
+            parts.push("Bu cihazda Wi-Fi kapalı tutuluyor (Wi-Fi'yi kapat); kart kapalı bırakıldı.");
           }
           if (feed.probeInfo && feed.probeInfo.note) {
             parts.push(Render.PROBE_NOTE[feed.probeInfo.note] || "");
@@ -616,7 +616,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           feed.sniffing = false;
           syncControls();
           if (e.code !== 1000) {
-            const why = { 4001: "Tahta bulunamadı.", 4002: "Tahtaya ulaşılamıyor.", 4003: "SSH girişi reddedildi.", 4009: "Tahtada nmcli yok.", 4010: "Tahtada /run dizinine yazılamıyor." };
+            const why = { 4001: "Cihaz bulunamadı.", 4002: "Cihaza ulaşılamıyor.", 4003: "SSH girişi reddedildi.", 4009: "Cihazda nmcli yok.", 4010: "Cihazda /run dizinine yazılamıyor." };
             const retry = watchBox.getValue() && ![4001, 4003, 4009, 4010].includes(e.code);
             feed.error = true;
             feed.statusText = (why[e.code] || "Bağlantı kesildi.") + (retry ? " Yeniden deneniyor…" : "");
@@ -670,7 +670,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       fixedBox.addListener("changeValue", render);
       refresh.addListener("execute", () => feeds.forEach(feed => !feed.ws && connect(feed)));
       watchBox.addListener("changeValue", e => {
-        // Eski oturum kapanırken yenisi başlarsa tahtadaki sayım radyoyu boşuna kapatmaz (bkz. wifi_remote_scan.py).
+        // Eski oturum kapanırken yenisi başlarsa cihazdaki sayım radyoyu boşuna kapatmaz (bkz. wifi_remote_scan.py).
         if (e.getData()) {
           restartAll();
         } else {
@@ -700,8 +700,8 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         },
         closeAll: () => {
           closed = true;
-          // Pencere kapanınca tahtalar kartı kendisi geri yükler (birkaç sn; zorla kesilen Wi-Fi yeniden bağlanır), sunucu son
-          // durumu boards.facts'e yazar ve "Monitör modu"nu siler; kapanış iletisi bu pencereye artık gelmeyeceğinden Tahtalar
+          // Pencere kapanınca cihazlar kartı kendisi geri yükler (birkaç sn; zorla kesilen Wi-Fi yeniden bağlanır), sunucu son
+          // durumu boards.facts'e yazar ve "Monitör modu"nu siler; kapanış iletisi bu pencereye artık gelmeyeceğinden Cihazlar
           // listesi birkaç kez tazelenir (değişen durum anında görünsün).
           const ids = Array.from(feeds.keys());
           [4000, 9000, 20000, 45000].forEach(ms => qx.event.Timer.once(() =>

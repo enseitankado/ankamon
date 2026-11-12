@@ -28,7 +28,7 @@
 /**
  * Ağ envanteri (sol menü "Ağ"): sunucunun bağlı olduğu BÜTÜN ağların cihazları tek listede — o an çevrim dışı
  * olanlar dahil (kullanıcı isteği 2026-11-09: ağ başına alt menü yok; cihazın ağı "Ağ", "IP/Maske" ve "Ağ arabirimi"
- * sütunlarında, ağ işlemleri — yeniden adlandır, taramayı durdur/başlat, bağlı olmayan ağı sil — "Ağlar" düğmesinde). Cihazların kimliği MAC adresidir. Tahtalar grid'iyle aynı kalıp (satır başı onay
+ * sütunlarında, ağ işlemleri — yeniden adlandır, taramayı durdur/başlat, bağlı olmayan ağı sil — "Ağlar" düğmesinde). Cihazların kimliği MAC adresidir. Cihazlar grid'iyle aynı kalıp (satır başı onay
  * kutuları, sütun süzgeçleri, sütun genişliği/görünürlüğü kullanıcıya göre saklanır, sağ menü).
  *
  * Her cihaz satırının altında açık portları/servisleri alt satırlar olarak durur (varsayılan kapalı;
@@ -66,7 +66,7 @@ qx.Class.define("ankamon.page.Network", {
         this.__pollState();
       }).set({ toolTipText: "Bağlı bütün ağlarda varlık taramasını hemen başlatır (makine çok yoğunsa yine ertelenir)" });
     }
-    // "İşaretleri kaldır" kalktı (kullanıcı isteği 2026-11-11: Tahtalar/Varlıklar/gruplarda tümünü seç/kaldır yok) — başlıktaki
+    // "İşaretleri kaldır" kalktı (kullanıcı isteği 2026-11-11: Cihazlar/Varlıklar/gruplarda tümünü seç/kaldır yok) — başlıktaki
     // onay kutusu görünen satırların hepsini işaretler/kaldırır.
     this._addButton("Servisleri aç/kapat", () => this.__toggleAll())
       .set({ toolTipText: "Bütün cihazların port/servis alt satırlarını açar ya da kapatır" });
@@ -118,7 +118,7 @@ qx.Class.define("ankamon.page.Network", {
       // servis/paylaşım alt satırları sabit (düşük) sütun sırası kullanır, boş kalır.
       { id: "activity", label: "Ağ etkinliği", hint: "Göreli ağ yoğunluğu 0–100 (anlık en yüksek görülen akış = 100; pasif gözlem). Ham değer: 'Ağ akışı' sütunu.", width: 120 },
       { id: "activity_detail", label: "Ağ akışı", hint: "Görülen akış ayrıntısı: kbit/sn + baskın protokol; görünür akış yoksa Windows IP-ID gönderim hızı (sakin/boş).", width: 170 },
-      // Sensörler: bağlı tahta kaydına son 24 saatte sensör verisi geldi mi — Var/Yok (kullanıcı isteği 2026-11-12;
+      // Sensörler: bağlı cihaz kaydına son 24 saatte sensör verisi geldi mi — Var/Yok (kullanıcı isteği 2026-11-12;
       // backend Core\BoardSensors::lastSeenAll). Sona eklendi: servis/paylaşım alt satırları sabit sütun sırası kullanır.
       { id: "sensors", label: "Sensörler", hint: "Sensör verisi geliyor mu (son 24 saat)", width: 90, choices: true }
       // Ayrı "Takma ad" (MAC kaydı) sütunu yok (kullanıcı isteği, 2026-10-19: "Takma ad / Ad" ile yineleniyordu);
@@ -725,7 +725,7 @@ qx.Class.define("ankamon.page.Network", {
 
     /**
      * Bilgisayar ayrıntıları (çift tıklama, sağ menü, Düzenle — kullanıcı isteği 2026-11-09): düzenle kipinde açılan
-     * sekmeli pencere (Genel / Tahta / Portlar ve paylaşımlar), alt düğme Kaydet — bkz. ui.network.DeviceWindow.
+     * sekmeli pencere (Genel / Cihaz / Portlar ve paylaşımlar), alt düğme Kaydet — bkz. ui.network.DeviceWindow.
      */
     __showDetails(device) {
       if (device) {

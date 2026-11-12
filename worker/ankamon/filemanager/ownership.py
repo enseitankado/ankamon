@@ -23,17 +23,17 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Dosya yöneticisinde (FileBrowser) yazılanların tahtadaki sahipliği.
+"""Dosya yöneticisinde (FileBrowser) yazılanların cihazdaki sahipliği.
 
-Tahta sshfs ile root olarak bağlı olduğundan FileBrowser'ın oluşturduğu her şey (kopya, yükleme, yeni
-klasör, arşivden çıkarılanlar) tahtada root:root olur; öğretmen kendi klasörüne konan dosyayı
+Cihaz sshfs ile root olarak bağlı olduğundan FileBrowser'ın oluşturduğu her şey (kopya, yükleme, yeni
+klasör, arşivden çıkarılanlar) cihazda root:root olur; öğretmen kendi klasörüne konan dosyayı
 değiştiremez/silemez. Bilgisayarlar arasında kopyalamadaki (files/copy.py) kuralın aynısı uygulanır:
 yeni öğe, içine konduğu klasörün sahibine verilir; klasör root'unsa (sistem dizinleri) root kalır.
 Aradaki, işlemin kendisinin açtığı (root sahipli) ara klasörler de aynı sahibe geçer. İzinler
 (700/600…) FileBrowser'da zaten korunuyor, onlara dokunulmaz.
 
-Düzeltme tahtada tek bir SSH komutuyla yapılır (files/remote.py — ortak ControlMaster bağlantısı);
-aynı tahtaya kısa aralıkla gelen yollar (parçalı yüklemenin her parçası, çok dosyalı yükleme) DELAY
+Düzeltme cihazda tek bir SSH komutuyla yapılır (files/remote.py — ortak ControlMaster bağlantısı);
+aynı cihaza kısa aralıkla gelen yollar (parçalı yüklemenin her parçası, çok dosyalı yükleme) DELAY
 saniye bekletilip tek komutta toplanır.
 """
 
@@ -49,7 +49,7 @@ log = logging.getLogger("ankamon.filemanager.ownership")
 
 DELAY = 1.5
 
-# Argümanlar: tahtadaki mutlak yollar. Sahip, yolun en yakın root OLMAYAN (uid≠0) üst klasöründen
+# Argümanlar: cihazdaki mutlak yollar. Sahip, yolun en yakın root OLMAYAN (uid≠0) üst klasöründen
 # alınır; arada kalan root sahipli ara klasörler (yükleme/kopyanın açtıkları) da ona geçer. "/"a dek
 # hepsi root'sa (ör. /etc, /opt, /tmp) hiçbir şey değişmez. Bağlar izlenmez (-h; -R zaten -P).
 _FIX = r"""
@@ -77,7 +77,7 @@ exit 0
 
 
 class Fixer:
-    """Tahta başına bekleyen yolları toplar, DELAY sonra tek SSH komutuyla düzeltir.
+    """Cihaz başına bekleyen yolları toplar, DELAY sonra tek SSH komutuyla düzeltir.
     access(board_id) → {ip, user, password} ya da None (eşzamansız)."""
 
     def __init__(self, access):
@@ -111,8 +111,8 @@ class Fixer:
             if not access:
                 return
             await run(access, _FIX, *paths, timeout=600)
-            log.info("tahta #%s: %d yolun sahipliği düzeltildi", board_id, len(paths))
+            log.info("cihaz #%s: %d yolun sahipliği düzeltildi", board_id, len(paths))
         except RemoteError as e:
-            log.warning("tahta #%s: sahiplik düzeltilemedi: %s", board_id, e)
+            log.warning("cihaz #%s: sahiplik düzeltilemedi: %s", board_id, e)
         except Exception:
-            log.exception("tahta #%s: sahiplik düzeltilemedi", board_id)
+            log.exception("cihaz #%s: sahiplik düzeltilemedi", board_id)

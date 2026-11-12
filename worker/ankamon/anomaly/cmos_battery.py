@@ -26,10 +26,10 @@
 """Anomali: BIOS (CMOS) pili 2,4 V'un altında.
 
 Kaynak: metrics_5m özetindeki Super I/O in8 = Vbat (bkz. docker/telegraf/reshape.star). Yalnız Super I/O sürücüsü
-yüklü tahtalarda ölçülür ("Metrik izlemeyi kur (fan/pil/anakart sensörleri dahil)" hazır komutu, bkz. actions/node-exporter).
+yüklü cihazlarda ölçülür ("Metrik izlemeyi kur (fan/pil/anakart sensörleri dahil)" hazır komutu, bkz. actions/node-exporter).
 
 Düşük okuma en az MIN_BUCKETS kez (15 dk) görülmelidir (tek okuma parazit olabilir). Pil kendiliğinden düzelmez:
-tahta kapanınca anomali bitmez, sağlam bir okuma (pil değişti) gelene dek sürer. ~0 V okuma yonga girişinin bağlı
+cihaz kapanınca anomali bitmez, sağlam bir okuma (pil değişti) gelene dek sürer. ~0 V okuma yonga girişinin bağlı
 olmadığını gösterir, ölçüm sayılmaz.
 """
 

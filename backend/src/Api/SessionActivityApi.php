@@ -38,8 +38,8 @@ use Ankamon\Core\Storage;
 
 /**
  * Oturum hareketleri (Oturumlar ▸ Hareketler): worker'ın log, sensör ve Ankamon işlemlerinden ayıkladığı olaylar (bkz. worker
- * tasks/session_activity.py). Süzme yalnız bu tablodadır, loglara gidilmez. Tahta, kullanıcı, oturum, tarih ve metin serbestçe
- * birleştirilir: bir tahtanın bütün hareketleri, bir kullanıcının bir tahtadaki ya da bütün tahtalardaki hareketleri, tek oturum.
+ * tasks/session_activity.py). Süzme yalnız bu tablodadır, loglara gidilmez. Cihaz, kullanıcı, oturum, tarih ve metin serbestçe
+ * birleştirilir: bir cihazın bütün hareketleri, bir kullanıcının bir cihazdaki ya da bütün cihazlardaki hareketleri, tek oturum.
  */
 final class SessionActivityApi
 {
@@ -95,7 +95,7 @@ final class SessionActivityApi
         ];
     }
 
-    /** Disk kullanımı: tahta (ad) başına olay sayısı, ilk/son; boyut tablodan orantılı (tahmini). */
+    /** Disk kullanımı: cihaz (ad) başına olay sayısı, ilk/son; boyut tablodan orantılı (tahmini). */
     public function stats(Request $request): array
     {
         $bytes = Storage::relationBytes('session_activity');
@@ -121,7 +121,7 @@ final class SessionActivityApi
         ];
     }
 
-    /** Kalıcı silme: name=<tahta adı> ya da all=1. Ayıklama imleci geri gitmez, silinenler yeniden üretilmez. */
+    /** Kalıcı silme: name=<cihaz adı> ya da all=1. Ayıklama imleci geri gitmez, silinenler yeniden üretilmez. */
     public function delete(Request $request, array $user): array
     {
         if ($request->query('all') === '1') {

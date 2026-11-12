@@ -23,14 +23,14 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Başarım akışı: ws://127.0.0.1:8890/screen/ws/perf/<tahta id> (nginx /screen/ws/ vekiller, yetki "screen").
+"""Başarım akışı: ws://127.0.0.1:8890/screen/ws/perf/<cihaz id> (nginx /screen/ws/ vekiller, yetki "screen").
 
-Tahtalar → Ekranlar sekmesindeki "Başarım" görünümü (bkz. docker/rootfs/screen/index.html Tile.perf*)
+Cihazlar → Ekranlar sekmesindeki "Başarım" görünümü (bkz. docker/rootfs/screen/index.html Tile.perf*)
 htop'un varsayılan üst panellerini (sol: çekirdek başına CPU, Mem, Swp; sağ: görevler, yük ortalaması,
-çalışma süresi) kutucuğun üstünde saniyelik gösterir. Tahta başına TEK bir SSH oturumu açılır; tahtada
+çalışma süresi) kutucuğun üstünde saniyelik gösterir. Cihaz başına TEK bir SSH oturumu açılır; cihazda
 çalışan küçük bir sh döngüsü her saniye /proc'tan ham değerleri basar (htop da aynı dosyaları okur),
 hesap (fark → yüzde) burada yapılır ve her saniye tek bir JSON mesajı gönderilir. WebSocket kapanınca
-SSH süreci öldürülür; tahtadaki döngü ilk yazışında SIGPIPE ile kendiliğinden biter.
+SSH süreci öldürülür; cihazdaki döngü ilk yazışında SIGPIPE ile kendiliğinden biter.
 
 Mesaj: {"cpus": [[user, nice, sys, other], ...] (yüzde), "cpu": toplam yüzde,
         "mem": {"total", "used", "buffers", "cache"} (KiB), "swap": {"total", "used"} (KiB),
@@ -38,7 +38,7 @@ Mesaj: {"cpus": [[user, nice, sys, other], ...] (yüzde), "cpu": toplam yüzde,
         "uptime": saniye,
         "cast": {"cpu": makinenin yüzdesi (tüm çekirdekler = 100), "rss": KiB} | null — ekran yansıtma
                 oynatıcısı (mpv --x11-name=ankamon-cast, bkz. executor/cast.py) çalışıyorsa; yansıtma
-                penceresi tahta başına tüketimi göstermek için kullanır (nginx /cast/ws/perf/, yetki "cast")}
+                penceresi cihaz başına tüketimi göstermek için kullanır (nginx /cast/ws/perf/, yetki "cast")}
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ log = logging.getLogger("ankamon.screen.perf")
 # Aynı anda açık başarım akışı sınırı (her biri bu makinede bir ssh süreci).
 MAX_STREAMS = int(os.environ.get("SCREEN_MAX_PERF_STREAMS", "64"))
 
-# Tahtada çalışır (dash uyumlu). "@" her saniyelik çerçevenin başıdır.
+# Cihazda çalışır (dash uyumlu). "@" her saniyelik çerçevenin başıdır.
 _REMOTE_LOOP = r"""
 while :; do
   echo @

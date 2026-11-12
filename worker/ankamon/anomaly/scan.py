@@ -25,8 +25,8 @@
 
 """Anlık anomali taraması (Anomaliler ▸ Tarama; görev türü "anomaly_scan" — bkz. runner, backend JobsApi).
 
-Seçilen tahtalarda seçilen kurallar o an yoklanır. Her kural modülü PROBE (tahtada çalışan kabuk parçası,
-"anahtar=değer" satırları basar) ve evaluate(values, ctx) tanımlar. Bir tahtaya TEK SSH bağlantısı: seçili
+Seçilen cihazlarda seçilen kurallar o an yoklanır. Her kural modülü PROBE (cihazda çalışan kabuk parçası,
+"anahtar=değer" satırları basar) ve evaluate(values, ctx) tanımlar. Bir cihaza TEK SSH bağlantısı: seçili
 kuralların parçaları bölüm başlıklarıyla ("@@<kind>") tek betikte çalışır.
 
 Sonuç bir anlık görüntüdür (job_targets.output, JSON): {"results": {kind: {anomaly, summary, detail}}}.
@@ -72,11 +72,11 @@ def _parse(text: str) -> dict[str, dict]:
 
 
 def run(conn, board: dict, kinds: list[str], user: str, password: str, timeout: int = 20) -> dict:
-    """Tek tahtayı tarar. Döner: {"status": ok|unreachable|failed, "rc", "output": JSON metin}.
+    """Tek cihazı tarar. Döner: {"status": ok|unreachable|failed, "rc", "output": JSON metin}.
     conn yalnız evaluate'in okuması için (iş parçacığına özgü bağlantı verilmeli)."""
     kinds = [k for k in kinds if k in SCANNABLE]
     if not board.get("ip"):
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", f"ConnectTimeout={min(timeout, 8)}",
            f"{user}@{board['ip']}", "sh -s"]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
@@ -89,7 +89,7 @@ def run(conn, board: dict, kinds: list[str], user: str, password: str, timeout: 
     t1 = time.time()
     if proc.returncode == 255 or (proc.returncode == 5 and not proc.stdout):
         err = proc.stderr.decode("utf-8", "replace").strip()
-        msg = "SSH parolası reddedildi." if proc.returncode == 5 else (err or "Tahtaya bağlanılamadı.")
+        msg = "SSH parolası reddedildi." if proc.returncode == 5 else (err or "Cihaza bağlanılamadı.")
         return {"status": "unreachable", "rc": proc.returncode, "output": msg}
     sections = _parse(proc.stdout.decode("utf-8", "replace"))
     ctx = {"t0": t0, "t1": t1, "board": board, "conn": conn}

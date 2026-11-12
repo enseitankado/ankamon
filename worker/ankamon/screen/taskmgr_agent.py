@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Ankamon görev yöneticisi ajanı — TAHTADA root olarak çalışır (bkz. taskmgr.py, SSH ile base64 gönderilir).
+"""Ankamon görev yöneticisi ajanı — CİHAZDA root olarak çalışır (bkz. taskmgr.py, SSH ile base64 gönderilir).
 
 Yalnız standart kitaplık (ETAP'ta python3 hazır gelir; kurulum yok). stdout'a satır başına bir JSON çerçeve
 basar, stdin'den satır başına bir JSON komut okur; stdin kapanınca (SSH/WebSocket koptu) kendiliğinden çıkar.
@@ -597,7 +597,7 @@ def command(cmd, sampler):
         sess = sampler.sess or session_info()
         user = sess.get("user")
         if not user or user == "lightdm":
-            raise ValueError("Tahtada oturum açık değil: başlangıç uygulamaları oturum açan kullanıcıya göre ayarlanır.")
+            raise ValueError("Cihazda oturum açık değil: başlangıç uygulamaları oturum açan kullanıcıya göre ayarlanır.")
         pw = pwd.getpwnam(user)
         target_dir = pw.pw_dir + "/.config/autostart"
         target = target_dir + "/" + fid

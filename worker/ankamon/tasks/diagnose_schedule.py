@@ -23,25 +23,25 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Otomatik sorun tespiti: çevrimiçi her tahta haftada EN AZ bir kez denetlensin (bkz. executor/diagnose.py).
+"""Otomatik sorun tespiti: çevrimiçi her cihaz haftada EN AZ bir kez denetlensin (bkz. executor/diagnose.py).
 
 Konteyner dışında hiçbir şeye (cron, systemd timer) dayanmaz: worker'ın TICK_SECONDS döngüsünde çalışır,
 gerekirse kuyruğa "diagnose" görevi yazar (pg_notify) — runner onu, elle başlatılan taramayla AYNI yoldan
 çalıştırır.
 
-Tahta bazında: bir tahtanın son BAŞARILI denetiminin (elle ya da otomatik) üzerinden INTERVAL'in
+Cihaz bazında: bir cihazın son BAŞARILI denetiminin (elle ya da otomatik) üzerinden INTERVAL'in
 EARLY_FRACTION'ı (≈6 gün) geçtiyse "zamanı yaklaşmış" sayılır ve kaynaklar müsait olduğu ilk anda taranır.
 Kaynak müsaitliği sunucunun (konteyner host ağında; /proc host çekirdeğinin değerlerini gösterir) işlemci
 yükü, boş belleği ve ağ trafiğine bakılarak belirlenir:
   - zamanı yaklaşmış (≥ ~6 gün):   sıkı eşikler (gerçekten boşta)
   - süresi dolmuş   (≥ 7 gün):    gevşek eşikler (aşırı yük yoksa)
   - bir gün daha gecikmiş (≥ 8 gün): yalnız bellek kontrolü — "haftada en az bir kez" garantisi için
-Tahtalar yalnız açıkken taranabilir; açılmayan tahta ilk açıldığı uygun anda taranır.
-Denetimi BAŞARISIZ olan tahta (ör. root parolası genel paroladan farklı → "SSH parolası reddedildi") son
+Cihazlar yalnız açıkken taranabilir; açılmayan cihaz ilk açıldığı uygun anda taranır.
+Denetimi BAŞARISIZ olan cihaz (ör. root parolası genel paroladan farklı → "SSH parolası reddedildi") son
 denemesinin üzerinden RETRY_SECONDS (6 sa) geçmeden yeniden denenmez. Bu bekleme yokken başarılı denetimi hiç
-olmayan tek tahta her TICK'te (1 dk) yeni bir "1 tahta" taraması açıyordu — Bakım raporu listesi aynı
-tahtanın dakikalık hatalarıyla doluyordu (günde ~1400 görev).
-Tarama hafiftir (tahta başına tek SSH turu, ~1-2 sn) — eşikler sunucudaki diğer işleri korumak içindir.
+olmayan tek cihaz her TICK'te (1 dk) yeni bir "1 cihaz" taraması açıyordu — Bakım raporu listesi aynı
+cihazın dakikalık hatalarıyla doluyordu (günde ~1400 görev).
+Tarama hafiftir (cihaz başına tek SSH turu, ~1-2 sn) — eşikler sunucudaki diğer işleri korumak içindir.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ from .. import activity
 
 log = logging.getLogger(__name__)
 
-# Varsayılan aralık; yönetici Tahta sağlığı ▸ Yardım ▸ Denetim türleri'nden değiştirebilir (settings.diagnose_interval_days,
+# Varsayılan aralık; yönetici Cihaz sağlığı ▸ Yardım ▸ Denetim türleri'nden değiştirebilir (settings.diagnose_interval_days,
 # her turda okunur — bkz. _interval).
 INTERVAL_SECONDS = float(os.environ.get("DIAGNOSE_INTERVAL_DAYS", "7")) * 86400
 EARLY_FRACTION = 0.85
@@ -116,7 +116,7 @@ def run(conn) -> None:
     if res is None:
         return
 
-    # last: son BAŞARILI denetim; tried: son deneme (sonucu ne olursa olsun) — başarısız tahta beklesin.
+    # last: son BAŞARILI denetim; tried: son deneme (sonucu ne olursa olsun) — başarısız cihaz beklesin.
     rows = conn.execute(
         """SELECT b.id,
                   extract(epoch FROM max(j.created_at) FILTER (WHERE t.status = 'ok'))::float8 AS last,
@@ -147,7 +147,7 @@ def run(conn) -> None:
     if res["load"] > limits["load"] or res["mem"] < limits["mem"] or res["net"] > limits["net"]:
         if time.monotonic() - _last_skip_log > 3600:  # günlüğü doldurmasın
             _last_skip_log = time.monotonic()
-            log.info("otomatik sorun tespiti ertelendi (%s, %d tahta): yük %.2f, boş bellek %%%.0f, ağ %.1f MB/sn",
+            log.info("otomatik sorun tespiti ertelendi (%s, %d cihaz): yük %.2f, boş bellek %%%.0f, ağ %.1f MB/sn",
                      mode, len(due), res["load"], res["mem"] * 100, res["net"] / 1048576)
         return
 
@@ -160,5 +160,5 @@ def run(conn) -> None:
     ).fetchone()["id"]
     conn.execute("INSERT INTO job_targets (job_id, board_id) SELECT %s, unnest(%s::int[])", (job_id, ids))
     conn.execute("SELECT pg_notify('ankamon_jobs', %s)", (str(job_id),))
-    activity.record(conn, f"Otomatik sorun tespiti başlatıldı: {len(ids)} tahta ({mode})")
-    log.info("otomatik sorun tespiti #%s: %d tahta (%s)", job_id, len(ids), mode)
+    activity.record(conn, f"Otomatik sorun tespiti başlatıldı: {len(ids)} cihaz ({mode})")
+    log.info("otomatik sorun tespiti #%s: %d cihaz (%s)", job_id, len(ids), mode)

@@ -23,9 +23,9 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Wi-Fi Monitör görülme geçmişi (wifimon_sightings, göç 040): tahta başına hangi verici ilk ne zaman, kaç farklı günde görüldü.
+"""Wi-Fi Monitör görülme geçmişi (wifimon_sightings, göç 040): cihaz başına hangi verici ilk ne zaman, kaç farklı günde görüldü.
 
-Arayüz "yeni" rozetini (bu tahtada son 24 saatte ilk kez) ve "N günde görüldü" bilgisini buradan alır. Yalnız kalıcı adresler
+Arayüz "yeni" rozetini (bu cihazda son 24 saatte ilk kez) ve "N günde görüldü" bilgisini buradan alır. Yalnız kalıcı adresler
 yazılır: rastgele (yerel yönetimli) adresler dakikalar içinde değiştiğinden geçmişleri anlamsızdır ve tabloyu şişirir —
 Wi-Fi ağlarında BSSID ise rastgele de olsa paylaşım noktası boyunca sabit kaldığından yazılır; Wi-Fi'ye bağlı cihazın
 (client) rastgele adresi de telefonların ağa özel adresi olduğundan o ağda sabit kalır, yazılır. 90 günden eski kayıtlar saatte

@@ -26,8 +26,8 @@
 """Anomaliler ▸ Bildirimler kuralları: anomali verisinden ntfy bildirimi (bkz. executor/ntfy.py, 037_session_activity_ntfy.sql).
 
 Kural iki çalışma biçiminden birine bağlıdır (bkz. 038_ntfy_rule_modes.sql):
-  live    (Anomali başlayınca): süren yeni anomali görülünce; aynı tahta + tür için tekrar sınırı seçilir.
-  summary (Düzenli özet):       seçilen aralıkta süren anomalilerin tahta ve tür başına sayısı.
+  live    (Anomali başlayınca): süren yeni anomali görülünce; aynı cihaz + tür için tekrar sınırı seçilir.
+  summary (Düzenli özet):       seçilen aralıkta süren anomalilerin cihaz ve tür başına sayısı.
 Saatlik üst sınır (max_per_hour) her kuralda geçerlidir: dolunca canlı bildirimler bekler, gürültü telefona taşmaz.
 """
 
@@ -52,7 +52,7 @@ _LABELS = {
     "disk_temp_high": "Disk sıcaklığı yüksek", "cmos_battery_low": "BIOS pili zayıf", "uefi_nvram_high": "UEFI NVRAM dolu",
     "net_link_lost": "Ağ bağlantısı koptu", "log_delayed": "Log iletimi gecikti", "ssh_bruteforce": "SSH kaba kuvvet",
     "dhcp_issue": "DHCP adres alamadı", "nic_error": "Ağ kartı hatası", "identity_conflict": "Ad / IP çakışması",
-    "subnet_changed": "Tahta başka ağda", "clock_skew": "Tahta saati yanlış",
+    "subnet_changed": "Cihaz başka ağda", "clock_skew": "Cihaz saati yanlış",
 }
 
 

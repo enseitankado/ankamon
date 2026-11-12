@@ -36,17 +36,17 @@ use Ankamon\Core\Settings;
 use DateTimeImmutable;
 
 /**
- * Oturumlar ▸ Şampiyonlar Ligi: tahtalarda en uzun süre oturum açık tutan kullanıcılar (by=users) ya da en uzun süre
- * oturumlu kalan tahtalar (by=boards) — bugün, bu hafta, bu ay, bu dönem ve bu eğitim-öğretim yılı için ayrı sıralama.
+ * Oturumlar ▸ Şampiyonlar Ligi: cihazlarda en uzun süre oturum açık tutan kullanıcılar (by=users) ya da en uzun süre
+ * oturumlu kalan cihazlar (by=boards) — bugün, bu hafta, bu ay, bu dönem ve bu eğitim-öğretim yılı için ayrı sıralama.
  * Kaynak board_sessions DEĞİL, worker'ın ondan türettiği session_league_parts (oturumun gün parçaları; bkz.
  * db/migrations/039_session_league.sql, worker tasks/session_league.py): oturum kayıtları ya da loglar silinse de
  * sıralama korunur. Günler veritabanının saat diliminde (TZ) yerel gündür; dönem/yıl sınırları Settings
- * 'school_calendar'dan. Lig dışı bırakılan kullanıcı/tahtalar (league_exclusions, league 'session' — bkz.
+ * 'school_calendar'dan. Lig dışı bırakılan kullanıcı/cihazlar (league_exclusions, league 'session' — bkz.
  * LeagueExclusionsApi) varsayılan olarak sayılmaz; with_excluded=1 ile işaretli (excluded: true) katılır.
  */
 final class SessionLeagueApi
 {
-    /** Sıralamaya girmeyen hesaplar: tahtanın yönetici ve sistem hesabı (öğretmen kullanımı değil). Tahta
+    /** Sıralamaya girmeyen hesaplar: cihazın yönetici ve sistem hesabı (öğretmen kullanımı değil). Cihaz
      * sıralamasında da bu hesapların oturumları sayılmaz. */
     public const LEAGUE_EXCLUDED_USERS = ['etapadmin', 'root'];
 
@@ -60,7 +60,7 @@ final class SessionLeagueApi
         $periods = [];
         foreach (self::leaguePeriods($today, Settings::get('school_calendar')) as $period) {
             if ($by === 'boards') {
-                $period['title'] = str_replace('şampiyonu', 'şampiyon tahtası', $period['title']);
+                $period['title'] = str_replace('şampiyonu', 'şampiyon cihazı', $period['title']);
             }
             $periods[] = $period + self::leagueStandings($by, $period['from'], $period['to'], $limit, $leagueOut, $withOut);
         }
@@ -109,15 +109,15 @@ final class SessionLeagueApi
     }
 
     /**
-     * [from, to) aralığında kullanıcı (by=users) ya da tahta (by=boards) başına toplam açık oturum süresi (çoktan aza,
-     * ilk $limit), etkin gün, oturum sayısı; kullanıcıda tahta sayısı ve en çok kullandığı tahta (takma adıyla),
-     * tahtada kullanıcı sayısı ve en çok kullanan kullanıcı. Ayrıca katılımcı sayısı, toplam süre ve dönemde süresi
+     * [from, to) aralığında kullanıcı (by=users) ya da cihaz (by=boards) başına toplam açık oturum süresi (çoktan aza,
+     * ilk $limit), etkin gün, oturum sayısı; kullanıcıda cihaz sayısı ve en çok kullandığı cihaz (takma adıyla),
+     * cihazda kullanıcı sayısı ve en çok kullanan kullanıcı. Ayrıca katılımcı sayısı, toplam süre ve dönemde süresi
      * olan lig dışı sayısı (excluded_count). Lig dışılar $withOut değilse ne sıralamaya ne toplamlara girer.
      */
     private static function leagueStandings(string $by, string $from, string $to, int $limit, array $leagueOut, bool $withOut): array
     {
         $users = $by === 'users';
-        // Gruplama anahtarı ve "en çok" eşi: kullanıcının en çok kullandığı tahta / tahtayı en çok kullanan kullanıcı.
+        // Gruplama anahtarı ve "en çok" eşi: kullanıcının en çok kullandığı cihaz / cihazı en çok kullanan kullanıcı.
         $key = $users ? 'username' : 'host';
         $outMatch = $users ? 'lower(username)' : 'host';
         $count = $users ? 'count(DISTINCT host) AS boards' : 'count(DISTINCT username) AS users, max(board_id) AS board_id';

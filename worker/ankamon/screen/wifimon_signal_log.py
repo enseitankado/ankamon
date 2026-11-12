@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Wi-Fi Monitör sinyal kaydı (wifimon_signal_stats, göç 050): sensör (tahta) başına vericilerin bant bant sinyal istatistiği.
+"""Wi-Fi Monitör sinyal kaydı (wifimon_signal_stats, göç 050): sensör (cihaz) başına vericilerin bant bant sinyal istatistiği.
 
 Amaç (kullanıcı isteği 2026-11-11): güvenilir vericilerin (okulun erişim noktaları, sabit cihazlar) hangi sensörün yanında
 durduğunu bulmak. Güvenilir cihazlar sensörlerin birkaç metre yakınında sabittir; hangi sensör hangi bantta ne güçte duyuyor,
@@ -36,7 +36,7 @@ Wi-Fi Monitör penceresi açıkken her taramada (sürekli izlemede ~her tur) yaz
 paylaşım noktası boyunca sabit) ve kalıcı adresli Wi-Fi cihazları (bağlı/arayan; rastgele adres dakikalar içinde değişir) —
 güvenilir işaretlenmeden önceki geçmiş de kalsın diye yalnız güvenilirler değil. 90 günden eski günler silinir.
 
-dBm kaynağı: erişim noktasında tahtanın `iw dev <kart> scan dump` ölçümü (@@IWDUMP); yoksa NetworkManager yüzdesinden tahmin
+dBm kaynağı: erişim noktasında cihazın `iw dev <kart> scan dump` ölçümü (@@IWDUMP); yoksa NetworkManager yüzdesinden tahmin
 (NM'nin dBm → % dönüşümünün tersi; n_est sayılır, arayüz "tahmini" der). Dinlenen cihazda radiotap RSSI'si (gerçek dBm).
 Hata Wi-Fi Monitör'ü durdurmaz.
 """

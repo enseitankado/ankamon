@@ -23,20 +23,20 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Sağ menü "Wi-Fi Monitör": tahtanın (sensörün) Wi-Fi kartı, bağlantısı ve çevredeki Wi-Fi vericileri (ws /screen/ws/wifi/<tahta id>).
+"""Sağ menü "Wi-Fi Monitör": cihazın (sensörün) Wi-Fi kartı, bağlantısı ve çevredeki Wi-Fi vericileri (ws /screen/ws/wifi/<cihaz id>).
 Bluetooth kullanılmaz (kullanıcı kararı 2026-11-06).
 
-Çoklu tahta penceresi (sınıfta telefon arama) her tahta için ayrı bağlantı açar; "sabit" verici listesi ayrı (PHP
+Çoklu cihaz penceresi (sınıfta telefon arama) her cihaz için ayrı bağlantı açar; "sabit" verici listesi ayrı (PHP
 /api/wifimon/fixed), ayırma tarayıcıda yapılır. Bu köprü satırlara telefon kanıtlarını (wifimon_phone_hints.py) ve görülme
 geçmişini (wifimon_sightings.py) ekler.
 
-Varsayılan tek atış: bir tarama, sonuç, tahtada durum geri yüklenir, kapanış 1000. `?watch=1`: tarama döngüsü; tarayıcıdan "stop" iletisi
+Varsayılan tek atış: bir tarama, sonuç, cihazda durum geri yüklenir, kapanış 1000. `?watch=1`: tarama döngüsü; tarayıcıdan "stop" iletisi
 ya da bağlantının kapanması biter. `?probe=1`: her taramadan sonra Wi-Fi trafiği de dinlenir (bkz. wifimon_probe_sniffer.py). `?force=1` (kullanıcı onayı:
-tahta kabloyla da bağlı): kart bir ağa bağlı olsa da bağlantısı oturum boyunca kesilip dinlenir, kapanışta yeniden kurulur —
-SSH Wi-Fi'den geliyorsa tahta yine dinlemez (bkz. wifi_remote_scan.py). Dinleme olan her turda boards.facts.wifi_monitor
-(epoch) yazılır, kapanışta silinir: Tahtalar grid'inin Wi-Fi sütunu "Monitör modu" gösterir (bkz. ui.FactsView.wifiStatus).
-Wi-Fi kapalıysa tarama süresince geçici açılır, bağlantı kurulmaz, sonra eski durumuna döner: tahtadaki program ve geri yükleme güvenceleri wifi_remote_scan.py'de. Bu köprü SSH stdin'ine kalp atışı yazar; stdin'in
-kapanması (ya da SSH'nin ölmesi) tahtadaki bekçiyi tetikler. Yetki: /screen/ws/ ile aynı ("screen", nginx).
+cihaz kabloyla da bağlı): kart bir ağa bağlı olsa da bağlantısı oturum boyunca kesilip dinlenir, kapanışta yeniden kurulur —
+SSH Wi-Fi'den geliyorsa cihaz yine dinlemez (bkz. wifi_remote_scan.py). Dinleme olan her turda boards.facts.wifi_monitor
+(epoch) yazılır, kapanışta silinir: Cihazlar grid'inin Wi-Fi sütunu "Monitör modu" gösterir (bkz. ui.FactsView.wifiStatus).
+Wi-Fi kapalıysa tarama süresince geçici açılır, bağlantı kurulmaz, sonra eski durumuna döner: cihazdaki program ve geri yükleme güvenceleri wifi_remote_scan.py'de. Bu köprü SSH stdin'ine kalp atışı yazar; stdin'in
+kapanması (ya da SSH'nin ölmesi) cihazdaki bekçiyi tetikler. Yetki: /screen/ws/ ile aynı ("screen", nginx).
 Sunucu iletileri, `phase` alanıyla:
   scanning {info}: tarama başladı.
   data {radio, device, state, connection, rows: [{kind: wifi, name, addr, signal, chan, freq, rate, security, active,
@@ -44,13 +44,13 @@ Sunucu iletileri, `phase` alanıyla:
   probes {rows: [{kind: probe, addr, signal, rssi, count, fp, fps, ssids, wps, random, vendor, hints, phone, first_seen, seen_days;
                    rastgele adresliyse addrs (aynı cihaz sayılan adresler), why (gerekçe kodları), dev (cihaz anahtarı)}
         | {kind: client (Wi-Fi'ye bağlı cihaz), addr, bssid, name (bağlı olduğu ağ adı), chan, signal, rssi, count, random,
-           vendor, board_name (adres bir tahtanın kablolu/kablosuz MAC'iyse), hints, phone, first_seen, seen_days}],
+           vendor, board_name (adres bir cihazın kablolu/kablosuz MAC'iyse), hints, phone, first_seen, seen_days}],
         devices (yoklama yapan kestirilen cihaz sayısı), clients (bağlı cihaz sayısı),
         note (boşsa dinlendi: nodev|tools|radio|busy|nomon|shared|monfail|sshwifi), secs, at}.
-  done {result: restored|shared|none|fail|lock, radio, policy (off: tahtada "Wi-Fi'yi kapat" kuralı var), wifi_temp, wifi_fail}:
+  done {result: restored|shared|none|fail|lock, radio, policy (off: cihazda "Wi-Fi'yi kapat" kuralı var), wifi_temp, wifi_fail}:
         geri yükleme sonucu (radyo durumu boards.facts'e de yazılır), ardından kapanış 1000.
 info: {wifi_temp: "0"|"1", wifi_fail, disconnected, forced ("1": bağlantı kullanıcı onayıyla kesildi)}.
-Kapanış kodları: 4001 tahta yok · 4002 SSH · 4003 giriş reddedildi · 4009 tahtada nmcli yok · 4010 tahtada /run yazılamıyor.
+Kapanış kodları: 4001 cihaz yok · 4002 SSH · 4003 giriş reddedildi · 4009 cihazda nmcli yok · 4010 cihazda /run yazılamıyor.
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ from .wifi_remote_scan import wifimon_remote_command
 log = logging.getLogger("ankamon.screen.wifi")
 
 _HEARTBEAT_SECONDS = 5
-# Pencere kapanınca tahtadaki geri yüklemenin bitip @@DONE'un gelmesi için beklenen en uzun süre.
+# Pencere kapanınca cihazdaki geri yüklemenin bitip @@DONE'un gelmesi için beklenen en uzun süre.
 _CLOSE_GRACE_SECONDS = 45
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|[\x01\x02]")
 
@@ -168,8 +168,8 @@ def _wifimon_build(parser, board_id: int, sections: dict) -> dict:
 
 
 def _wifimon_mark_boards(rows: list[dict]) -> None:
-    """Wi-Fi'ye bağlı ya da ağ arayan cihaz bir tahtanın kendisiyse (boards.mac kablolu, boards.wifi_mac kablosuz — göç 043)
-    satıra board_name eklenir: arayüz onu sabit sayar (sınıftaki telefon değil, komşu tahta). Hata izlemeyi durdurmaz."""
+    """Wi-Fi'ye bağlı ya da ağ arayan cihaz bir cihazın kendisiyse (boards.mac kablolu, boards.wifi_mac kablosuz — göç 043)
+    satıra board_name eklenir: arayüz onu sabit sayar (sınıftaki telefon değil, komşu cihaz). Hata izlemeyi durdurmaz."""
     devices = [r for r in rows if r["kind"] in ("client", "probe") and not r.get("random")]
     if not devices:
         return
@@ -181,18 +181,18 @@ def _wifimon_mark_boards(rows: list[dict]) -> None:
                    WHERE m IS NOT NULL AND upper(m) = ANY(%s::text[])""",
                 ([r["addr"] for r in devices],)).fetchall()
     except Exception as exc:
-        log.warning("Wi-Fi Monitör tahta MAC eşlemesi yapılamadı: %s", exc)
+        log.warning("Wi-Fi Monitör cihaz MAC eşlemesi yapılamadı: %s", exc)
         return
     names = {g["mac"]: g["name"] for g in got}
     for row in devices:
         name = names.get(row["addr"])
         if name:
             row["board_name"], row["phone"] = name, ""
-            row["hints"] = [f"Ankamon tahtası ({name})"]
+            row["hints"] = [f"Ankamon cihazı ({name})"]
 
 
 def _store_monitor(board_id: int, on: bool) -> None:
-    """boards.facts.wifi_monitor: dinleme (monitör kipi) olan turun zamanı; kapanışta silinir. Tahtalar grid'i bunu "Monitör
+    """boards.facts.wifi_monitor: dinleme (monitör kipi) olan turun zamanı; kapanışta silinir. Cihazlar grid'i bunu "Monitör
     modu" diye gösterir (tazeyse — bkz. ui.FactsView.wifiStatus; worker çökerse damga eskir, sütun kendiliğinden düzelir)."""
     try:
         with db.connect() as conn:
@@ -202,11 +202,11 @@ def _store_monitor(board_id: int, on: bool) -> None:
             else:
                 conn.execute("UPDATE boards SET facts = facts - 'wifi_monitor' WHERE id = %s", (board_id,))
     except Exception as exc:  # gösterge yazılamazsa izleme sürer
-        log.warning("Wi-Fi monitör durumu yazılamadı (tahta %s): %s", board_id, exc)
+        log.warning("Wi-Fi monitör durumu yazılamadı (cihaz %s): %s", board_id, exc)
 
 
 def _store_radio(board_id: int, radio: str, state: str | None = None) -> None:
-    """Kartın o anki radyo durumunu boards.facts'e yazar — Tahtalar grid'inin Wi-Fi sütunu anında doğru olsun (kullanıcı isteği):
+    """Kartın o anki radyo durumunu boards.facts'e yazar — Cihazlar grid'inin Wi-Fi sütunu anında doğru olsun (kullanıcı isteği):
     pencere açılınca ilk taramadaki durum (ör. geçici açıldı), kapanınca geri yüklemeden sonraki durum. Kapalıysa bağlantı
     alanları da silinir (hwfacts.mark_wifi_radio); açıksa radyo ve (biliniyorsa) kart durumu yazılır."""
     if radio not in ("enabled", "disabled"):
@@ -220,7 +220,7 @@ def _store_radio(board_id: int, radio: str, state: str | None = None) -> None:
                                   || CASE WHEN %s::text IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('wifi_state', %s::text) END
                                 WHERE id = %s AND facts->>'wifi_iface' IS NOT NULL""", (state, state, board_id))
     except Exception as exc:  # durum yazılamazsa sonraki donanım toplaması düzeltir
-        log.warning("Wi-Fi radyo durumu yazılamadı (tahta %s): %s", board_id, exc)
+        log.warning("Wi-Fi radyo durumu yazılamadı (cihaz %s): %s", board_id, exc)
 
 
 class WifiSocket(tornado.websocket.WebSocketHandler):
@@ -249,7 +249,7 @@ class WifiSocket(tornado.websocket.WebSocketHandler):
         asyncio.ensure_future(self._pump())
 
     async def _heartbeat(self):
-        """Tahtadaki bekçinin kirası: kesilirse (ağ koptu, süreç öldü) tahta durumu kendisi geri yükler."""
+        """Cihazdaki bekçinin kirası: kesilirse (ağ koptu, süreç öldü) cihaz durumu kendisi geri yükler."""
         proc = self.proc
         try:
             while proc.returncode is None and not proc.stdin.is_closing():
@@ -260,7 +260,7 @@ class WifiSocket(tornado.websocket.WebSocketHandler):
             pass
 
     def _end_remote(self):
-        """stdin EOF: tahtada bekçi taramayı bitirir, durumu geri yükler, @@DONE gelir."""
+        """stdin EOF: cihazda bekçi taramayı bitirir, durumu geri yükler, @@DONE gelir."""
         if self.proc and self.proc.stdin and not self.proc.stdin.is_closing():
             self.proc.stdin.close()
 
@@ -329,7 +329,7 @@ class WifiSocket(tornado.websocket.WebSocketHandler):
             self._end_remote()
 
     def on_close(self):
-        # Pencere kapandı: stdin EOF ile tahtadaki program durumu geri yükler ve @@DONE yazar; _pump onu okuyup radyo durumunu
+        # Pencere kapandı: stdin EOF ile cihazdaki program durumu geri yükler ve @@DONE yazar; _pump onu okuyup radyo durumunu
         # veritabanına işler. SSH hemen öldürülmez (yoksa son durum yazılamazdı); takılırsa bir süre sonra öldürülür.
         self._end_remote()
         proc = self.proc

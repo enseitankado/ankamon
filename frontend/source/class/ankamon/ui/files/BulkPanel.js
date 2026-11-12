@@ -27,16 +27,16 @@
 
 /**
  * "Dosyaları dağıt/topla" penceresinin (bkz. ui.files.BulkWindow) bir sekmesi — "Dağıt" ya da "Topla": bu bilgisayardaki dosya/klasörleri seçilen
- * tahtalarda seçilen kullanıcıların bir konumuna (varsayılan Masaüstü) kopyalar ya da tersine, tahtalardan
+ * cihazlarda seçilen kullanıcıların bir konumuna (varsayılan Masaüstü) kopyalar ya da tersine, cihazlardan
  * toplayıp bu bilgisayara indirir (ZIP / tar.gz / seçilen klasöre tek tek; isteğe bağlı taşıma).
  *
- * Kullanıcılar: "Oturumu açık kullanıcılar" her tahtada o an oturumu açık olan(lar)ı hedefler; ayrıca
- * listeden belirli kullanıcılar işaretlenebilir (liste seçili tahtalardan okunur, kaç tahtada bulunduğu
+ * Kullanıcılar: "Oturumu açık kullanıcılar" her cihazda o an oturumu açık olan(lar)ı hedefler; ayrıca
+ * listeden belirli kullanıcılar işaretlenebilir (liste seçili cihazlardan okunur, kaç cihazda bulunduğu
  * yazılır). Konum: Masaüstü / Belgeler / İndirilenler (kullanıcının XDG dizinleri), ev dizini, ev dizini
  * altında bir yol ya da (kullanıcıdan bağımsız) mutlak yol.
  *
- * İş sunucuda yürür (worker/ankamon/files/bulk.py): tahta başına bir iş, aynı anda yürüyen iş sayısı
- * konteynerin işlemci/bellek durumuna göre sunucuda ayarlanır. Pencere ilerlemeyi, tahta/kullanıcı satırlarını
+ * İş sunucuda yürür (worker/ankamon/files/bulk.py): cihaz başına bir iş, aynı anda yürüyen iş sayısı
+ * konteynerin işlemci/bellek durumuna göre sunucuda ayarlanır. Pencere ilerlemeyi, cihaz/kullanıcı satırlarını
  * ve olayları (bilgi/uyarı/hata) gösterir; iş bitince aynı sekmede rapor (CSV olarak kaydedilebilir).
  */
 qx.Class.define("ankamon.ui.files.BulkPanel", {
@@ -72,8 +72,8 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
 
   /**
    * @param mode {String} "distribute" | "collect"
-   * @param boards {Array} sunulan tahtalar [{id, name}]
-   * @param selected {Array} başlangıçta işaretli tahta numaraları
+   * @param boards {Array} sunulan cihazlar [{id, name}]
+   * @param selected {Array} başlangıçta işaretli cihaz numaraları
    * @param user {Map} oturum sahibi
    */
   construct(mode, boards, selected, user) {
@@ -213,7 +213,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         .set({ textColor: "app-muted", rich: true, wrap: true, alignY: "middle", marginLeft: 10 }), { flex: 1 });
       if (!distribute) {
         const preview = new qx.ui.form.Button("Önizle").set({
-          minWidth: 90, toolTipText: "Hiçbir şey aktarmadan, her tahtada neyin toplanacağını sayıp listeler"
+          minWidth: 90, toolTipText: "Hiçbir şey aktarmadan, her cihazda neyin toplanacağını sayıp listeler"
         });
         preview.addListener("execute", () => this.__start(true));
         head.add(preview);
@@ -273,7 +273,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         return cb;
       });
       if (!boards.length) {
-        list.box.add(new qx.ui.basic.Label("Çevrimiçi tahta yok.").set({ textColor: "app-muted" }));
+        list.box.add(new qx.ui.basic.Label("Çevrimiçi cihaz yok.").set({ textColor: "app-muted" }));
       }
       col.add(list.scroll, { flex: 1 });
       filter.addListener("input", () => {
@@ -574,12 +574,12 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       head.add(this.__heading("Kullanıcılar"));
       this.__userInfo = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true });
       head.add(this.__userInfo, { flex: 1 });
-      const refresh = new qx.ui.form.Button("⟳").set({ toolTipText: "Kullanıcıları tahtalardan yeniden oku", padding: [2, 8] });
+      const refresh = new qx.ui.form.Button("⟳").set({ toolTipText: "Kullanıcıları cihazlardan yeniden oku", padding: [2, 8] });
       refresh.addListener("execute", this.__loadUsers, this);
       head.add(refresh);
       parent.add(head);
       this.__logged = new qx.ui.form.CheckBox(
-        "Oturumu açık kullanıcılar (her tahtada o anda oturumu açık olan kullanıcı)").set({ value: true });
+        "Oturumu açık kullanıcılar (her cihazda o anda oturumu açık olan kullanıcı)").set({ value: true });
       parent.add(this.__logged);
       const list = this.__checkList(null);
       this.__userBox = list.box;
@@ -606,10 +606,10 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       if (!boards.length) {
         this.__boardUsers = [];
         this.__renderUsers();
-        this.__userInfo.setValue("Önce tahta seçin.");
+        this.__userInfo.setValue("Önce cihaz seçin.");
         return;
       }
-      this.__userInfo.setValue(`${boards.length} tahtadan okunuyor…`);
+      this.__userInfo.setValue(`${boards.length} cihazdan okunuyor…`);
       let res;
       try {
         res = await ankamon.ui.files.Api.post("/bulk/users", { boards: boards.map(b => b.id) });
@@ -626,13 +626,13 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       this.__renderUsers();
       const bad = res.boards.filter(b => b.error);
       const logged = res.boards.filter(b => (b.users || []).some(u => u.logged)).length;
-      this.__userInfo.setValue(`${res.boards.length - bad.length} tahtadan okundu · ${logged} tahtada oturum açık` +
+      this.__userInfo.setValue(`${res.boards.length - bad.length} cihazdan okundu · ${logged} cihazda oturum açık` +
         (bad.length ? ` · <span style="color:${this.__color("error")}" title="${qx.bom.String.escape(
-          bad.map(b => b.name + ": " + b.error).join("\n"))}">${bad.length} tahtaya ulaşılamadı</span>` : ""));
+          bad.map(b => b.name + ": " + b.error).join("\n"))}">${bad.length} cihaza ulaşılamadı</span>` : ""));
     },
 
     __renderUsers() {
-      // Önceki işaretler korunur (tahta seçimi değişince liste yeniden kurulur).
+      // Önceki işaretler korunur (cihaz seçimi değişince liste yeniden kurulur).
       this.__userBox.getChildren().slice().forEach(cb => {
         if (cb instanceof qx.ui.form.CheckBox && !cb.getValue()) {
           this.__checked.delete(cb.getUserData("name"));
@@ -651,8 +651,8 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       const n = this.__boardUsers.length;
       names.forEach(name => {
         const s = stats.get(name);
-        const where = s.boards === n ? (n > 1 ? "tüm tahtalarda" : "") : `${s.boards} tahtada`;
-        const extra = [where, s.logged ? (n > 1 ? `${s.logged} tahtada oturumu açık` : "oturumu açık") : ""]
+        const where = s.boards === n ? (n > 1 ? "tüm cihazlarda" : "") : `${s.boards} cihazda`;
+        const extra = [where, s.logged ? (n > 1 ? `${s.logged} cihazda oturumu açık` : "oturumu açık") : ""]
           .filter(Boolean).join(", ");
         const cb = new qx.ui.form.CheckBox(name + (extra ? `  — ${extra}` : "")).set({ value: this.__checked.has(name) });
         cb.setUserData("name", name);
@@ -766,10 +766,10 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
           (w.mode === "types" ? "En az bir dosya türü seçin." : "Bir ad deseni yazın.") + "</span>");
         return;
       }
-      this.__whatText.setValue(`<b>Toplanacak:</b> her seçili tahtada${who} <b>${esc(loc)}</b> konumundan ` +
+      this.__whatText.setValue(`<b>Toplanacak:</b> her seçili cihazda${who} <b>${esc(loc)}</b> konumundan ` +
         `<b>${esc(w.what)}</b>` + (w.deep ? ", alt klasörlerin içindekiler dahil" : (w.mode === "all" ? "" : " (yalnız konumun kendisindekiler)")) +
         (this.__skipJunk.getValue() ? "; kısayollar ve gizli dosyalar hariç" : "") +
-        `. Bu bilgisayara <i>tahta / kullanıcı / …</i> klasör yapısıyla gelir.`);
+        `. Bu bilgisayara <i>cihaz / kullanıcı / …</i> klasör yapısıyla gelir.`);
     },
 
     __createOptionSection(parent) {
@@ -782,7 +782,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         this.__conflict = new qx.ui.form.RadioGroup(overwrite, skip);
         row.add(overwrite);
         row.add(skip);
-        this.__relay = new qx.ui.form.CheckBox("Köprü tahtalarla dağıt").set({
+        this.__relay = new qx.ui.form.CheckBox("Köprü cihazlarla dağıt").set({
           value: true, marginLeft: 16,
           toolTipText: "Önerilir. Sunucu dosyaları yalnız birkaç bilgisayara gönderir (sayı sunucunun işlemci/bellek " +
             "durumuna göre belirlenir); diğer bilgisayarlar onları almış bilgisayarlardan çeker. Çok bilgisayara " +
@@ -798,7 +798,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
           this.__delivery.add(new qx.ui.form.ListItem("Bir klasöre kaydet (arşivsiz)", null, "folder"));
         }
         row.add(this.__delivery);
-        this.__move = new qx.ui.form.CheckBox("Taşı (alınan öğeler tahtadan silinir)").set({ marginLeft: 10 });
+        this.__move = new qx.ui.form.CheckBox("Taşı (alınan öğeler cihazdan silinir)").set({ marginLeft: 10 });
         row.add(this.__move);
       }
       parent.add(row);
@@ -817,7 +817,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       }
       const boards = this.__selectedBoards().map(b => b.id);
       if (!boards.length) {
-        throw new Error("En az bir tahta seçin.");
+        throw new Error("En az bir cihaz seçin.");
       }
       const users = { logged: this.__logged.getValue(), names: Array.from(this.__checked) };
       if (kind !== "abs" && !users.logged && !users.names.length) {
@@ -854,8 +854,8 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       }
       if (this.__mode === "collect" && !dry && this.__move.getValue()) {
         const ok = await ankamon.ui.Dialog.confirm(
-          `<b>Taşıma</b>: ${req.boards.length} tahtada ${where} konumundan alınan öğeler, sunucuya sağ salim ` +
-          "aktarıldıktan sonra <b>tahtadan silinecek</b>." +
+          `<b>Taşıma</b>: ${req.boards.length} cihazda ${where} konumundan alınan öğeler, sunucuya sağ salim ` +
+          "aktarıldıktan sonra <b>cihazdan silinecek</b>." +
           (req.location.kind === "home" ? "<br><br>Konum <b>ev dizininin tamamı</b> — gizli ayar dosyaları da taşınır!" : ""),
           "Taşı");
         if (!ok) {
@@ -884,7 +884,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
           this.__lastReq = req;
           res = await this.__uploadAndDistribute(req);
         } else {
-          this.__phase.setValue(ankamon.ui.JobSpinner.label(dry ? "Önizleme: tahtalarda neyin toplanacağı sayılıyor (hiçbir şey aktarılmaz)…" : "Toplanıyor…"));
+          this.__phase.setValue(ankamon.ui.JobSpinner.label(dry ? "Önizleme: cihazlarda neyin toplanacağı sayılıyor (hiçbir şey aktarılmaz)…" : "Toplanıyor…"));
           res = await ankamon.ui.files.Api.post("/bulk/collect", Object.assign(req, this.__whatRequest().body, {
             move: this.__move.getValue(), dry: !!dry
           }));
@@ -927,7 +927,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
 
     /**
      * Dağıt'ta İptal'den sonra (iş anında durdurulmuştur): sürdür / kopyalananlar kalsın / kopyalananları sil.
-     * @param phase {String} "upload" (tahtalara henüz bir şey gitmedi) | "job" (tahtalara kopyalama sürüyordu)
+     * @param phase {String} "upload" (cihazlara henüz bir şey gitmedi) | "job" (cihazlara kopyalama sürüyordu)
      */
     __askAfterCancel(phase) {
       const win = ankamon.ui.Dialog.window("Dağıtma durduruldu", 520);
@@ -935,14 +935,14 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       if (phase === "upload") {
         const n = this.__upload ? this.__upload.index || 0 : 0;
         text = `Dosyalar sunucuya yüklenirken durduruldu (${n} / ${this.__files.length} dosya yüklendi).<br>` +
-          "Tahtalara henüz hiçbir şey kopyalanmadı.";
+          "Cihazlara henüz hiçbir şey kopyalanmadı.";
       } else {
         const rows = this.__job ? this.__job.boards : [];
         const done = rows.filter(b => ["done", "partial"].includes(b.state)).length;
         const half = rows.filter(b => b.targets.some(t => (t.created || []).length) && !["done", "partial"].includes(b.state)).length;
         const rest = rows.length - done;
-        text = `Kopyalama durduruldu: <b>${done}</b> tahtada tamamlandı, <b>${rest}</b> tahtada yarıda kaldı ya da başlamadı` +
-          (half ? ` (${half} tahtada bir kısmı kopyalanmıştı)` : "") + ".<br><br>" +
+        text = `Kopyalama durduruldu: <b>${done}</b> cihazda tamamlandı, <b>${rest}</b> cihazda yarıda kaldı ya da başlamadı` +
+          (half ? ` (${half} cihazda bir kısmı kopyalanmıştı)` : "") + ".<br><br>" +
           "<b>Kopyalananları sil</b> yalnız bu işin oluşturduğu dosya/klasörleri siler; hedefte önceden var olan " +
           "aynı adlı öğelere dokunulmaz (üzerine yazılmışlarsa eski hâlleri geri gelmez).";
       }
@@ -994,7 +994,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       }
       if (phase === "upload") {
         this.__upload = null;
-        this.__phase.setValue(`<span style="color:${this.__color("app-warn")}">Durduruldu</span> — tahtalara bir şey kopyalanmadı`);
+        this.__phase.setValue(`<span style="color:${this.__color("app-warn")}">Durduruldu</span> — cihazlara bir şey kopyalanmadı`);
         this.__finishUi(null);
         return;
       }
@@ -1007,8 +1007,8 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
           this.__renderRows(job);
           this.__renderEvents(job);
           this.__phase.setValue(`<span style="color:${this.__color("app-warn")}">Durduruldu ve geri alındı</span> — ` +
-            `${res.boards} tahtada ${res.removed} öğe silindi` +
-            (res.failed ? `, <span style="color:${this.__color("error")}">${res.failed} tahtada silinemedi</span>` : ""));
+            `${res.boards} cihazda ${res.removed} öğe silindi` +
+            (res.failed ? `, <span style="color:${this.__color("error")}">${res.failed} cihazda silinemedi</span>` : ""));
         } catch (e) {
           ankamon.ui.Dialog.error(e);
         }
@@ -1032,7 +1032,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       page.add(this.__phase);
 
       const model = new qx.ui.table.model.Simple();
-      model.setColumns(["Tahta", "Kullanıcı", "Konum", "Durum", "Öğe", "Boyut", "Ayrıntı"]);
+      model.setColumns(["Cihaz", "Kullanıcı", "Konum", "Durum", "Öğe", "Boyut", "Ayrıntı"]);
       const table = new qx.ui.table.Table(model, {
         tableColumnModel: obj => new qx.ui.table.columnmodel.Resize(obj)
       }).set({ statusBarVisible: false, columnVisibilityButtonVisible: false });
@@ -1066,8 +1066,8 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
     },
 
     /**
-     * İptal HEMEN uygulanır: yükleme sürüyorsa o anki istek kesilir; tahtalara kopyalama sürüyorsa sunucu
-     * süreçleri (tahtadakiler dahil) durdurur. Dağıt'ta ardından ne yapılacağı sorulur (bkz. __askAfterCancel).
+     * İptal HEMEN uygulanır: yükleme sürüyorsa o anki istek kesilir; cihazlara kopyalama sürüyorsa sunucu
+     * süreçleri (cihazdakiler dahil) durdurur. Dağıt'ta ardından ne yapılacağı sorulur (bkz. __askAfterCancel).
      */
     async __cancel() {
       this.__cancelled = true;
@@ -1141,7 +1141,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         this.__speed.bytes = job.bytes;
       }
       const elapsed = Math.round((job.finished || now) - job.started);
-      const parts = [`%${Math.floor(frac * 100)}`, `${finished} / ${job.boards.length} tahta bitti`];
+      const parts = [`%${Math.floor(frac * 100)}`, `${finished} / ${job.boards.length} cihaz bitti`];
       if (job.state === "running") {
         parts.push(`${job.running} yürüyor (paralel sınır ${job.limit})`);
         if (this.__speed.rate > 0) {
@@ -1272,7 +1272,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       }
       this.__phase.setValue(`<span style="color:${color}">${title}</span>`);
       this.__reportText.setValue(
-        `<b>Rapor</b>: ${job.boards.length} tahta (${esc(summary)}) · ${ok} ${job.kind === "distribute" ? "hedefe kopyalandı" : "kaynaktan alındı"}` +
+        `<b>Rapor</b>: ${job.boards.length} cihaz (${esc(summary)}) · ${ok} ${job.kind === "distribute" ? "hedefe kopyalandı" : "kaynaktan alındı"}` +
         (bad ? `, <span style="color:${this.__color("error")}">${bad} hedefte hata</span>` : "") +
         ` · konum: ${esc(job.options.location_text)}` +
         (job.kind === "collect" && job.options.move ? " · <b>taşıma</b>" : ""));
@@ -1354,7 +1354,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
     },
 
     __saveReport(job) {
-      const head = ["Tahta", "Kullanıcı", "Konum", "Durum", "Öğe", "Boyut", "Ayrıntı"];
+      const head = ["Cihaz", "Kullanıcı", "Konum", "Durum", "Öğe", "Boyut", "Ayrıntı"];
       const rows = [];
       let board = "";
       this.__rows(job).forEach(r => {

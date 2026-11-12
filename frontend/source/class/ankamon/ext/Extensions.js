@@ -36,13 +36,13 @@
  *
  * Kancalar: on(ad, işleyici) ile kaydolunur; çekirdek handle(ad, ...) ile sorar. İşleyicilerden biri true
  * döndürürse olay "işlendi" sayılır ve çekirdek kendi varsayılan davranışını atlar. Kancalar:
- *  - "boards.statusFilter" (metin, sayfa): Tahtalar grid'inin Durum süzgeç kutusuna yazılan metin.
+ *  - "boards.statusFilter" (metin, sayfa): Cihazlar grid'inin Durum süzgeç kutusuna yazılan metin.
  *    İşlendi ise kutu temizlenir, süzme yapılmaz.
  *  - "settings.extensionHidden" (eklenti adı): Ayarlar ▸ Eklentiler listesi. İşlendi ise (true) o eklentinin
  *    bölümü gösterilmez (yalnız arayüz; API yönetici yetkisiyle yine erişilebilir).
  *  - "statusBar.usersVisible" (): alt çubuktaki oturum açmış kullanıcılar göstergesi (👤 + ipucu).
  *    Varsayılan gizli; işlendi ise (true) görünür.
- * Kanca dışındaki eklenti noktaları: addMaintenanceTab (Bakım sekmesi), addBoardMenu (Tahtalar sağ menüsü
+ * Kanca dışındaki eklenti noktaları: addMaintenanceTab (Bakım sekmesi), addBoardMenu (Cihazlar sağ menüsü
  * maddesi ve isteğe bağlı araç çubuğu düğmesi), addPage (sol menüde eklentinin kendi sayfası), addWifiTrustedAction
  * (Wi-Fi Monitör güvenilir listesinde işaretli kayıtlara düğme), addDiskUsageTab (Sistem ▸ Disk kullanımı'nda eklentinin
  * verisi için sekme), addSettingsTab (Ayarlar ▸ Eklentiler'de eklentinin bölümüne ayar formunun yanında ek sekme).
@@ -63,7 +63,7 @@ qx.Class.define("ankamon.ext.Extensions", {
     __maintenanceTabs: [],  // eklentilerin Bakım sekmeleri (bkz. addMaintenanceTab)
     __pages: [],            // eklentilerin sol menü sayfaları (bkz. addPage)
     __wifiTrustedActions: [], // eklentilerin Wi-Fi Monitör güvenilir listesi düğmeleri (bkz. addWifiTrustedAction)
-    __boardMenus: [],       // eklentilerin Tahtalar sağ menüsü maddeleri (bkz. addBoardMenu)
+    __boardMenus: [],       // eklentilerin Cihazlar sağ menüsü maddeleri (bkz. addBoardMenu)
     __diskUsageTabs: [],    // eklentilerin Disk kullanımı sekme tanımı üreticileri (bkz. addDiskUsageTab)
     __settingsTabs: {},     // {eklenti-adı: [{key, label, create}]} Ayarlar ▸ Eklentiler ek sekmeleri (bkz. addSettingsTab)
 
@@ -112,12 +112,12 @@ qx.Class.define("ankamon.ext.Extensions", {
     },
 
     /**
-     * Bir eklenti Tahtalar sağ menüsüne (grid satırı ve ekran kutucuğu — ikisi de page.Boards.__rowMenu) madde
+     * Bir eklenti Cihazlar sağ menüsüne (grid satırı ve ekran kutucuğu — ikisi de page.Boards.__rowMenu) madde
      * ekler; araç çubuğu menüden türediği için madde çubukta da görünür (bkz. ui.boards.ActionBar). init() içinde
      * yalnız eklenti etkinse çağrılmalı.
      * @param spec {Map} {
      *   build: (board, boards, user) → qx.ui.menu.Button|null — maddeyi kurar (BoardOps.menuButton ile; null: yok).
-     *     ActionBar yetkiyi sınamak için sentetik tahtayla da çağırır ({id: 0, online, label: ""}).
+     *     ActionBar yetkiyi sınamak için sentetik cihazla da çağırır ({id: 0, online, label: ""}).
      *   parent: isteğe bağlı çekirdek grubunun etiketi (ör. "Komut çalıştır"): madde o grubun alt menüsüne girer;
      *     araç çubuğunda da o grubun düğmesinde görünür (grup yoksa — yetki/çevrimdışı — eklentinin kendi bölümüne).
      *   bar: {id, label, iconSvg|icon, mirror?, primary?, sep?, single?, hint?} — isteğe bağlı ayrı araç çubuğu düğmesi;
@@ -128,7 +128,7 @@ qx.Class.define("ankamon.ext.Extensions", {
       this.__boardMenus.push(spec);
     },
 
-    /** @return {Array} eklentilerin bu tahta(lar) için kurduğu sağ menü maddeleri (hata veren eklenti atlanır); parent
+    /** @return {Array} eklentilerin bu cihaz(lar) için kurduğu sağ menü maddeleri (hata veren eklenti atlanır); parent
      * verilen maddede userData "ankamon.menuParent" (bkz. page.Boards.__rowMenu). */
     boardMenuItems(board, boards, user) {
       return this.__boardMenus.map(spec => {
@@ -145,7 +145,7 @@ qx.Class.define("ankamon.ext.Extensions", {
       }).filter(Boolean);
     },
 
-    /** @return {Array} eklentilerin Tahtalar araç çubuğu grupları (bkz. addBoardMenu bar). */
+    /** @return {Array} eklentilerin Cihazlar araç çubuğu grupları (bkz. addBoardMenu bar). */
     boardBarGroups() {
       return this.__boardMenus.filter(spec => spec.bar).map(spec => spec.bar);
     },

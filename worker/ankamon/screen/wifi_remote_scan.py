@@ -23,13 +23,13 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Wi-Fi Monitör'ün tahtada çalışan kabuk programı (bkz. wifi.py).
+"""Wi-Fi Monitör'ün cihazda çalışan kabuk programı (bkz. wifi.py).
 
 Program /run/ankamon-wifimon/prog.sh olarak yazılıp sh (dash) ile çalışır. Kart kapalıysa geçici açar, tarar, eski durumuna döndürür:
 - Radyo kapalıysa önce `nmcli device set <kart> autoconnect no`, sonra radyo açılır; kart kayıtlı ağa bağlanmaz (bu sunucu ağları
   arası geçiş yasak). Yine de bağlanmaya kalkarsa `device disconnect`. Autoconnect kapatılamazsa radyo hiç açılmaz.
 - Başlangıç durumu değişiklikten ÖNCE `orig` dosyasına yazılır. Geri yükleme önce radyoyu kapatır, sonra autoconnect'i döndürür.
-- Aynı tahtada eşzamanlı oturumlar: `flock` altında oturum sayımı; durumu ilk oturum kaydeder, son çıkan geri yükler.
+- Aynı cihazda eşzamanlı oturumlar: `flock` altında oturum sayımı; durumu ilk oturum kaydeder, son çıkan geri yükler.
 - Geri yüklemeyi hem ana sürecin trap'i hem `setsid` ile ayrılmış bekçi yapar (ikisi de güvenli, iş bir kez yapılır). Bekçi sunucudan
   gelen stdin kalp atışını okur: EOF (SSH koptu, durdurma istendi), LEASE saniye sessizlik (ağ koptu) ya da ana sürecin ölmesi
   (kill -9) durumunda devreye girer. stdout'u /dev/null'dur; SSH oturumunu açık tutmaz.
@@ -39,19 +39,19 @@ Program /run/ankamon-wifimon/prog.sh olarak yazılıp sh (dash) ile çalışır.
   listesi $TMP verilir, AP'lerin kanalları da dinlenir): Wi-Fi kartı BAĞLI DEĞİLSE (durum 20/30) kart NetworkManager'dan geçici
   bırakılır (`managed no`, çalışma zamanı ayarı; açılışta kendiliğinden döner), arabirim indirilir, monitör kipinde ankamon-mon0
   eklenir ve dinlenir; sonra arabirim silinir, kart yeniden `managed yes` olur (autoconnect "no" korunur, Arge 2'de denendi).
-  Kart bağlıysa ya da bağlanıyorsa dinlenmez (bağlantı kesilirdi) — FORCE=1 değilse. Aynı tahtada tek oturum dinler (flock -n).
+  Kart bağlıysa ya da bağlanıyorsa dinlenmez (bağlantı kesilirdi) — FORCE=1 değilse. Aynı cihazda tek oturum dinler (flock -n).
   Geri alma işaretli ($D/unmanaged): finish, bekçi ve restore_orig sahibi ölmüş/biten işareti temizler.
-- FORCE=1 (kullanıcı onayı: tahta kabloyla da bağlı, Wi-Fi bağlantısı dinleme süresince kopacak): kart bağlıysa bağlantı adı ve
+- FORCE=1 (kullanıcı onayı: cihaz kabloyla da bağlı, Wi-Fi bağlantısı dinleme süresince kopacak): kart bağlıysa bağlantı adı ve
   autoconnect değeri kalıcı diske ($P/forced) yazılır, autoconnect kapatılır, bağlantı kesilir; oturum boyunca kopuk tutulur
   (block_connect). Son oturum çıkınca (restore_orig) autoconnect döner ve bağlantı yeniden kurulur. Güç kesilirse açılışta
   NetworkManager zaten kendisi bağlanır; dosya bir sonraki oturumda temizlenir.
 - SSH koruması: SSH istemcisine giden yol ($SSH_CLIENT, `ip route get`) Wi-Fi kartından geçiyorsa kart HİÇBİR koşulda monitör
-  kipine alınmaz (PROBE_NOTE=sshwifi) — yoksa tahtaya erişim kaybolurdu.
+  kipine alınmaz (PROBE_NOTE=sshwifi) — yoksa cihaza erişim kaybolurdu.
 
-- Tahtanın Ankamon Wi-Fi ayarı: "Wi-Fi'yi kapat" işleminin polkit kuralı ($RULE) varsa geri yüklemenin sonunda kart, açılıştaki
-  durumu ne olursa olsun kapatılır (Tahtalar grid'inin Wi-Fi sütunu ve wifi-on/wifi-off işlemleriyle tutarlı).
+- Cihazın Ankamon Wi-Fi ayarı: "Wi-Fi'yi kapat" işleminin polkit kuralı ($RULE) varsa geri yüklemenin sonunda kart, açılıştaki
+  durumu ne olursa olsun kapatılır (Cihazlar grid'inin Wi-Fi sütunu ve wifi-on/wifi-off işlemleriyle tutarlı).
 
-Bilinen sınır: geçici açıkken tahtanın gücü kesilirse trap da bekçi de çalışamaz; NetworkManager radyoyu açık hatırlar. Başlangıç
+Bilinen sınır: geçici açıkken cihazın gücü kesilirse trap da bekçi de çalışamaz; NetworkManager radyoyu açık hatırlar. Başlangıç
 durumu kalıcı diskte ($P/orig) olduğundan bir sonraki Wi-Fi Monitör oturumu önce onu geri yükler.
 
 Çıktı: önce @@INFO + @@START; her tarama @@RADIO/@@DEV/@@LIST/@@IWDUMP (iw scan dump: BSS/freq/signal)/@@INFO bölümleri + @@END; yoklama dinlendiyse ardından
@@ -65,12 +65,12 @@ from .wifimon_probe_sniffer import WIFIMON_PROBE_SNIFFER_SOURCE
 _WIFIMON_PROGRAM = r"""
 export LC_ALL=C.UTF-8 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 D=/run/ankamon-wifimon
-# Başlangıç durumu kalıcı diskte: pencere açıkken tahtanın gücü kesilirse /run silinir ama bu dosya kalır; sonraki
+# Başlangıç durumu kalıcı diskte: pencere açıkken cihazın gücü kesilirse /run silinir ama bu dosya kalır; sonraki
 # Wi-Fi Monitör oturumu (canlı oturum yokken) önce bu durumu geri yükler.
 P=/var/lib/ankamon-wifimon
 O=$P/orig
 L=$D/lock
-# Tahtanın Ankamon Wi-Fi ayarı: "Wi-Fi'yi kapat" (actions/wifi-off) bu kuralı kurar, "Wi-Fi'yi aç" siler. Kural varsa
+# Cihazın Ankamon Wi-Fi ayarı: "Wi-Fi'yi kapat" (actions/wifi-off) bu kuralı kurar, "Wi-Fi'yi aç" siler. Kural varsa
 # pencere kapanınca kart her durumda kapalı bırakılır.
 RULE=/etc/polkit-1/rules.d/49-ankamon-wifi-off.rules
 LEASE=25
@@ -177,7 +177,7 @@ probe_sniff() {
   [ -n "$W_DEV" ] || { PROBE_NOTE=nodev; return 0; }
   { command -v iw && command -v python3; } >/dev/null 2>&1 || { PROBE_NOTE=tools; return 0; }
   [ "$(wifi_radio)" = enabled ] || { PROBE_NOTE=radio; return 0; }
-  # SSH bu karttan geliyorsa monitör kipi tahtaya erişimi keserdi: hiçbir koşulda (FORCE olsa da) dinlenmez.
+  # SSH bu karttan geliyorsa monitör kipi cihaza erişimi keserdi: hiçbir koşulda (FORCE olsa da) dinlenmez.
   [ -n "$SSH_DEV" ] && [ "$SSH_DEV" = "$W_DEV" ] && { PROBE_NOTE=sshwifi; return 0; }
   case "$(wifi_state "$W_DEV")" in
     20|30) ;;
@@ -403,7 +403,7 @@ esac
 
 
 def wifimon_remote_command(watch: bool, probe: bool = False, force: bool = False) -> str:
-    """SSH ile tahtaya verilecek komut: programı (ve yoklama dinleyicisini) /run altına yazar, çalıştırır.
+    """SSH ile cihaza verilecek komut: programı (ve yoklama dinleyicisini) /run altına yazar, çalıştırır.
     Çıkış: 49 nmcli yok, 48 /run yazılamıyor."""
     return (
         "command -v nmcli >/dev/null 2>&1 || { echo NO_NMCLI >&2; exit 49; }\n"

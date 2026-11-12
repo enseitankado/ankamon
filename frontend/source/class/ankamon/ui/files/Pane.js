@@ -26,7 +26,7 @@
  */
 
 /**
- * Dosya gezgininin bir paneli: tahta seçimi, yol, araç düğmeleri (Üst, Ev, Yenile, Yeni klasör, Ad
+ * Dosya gezgininin bir paneli: cihaz seçimi, yol, araç düğmeleri (Üst, Ev, Yenile, Yeni klasör, Ad
  * değiştir, Sil) ve dizin tablosu (Ad, Boyut, Sahip, Grup, İzin, Değiştirilme). Veriyi dosya gezgini
  * servisinden alır (bkz. ui.files.Api, worker/ankamon/files). Klasörler her zaman önde sıralanır;
  * çift tıklama klasöre girer. Klavye: Delete = sil, F2 = ad değiştir, Backspace = üst dizin.
@@ -35,14 +35,14 @@ qx.Class.define("ankamon.ui.files.Pane", {
   extend: qx.ui.container.Composite,
 
   events: {
-    /** Seçim, dizin ya da tahta değişti (penceredeki Kopyala düğmeleri buna göre etkinleşir). */
+    /** Seçim, dizin ya da cihaz değişti (penceredeki Kopyala düğmeleri buna göre etkinleşir). */
     changeState: "qx.event.type.Event"
   },
 
   /**
    * @param caption {String} panel başlığı ("Kaynak", "Hedef")
-   * @param boards {Array} seçilebilecek tahtalar [{id, name}]
-   * @param boardId {Number} başlangıç tahtası
+   * @param boards {Array} seçilebilecek cihazlar [{id, name}]
+   * @param boardId {Number} başlangıç cihazı
    * @param path {String} başlangıç dizini
    * @param user {Map?} oturum sahibi: verilirse sütun sırası/gizleme kullanıcı başına sunucuda saklanır
    */
@@ -322,7 +322,7 @@ qx.Class.define("ankamon.ui.files.Pane", {
       const shown = names.slice(0, 8).map(n => "• " + esc(n)).join("<br>") +
         (names.length > 8 ? `<br>… ve ${names.length - 8} öğe daha` : "");
       const ok = await ankamon.ui.Dialog.confirm(
-        `<b>${esc(this.getBoardName())}</b> tahtasında <b>${esc(this.__path)}</b> içinden ` +
+        `<b>${esc(this.getBoardName())}</b> cihazında <b>${esc(this.__path)}</b> içinden ` +
         `${names.length} öğe <b>kalıcı olarak</b> silinsin mi? Klasörler içerikleriyle birlikte silinir.<br><br>${shown}`,
         "Sil");
       if (!ok) {

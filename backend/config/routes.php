@@ -54,7 +54,7 @@ return [
     ['GET',    '/api/auth/cast',         [Api\AuthApi::class, 'cast'],         'public'],
     ['GET',    '/api/auth/taskmgr',      [Api\AuthApi::class, 'taskmgr'],      'public'],
     ['GET',    '/api/auth/chat',         [Api\AuthApi::class, 'chat'],         'public'],
-    // Yansıtma penceresinin tüketim tablosu: yayını okuyan tahtaların aldığı veri (MediaMTX API'si).
+    // Yansıtma penceresinin tüketim tablosu: yayını okuyan cihazların aldığı veri (MediaMTX API'si).
     ['GET',    '/api/cast/stats',        [Api\CastApi::class, 'stats'],        'cast'],
     ['GET',    '/api/auth/filemanager',  [Api\AuthApi::class, 'filemanager'],  'public'],
     ['GET',    '/api/auth/home-restore', [Api\AuthApi::class, 'homeRestore'],  'public'],
@@ -94,17 +94,17 @@ return [
     ['GET',    '/api/board-uptime',      [Api\UptimeApi::class, 'index'],      'logs'],
     // Oturumlar ▸ Şampiyonlar Ligi: en uzun oturum süresi sıralamaları (bkz. SessionLeagueApi).
     ['GET',    '/api/session-league',    [Api\SessionLeagueApi::class, 'index'], 'logs'],
-    // Oturumlar ▸ Teneffüs Ligi: ders aralarında açık kalan tahtalar (bkz. BreakLeagueApi).
+    // Oturumlar ▸ Teneffüs Ligi: ders aralarında açık kalan cihazlar (bkz. BreakLeagueApi).
     ['GET',    '/api/break-league',      [Api\BreakLeagueApi::class, 'index'], 'logs'],
-    // Liglerin dışında bırakılan kullanıcı/tahtalar (bkz. LeagueExclusionsApi).
+    // Liglerin dışında bırakılan kullanıcı/cihazlar (bkz. LeagueExclusionsApi).
     ['GET',    '/api/league-exclusions', [Api\LeagueExclusionsApi::class, 'index'], 'logs'],
     ['PUT',    '/api/league-exclusions', [Api\LeagueExclusionsApi::class, 'update'], 'leagues.exclude'],
-    // Tahtalar ▸ Anomaliler (bkz. AnomaliesApi, worker/ankamon/anomaly).
+    // Cihazlar ▸ Anomaliler (bkz. AnomaliesApi, worker/ankamon/anomaly).
     ['GET',    '/api/anomalies',         [Api\AnomaliesApi::class, 'index'],   'anomalies'],
-    // Tahta sağlığı ▸ Yardım ▸ Denetim türleri: tür ayarları (sıklık, düzey, anlık taranır) ve SSH denetimi aralığı.
+    // Cihaz sağlığı ▸ Yardım ▸ Denetim türleri: tür ayarları (sıklık, düzey, anlık taranır) ve SSH denetimi aralığı.
     ['PUT',    '/api/anomaly-kinds',     [Api\AnomaliesApi::class, 'updateKind'], 'admin'],
     ['PUT',    '/api/diagnose/interval', [Api\DiagnoseApi::class, 'setInterval'], 'admin'],
-    // Tahta sağlığı ▸ Durum: sürekli izleme + SSH denetimi bulguları tek biçimde (yetki içeride: anomalies / diagnose).
+    // Cihaz sağlığı ▸ Durum: sürekli izleme + SSH denetimi bulguları tek biçimde (yetki içeride: anomalies / diagnose).
     ['GET',    '/api/board-health',      [Api\BoardHealthApi::class, 'index'], 'user'],
     ['DELETE', '/api/board-sessions',    [Api\SessionsApi::class, 'delete'],   'sessions.manage'],
     ['DELETE', '/api/board-hosts',       [Api\SessionsApi::class, 'deleteHost'], 'sessions.hosts'],

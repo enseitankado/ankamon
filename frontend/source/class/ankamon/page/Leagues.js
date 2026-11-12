@@ -5,12 +5,12 @@
 
 /**
  * Ligler (sol menüde Ağ'ın altında):
- *  - "Kullanım sıralaması" (ui.sessions.ChampionsLeague; eski adı "Şampiyonlar Ligi"): tahtalarda en uzun süre oturum
- *    açık tutan kullanıcılar / tahtalar.
+ *  - "Kullanım sıralaması" (ui.sessions.ChampionsLeague; eski adı "Şampiyonlar Ligi"): cihazlarda en uzun süre oturum
+ *    açık tutan kullanıcılar / cihazlar.
  *  - "Teneffüsler" (ui.sessions.BreakLeague; eski adları "Teneffüs Ligi", "Ders arası sıralaması"): ders aralarında açık
- *    kalan tahtalar / bunu yapan kullanıcılar.
+ *    kalan cihazlar / bunu yapan kullanıcılar.
  * Her sıralama kullanıcılar ve bilgisayarlar için ayrı sekme (kullanıcı isteği 2026-11-10: sayfadaki "Kullanıcılar /
- * Tahtalar" seçim listesi kalktı; sol menüde Ligler ▸ <sıralama> ▸ Kullanıcılar / Bilgisayarlar — bkz. TABS, ui.Shell
+ * Cihazlar" seçim listesi kalktı; sol menüde Ligler ▸ <sıralama> ▸ Kullanıcılar / Bilgisayarlar — bkz. TABS, ui.Shell
  * tab.group). Sekme kimlikleri eski tek sekmenin varsayılanını korur ("league" = kullanıcılar, "breakLeague" =
  * bilgisayarlar): hatırlanan sekme ve eski {page: "sessions", tab: "league"|"breakLeague"} bağlantıları
  * (ui.Shell.__openPage) çalışmaya devam eder. Yetki Oturumlar'la aynı ("logs").

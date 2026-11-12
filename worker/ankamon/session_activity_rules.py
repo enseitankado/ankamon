@@ -25,13 +25,13 @@
 
 """Log satırı → oturum hareketi: hangi mesaj kullanıcının yaptığı (ya da başına gelen) bir olaydır.
 
-Tahta logları her uygulama açılışını kaydetmez; buradaki liste canlı loglardan çıkarıldı (2026-11-02): kullanıcı/oturum hareketi
+Cihaz logları her uygulama açılışını kaydetmez; buradaki liste canlı loglardan çıkarıldı (2026-11-02): kullanıcı/oturum hareketi
 anlamı taşıyan her şey alınır. Bilerek ALINMAYANLAR (gürültü, ayrıntı için kurallara bakın): systemd, rsyslogd, pam-script,
 pam_sm_*, rtkit-daemon, gnome-keyring-daemon, cinnamon-session/x-session-manager, avahi-daemon, runuser (root otomasyonu),
 root'un sudo/su/CRON'ları, otomatik işler (_AUTOMATED), sshd'nin Ankamon bağlantıları, açılıştaki USB sıralaması.
 classify(program, message) -> (tür, özet, olayı yapan kullanıcı|None) ya da None.
 
-Sıradan kabuk komutları syslog'a gitmez ve bilerek toplanmaz (kullanıcı kararı): tahtalara komut kancası kurulmaz, yalnız
+Sıradan kabuk komutları syslog'a gitmez ve bilerek toplanmaz (kullanıcı kararı): cihazlara komut kancası kurulmaz, yalnız
 logda olan yetkili komutlar (sudo, pkexec, su) görünür.
 """
 
@@ -98,7 +98,7 @@ _ACCOUNT = {
 PROGRAMS = sorted({"lightdm", "pkexec", "polkitd", "sudo", "su", "sshd", "smbd", "CRON", "udisksd", "kernel", "NetworkManager",
                    "wpa_supplicant", "systemd-logind", "dbus-daemon", "tiha"} | set(_ACCOUNT) | set(APP_PROGRAMS))
 
-# Komut satırındaki parola benzeri değerler: sudo/pkexec satırları tahtada maskelenmeden gelir, hareket özeti ve ayrıntısında gizlenir.
+# Komut satırındaki parola benzeri değerler: sudo/pkexec satırları cihazda maskelenmeden gelir, hareket özeti ve ayrıntısında gizlenir.
 _V = r"""("[^"]*"|'[^']*'|[^ \t;&|,]+)"""
 SECRET_PATTERNS = [
     (r"\b(echo|printf)[ \t]+[^|]*\|[ \t]*(sudo[ \t]+-S|(sudo([ \t]+-[a-z]+)*[ \t]+)?([^ \t|;&]*/)?(chpasswd|passwd|smbpasswd|sshpass))", r"\1 *** | \2"),
@@ -207,7 +207,7 @@ def classify(program: str, message: str):
             return "ssh", f"SSH oturumu kapandı: {hit.group(1)} ({hit.group(2)})", hit.group(1)
         return None
     if program == "smbd":
-        # "nobody": kimliksiz bağlantı; yalnız kapanış satırı gelir, birkaç tahtada aynı saniyede (ağ taraması) — hareket değil.
+        # "nobody": kimliksiz bağlantı; yalnız kapanış satırı gelir, birkaç cihazda aynı saniyede (ağ taraması) — hareket değil.
         hit = re.match(r"pam_unix\(samba:session\): session (opened|closed) for user (\S+?)(?:\(|$)", m)
         if hit and hit.group(2) != "nobody":
             return "ag", f"Samba bağlantısı {'açıldı' if hit.group(1) == 'opened' else 'kapandı'}: {hit.group(2)}", hit.group(2)

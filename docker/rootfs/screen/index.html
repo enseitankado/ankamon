@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ankamon — Tahta ekranı</title>
+<title>Ankamon — Cihaz ekranı</title>
 <script>
   // Senkron (modül betiğinden ÖNCE çalışır — modül betiği <defer> gibi ertelenir): embed/single
   // sınıfını <html>'e HEMEN ekler. Bu olmadan tarayıcı, modül betiği devreye girip .embed'e özgü
@@ -24,12 +24,12 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   } catch (e) { /* boş/bozuk fragman: modül betiği asıl ayrıştırmayı yine yapacak */ }
 </script>
 <!--
-  Canlı tahta ekranı (salt izleme). Tek tahta (q=view) ya da çoklu önizleme kutucukları (q=thumb).
+  Canlı cihaz ekranı (salt izleme). Tek cihaz (q=view) ya da çoklu önizleme kutucukları (q=thumb).
   Adres: /screen/#<base64(JSON {boards:[{id,name,online,whoami?}], q})> — bilgi URL fragmanında taşınır,
   sunucuya gitmez. `whoami` varsa (bkz. Boards.js __whoamiState — "Oturumları sorgula", "Oturum aç"/"Oturumu kapat"
   sağ menülerinin tetiklediği SSH işleri) önizlemede sol altta sürmekte olan iş ("… açılıyor…") ya da
   sonuç gösterilir (bkz. Tile.setWhoami).
-  Her kutucuk /screen/ws/<id> WebSocket'ine bağlanır; ekran köprüsü tahtada x11vnc'yi SSH ile başlatır.
+  Her kutucuk /screen/ws/<id> WebSocket'ine bağlanır; ekran köprüsü cihazda x11vnc'yi SSH ile başlatır.
   Kaynak tasarrufu: görünmeyen (kaydırılmış) kutucuklar ve gizli sekme bağlantıyı kapatır, görününce açar.
 -->
 <style>
@@ -65,13 +65,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   .tile .view > .screen { position: absolute; inset: 0; }
   /* Duraklatılmış akışın son karesi (bkz. Tile.freeze) — noVNC'nin ölçekli tuvaliyle aynı yerleşim. */
   .tile .view > .screen > canvas.frozen, .tile .view > .screen > img.frozen { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
-  /* noVNC tahtanın imlecini tuvale satır içi stil olarak yazar (salt izlemede de); müdahale kapalıyken
+  /* noVNC cihazın imlecini tuvale satır içi stil olarak yazar (salt izlemede de); müdahale kapalıyken
      görüntü alanında fare imleci değişmesin (kullanıcı isteği) — !important satır içi stili ezer. */
   .tile:not(.control) .view, .tile:not(.control) .view * { cursor: default !important; }
   .tile .msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; font-size: 13px; color: #bbb; pointer-events: none; }
   .tile .msg a { pointer-events: auto; color: #6af; }
   .tile.live .msg { display: none; }
-  /* Ekran güç tasarrufunda: tahtanın monitörü DPMS ile kapalı (üst sayfadan "powersave" — periyodik SSH
+  /* Ekran güç tasarrufunda: cihazın monitörü DPMS ile kapalı (üst sayfadan "powersave" — periyodik SSH
      yoklaması, bkz. Boards.js __previewList) ya da bağlı görüntü tümüyle siyah (bkz. Tile.checkBlank).
      DPMS'te x11vnc son görüntüyü vermeye devam eder: yazı koyu zeminle görüntünün üstünde; zemin arkadaki
      görüntüyü yalnız hafifçe belli edecek kadar saydam (kullanıcı isteği). Uyandırmak için sağ menü Ekran ▸ Uyandır;
@@ -100,14 +100,14 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   .tile .view:has(> .perf:not([hidden])) .sleep .sd { position: static; order: -1; margin-bottom: 1px; font-size: 11px; }
   .tile .view:has(> .perf:not([hidden])) .sleep .wk { display: none; }
   html.single #toolbar { display: none; }
-  /* Gömülü kip (Tahtalar sayfasının "Ekranlar" sekmesi): sabit oranlı küçük kutucuklar, aşağı kaydırılır.
+  /* Gömülü kip (Cihazlar sayfasının "Ekranlar" sekmesi): sabit oranlı küçük kutucuklar, aşağı kaydırılır.
      Sınıf <html>'e eklenir (bkz. baştaki senkron betik), body'ye değil: <body> ayrıştırılmadan önce
      de erişilebilsin diye — aksi halde ilk boyama bu kurallar uygulanmadan, FOUC ile olurdu. */
   html.embed #toolbar { display: none; }
   #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     font-size: 15px; color: #888; pointer-events: none; z-index: 5; }
   /* Kutucuklar sarılan satırlarda; genişlik ortak boyuttan (alt slider, --tile-min) ya da kutucuğun kendi
-     boyutundan (kenarından sürükleyerek — --w). Görüntü yüksekliği genişlikten, tahtanın ekran
+     boyutundan (kenarından sürükleyerek — --w). Görüntü yüksekliği genişlikten, cihazın ekran
      çözünürlüğünün en-boy oranıyla (--ar; bilinmiyorsa 16:9) gelir. Bkz. setTileSize, Tile.setResolution. */
   html.embed #grid { display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start;
     gap: 6px; padding: 6px; background: #f3f3f3; }
@@ -123,7 +123,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   html.embed .tile.resizing { outline: 2px dashed #0096ff; outline-offset: -2px; }
   html.embed .tile:fullscreen .rs { display: none; }
   /* Kutucuk seçimi (Shift/Ctrl/dikdörtgen seçim) ve sürükle-bırak sıralama — yalnız gömülü kipte
-     (Tahtalar sayfasının Ekranlar sekmesi). Seçim: mavi çerçeve. Sürüklenen: soluk; bırakılacak
+     (Cihazlar sayfasının Ekranlar sekmesi). Seçim: mavi çerçeve. Sürüklenen: soluk; bırakılacak
      kutucuk: kesik çizgili çerçeve. Seçili kutucuk koyu görüntüler arasında seçilebilsin diye (kullanıcı isteği):
      dışa taşan düz mavi halka (ışıma yok), mavi başlık, başta ✓. */
   html.embed .tile.selected { outline: 3px solid #0096ff; outline-offset: -3px; z-index: 1;
@@ -145,7 +145,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   .tile:fullscreen { background: #000; }
   .tile:fullscreen .view { flex: 1; aspect-ratio: auto; }
   .tile.offline .msg { color: #888; }
-  /* Ekranı ayrı pencerede açık tahta (Boards.js "tm-popped"): önizleme akışı durur, yerine bu not. */
+  /* Ekranı ayrı pencerede açık cihaz (Boards.js "tm-popped"): önizleme akışı durur, yerine bu not. */
   .tile.popped .msg { color: #8cf; font-size: 14px; font-weight: 600; }
   /* Önizlemede (q=thumb) oturum durumu — "Oturumları sorgula" sonucu ve "Oturum aç"/"Oturumu kapat"
      ilerlemesi; sol alt köşe, siyah zemin beyaz yazı. Bkz. Tile.setWhoami / Boards.js __whoamiState. */
@@ -165,7 +165,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   @keyframes whoami-job-spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .tile .whoami.querying::before { animation-duration: 2.4s; } }
   .tile .whoami.error { background: rgba(140, 20, 20, .75); }
-  /* Alt bar (yalnız Ekranlar sekmesi — gömülü kip): üst başlık çubuğunun aynısı; tahtanın son
+  /* Alt bar (yalnız Ekranlar sekmesi — gömülü kip): üst başlık çubuğunun aynısı; cihazın son
      işlemci/bellek kullanımı ve işlemci sıcaklığı (bkz. Tile.setStats, Boards.js __previewList).
      Eşik aşılınca değer turuncu/kırmızı olur. */
   .tile .stats { display: none; }
@@ -219,7 +219,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     <button id="full" title="Bütün sayfayı tam ekran yapar">⛶ Tam ekran</button>
   </div>
   <div id="grid"></div>
-  <!-- Kutucuklar kurulana dek (noVNC modülleri + üst sayfadan tahta listesi) ortada görünür; bkz. markLoaded. -->
+  <!-- Kutucuklar kurulana dek (noVNC modülleri + üst sayfadan cihaz listesi) ortada görünür; bkz. markLoaded. -->
   <div id="loading">Yükleniyor…</div>
 
 <script type="module">
@@ -227,21 +227,21 @@ import RFB from "./novnc/core/rfb.js";
 
 const PROFILE = {
   view:  { quality: 6, compression: 2, retry: 4000 },
-  // Sohbet açıkken: tahtadaki sohbet penceresinin yazısı okunsun (tam çözünürlük, yüksek kalite; bkz. Tile.applyQuality).
+  // Sohbet açıkken: cihazdaki sohbet penceresinin yazısı okunsun (tam çözünürlük, yüksek kalite; bkz. Tile.applyQuality).
   chat:  { quality: 8, compression: 2, retry: 4000 },
   thumb: { quality: 4, compression: 6, retry: 15000 }
 };
 const MESSAGES = {
-  4001: "Tahta kaydı ya da IP adresi bulunamadı.",
-  4002: "Tahtaya SSH ile ulaşılamadı (kapalı ya da ağda değil). Yeniden deneniyor…",
+  4001: "Cihaz kaydı ya da IP adresi bulunamadı.",
+  4002: "Cihaza SSH ile ulaşılamadı (kapalı ya da ağda değil). Yeniden deneniyor…",
   4003: "SSH girişi reddedildi — Ayarlar'daki SSH kullanıcı/parolasını denetleyin.",
-  4004: "Tahtada ekran istemcisi (x11vnc) kurulu değil. Hazır işlemlerden \"Ekran istemcisini (x11vnc) kur\"u çalıştırın ya da Ayarlar → Tahta erişimi'nde otomatik kurulumu açın.",
+  4004: "Cihazda ekran istemcisi (x11vnc) kurulu değil. Hazır işlemlerden \"Ekran istemcisini (x11vnc) kur\"u çalıştırın ya da Ayarlar → Cihaz erişimi'nde otomatik kurulumu açın.",
   4005: "Ekran paylaşımı başlatılamadı",
   // Köprü x11vnc yokken kurulumu arka planda başlattı (ayar: "Ekran istemcisini otomatik kur").
   4006: "İstemci yükleniyor…",
   4007: "Ekran istemcisi (x11vnc) otomatik kurulamadı — ayrıntı Arka plan işlemleri'nde. Bir süre sonra yeniden denenecek.",
   4029: "Eşzamanlı izleme sınırına ulaşıldı.",
-  4030: "Fare/klavye ile müdahale yetkiniz yok (yönetici \"Tahta ekranını uzaktan yönetme\" yetkisini verebilir).",
+  4030: "Fare/klavye ile müdahale yetkiniz yok (yönetici \"Cihaz ekranını uzaktan yönetme\" yetkisini verebilir).",
   4900: "Bağlantı zaman aşımına uğradı. Yeniden deneniyor…"   // istemci tarafı (bkz. Tile.CONNECT_TIMEOUT_MS)
 };
 const FINAL = new Set([4001, 4003, 4004, 4029, 4030]);   // kendiliğinden yeniden denenmez
@@ -250,7 +250,7 @@ let spec = { boards: [], q: "view" };
 try {
   spec = Object.assign(spec, JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1))))));
 } catch (e) { /* boş/bozuk fragman */ }
-const embed = !!spec.embed;   // Tahtalar sayfasının "Ekranlar" sekmesi: liste üst sayfadan güncellenir
+const embed = !!spec.embed;   // Cihazlar sayfasının "Ekranlar" sekmesi: liste üst sayfadan güncellenir
 // Ekranlar araç çubuğunun aç/kapa düğmeleri (üst sayfadan "tm-view"): alt donanım barı, başarım görünümü.
 const view = { stats: true, perf: false };
 const single = !embed && spec.boards.length === 1;
@@ -259,7 +259,7 @@ const single = !embed && spec.boards.length === 1;
 if (single) document.documentElement.classList.add("single");
 if (embed) document.documentElement.classList.add("embed");
 document.getElementById("count").textContent =
-  spec.boards.length + " tahta" + (spec.q === "thumb" ? " · önizleme" : "") + " · çift tıkla: tam ekran";
+  spec.boards.length + " cihaz" + (spec.q === "thumb" ? " · önizleme" : "") + " · çift tıkla: tam ekran";
 
 const grid = document.getElementById("grid");
 if (!embed) {
@@ -282,7 +282,7 @@ class Tile {
     this.base = spec.q in PROFILE ? spec.q : "view";
     this.q = chatting.has(board.id) ? "chat" : this.base;
     this.isFs = false;        // kutucuk tam ekranda
-    this.wanted = false;      // görünür + sekme açık + tahta çevrimiçi (ilk refreshWanted bağlar)
+    this.wanted = false;      // görünür + sekme açık + cihaz çevrimiçi (ilk refreshWanted bağlar)
     this.inView = true;       // kutucuk görünür alanda (IntersectionObserver)
     this.rfb = null;
     this.timer = null;
@@ -291,9 +291,9 @@ class Tile {
     this.el._boardId = board.id;   // orderedIds() DOM sırasını buradan okur
     this.control = false;     // fare/klavye ile müdahale (yalnız "screen.control" yetkisiyle; sunucu da denetler)
     this.el.innerHTML = `<div class="title"><span class="dot"></span><span class="name"></span>
-      ${embed ? "" : `<button class="snd" title="Tahtanın sesini bu bilgisayara aktar (kapalı)">${SPEAKER_OFF}</button>`}
+      ${embed ? "" : `<button class="snd" title="Cihazın sesini bu bilgisayara aktar (kapalı)">${SPEAKER_OFF}</button>`}
       ${!embed && spec.input ? `<button class="lk" data-device="keyboard">${KEYBOARD_ICON}</button><button class="lk" data-device="mouse">${MOUSE_ICON}</button>` : ""}
-      ${spec.control ? '<button class="ctl" title="Fare ve klavye ile tahtayı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
+      ${spec.control ? '<button class="ctl" title="Fare ve klavye ile cihazı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
       <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div><div class="sleep"><div>Ekran güç tasarrufu kipinde<div class="sd"></div>${embed ? '<div class="wk">Uyandırmak için tıklayın</div>' : ""}</div></div>
       <div class="whoami" hidden></div></div><div class="stats"></div>`;
     this.el.querySelector(".name").textContent = board.name || ("#" + board.id);
@@ -319,7 +319,7 @@ class Tile {
     this.showLocks();
     const ctl = this.el.querySelector("button.ctl");
     // Müdahale tam ekranda yapılır (kullanıcı isteği): Ekranlar sekmesinde (gömülü) kutucuğun kendisi değil,
-    // o tahtanın "Ekranı yönet" penceresi büyütülmüş açılır (üst sayfa — bkz. Boards.js "tm-manage"); ekran
+    // o cihazın "Ekranı yönet" penceresi büyütülmüş açılır (üst sayfa — bkz. Boards.js "tm-manage"); ekran
     // penceresinin içinde açılınca pencere büyütülür (bkz. BoardOps.screen "tm-maximize").
     if (ctl) ctl.addEventListener("click", () => {
       if (embed) {
@@ -335,7 +335,7 @@ class Tile {
         if (e.button === 0 && !this.control && e.target.closest(".view")) this.wake();
       }, true);
     }
-    // Müdahale kipinde çift tıklama tahtaya gider; tam ekran yalnız ⛶ düğmesiyle.
+    // Müdahale kipinde çift tıklama cihaza gider; tam ekran yalnız ⛶ düğmesiyle.
     // Gömülü kipte (Ekranlar sekmesi) ekran alanına çift tıklama sağ menüdeki "Ekranı göster" ile aynı
     // işi yapar (kullanıcı isteği; üst sayfa açar — bkz. Boards.js "tm-show"); başlık çubuğuna çift
     // tıklama ve tam ekrandayken çift tıklama tam ekranı aç/kapatır. Ekran alanındaki çift tıklama
@@ -357,9 +357,9 @@ class Tile {
         this.viewDownAt = now;
       }
     }, true);
-    // Gömülü kipte sağ tık, Tahtalar grid'inin satır menüsüyle AYNI menüyü açar: menü üst sayfada
-    // (qooxdoo, Boards.__rowMenu) kurulur — burada yalnız tahta kimliği, o anki çoklu seçim ve konum
-    // iletilir (bkz. Boards.__openPreviewMenu). Müdahale kipinde sağ tık tahtaya gider.
+    // Gömülü kipte sağ tık, Cihazlar grid'inin satır menüsüyle AYNI menüyü açar: menü üst sayfada
+    // (qooxdoo, Boards.__rowMenu) kurulur — burada yalnız cihaz kimliği, o anki çoklu seçim ve konum
+    // iletilir (bkz. Boards.__openPreviewMenu). Müdahale kipinde sağ tık cihaza gider.
     if (embed) {
       // Yakalama aşamasında dinlenir: noVNC tuvali olayı kendisi durdurduğu için kabarcıklanma aşamasına ulaşmıyor.
       this.el.addEventListener("contextmenu", e => {
@@ -369,7 +369,7 @@ class Tile {
         // Seçim dışı bir kutucuğa sağ tıklanırsa (çoğu dosya yöneticisindeki gibi) seçim ona
         // sıfırlanır; zaten seçimin bir parçasıysa (Shift/Ctrl ile yapılmış) seçim KORUNUR.
         if (!selected.has(this.board.id)) setSelected([this.board.id]);
-        // Alt barda sağ tık: hangi göstergelerin görüneceği (bkz. Boards.__openStatsMenu); başka yerde tahta menüsü.
+        // Alt barda sağ tık: hangi göstergelerin görüneceği (bkz. Boards.__openStatsMenu); başka yerde cihaz menüsü.
         const type = e.target.closest && e.target.closest(".stats") ? "tm-statsmenu" : "tm-menu";
         window.parent.postMessage(
           { type, id: this.board.id, ids: [...selected], x: e.clientX, y: e.clientY }, location.origin);
@@ -449,9 +449,9 @@ class Tile {
 
   /**
    * Gömülü kipte kutucuk kenarından boyutlandırılır (kullanıcı isteği): sağ kenar, alt kenar ya da köşe —
-   * hangisinden sürüklenirse sürüklensin en-boy oranı korunur (tahtanın ekran çözünürlüğü, bkz.
+   * hangisinden sürüklenirse sürüklensin en-boy oranı korunur (cihazın ekran çözünürlüğü, bkz.
    * setResolution); yalnız ölçek değişir. Köşede iki yöndeki sürüklemeden büyük olanı geçerlidir.
-   * Boyut (genişlik) tahta başına bu tarayıcıda saklanır; alt slider (setTileSize reset) hepsini ortak boyuta döndürür.
+   * Boyut (genişlik) cihaz başına bu tarayıcıda saklanır; alt slider (setTileSize reset) hepsini ortak boyuta döndürür.
    */
   makeResizable() {
     ["e", "s", "se"].forEach(dir => {
@@ -500,15 +500,15 @@ class Tile {
     if (res) s.setProperty("--ar", res[0] + " / " + res[1]); else s.removeProperty("--ar");
   }
 
-  /** Görüntünün en-boy oranı (genişlik / yükseklik): tahtanın bilinen çözünürlüğü, yoksa 16:9. */
+  /** Görüntünün en-boy oranı (genişlik / yükseklik): cihazın bilinen çözünürlüğü, yoksa 16:9. */
   aspect() {
     const res = tileRes[this.board.id];
     return res ? res[0] / res[1] : 16 / 9;
   }
 
   /**
-   * Tahtanın ekran çözünürlüğü (VNC çerçeve boyutu — bağlanınca ve tahtada değişince): kutucuk oranı
-   * buna uyar, tahta kapalıyken de son bilinen oran kullanılsın diye bu tarayıcıda saklanır; üst sayfaya
+   * Cihazın ekran çözünürlüğü (VNC çerçeve boyutu — bağlanınca ve cihazda değişince): kutucuk oranı
+   * buna uyar, cihaz kapalıyken de son bilinen oran kullanılsın diye bu tarayıcıda saklanır; üst sayfaya
    * bildirilir (slider'ın yanındaki % değeri — bkz. Boards "tm-res").
    */
   setResolution(w, h) {
@@ -577,11 +577,11 @@ class Tile {
 
   /**
    * Alt bar: `stats` {cpu, mem, temp, disk_temp, fan, battery} (yüzde/°C/RPM/V, her biri null
-   * olabilir — fan/pil tahtada Super I/O sürücüsü yüklüyse gelir) ya da null (kapalı tahta /
+   * olabilir — fan/pil cihazda Super I/O sürücüsü yüklüyse gelir) ya da null (kapalı cihaz /
    * son 5 dakikada ölçüm yok — bkz. backend MetricsApi::latest). Yalnız gömülü kipte görünür (CSS).
    */
   setStats(stats) {
-    // board.hide: bu kullanıcının bu tahtada gizlediği göstergeler (cpu, temp, mem, disk_temp, fan, battery, net —
+    // board.hide: bu kullanıcının bu cihazda gizlediği göstergeler (cpu, temp, mem, disk_temp, fan, battery, net —
     // alt bara sağ tıkla seçilir, sunucuda kullanıcı tercihi; bkz. Boards.__openStatsMenu).
     const hide = new Set(this.board.hide || []);
     const net = this.board.online === false || hide.has("net") ? null : this.board.net;
@@ -591,7 +591,7 @@ class Tile {
     this.statsEl.textContent = "";
     this.netIcons(net);
     if (!stats) {
-      this.statsEl.insertAdjacentHTML("beforeend", `<span class="none">${this.board.online === false ? "Tahta kapalı" : "Ölçüm yok"}</span>`);
+      this.statsEl.insertAdjacentHTML("beforeend", `<span class="none">${this.board.online === false ? "Cihaz kapalı" : "Ölçüm yok"}</span>`);
       return;
     }
     // Eşikler: warn/crit değerin üstünde ise renklenir; pilde ters (alt eşik) — CR2032 ~3 V, 2.5 V altı biter.
@@ -638,14 +638,14 @@ class Tile {
 
   /**
    * "Oturumları sorgula" ve "Oturum aç"/"Oturumu kapat" (bkz. Boards.js __sessionJob)
-   * sonucunu sol altta gösterir — yalnız önizlemede (q=thumb); tam ekran/tek tahta görünümünde
+   * sonucunu sol altta gösterir — yalnız önizlemede (q=thumb); tam ekran/tek cihaz görünümünde
    * (q=view) zaten canlı ekranın kendisi yeterli, rozet gereksiz. `whoami`: null (hiç sorgulanmadı,
    * gizli), {status:"querying", text?}, ya da {status:"ok"|"error", text}.
    */
 
   /**
-   * Hoparlör düğmesi (varsayılan kapalı): tahtanın çıkış sesi bu tarayıcıda çalar. Ham PCM (24 kHz, stereo, s16le — bkz.
-   * worker screen/audio.py) parça parça zamanlanır; ağ gecikmesi birikirse atlanarak canlıya dönülür. Tahtanın sesi kesilmez.
+   * Hoparlör düğmesi (varsayılan kapalı): cihazın çıkış sesi bu tarayıcıda çalar. Ham PCM (24 kHz, stereo, s16le — bkz.
+   * worker screen/audio.py) parça parça zamanlanır; ağ gecikmesi birikirse atlanarak canlıya dönülür. Cihazın sesi kesilmez.
    */
   setAudio(on, note) {
     const btn = this.el.querySelector("button.snd");
@@ -654,12 +654,12 @@ class Tile {
     if (ws) { ws.onclose = null; ws.close(); }
     if (!on) {
       if (this.audioCtx) { this.audioCtx.close(); this.audioCtx = null; }
-      if (btn) { btn.innerHTML = SPEAKER_OFF; btn.title = note || "Tahtanın sesini bu bilgisayara aktar (kapalı)"; btn.classList.remove("on"); btn.classList.toggle("err", !!note); }
+      if (btn) { btn.innerHTML = SPEAKER_OFF; btn.title = note || "Cihazın sesini bu bilgisayara aktar (kapalı)"; btn.classList.remove("on"); btn.classList.toggle("err", !!note); }
       return;
     }
     const ctx = this.audioCtx || (this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 }));
     ctx.resume();
-    if (btn) { btn.innerHTML = SPEAKER_ON; btn.title = "Tahtanın sesi aktarılıyor (kapatmak için tıklayın)"; btn.classList.add("on"); btn.classList.remove("err"); }
+    if (btn) { btn.innerHTML = SPEAKER_ON; btn.title = "Cihazın sesi aktarılıyor (kapatmak için tıklayın)"; btn.classList.add("on"); btn.classList.remove("err"); }
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const sock = this.audioWs = new WebSocket(`${proto}//${location.host}/screen/ws/audio/${this.board.id}`);
     sock.binaryType = "arraybuffer";
@@ -692,7 +692,7 @@ class Tile {
     };
     sock.onclose = e => {
       this.audioWs = null;
-      const why = { 4008: "Tahtada ses sunucusu yok (oturum yok ya da ses kapalı).", 4002: "Tahtaya ulaşılamadı.", 4003: "SSH girişi reddedildi." };
+      const why = { 4008: "Cihazda ses sunucusu yok (oturum yok ya da ses kapalı).", 4002: "Cihaza ulaşılamadı.", 4003: "SSH girişi reddedildi." };
       this.setAudio(false, why[e.code] || "Ses aktarımı kesildi.");
     };
   }
@@ -711,7 +711,7 @@ class Tile {
   }
 
   /**
-   * " (23 dk)" / " (1 sa 12 dk)": tahtanın ne zamandır oturumsuz açık olduğu (kullanıcı isteği). Başlangıç
+   * " (23 dk)" / " (1 sa 12 dk)": cihazın ne zamandır oturumsuz açık olduğu (kullanıcı isteği). Başlangıç
    * üst sayfadan gelir (board.noSessionSince, epoch sn — BoardsApi no_session_since: oturumsuz kalınan
    * açık aralığın başı ya da son oturumun bitişi); bilinmiyorsa boş. Dakikada bir tazelenir (bkz. tickWhoami).
    */
@@ -723,7 +723,7 @@ class Tile {
     return " (" + (h ? `${h} sa ${m} dk` : `${m} dk`) + ")";
   }
 
-  /** Bağlı kalmalı mı: sekme görünür, kutucuk görünür alanda ve tahta çevrimiçi (kapalı tahtaya SSH denenmez). */
+  /** Bağlı kalmalı mı: sekme görünür, kutucuk görünür alanda ve cihaz çevrimiçi (kapalı cihaza SSH denenmez). */
   refreshWanted() {
     const offline = this.board.online === false;
     this.el.classList.toggle("offline", offline);
@@ -732,10 +732,10 @@ class Tile {
       this.disconnect();
       this.syncPerf();
       // Ağda canlı ama SSH yanıt vermiyor (Akıllı Tahtalar ▸ Yönetilebilir: Hayır): kapalı DEĞİL, yönetilemiyor.
-      this.setState("offline", this.board.alive ? "Tahta açık — yönetilemiyor (SSH yanıt vermiyor)" : "Tahta kapalı");
+      this.setState("offline", this.board.alive ? "Cihaz açık — yönetilemiyor (SSH yanıt vermiyor)" : "Cihaz kapalı");
       return;
     }
-    // Ekranı ayrı pencerede açık (bkz. "tm-popped"): aynı tahtaya ikinci akış açılmaz; pencere kapanınca döner.
+    // Ekranı ayrı pencerede açık (bkz. "tm-popped"): aynı cihaza ikinci akış açılmaz; pencere kapanınca döner.
     const wasPopped = this.el.classList.contains("popped");
     const isPopped = popped.has(this.board.id);
     this.el.classList.toggle("popped", isPopped);
@@ -790,14 +790,14 @@ class Tile {
     rfb.viewOnly = !this.control;
     rfb.scaleViewport = true;
     rfb.resizeSession = false;
-    rfb.focusOnClick = this.control;   // müdahalede ekrana tıklayınca klavye de tahtaya gider
+    rfb.focusOnClick = this.control;   // müdahalede ekrana tıklayınca klavye de cihaza gider
     rfb.qualityLevel = p.quality;
     rfb.compressionLevel = p.compression;
     rfb.background = "#000";
     const fresh = !prev;                // kalite değişimi (kesintisiz geçiş) yeni bağlantı sayılmaz
     // Ekranın gerçek çözünürlüğü VNC masaüstü adında gelir ("ankamon-1920x1080" — bkz. worker/ankamon/
-    // screen/remote.py; önizleme akışı tahtada küçültüldüğünden çerçeve boyutu gerçek boyut değildir).
-    // Ad yoksa (eski x11vnc) oran için çerçeve boyutu kullanılır: bağlantıda (ServerInit) ve tahtada
+    // screen/remote.py; önizleme akışı cihazda küçültüldüğünden çerçeve boyutu gerçek boyut değildir).
+    // Ad yoksa (eski x11vnc) oran için çerçeve boyutu kullanılır: bağlantıda (ServerInit) ve cihazda
     // çözünürlük değişince (DesktopSize) gelir; noVNC bunu olay olarak yaymıyor, iç _resize sarılır.
     let native = false;
     rfb.addEventListener("desktopname", e => {
@@ -815,7 +815,7 @@ class Tile {
     rfb.addEventListener("connect", () => {
       this.setState("live");
       if (this.control) rfb.focus();
-      // "Bağlanıyor…" bitti: ana sayfa bu tahtanın oturumunu sorgulasın (bkz. Boards.__onMessage "tm-live").
+      // "Bağlanıyor…" bitti: ana sayfa bu cihazın oturumunu sorgulasın (bkz. Boards.__onMessage "tm-live").
       if (fresh) window.parent.postMessage({ type: "tm-live", id: this.board.id }, location.origin);
       if (prev) {
         // "connect" ilk kareden hemen önce gelir; yeni akış ilk görüntüsünü çizene dek eskisi kalsın.
@@ -833,7 +833,7 @@ class Tile {
     this.rfb = rfb;
     this.wrap = wrap;
     if (!prev) this.setState("connecting", "Bağlanıyor…");
-    // El sıkışma bir yerde takılırsa (ör. tahta yeni açılmış, X/x11vnc hazır değil) "Bağlanıyor…"da
+    // El sıkışma bir yerde takılırsa (ör. cihaz yeni açılmış, X/x11vnc hazır değil) "Bağlanıyor…"da
     // süresiz kalmasın: süre dolunca bu akış bırakılır ve olağan yeniden deneme yoluna girilir.
     this.timer = setTimeout(() => {
       if (this.token !== token || this.el.classList.contains("live")) return;
@@ -914,8 +914,8 @@ class Tile {
 
   /**
    * Siyah ekran / "Bağlanıyor…" göstermeden yeni bir akışa geçer (müdahale kipi aç/kapa, kalite
-   * değişimi). Tahtadaki x11vnc salt izleme (-viewonly) ya da girdi kabul eden kipte başlatıldığından
-   * (güvenlik tahta tarafında, bkz. worker/ankamon/screen/remote.py) kip değişimi yeni bir bağlantı
+   * değişimi). Cihazdaki x11vnc salt izleme (-viewonly) ya da girdi kabul eden kipte başlatıldığından
+   * (güvenlik cihaz tarafında, bkz. worker/ankamon/screen/remote.py) kip değişimi yeni bir bağlantı
    * gerektirir — ama o kurulurken eski görüntü canlı kalır.
    */
   reconnect() {
@@ -972,8 +972,8 @@ class Tile {
 
   /**
    * "Başarım" görünümü: yalnız görünüm açıkken VE kutucuk bağlı kalmalıyken (sekme açık, görünür
-   * alanda, tahta çevrimiçi — bkz. refreshWanted) tahta başına tek bir WebSocket; kopunca 5 sn sonra
-   * yeniden denenir. Kapanınca akış ve tahtadaki döngü biter (bkz. worker/ankamon/screen/perf.py).
+   * alanda, cihaz çevrimiçi — bkz. refreshWanted) cihaz başına tek bir WebSocket; kopunca 5 sn sonra
+   * yeniden denenir. Kapanınca akış ve cihazdaki döngü biter (bkz. worker/ankamon/screen/perf.py).
    */
   syncPerf() {
     const want = view.perf && this.wanted;
@@ -1031,7 +1031,7 @@ class Tile {
   }
 
   /**
-   * Müdahale kipini açar/kapatır: tahtadaki x11vnc girdi kabul eden kipte yeniden başlatılır.
+   * Müdahale kipini açar/kapatır: cihazdaki x11vnc girdi kabul eden kipte yeniden başlatılır.
    * Onay istemez (kullanıcı isteğiyle kaldırıldı) — yetki zaten "screen.control" özelliğiyle
    * denetleniyor (bkz. Kullanıcılar sayfası); oturum açılışı yine de command/etkinlik loguna yazılır.
    */
@@ -1083,7 +1083,7 @@ class Tile {
       locks: this.locks }, location.origin);
   }
 
-  /** done: bu düğmenin işi bitti. Tahta listesi tazelemesi iş sürerken düğmeyi serbest bırakmaz. */
+  /** done: bu düğmenin işi bitti. Cihaz listesi tazelemesi iş sürerken düğmeyi serbest bırakmaz. */
   setLocks(locks, done) {
     this.locks = locks;
     if (done) this.el.querySelectorAll("button.lk").forEach(btn => btn.classList.remove("busy"));
@@ -1108,7 +1108,7 @@ class Tile {
 // Kesintisiz geçişte yeni akış "connect" olduktan sonra eski görüntünün kaldırılmadan önce
 // beklediği süre (ilk tam kare genelde bundan önce çizilir).
 Tile.SWAP_MS = 700;
-// Kutucuğa basarak uyandırmada aynı tahtaya yeni iş gönderilmeden geçmesi gereken süre (bkz. Tile.wake).
+// Kutucuğa basarak uyandırmada aynı cihaza yeni iş gönderilmeden geçmesi gereken süre (bkz. Tile.wake).
 Tile.WAKE_MS = 15000;
 // Köprü x11vnc'yi ~2 sn'de başlatır (ssh ConnectTimeout 8 sn, başlatma en çok 30 sn bekler) — bu
 // süre içinde "connect" gelmezse akış takılmış sayılır.
@@ -1120,10 +1120,10 @@ Tile.INSTALL_FAILED_RETRY_MS = 60000;
 // Kenardan boyutlandırmada en küçük kutucuk genişliği / görüntü yüksekliği (slider'ın alt sınırıyla uyumlu).
 Tile.MIN_W = 140;
 
-// Kutucukların kendi boyutları (tahta id → {w?, h?}, piksel) — bu tarayıcıda kalıcı (bkz. Tile.makeResizable).
+// Kutucukların kendi boyutları (cihaz id → {w?, h?}, piksel) — bu tarayıcıda kalıcı (bkz. Tile.makeResizable).
 const TILE_SIZES_KEY = "ankamon.screens.tileSizes";
 let tileSizes = {};
-// Tahta başına son bilinen ekran çözünürlüğü [genişlik, yükseklik] (bkz. Tile.setResolution).
+// Cihaz başına son bilinen ekran çözünürlüğü [genişlik, yükseklik] (bkz. Tile.setResolution).
 const TILE_RES_KEY = "ankamon.screens.tileRes";
 let tileRes = {};
 try { tileRes = JSON.parse(localStorage.getItem(TILE_RES_KEY) || "{}") || {}; } catch (e) { tileRes = {}; }
@@ -1170,14 +1170,14 @@ function toggleFullscreen(el) {
   else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
 }
 
-const tiles = new Map();   // tahta id → Tile
-let chatting = new Set(spec.chat || []);   // sohbet penceresi açık tahtalar (üst sayfadan "tm-chat")
-let popped = new Set();     // ekranı ayrı pencerede açık tahtalar (üst sayfadan "tm-popped")
+const tiles = new Map();   // cihaz id → Tile
+let chatting = new Set(spec.chat || []);   // sohbet penceresi açık cihazlar (üst sayfadan "tm-chat")
+let popped = new Set();     // ekranı ayrı pencerede açık cihazlar (üst sayfadan "tm-popped")
 // Üst sayfada Ekranlar sekmesi bir süredir görünmüyor ("tm-pause"): akışlar durur, kutucuklar ve son
 // görüntüler yerinde kalır (sayfa yeniden kurulmaz); sekme görününce kaldığı yerden sürer.
 let paused = false;
 
-// Kutucuk seçimi (yalnız gömülü kip — Tahtalar sayfasının Ekranlar sekmesi): Tile.click/contextmenu
+// Kutucuk seçimi (yalnız gömülü kip — Cihazlar sayfasının Ekranlar sekmesi): Tile.click/contextmenu
 // ve aşağıdaki dikdörtgen (fare ile sürükleyerek) seçim bunları kullanır. `selected` DOM sırasıyla
 // değil, kimlik kümesiyle tutulur; görünür vurgu setSelected() ile kutucukların kendi sınıfına yansır.
 let selected = new Set();
@@ -1186,7 +1186,7 @@ let pendingCollapse = null; // çoklu seçimdeki kutucuğa düz basıldı: sür�
 
 /**
  * Seçimi verilen kimlik kümesine EŞİTLER (öncekini temizler) ve kutucukların vurgusunu günceller.
- * Seçim, Tahtalar grid'inin onay kutularıyla TEK kaynaktır: burada değişen seçim "tm-select" ile üst
+ * Seçim, Cihazlar grid'inin onay kutularıyla TEK kaynaktır: burada değişen seçim "tm-select" ile üst
  * sayfaya bildirilir (grid işaretleri ona eşitlenir — araç çubuğundaki Sil/Komut çalıştır/Kapat…
  * böylece Ekranlar sekmesinde de seçili kutucuklara uygulanır); üst sayfadan gelen "tm-selection"
  * (Tümünü işaretle, grid'de işaretleme) ise fromParent=true ile, geri bildirilmeden uygulanır.
@@ -1456,10 +1456,10 @@ function setBoards(list) {
   if (!list.length && !empty) {
     empty = document.createElement("div");
     empty.id = "empty";
-    empty.textContent = "Gösterilecek tahta yok.";
+    empty.textContent = "Gösterilecek cihaz yok.";
     grid.appendChild(empty);
   }
-  // Artık gösterilmeyen tahtaların seçimi de kalkar (süzgeç değişince "hayalet" seçim kalmasın).
+  // Artık gösterilmeyen cihazların seçimi de kalkar (süzgeç değişince "hayalet" seçim kalmasın).
   if ([...selected].some(id => !ids.has(id))) {
     setSelected([...selected].filter(id => ids.has(id)), true); // grid zaten yalnız gösterilenleri tutar
   }
@@ -1478,7 +1478,7 @@ document.addEventListener("fullscreenchange", () => {
     t.applyQuality();
   });
 });
-// Yalnız görünen kutucuklar bağlı kalır (onlarca tahtalık önizlemede kaydırılan kutucuklar akış tutmaz).
+// Yalnız görünen kutucuklar bağlı kalır (onlarca cihazlık önizlemede kaydırılan kutucuklar akış tutmaz).
 document.addEventListener("visibilitychange", () => tiles.forEach(t => t.refreshWanted()));
 
 // Gömülü kipte de ayrı pencerede de: açık sohbetler ve kilit durumu üst sayfadan gelir.
@@ -1493,7 +1493,7 @@ window.addEventListener("message", e => {
 });
 
 if (embed) {
-  // Üst sayfa (Tahtalar) grid'deki tahta listesini her değiştiğinde gönderir.
+  // Üst sayfa (Cihazlar) grid'deki cihaz listesini her değiştiğinde gönderir.
   window.addEventListener("message", e => {
     if (e.source !== window.parent || e.origin !== location.origin || !e.data) return;
     if (e.data.type === "tm-boards") { setBoards(e.data.boards || []); markLoaded(); }
@@ -1526,13 +1526,13 @@ if (embed) {
   window.parent.postMessage({ type: "tm-ready" }, location.origin);
 }
 
-/** "Yükleniyor…" yazısını kaldırır — ilk tahta listesi kutucuklara dönüşünce (kullanıcı isteği). */
+/** "Yükleniyor…" yazısını kaldırır — ilk cihaz listesi kutucuklara dönüşünce (kullanıcı isteği). */
 function markLoaded() {
   document.getElementById("loading")?.remove();
 }
 
 // Gömülü kipte liste üst sayfadan ("tm-boards") gelir: o gelene dek boş liste çizilmez (yoksa yükleme
-// sırasında yanlışlıkla "Gösterilecek tahta yok." görünüyordu). Tek pencere kipinde liste adresle gelir.
+// sırasında yanlışlıkla "Gösterilecek cihaz yok." görünüyordu). Tek pencere kipinde liste adresle gelir.
 if (!embed) {
   setBoards(spec.boards);
   markLoaded();

@@ -38,19 +38,19 @@ use Ankamon\Core\Storage;
 
 /**
  * Oturumlar — iki tür, tek listede (her satırda `kind`):
- *  - "board": tahta (greeter) oturumları — worker/ankamon/tasks/board_sessions.py'nin lightdm PAM
+ *  - "board": cihaz (greeter) oturumları — worker/ankamon/tasks/board_sessions.py'nin lightdm PAM
  *    loglarından çıkardığı gerçek kullanıcı oturum açma/kapama kayıtları (bkz. 007_board_sessions.sql).
  *  - "webshell": Ankamon üzerinden açılan web terminal (SSH) oturumları; username Ankamon
  *    kullanıcısıdır (bkz. 011_webshell_sessions.sql, docker/rootfs/webssh-hook.py).
  * Silmede kimlikler türe göre ayrı gelir (ids / webshell_ids) — iki tablonun kimlikleri çakışabilir.
- * Arayüz tüm satırları tek seferde çekip (Tahtalar grid'iyle aynı desen) sütun bazlı filtre + yerleşik
- * sıralamayla gösterir — veri hacmi (tahta başına günde birkaç oturum) buna uygundur.
+ * Arayüz tüm satırları tek seferde çekip (Cihazlar grid'iyle aynı desen) sütun bazlı filtre + yerleşik
+ * sıralamayla gösterir — veri hacmi (cihaz başına günde birkaç oturum) buna uygundur.
  */
 final class SessionsApi
 {
-    // locked: sürmekte olan oturum ekran kilidinde mi — Tahtalar grid'iyle aynı kaynak (session_probe'un
-    // boards.session_* alanları, bkz. 012_board_session_state.sql). Yalnız tahtadaki etkin oturumun
-    // kullanıcısı bu satırın kullanıcısıysa ve bilgi tazeyse (yoklama tahta erişilebilirken 30 sn'de bir).
+    // locked: sürmekte olan oturum ekran kilidinde mi — Cihazlar grid'iyle aynı kaynak (session_probe'un
+    // boards.session_* alanları, bkz. 012_board_session_state.sql). Yalnız cihazdaki etkin oturumun
+    // kullanıcısı bu satırın kullanıcısıysa ve bilgi tazeyse (yoklama cihaz erişilebilirken 30 sn'de bir).
     private const COLUMNS = "s.id, s.board_id, COALESCE(NULLIF(b.label, ''), s.host) AS board, s.host,
         s.username, s.uid,
         extract(epoch FROM s.started_at)::bigint AS started_at,
@@ -116,13 +116,13 @@ final class SessionsApi
     }
 
     /**
-     * Tahtalar'a kayıtlı OLMAYAN bir bilgisayarın (log gönderen ama eklenmemiş, ya da yeniden kurulup
-     * adı değişmiş eski tahta) kayıtlarını siler: tahtaya bağlanmamış oturumları (board_sessions,
+     * Cihazlar'a kayıtlı OLMAYAN bir bilgisayarın (log gönderen ama eklenmemiş, ya da yeniden kurulup
+     * adı değişmiş eski cihaz) kayıtlarını siler: cihaza bağlanmamış oturumları (board_sessions,
      * board_id NULL) ve açık/kapalı aralıklarını (board_uptime); `logs` verilirse ham loglarını da.
      * Oturum/aralık çıkarıcıları loglarda kaldıkları yerden ilerlediği için silinenler geri gelmez —
      * bilgisayar log göndermeyi sürdürürse yalnız yeni kayıtlar oluşur.
-     * Ad kayıtlı bir tahtanın bilgisayar adıysa (eski, tahtaya bağlanmamış oturum satırları) yalnız o
-     * satırlar silinir; açık/kapalı aralıkları ve loglar tahtanındır, dokunulmaz.
+     * Ad kayıtlı bir cihazın bilgisayar adıysa (eski, cihaza bağlanmamış oturum satırları) yalnız o
+     * satırlar silinir; açık/kapalı aralıkları ve loglar cihazındır, dokunulmaz.
      */
     public function deleteHost(Request $request, array $user): array
     {

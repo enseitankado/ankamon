@@ -31,7 +31,7 @@ Cihazın ailesi şu sırayla belirlenir (SQL `device_os_family(id)`, göç 052 �
 
 ## 2. İşlev kataloğu — `catalog.json`
 
-Her işlev: `id`, `title`, `menu` (sağ menü / araç çubuğu madde adları — `BoardOps.menuButton` anahtarı, tahta sayısı eki
+Her işlev: `id`, `title`, `menu` (sağ menü / araç çubuğu madde adları — `BoardOps.menuButton` anahtarı, cihaz sayısı eki
 olmadan), `jobs` (worker görev türleri) ve `impl` (aile → uygulamanın kısa tanımı). `impl`'de adı olmayan aile o işlevi
 **desteklemez**. Katalogda hiç geçmeyen menü maddesi / görev türü `unknown_function_families` ailelerinde (Linux) çalışır —
 eklentilerin eski maddeleri böylece güvenle Linux'ta kalır; eklenti, maddesinin `ankamon.menuKey`'ini katalogdaki bir işleve

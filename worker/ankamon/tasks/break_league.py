@@ -23,12 +23,12 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Teneffüs Ligi verisi: ders aralarında açık kalan tahtalar → break_league_days, kullanıcı bazında →
+"""Teneffüs Ligi verisi: ders aralarında açık kalan cihazlar → break_league_days, kullanıcı bazında →
 break_league_user_days. Bkz. db/migrations/041_break_league.sql, 044_break_league_users.sql.
 
 Teneffüs pencereleri Ayarlar ▸ Ders saatleri'nden (settings.lesson_times): tanımlı okul günlerinde ardışık iki dersin
-arası (teneffüsler ve öğle arası; ilk dersten önce ve son dersten sonra sayılmaz). Tahta başına gün başına:
-  on_seconds      = tahtanın açık aralıkları (board_uptime) ∩ teneffüs pencereleri
+arası (teneffüsler ve öğle arası; ilk dersten önce ve son dersten sonra sayılmaz). Cihaz başına gün başına:
+  on_seconds      = cihazın açık aralıkları (board_uptime) ∩ teneffüs pencereleri
   session_seconds = on_seconds'ın oturum açıkken geçen kısmı (∩ board_sessions; örtüşen oturumlar birleştirilir)
 Aralıklar PostgreSQL multirange (range_agg, *) ile birleştirilip kesiştirilir.
 
@@ -51,7 +51,7 @@ _SCHEDULE_CURSOR = "break_league.schedule"
 _USERS_CURSOR = "break_league.users"  # kullanıcı tablosu (göç 044) dolduruldu mu — yoksa oturum kaydı olan günler baştan
 _FINAL_LAG = 2  # bu kadar günden eski günler kesinleşmiş sayılır
 
-# Ortak kısım: teneffüs pencereleri (win) ve tahtanın gün başına teneffüste açık kaldığı aralıklar (up.on_mr).
+# Ortak kısım: teneffüs pencereleri (win) ve cihazın gün başına teneffüste açık kaldığı aralıklar (up.on_mr).
 _BREAK_UP_CTE = r"""
 WITH brk AS (SELECT * FROM unnest(%(starts)s::time[], %(ends)s::time[]) AS b(s, e)),
 days AS (SELECT d::date AS day FROM generate_series(%(d1)s::date, %(d2)s::date, interval '1 day') d
@@ -83,10 +83,10 @@ SELECT day, host,
 FROM sess
 """
 
-# Kullanıcı bazında (break_league_user_days, göç 044): tahtanın teneffüste açık aralıkları (up.on_mr)
-#   session_seconds = ∩ kullanıcının o tahtadaki oturumları (aynı anda iki kullanıcı oturumluysa ikisine de yazılır)
-#   idle_seconds    = oturumsuz parçalar (on_mr - bütün oturumlar); her parça, tahtanın O AÇILIŞINDA (parçayı içeren
-#                     board_uptime aralığı) parçadan önce oturumu son kapanan kullanıcıya yazılır — tahtayı giriş
+# Kullanıcı bazında (break_league_user_days, göç 044): cihazın teneffüste açık aralıkları (up.on_mr)
+#   session_seconds = ∩ kullanıcının o cihazdaki oturumları (aynı anda iki kullanıcı oturumluysa ikisine de yazılır)
+#   idle_seconds    = oturumsuz parçalar (on_mr - bütün oturumlar); her parça, cihazın O AÇILIŞINDA (parçayı içeren
+#                     board_uptime aralığı) parçadan önce oturumu son kapanan kullanıcıya yazılır — cihazı giriş
 #                     ekranında açık bırakan. Açılıştan beri kimse oturum açmadıysa parça kimseye yazılmaz.
 # etapadmin/root ve lig dışılar burada elenmez (API eler): son oturum etapadmin'inse parça etapadmin'e yazılır, sayılmaz.
 _COMPUTE_BREAK_USERS = _BREAK_UP_CTE + r""",

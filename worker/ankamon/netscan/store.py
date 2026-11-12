@@ -39,10 +39,10 @@ log = logging.getLogger("ankamon.netscan")
 
 # Üst üste bu kadar taramada görülmeyen cihaz çevrimdışı sayılır (telefonlar uykuda ARP'yi kaçırabilir).
 MISSES_BEFORE_OFFLINE = 2
-# Aday sorgularında: cihazın ağı tahta ağı mı (Ayarlar ▸ Ağ arabirimleri; bkz. netroles) YA DA cihazın kendisi tahta
-# (MAC'iyle sınıflandırılmış, elle tahta seçilmiş ya da Tahtalar'da kayıtlı). Ayrıntılı taramalar (servis, paylaşım,
-# etkinlik, ad) idari ağdaki sıradan bilgisayarlara yapılmaz ama tahtalar hangi ağda olursa olsun taranır
-# (kullanıcı isteği 2026-11-09: tahtalar bütün ağ bağdaştırıcılarından algılanır).
+# Aday sorgularında: cihazın ağı cihaz ağı mı (Ayarlar ▸ Ağ arabirimleri; bkz. netroles) YA DA cihazın kendisi cihaz
+# (MAC'iyle sınıflandırılmış, elle cihaz seçilmiş ya da Cihazlar'da kayıtlı). Ayrıntılı taramalar (servis, paylaşım,
+# etkinlik, ad) idari ağdaki sıradan bilgisayarlara yapılmaz ama cihazlar hangi ağda olursa olsun taranır
+# (kullanıcı isteği 2026-11-09: cihazlar bütün ağ bağdaştırıcılarından algılanır).
 _BOARD_NET = ("(" + netroles.board_net_sql("n") + f" OR d.type_auto = '{classify.BOARD}' OR d.device_type = '{classify.BOARD}'"
               " OR EXISTS (SELECT 1 FROM boards bb WHERE bb.mac = d.mac OR bb.wifi_mac = d.mac))")
 
@@ -82,13 +82,13 @@ def sync_networks(conn, detected: list[dict]) -> list[dict]:
         activity.record(conn, f"Ağ: sunucu artık bu ağa bağlı değil — {row['cidr']}", "warn")
     if changed or gone:
         bump(conn)
-    # Cihaz keşfi (ARP) bütün bağlı ağlarda — taraması açık olanlar (Ağ sayfasındaki ağ başına anahtar): tahtalar
+    # Cihaz keşfi (ARP) bütün bağlı ağlarda — taraması açık olanlar (Ağ sayfasındaki ağ başına anahtar): cihazlar
     # hangi bağdaştırıcıdan olursa olsun bulunsun (kullanıcı isteği 2026-11-09).
     return _scannable(detected, netroles.roles(conn), board_only=False)
 
 
 def _scannable(detected: list[dict], role: dict, board_only: bool = True) -> list[dict]:
-    """Taranacak ağlar: taraması açık olanlar; board_only ise yalnız tahta ağı (bkz. netroles). Arabirim role göre."""
+    """Taranacak ağlar: taraması açık olanlar; board_only ise yalnız cihaz ağı (bkz. netroles). Arabirim role göre."""
     nets = [n for n in detected if n["scan_enabled"] and (not board_only or netroles.is_board_net(n["ifaces"], role))]
     for n in nets:
         n["iface"] = netroles.scan_iface(n, role)
@@ -96,7 +96,7 @@ def _scannable(detected: list[dict], role: dict, board_only: bool = True) -> lis
 
 
 def scannable(conn, detected: list[dict]) -> list[dict]:
-    """Pasif akış gözlemi için ağlar: kayıtlı scan_enabled'a ve role göre — YALNIZ tahta ağı (idari ağın trafiği izlenmez)."""
+    """Pasif akış gözlemi için ağlar: kayıtlı scan_enabled'a ve role göre — YALNIZ cihaz ağı (idari ağın trafiği izlenmez)."""
     enabled = {r["cidr"]: r["scan_enabled"] for r in conn.execute(
         "SELECT cidr::text AS cidr, scan_enabled FROM net_networks").fetchall()}
     for n in detected:
@@ -105,8 +105,8 @@ def scannable(conn, detected: list[dict]) -> list[dict]:
 
 
 def _boards(conn) -> dict[str, dict]:
-    """MAC → tahta. boards.mac kablolu kartın MAC'i; Wi-Fi kartının kalıcı MAC'i (wifi_mac, göç 043) de aynı
-    tahtaya düşer — tahta ağa Wi-Fi ile de çıkabilir. Aynı adres iki tahtada varsa kablolu eşleşme kazanır."""
+    """MAC → cihaz. boards.mac kablolu kartın MAC'i; Wi-Fi kartının kalıcı MAC'i (wifi_mac, göç 043) de aynı
+    cihaza düşer — cihaz ağa Wi-Fi ile de çıkabilir. Aynı adres iki cihazda varsa kablolu eşleşme kazanır."""
     rows = conn.execute(
         "SELECT mac::text AS mac, wifi_mac::text AS wifi_mac, coalesce(nullif(label, ''), hostname, '') AS name,"
         " hostname, coalesce(facts->>'motherboard_model', '') AS model FROM boards"
@@ -179,7 +179,7 @@ def apply_sweep(conn, net: dict, found: dict[str, str]) -> int:
                 sets.append("ip = %s")
                 args.append(ip)
                 changed = True
-            # Sonradan Ankamon'a tahta olarak kaydedilen cihaz: türü/modeli tahtadan gelsin.
+            # Sonradan Ankamon'a cihaz olarak kaydedilen cihaz: türü/modeli cihazdan gelsin.
             if board and dev["type_auto"] != classify.BOARD:
                 sets += ["type_auto = %s", "model_auto = %s"]
                 args += [classify.BOARD, board["model"]]
@@ -207,8 +207,8 @@ def apply_sweep(conn, net: dict, found: dict[str, str]) -> int:
 def fill_labels(conn) -> int:
     """Boş takma adları doldurur (kalıcı; her tarama sonunda — kullanıcı isteği). Doldurulan kayıt sayısı.
 
-    Kaynak önceliği: Tahtalar'daki takma ad, sonra net_known_aliases (MAC'e göre bilinen adlar, ör. eski
-    envanterden). Ağ grid'i (net_devices) MAC ile eşleşir — tahta kaydında MAC yoksa IP ile; Tahtalar
+    Kaynak önceliği: Cihazlar'daki takma ad, sonra net_known_aliases (MAC'e göre bilinen adlar, ör. eski
+    envanterden). Ağ grid'i (net_devices) MAC ile eşleşir — cihaz kaydında MAC yoksa IP ile; Cihazlar
     grid'i (boards) bilinen adlardan MAC ile dolar. Elle girilmiş ad asla ezilmez (yalnız boş olanlar);
     bilinen adın notu, cihazın notu boşsa ona yazılır.
     """
@@ -240,14 +240,14 @@ def fill_labels(conn) -> int:
 
 def boards_from_devices(conn) -> int:
     """Ağ ▸ Akıllı Tahtalar satırları Ağ ▸ Varlıklar'dan beslenir (kullanıcı isteği 2026-11-09): Varlıklar'da varlık türü
-    "Akıllı tahta" olan (elle seçilmiş ya da tarayıcının tahmini — MAC öneki) ama Tahtalar'da kaydı olmayan her cihaz
-    için tahta kaydı açılır (source 'scan'; takma ad, bilgisayar adı ve IP cihazdan). Kayıt yalnız AÇILIR: türü sonradan
-    değişen cihazın tahta kaydı silinmez (geçmişi/oturumları var), Akıllı Tahtalar listesinden gizlenir (bkz. backend
+    "Akıllı tahta" olan (elle seçilmiş ya da tarayıcının tahmini — MAC öneki) ama Cihazlar'da kaydı olmayan her cihaz
+    için cihaz kaydı açılır (source 'scan'; takma ad, bilgisayar adı ve IP cihazdan). Kayıt yalnız AÇILIR: türü sonradan
+    değişen cihazın cihaz kaydı silinmez (geçmişi/oturumları var), Akıllı Tahtalar listesinden gizlenir (bkz. backend
     BoardsApi LISTED); tür geri alınınca yeniden görünür.
 
-    Önce sahiplenme: MAC'i boş eski bir kayıt (loglardan açılmış — yalnız bilgisayar adı/IP bilinir) aynı tahtaysa
+    Önce sahiplenme: MAC'i boş eski bir kayıt (loglardan açılmış — yalnız bilgisayar adı/IP bilinir) aynı cihazsa
     (bilgisayar adı büyük/küçük harf duyarsız ya da IP eşleşir) yeni kayıt AÇILMAZ, MAC o kayda yazılır. Kullanıcı bildirimi
-    2026-11-10: "A1-1" (etap-973494, MAC'siz) varken aynı tahta için ikinci kayıt ("A Blok - 10C") açılmıştı."""
+    2026-11-10: "A1-1" (etap-973494, MAC'siz) varken aynı cihaz için ikinci kayıt ("A Blok - 10C") açılmıştı."""
     adopted = conn.execute(
         f"""UPDATE boards b SET mac = d.mac, updated_at = now()
             FROM (SELECT DISTINCT ON (d.mac) d.mac, d.ip, d.hostname FROM net_devices d
@@ -261,7 +261,7 @@ def boards_from_devices(conn) -> int:
             RETURNING b.id, b.mac::text AS mac"""
     ).fetchall()
     for r in adopted:
-        activity.record(conn, f"Tahta kaydına MAC eklendi (ağ envanterinden): #{r['id']} {r['mac']}")
+        activity.record(conn, f"Cihaz kaydına MAC eklendi (ağ envanterinden): #{r['id']} {r['mac']}")
     rows = conn.execute(
         f"""INSERT INTO boards (mac, ip, label, hostname, source)
             SELECT DISTINCT ON (d.mac) d.mac, d.ip, COALESCE(NULLIF(d.label, ''), k.label, ''), NULLIF(d.hostname, ''), 'scan'
@@ -272,10 +272,10 @@ def boards_from_devices(conn) -> int:
             RETURNING id, host(ip) AS ip, mac::text AS mac"""
     ).fetchall()
     for r in rows:
-        activity.record(conn, f"Yeni tahta (ağ envanterinde akıllı tahta): {r['mac']} ({r['ip'] or 'IP yok'})")
-    # Kayıt açılırken cihazın adı çoğu zaman henüz bilinmez (ad/NetBIOS taraması sonra doldurur): adı boş tahta kaydı,
-    # cihazın sonradan öğrenilen adını alır (kullanıcı bildirimi 2026-11-11: Tahtalar listesinde "Bilgisayar adı" boş,
-    # Bilgisayar ayrıntılarında dolu). NetBIOS adı büyük harfle gelir (ETAP-8AB221): tahta adları gibi küçük harfe çevrilir.
+        activity.record(conn, f"Yeni cihaz (ağ envanterinde akıllı tahta): {r['mac']} ({r['ip'] or 'IP yok'})")
+    # Kayıt açılırken cihazın adı çoğu zaman henüz bilinmez (ad/NetBIOS taraması sonra doldurur): adı boş cihaz kaydı,
+    # cihazın sonradan öğrenilen adını alır (kullanıcı bildirimi 2026-11-11: Cihazlar listesinde "Bilgisayar adı" boş,
+    # Bilgisayar ayrıntılarında dolu). NetBIOS adı büyük harfle gelir (ETAP-8AB221): cihaz adları gibi küçük harfe çevrilir.
     named = conn.execute(
         """UPDATE boards b SET hostname = CASE WHEN d.hostname = upper(d.hostname) THEN lower(d.hostname) ELSE d.hostname END,
                   updated_at = now()
@@ -285,14 +285,14 @@ def boards_from_devices(conn) -> int:
            RETURNING b.id, b.hostname"""
     ).fetchall()
     for r in named:
-        activity.record(conn, f"Tahta kaydına bilgisayar adı eklendi (ağ envanterinden): #{r['id']} {r['hostname']}")
+        activity.record(conn, f"Cihaz kaydına bilgisayar adı eklendi (ağ envanterinden): #{r['id']} {r['hostname']}")
     return len(rows)
 
 
 def device_ips_from_boards(conn) -> int:
-    """Varlıklar'daki cihazın IP'si en güncel keşiften (kullanıcı isteği 2026-11-09): tahtanın IP'si tarayıcıdan sonra
-    loglarından (gönderenin MAC'i tahtanınkiyle eşleşerek — bkz. tasks/boards_from_logs) değiştiyse ve yeni adres
-    cihazın ağındaysa cihaz satırı da o adrese geçer. Tersi (tarama → tahta) fill_board_ips'te."""
+    """Varlıklar'daki cihazın IP'si en güncel keşiften (kullanıcı isteği 2026-11-09): cihazın IP'si tarayıcıdan sonra
+    loglarından (gönderenin MAC'i cihazınkiyle eşleşerek — bkz. tasks/boards_from_logs) değiştiyse ve yeni adres
+    cihazın ağındaysa cihaz satırı da o adrese geçer. Tersi (tarama → cihaz) fill_board_ips'te."""
     rows = conn.execute(
         """UPDATE net_devices d SET ip = b.ip
            FROM boards b, net_networks n
@@ -306,9 +306,9 @@ def device_ips_from_boards(conn) -> int:
 
 
 def fill_board_ips(conn) -> int:
-    """Tahtaların IP'si, ağ taramasının o MAC için bulduğu adresle (hangi ağda olursa olsun):
-      - IP'si olmayan tahta (Tahta ekle'de yalnız MAC girilmiş): bilinen herhangi bir adres;
-      - IP'si değişmiş tahta (DHCP — kullanıcı bildirimi 2026-11-09: Arge 1 yeni adres alınca kapalı görünüyordu):
+    """Cihazların IP'si, ağ taramasının o MAC için bulduğu adresle (hangi ağda olursa olsun):
+      - IP'si olmayan cihaz (Cihaz ekle'de yalnız MAC girilmiş): bilinen herhangi bir adres;
+      - IP'si değişmiş cihaz (DHCP — kullanıcı bildirimi 2026-11-09: Arge 1 yeni adres alınca kapalı görünüyordu):
         tarama MAC'i 15 dk içinde çevrim içi gördüyse o adres.
     Önce kablolu MAC (boards.mac), o çevrim içi değilse Wi-Fi kartının MAC'i (boards.wifi_mac). MAC ARP ile görülür,
     sahte kaynak adresiyle değiştirilemez."""
@@ -337,20 +337,20 @@ def fill_board_ips(conn) -> int:
 def _etap_board(mac: str) -> bool:
     """MAC, ETAP faz veritabanında bilinen bir akıllı tahta modeline mi düşüyor (bkz. etap_phase)."""
     info = etap_phase.lookup(mac)
-    return bool(info and info["tahta"])
+    return bool(info and info["cihaz"])
 
 
 def _etap_value(info: dict | None) -> dict | None:
     """etap sütununa yazılan kararlı alt küme (önek ayrıntısı yazılmaz — her turda gereksiz değişmesin)."""
     if not info:
         return None
-    return {k: info[k] for k in ("model", "ad", "faz", "marka", "guven", "tahta", "kaynak")}
+    return {k: info[k] for k in ("model", "ad", "faz", "marka", "guven", "cihaz", "kaynak")}
 
 
 def update_etap(conn) -> int:
-    """Tahtalar ve ağ cihazları için ETAP faz bilgisini (etap sütunu) günceller; her tarama sonunda.
+    """Cihazlar ve ağ cihazları için ETAP faz bilgisini (etap sütunu) günceller; her tarama sonunda.
 
-    Kaynak önceliği: Tahtalar'daki SSH ile okunmuş anakart modeli (kesin), yoksa maskelenmiş MAC öneki.
+    Kaynak önceliği: Cihazlar'daki SSH ile okunmuş anakart modeli (kesin), yoksa maskelenmiş MAC öneki.
     Akıllı tahta olarak tanınan ağ cihazının otomatik türü "Akıllı tahta" olur, otomatik modeli boşsa
     doldurulur (elle girilen tür/model ayrı sütunlardadır, ezilmez). Değişen kayıt sayısını döner.
     """
@@ -372,7 +372,7 @@ def update_etap(conn) -> int:
         if value != dev["etap"]:
             sets.append("etap = %s")
             args.append(Jsonb(value) if value else None)
-        if value and value["tahta"]:
+        if value and value["cihaz"]:
             if dev["type_auto"] != classify.BOARD:
                 sets.append("type_auto = %s")
                 args.append(classify.BOARD)

@@ -23,9 +23,9 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtadaki grafik oturumun ANLIK durumu: kim oturum açmış, ekran kilitli mi (SSH + loginctl).
+"""Cihazdaki grafik oturumun ANLIK durumu: kim oturum açmış, ekran kilitli mi (SSH + loginctl).
 
-Tahtalar grid'inin "Oturum" sütununu besler (bkz. tasks/session_probe.py periyodik yoklama,
+Cihazlar grid'inin "Oturum" sütununu besler (bkz. tasks/session_probe.py periyodik yoklama,
 boards.session_username/session_locked/session_checked_at — migration 012).
 
 ETAP'ta ekran kilidi LightDM'in `dm-tool lock`'udur (Cinnamon'un custom-screensaver-command'ı):
@@ -121,7 +121,7 @@ def probe(board: dict, user: str, password: str, timeout: int = 8) -> dict:
 
 def store_extras(conn, board_id: int, res: dict) -> None:
     """Ağ arabirimleri, otomatik kapatma ve ekran kilidi durumunu yazar (bkz. göç 026, 035; None =
-    bilinmiyor/yok). Wi-Fi kartının kalıcı MAC'i okunduysa Tahtalar ▸ Kablosuz MAC'e (boards.wifi_mac, göç 043)
+    bilinmiyor/yok). Wi-Fi kartının kalıcı MAC'i okunduysa Cihazlar ▸ Kablosuz MAC'e (boards.wifi_mac, göç 043)
     de yazılır — donanımdan okunan değer elle girileni günceller; kart okunamadıysa eski değer kalır."""
     conn.execute(
         "UPDATE boards SET netifs = %s::jsonb, autoshutdown = %s::jsonb, screen_locked = %s, input_locks = %s,"
@@ -142,7 +142,7 @@ def store_display(conn, board_id: int, state: str) -> None:
 
 
 def store(conn, board_id: int, user: str | None, locked: bool | None = None) -> None:
-    """Tahtanın oturum durumunu yazar. user boş/None = oturum kapalı. locked None ise (ör. `who`
+    """Cihazın oturum durumunu yazar. user boş/None = oturum kapalı. locked None ise (ör. `who`
     tabanlı "Oturumları sorgula" kilidi bilmez) kullanıcı değişmediyse önceki kilit durumu korunur,
     değiştiyse kilitsiz sayılır — bir sonraki periyodik yoklama kesinleştirir."""
     conn.execute(

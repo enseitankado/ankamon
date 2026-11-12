@@ -8,7 +8,7 @@ if ! command -v nmcli >/dev/null 2>&1; then
     exit 1
 fi
 if ! nmcli -t -f TYPE dev | grep -qx wifi; then
-    echo "Bu tahtada kablosuz ağ kartı yok — yapılacak bir şey yok."
+    echo "Bu cihazda kablosuz ağ kartı yok — yapılacak bir şey yok."
     exit 0
 fi
 

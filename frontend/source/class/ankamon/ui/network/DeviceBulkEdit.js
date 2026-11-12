@@ -30,7 +30,7 @@
  * Ağ ▸ Akıllı Tahtalar'da birden çok satır işaretliyken "Düzenle". Tek bilgisayar penceresinin (ui.network.DeviceWindow)
  * alanlarını taşır; her bilgisayara ÖZGÜ olanlar (takma ad, IP adresi, bilgisayar adı, kablolu/kablosuz MAC) salt okunur
  * ve devre dışıdır — topluca değiştirilemez. Toplu değişebilenler: varlık türü, marka/model, not (ağ envanteri kaydı) ve
- * tahta kaydının konum, sensör portu, sensör toplama, not alanları.
+ * cihaz kaydının konum, sensör portu, sensör toplama, not alanları.
  *
  * Alan bütün seçilenlerde aynıysa o değerle, değilse boş ve "farklı değerler" ipucuyla açılır; YALNIZ değiştirilen alanlar
  * seçilen her kayda yazılır (PATCH /network/devices/{id}, PATCH /boards/{id} — ikisi de kısmi gövde kabul eder).
@@ -42,8 +42,8 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
     MIXED: "— farklı değerler; boş bırakılırsa korunur —",
 
     /**
-     * @param opts {Map} {devices?: ağ envanteri satırları, boards?: tahta satırları (en az biri), user?, onSaved?}
-     *   Varlıklar'dan gelen cihazların tahta kayıtları ve Akıllı Tahtalar'dan gelen tahtaların cihaz kayıtları burada bulunur.
+     * @param opts {Map} {devices?: ağ envanteri satırları, boards?: cihaz satırları (en az biri), user?, onSaved?}
+     *   Varlıklar'dan gelen cihazların cihaz kayıtları ve Akıllı Tahtalar'dan gelen cihazların cihaz kayıtları burada bulunur.
      */
     async open(opts) {
       let { devices = [], boards = [], user = null } = opts;
@@ -179,8 +179,8 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
         check.setUserData("bulkInitial", monitor === undefined ? null : monitor === "true");
         check.setToolTipText(monitor === undefined ? "Seçilenlerin bir kısmında açık, bir kısmında kapalı; tıklayınca hepsi için seçilir" : null);
         boardForm.addField("monitor_enabled", "Sensör verisi toplansın", check);
-        this.__editable(boardForm, "notes", "Not (tahta)", boards, b => b.notes);
-        const boardPage = page(`Tahta (${boards.length} tahta)`);
+        this.__editable(boardForm, "notes", "Not (cihaz)", boards, b => b.notes);
+        const boardPage = page(`Cihaz (${boards.length} cihaz)`);
         boardPage.add(new qx.ui.container.Scroll(boardForm), { flex: 1 });
         tabs.add(boardPage);
       }
@@ -207,7 +207,7 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
             }
             boardChanges.exporter_port = port;
           }
-          // Varlık türü "Akıllı tahta" seçildiyse tahta kaydı da tahta sayılsın (eski "Bu bir akıllı tahtadır" işaretinin yerine).
+          // Varlık türü "Akıllı tahta" seçildiyse cihaz kaydı da cihaz sayılsın (eski "Bu bir akıllı tahtadır" işaretinin yerine).
           if (deviceChanges.device_type === "Akıllı tahta" && boards.length) {
             boardChanges.smart_board = true;
           }

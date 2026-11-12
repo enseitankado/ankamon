@@ -28,9 +28,9 @@
 /**
  * Sağlık ▸ Geçmiş (kullanıcı isteği 2026-11-10: eski "Geçmiş" ve "Özet" sekmeleri tek sekmede). Sürekli izlemenin
  * seçili dönemdeki kayıtları iki bölmede:
- *   - üstte tahta × bulgu ÖZETİ (ui.anomaly.Summary — sayı, toplam/en uzun süre, son başlangıç, şu an sürüyor mu),
+ *   - üstte cihaz × bulgu ÖZETİ (ui.anomaly.Summary — sayı, toplam/en uzun süre, son başlangıç, şu an sürüyor mu),
  *   - altta tek tek KAYITLAR (ui.anomaly.History — başlangıç, bitiş, süre, ayrıntı).
- * Özette bir satır seçilince alt tablo o tahtanın o bulgusuna süzülür; seçim kalkınca bütün kayıtlar. Bölmelerin
+ * Özette bir satır seçilince alt tablo o cihazın o bulgusuna süzülür; seçim kalkınca bütün kayıtlar. Bölmelerin
  * düzeni Durum sekmesiyle aynı (kalın ayırıcı, eşit iç boşluk — bkz. ui.health.Status SPLITTER/PANE_GAP).
  * Sekme kimliği "Geçmiş" (eski sol menü yaprağı ve hatırlanan sekme); eski "summary" buraya yönlenir (page.Anomalies OLD_TABS).
  */
@@ -71,7 +71,7 @@ qx.Class.define("ankamon.ui.anomaly.Records", {
       this.__summary.setData(anomalies, from);
     },
 
-    /** Durum'dan çift tık: özet de kayıtlar da o tahtaya süzülür. */
+    /** Durum'dan çift tık: özet de kayıtlar da o cihaza süzülür. */
     showBoard(board) {
       this.__summary.filterBoard(board);
       this.__history.filterBoardKind(board, null);

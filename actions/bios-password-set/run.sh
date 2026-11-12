@@ -5,7 +5,7 @@
 # (bkz. worker/ankamon/executor/tools.py). Parolalar çıktıya YAZILMAZ.
 set -u
 T=/opt/eta-112/eta-112.py
-[ -f "$T" ] || { echo "eta-112 tahtada bulunamadı ($T)." >&2; exit 1; }
+[ -f "$T" ] || { echo "eta-112 cihazda bulunamadı ($T)." >&2; exit 1; }
 echo "Araç: eta-112 $(cut -d' ' -f2 /opt/eta-112/VERSION 2>/dev/null | cut -c1-7)"
 
 # JSON çıktının son satırını okur (araç önce bağımlılık kurulumu vb. satırlar basabilir).
@@ -34,7 +34,7 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
-echo "Flash'a yazılıyor… (kesmeyin, tahtayı kapatmayın)"
+echo "Flash'a yazılıyor… (kesmeyin, cihazı kapatmayın)"
 out=$(python3 "$T" bios set "$@" --json 2>&1); rc=$?
 if [ "$(printf '%s' "$out" | field ok)" = "True" ]; then
     [ -n "${YONETICI:-}" ] && echo "✓ Yönetici parolası ayarlandı"
@@ -45,7 +45,7 @@ if [ "$(printf '%s' "$out" | field ok)" = "True" ]; then
     esac
     [ "$(printf '%s' "$out" | field verified)" = "True" ] && echo "✓ Geri-okuma ile doğrulandı"
     [ "$(printf '%s' "$out" | field changed)" = "False" ] && echo "(BIOS'ta zaten aynı değerler vardı — değişiklik yapılmadı)"
-    echo "Etkili olması için tahtayı yeniden başlatın."
+    echo "Etkili olması için cihazı yeniden başlatın."
     exit 0
 fi
 err=$(printf '%s' "$out" | field error 2>/dev/null)

@@ -23,19 +23,19 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Parola ayarla ▸ "Yönetici hesapları" sekmesi: tek tahtada root ve etapadmin parolası.
+"""Parola ayarla ▸ "Yönetici hesapları" sekmesi: tek cihazda root ve etapadmin parolası.
 
-Genel parola: Ayarlar ▸ SSH erişimi (settings.ssh_access). Tahtada root parolası ondan farklıysa SSH o tahtada
-tutmaz; bu yüzden tahtaya özel root parolası `board_credentials`'ta saklanır. Konteynerdeki bütün sshpass çağrıları
+Genel parola: Ayarlar ▸ SSH erişimi (settings.ssh_access). Cihazda root parolası ondan farklıysa SSH o cihazda
+tutmaz; bu yüzden cihaza özel root parolası `board_credentials`'ta saklanır. Konteynerdeki bütün sshpass çağrıları
 docker/rootfs/ankamon-sshpass.sh'tan geçer: hedef adres için /run/ankamon/board-ssh/<ip> varsa parola o olur
 (sync() tablodan yazar; sshfs ve web terminal tabloyu doğrudan okur). Böylece hiçbir çağıran değişmedi.
 
-Görevler (parolalar komut satırına yazılmaz: tahtada `ps`'te görünürdü, stdin'den gider):
-  password_status : tahtadaki parola özeti genel parolayla tutuyor mu (root, etapadmin). Tutmuyorsa arayüz mevcut parola sorar.
+Görevler (parolalar komut satırına yazılmaz: cihazda `ps`'te görünürdü, stdin'den gider):
+  password_status : cihazdaki parola özeti genel parolayla tutuyor mu (root, etapadmin). Tutmuyorsa arayüz mevcut parola sorar.
   password_verify : verilen mevcut parola doğru mu. root'ta SSH zaten reddediliyorsa parola doğrudan SSH ile denenir;
-                    tutarsa tahtaya özel kaydedilir (erişim geri gelir).
+                    tutarsa cihaza özel kaydedilir (erişim geri gelir).
   password_change : mevcut parola genel paroladan farklıysa önce doğrulanır, sonra chpasswd. root'ta yeni parola
-                    tahtaya özel kaydedilir ve yeni parolayla bağlanılarak sınanır; genel parolayla aynıysa kayıt silinir.
+                    cihaza özel kaydedilir ve yeni parolayla bağlanılarak sınanır; genel parolayla aynıysa kayıt silinir.
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ from .accounts import _SSH_OPTS
 CRED_DIR = "/run/ankamon/board-ssh"
 ACCOUNTS = ("root", "etapadmin")
 
-# Tahtada stdin'den JSON okur; özetle karşılaştırma tahtadadır (libcrypt: $6$, $y$ …). Çıkış 3 = mevcut parola yanlış.
+# Cihazda stdin'den JSON okur; özetle karşılaştırma cihazdadır (libcrypt: $6$, $y$ …). Çıkış 3 = mevcut parola yanlış.
 _REMOTE = r"""
 import crypt, json, subprocess, sys
 req = json.loads(sys.stdin.readline())
@@ -70,7 +70,7 @@ elif op == "verify":
 elif op == "change":
     a = req["account"]
     if a not in shadow:
-        print("Tahtada %s hesabı yok." % a); sys.exit(4)
+        print("Cihazda %s hesabı yok." % a); sys.exit(4)
     if not same(a, req["general"]) and not same(a, req["current"]):
         print("Mevcut parola yanlış."); sys.exit(3)
     # Düz chpasswd ETAP'ın PAM zincirinde reddedilir (bkz. actions/user-password): özet burada üretilir, -e PAM'e uğramaz.
@@ -84,12 +84,12 @@ elif op == "change":
 def _run(board: dict, user: str, password: str, request: dict, direct: bool = False, timeout: int = 20) -> dict:
     """direct: süzgeci atlayarak tam bu parolayla bağlan (bkz. ankamon-sshpass.sh)."""
     if not board.get("ip"):
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", "ConnectTimeout=8",
            f"{user}@{board['ip']}", "python3 -c " + shlex.quote(_REMOTE)]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     if direct:
-        # Sarmalayıcı yine çalışır (SSH etkinlik kaydı) ama tahtaya özel parolayla değiştirmez.
+        # Sarmalayıcı yine çalışır (SSH etkinlik kaydı) ama cihaza özel parolayla değiştirmez.
         env["ANKAMON_SSHPASS_DIRECT"] = "1"
     try:
         proc = subprocess.run(cmd, input=(json.dumps(request) + "\n").encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -108,7 +108,7 @@ def _run(board: dict, user: str, password: str, request: dict, direct: bool = Fa
 
 
 def sync(conn) -> None:
-    """Tahtaya özel parolaları süzgecin okuduğu dosyalara yazar (adres değişse de güncel kalır). Yalnız root okur."""
+    """Cihaza özel parolaları süzgecin okuduğu dosyalara yazar (adres değişse de güncel kalır). Yalnız root okur."""
     rows = conn.execute(
         """SELECT host(b.ip) AS ip, c.root_password FROM board_credentials c JOIN boards b ON b.id = c.board_id
            WHERE b.ip IS NOT NULL""").fetchall()
@@ -160,7 +160,7 @@ def verify(conn, board: dict, user: str, general: str, account: str, current: st
     res = _run(board, user, general, {"op": "verify", "account": account, "current": current})
     if res["status"] == "ok":
         if account == "root" and user == "root":
-            remember_root(conn, board, current, general)   # tahtaya bağlanan parola bilinsin
+            remember_root(conn, board, current, general)   # cihaza bağlanan parola bilinsin
         return {"status": "ok", "rc": 0, "output": "Mevcut parola doğru."}
     if res["rc"] == 3:
         return {"status": "failed", "rc": 3, "output": "Mevcut parola yanlış."}
@@ -168,10 +168,10 @@ def verify(conn, board: dict, user: str, general: str, account: str, current: st
         direct = _run(board, "root", current, {"op": "verify", "account": "root", "current": current}, direct=True)
         if direct["status"] == "ok":
             remember_root(conn, board, current, general)
-            return {"status": "ok", "rc": 0, "output": "Mevcut parola doğru; tahtaya erişim bu parolayla sürecek."}
+            return {"status": "ok", "rc": 0, "output": "Mevcut parola doğru; cihaza erişim bu parolayla sürecek."}
         return {"status": "failed", "rc": 3, "output": "Mevcut parola yanlış."}
     if res["rc"] == 5:
-        return {"status": "failed", "rc": 5, "output": "Tahtaya bağlanılamadı: önce root'un mevcut parolasını doğrulayın."}
+        return {"status": "failed", "rc": 5, "output": "Cihaza bağlanılamadı: önce root'un mevcut parolasını doğrulayın."}
     return res
 
 
@@ -183,12 +183,12 @@ def change(conn, board: dict, user: str, general: str, account: str, current: st
     if res["status"] != "ok":
         return res
     if account != "root" or user != "root":
-        return {"status": "ok", "rc": 0, "output": f"{account} parolası bu tahtada değiştirildi."}
+        return {"status": "ok", "rc": 0, "output": f"{account} parolası bu cihazda değiştirildi."}
     # root: artık bağlantı parolası da bu. Önce sınanır, sonra kaydedilir; sınanamazsa açıkça söylenir.
     probe = _run(board, "root", new, {"op": "verify", "account": "root", "current": new}, direct=True)
     remember_root(conn, board, new, general)
     if probe["status"] != "ok":
         return {"status": "failed", "rc": probe["rc"],
                 "output": "Parola değişti ve kaydedildi, fakat yeni parolayla bağlantı sınanamadı: " + probe["output"]}
-    own = "genel parolayla aynı: tahtaya özel kayıt kaldırıldı" if new == general else "Ankamon bu tahtaya artık bu parolayla bağlanır"
-    return {"status": "ok", "rc": 0, "output": f"root parolası bu tahtada değiştirildi ({own})."}
+    own = "genel parolayla aynı: cihaza özel kayıt kaldırıldı" if new == general else "Ankamon bu cihaza artık bu parolayla bağlanır"
+    return {"status": "ok", "rc": 0, "output": f"root parolası bu cihazda değiştirildi ({own})."}

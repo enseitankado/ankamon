@@ -27,7 +27,7 @@
 "accounts" iş çıktılarından → session_league_names (hesapların ad soyadı). Bkz. db/migrations/039_session_league.sql.
 
 Artımlı ve tekrar çalıştırmaya dayanıklı: her turda yalnız parçası olmayan, açık ya da parçası hesaplandıktan sonra
-kapanışı/tahtası değişen oturumlar yeniden hesaplanır (o oturumun parçaları silinip baştan yazılır). İlk çalışmada
+kapanışı/cihazı değişen oturumlar yeniden hesaplanır (o oturumun parçaları silinip baştan yazılır). İlk çalışmada
 parçası olmayan bütün oturumlar — yani eldeki bütün geçmiş — bir kerede işlenir. Kaynak oturum silinince parçalar
 kalır (bilerek: sıralama log/oturum temizliğinden etkilenmez). Günler sunucu saat diliminde (TZ, varsayılan
 Europe/Istanbul) yerel gündür; gece yarısını aşan oturum her güne ayrı satırdır.
@@ -44,7 +44,7 @@ log = logging.getLogger(__name__)
 _NAMES_CURSOR = "session_league.names"
 
 # Parçası güncel olmayan oturumlar: hiç parçası yok, açık (süre "şu ana kadar" büyüyor) ya da parçası hesaplandığından
-# beri kapanış anı (session_end sonradan netleştirir) veya tahtası (sonradan tahtaya bağlanan oturum) değişmiş.
+# beri kapanış anı (session_end sonradan netleştirir) veya cihazı (sonradan cihaza bağlanan oturum) değişmiş.
 _STALE_SESSIONS = """
     SELECT s.id FROM board_sessions s
     WHERE s.ended_at IS NULL
@@ -83,7 +83,7 @@ def _refresh_parts(conn) -> None:
 
 
 def _refresh_names(conn) -> None:
-    """Tahtadan hesap listesi çeken işlerin (bkz. executor/accounts.py; çıktı [{name, full_name}] JSON'u) yeni
+    """Cihazdan hesap listesi çeken işlerin (bkz. executor/accounts.py; çıktı [{name, full_name}] JSON'u) yeni
     sonuçlarından ad soyadı alır; en yeni iş kazanır."""
     row = conn.execute("SELECT value FROM task_cursors WHERE name = %s", (_NAMES_CURSOR,)).fetchone()
     since = row["value"] if row else datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)

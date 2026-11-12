@@ -31,11 +31,11 @@ declare(strict_types=1);
 namespace Ankamon\Core;
 
 /**
- * Tahta sensörlerini (node_exporter hwmon + smartmon/nvme textfile) anlamlı göstergelere indirger:
+ * Cihaz sensörlerini (node_exporter hwmon + smartmon/nvme textfile) anlamlı göstergelere indirger:
  *   cpu_temp   işlemci (coretemp/k10temp)       board_temp  anakart (Super I/O temp1)
  *   acpi_temp  kasa içi (ACPI termal bölge)     disk_temp   disk (SMART 194/190, NVMe)
  *   fan_rpm    işlemci fanı (Super I/O)         battery_v   CMOS pili (Super I/O in8 = Vbat)
- * Super I/O değerleri tahtada sürücü yüklüyse gelir (bkz. actions/node-exporter, Super I/O adımı). Bir göstergeye
+ * Super I/O değerleri cihazda sürücü yüklüyse gelir (bkz. actions/node-exporter, Super I/O adımı). Bir göstergeye
  * birden çok seri düşerse (ör. çekirdek başına sıcaklık, bağlı olmayan fan3 = 0) son değeri en yüksek
  * olan seçilir; en düşük/en yüksek değerler de o serinin kendisinden verilir.
  */
@@ -85,7 +85,7 @@ final class BoardSensors
         return $out;
     }
 
-    /** Tüm tahtaların son 5 dakikadaki değerleri: [board_id => [key => değer]]. */
+    /** Tüm cihazların son 5 dakikadaki değerleri: [board_id => [key => değer]]. */
     public static function latestAll(): array
     {
         $rows = Db::all(
@@ -109,7 +109,7 @@ final class BoardSensors
     }
 
     /**
-     * Tek tahta: son değer + saklanan tüm geçmişteki (metrics_1h özeti — ayrıntılı veri silinse de
+     * Tek cihaz: son değer + saklanan tüm geçmişteki (metrics_1h özeti — ayrıntılı veri silinse de
      * kalır) en düşük/en yüksek değer ve zamanları. [key => {value, min, max, min_at, max_at, since}]
      */
     public static function withRange(int $boardId): array

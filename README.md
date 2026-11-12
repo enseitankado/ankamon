@@ -6,11 +6,11 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 # Ankamon
 
 **Pardus İzleme ve Yönetim Merkezi** — okuldaki akıllı tahtalar için merkezi log sunucusu, sensör izleme ve uzaktan yönetim.
-[TiHA](https://github.com/enseitankado/tiha) ile hazırlanmış tahtaların karşı tarafıdır: tahtalar loglarını
+[TiHA](https://github.com/enseitankado/tiha) ile hazırlanmış cihazların karşı tarafıdır: cihazlar loglarını
 buraya gönderir, sensör verileri buradan okunur.
 
 Bütün bileşenler **tek bir Docker konteynerinde** çalışır (içeride supervisord yönetir); kalıcı veri
-yalnız `data/` dizinindedir. Dışarıya yalnız iki port açılır: arayüz için **80**, tahta logları için
+yalnız `data/` dizinindedir. Dışarıya yalnız iki port açılır: arayüz için **80**, cihaz logları için
 **514** (TCP ve UDP).
 
 ## Kurulum
@@ -48,11 +48,11 @@ Hepsi tek konteynerde, supervisord ile yönetilir (bkz. `docker/rootfs/superviso
 | Süreç | Görev | Kalıcı veri |
 |---|---|---|
 | nginx | Derlenmiş qooxdoo arayüzü (80), `/api` → PHP-FPM, `/grafana` → Grafana vekili | — |
-| php-fpm | REST API: oturum, kullanıcılar, tahtalar, loglar, görev kuyruğu | — |
-| worker | Python: tahta kaydı, erişilebilirlik yoklaması, Telegraf hedefleri, Ansible ile görev yürütme | `data/telegraf` |
+| php-fpm | REST API: oturum, kullanıcılar, cihazlar, loglar, görev kuyruğu | — |
+| worker | Python: cihaz kaydı, erişilebilirlik yoklaması, Telegraf hedefleri, Ansible ile görev yürütme | `data/telegraf` |
 | postgres | PostgreSQL 17 + TimescaleDB: bütün veriler | `data/postgres` |
-| rsyslog | Tahtalardan syslog alır (TCP/UDP 514), Postgres'e yazar | `data/rsyslog` (disk kuyruğu) |
-| telegraf | Tahtaların node_exporter ucunu (`:9100`) okur, Postgres'e yazar | — |
+| rsyslog | Cihazlardan syslog alır (TCP/UDP 514), Postgres'e yazar | `data/rsyslog` (disk kuyruğu) |
+| telegraf | Cihazların node_exporter ucunu (`:9100`) okur, Postgres'e yazar | — |
 | grafana | Sensör grafikleri; oturumu Ankamon'dan devralır | `data/grafana`, Postgres |
 | backup | Rutin `pg_dump` yedekleri | `data/backups` |
 | dbinit | Açılışta bir kez: şema göçleri ve etapadmin hesabı | — |
@@ -83,7 +83,7 @@ data/         Çalışma verisi (depoya girmez)
 ## Dayanıklılık ve yedek
 
 - Postgres `fsync`, `full_page_writes` ve veri sağlama toplamlarıyla çalışır; onaylanmış veri güç kesintisinde kaybolmaz.
-- rsyslog, veritabanı erişilemezken kayıtları `data/rsyslog` altındaki disk kuyruğunda tutar; tahtalar da
+- rsyslog, veritabanı erişilemezken kayıtları `data/rsyslog` altındaki disk kuyruğunda tutar; cihazlar da
   sunucu kapalıyken kendi kuyruklarında biriktirir.
 - Bütün servisler `restart: always` ile çalışır; sunucu açılınca yığın kendiliğinden kalkar.
 - `backup` servisi `data/backups` altına yazar: yapılandırma yedeği (`config-*.dump`, `grafana-*.dump`)
@@ -110,15 +110,15 @@ açılışta kendiliğinden yenilenir. Tarayıcı uyarısını kaldırmak için 
 dosyasını yönetici bilgisayarına bir kez "Güvenilen kök sertifika yetkilileri" deposuna kurun
 (Windows: dosyaya çift tık → Sertifika yükle → Yerel makine; Firefox: Ayarlar → Sertifikalar → İçe aktar).
 
-**Ekranımı yansıt** (yetki: `cast`): Tahtalar sayfasında tahtaları işaretleyip **Yansıt** ya da sağ menüden
+**Ekranımı yansıt** (yetki: `cast`): Cihazlar sayfasında cihazları işaretleyip **Yansıt** ya da sağ menüden
 "Ekranımı yansıt" seçilir; açılan pencerede ekran, pencere ya da sekme seçilip paylaşılır. Görüntü tarayıcıdan
-WebRTC (WHIP) ile konteynerdeki [MediaMTX](https://github.com/bluenviron/mediamtx)'e gider, tahtalar onu RTSP ile
-okuyup `mpv` ile tam ekran ve en üstte gösterir (yeniden kodlama yok). Tahta ekranı kapalıysa ya da ekran
-koruyucu açıksa uyandırılır, yansıtma bitince eski hâline döner. Tahtaya kurulum gerekmez (ETAP 23'te `mpv`
+WebRTC (WHIP) ile konteynerdeki [MediaMTX](https://github.com/bluenviron/mediamtx)'e gider, cihazlar onu RTSP ile
+okuyup `mpv` ile tam ekran ve en üstte gösterir (yeniden kodlama yok). Cihaz ekranı kapalıysa ya da ekran
+koruyucu açıksa uyandırılır, yansıtma bitince eski hâline döner. Cihaza kurulum gerekmez (ETAP 23'te `mpv`
 hazır). Gerekenler:
 
-- Yansıtan bilgisayardan sunucunun **8189** (UDP, yoksa TCP) portuna, tahtalardan **8554/TCP** portuna erişim.
-- Bant genişliği: her tahtaya ayrı akış gider (1–3 Mbit/sn); kablolu ağda sorun olmaz, Wi-Fi'de takılabilir.
+- Yansıtan bilgisayardan sunucunun **8189** (UDP, yoksa TCP) portuna, cihazlardan **8554/TCP** portuna erişim.
+- Bant genişliği: her cihaza ayrı akış gider (1–3 Mbit/sn); kablolu ağda sorun olmaz, Wi-Fi'de takılabilir.
 - Ses isteğe bağlıdır: Chrome/Edge'de sekme sesi, Windows'ta tüm sistem sesi paylaşılabilir.
 
 ## Ağ envanteri
@@ -135,8 +135,8 @@ o an kapalı olanlar "Çevrim dışı" olarak kalır. Cihaz kimliği MAC adresid
   Ayarlar: `NETSCAN_MIN_INTERVAL`, `NETSCAN_MAX_INTERVAL`, `NETSCAN_SERVICE_RESCAN_HOURS`, `NETSCAN_TOP_PORTS`.
 - Marka sütunu Wireshark `manuf` tablosundan (IEEE MA-L/MA-M/MA-S, ~58 bin kayıt). Depoda tutulmaz: imaj her
   derlendiğinde wireshark.org'dan güncel hâli indirilir (indirilemezse marka sütunu boş kalır). Cihaz türü
-  üretici + açık portlar + nmap cihaz sınıfı + Ankamon tahta kaydından tahmin edilir; elle de seçilebilir.
-- Takma ad: her tarama sonunda boş takma adlar Tahtalar'daki adla ve `net_known_aliases` tablosundaki
+  üretici + açık portlar + nmap cihaz sınıfı + Ankamon cihaz kaydından tahmin edilir; elle de seçilebilir.
+- Takma ad: her tarama sonunda boş takma adlar Cihazlar'daki adla ve `net_known_aliases` tablosundaki
   MAC → ad kayıtlarıyla (ör. eski envanterden aktarılmış) doldurulur; elle girilen ad ezilmez.
 - ETAP faz veritabanı (`worker/ankamon/netscan/etap_phase.py`): MAC'ten akıllı tahta modeli ve FATİH fazı.
   `etap_prefixes.tsv` yalnız maskelenmiş önekler tutar (6–10 onaltılık hane, en dar 256 adres; tam MAC ve

@@ -15,10 +15,10 @@ html {
 }
 
 /*
- * Sidebar'daki "Tahtalar" kaynak linki tek paylaşılan FileBrowser kaynağının KÖKÜNE gider — o kök,
- * o anda bağlı TÜM tahtaların takma adlı (ör. "A Blok - Lab 1") klasörlerini yan yana barındırıyor (bkz. filemanager.sh).
+ * Sidebar'daki "Cihazlar" kaynak linki tek paylaşılan FileBrowser kaynağının KÖKÜNE gider — o kök,
+ * o anda bağlı TÜM cihazların takma adlı (ör. "A Blok - Lab 1") klasörlerini yan yana barındırıyor (bkz. filemanager.sh).
  * disableDefaultLinks sunucu tarafında zaten kapatıyor; burada ayrıca CSS ile de gizliyoruz (ileride
- * disableDefaultLinks kaldırılsa/aşılsa bile tahtalar arası klasör sızıntısı görünür olmasın).
+ * disableDefaultLinks kaldırılsa/aşılsa bile cihazlar arası klasör sızıntısı görünür olmasın).
  */
 .sidebar-links {
   display: none !important;

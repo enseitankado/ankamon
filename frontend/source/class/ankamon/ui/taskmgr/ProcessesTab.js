@@ -32,8 +32,8 @@
  * var). Sütunlar: Ad, Durum, CPU, Bellek, Disk, Ağ, Güç kullanımı; başlıklarda toplamlar; değer arttıkça
  * koyulaşan "ısı" hücreleri. Sıralama grupların İÇİNDE yapılır (ui.table.GroupModel).
  *
- * Çok tahta: gruplar bütün tahtaların süreçlerini birlikte içerir, her satırda "Bilgisayar" sütunu (Bilgisayar
- * süzgeci ve arama ile daraltılır); başlıklardaki toplamlar gösterilen tahtaların ortalamasıdır.
+ * Çok cihaz: gruplar bütün cihazların süreçlerini birlikte içerir, her satırda "Bilgisayar" sütunu (Bilgisayar
+ * süzgeci ve arama ile daraltılır); başlıklardaki toplamlar gösterilen cihazların ortalamasıdır.
  */
 qx.Class.define("ankamon.ui.taskmgr.ProcessesTab", {
   extend: ankamon.ui.taskmgr.Tab,
@@ -48,7 +48,7 @@ qx.Class.define("ankamon.ui.taskmgr.ProcessesTab", {
     const F = ankamon.ui.taskmgr.Fmt;
     this.__expanded = new Set(["g:apps", "g:bg", "g:sys"]);
     this.__sort = null;
-    // Bellek ölçeği/yüzdesi satırın tahtasının belleğine göre (çok tahtada tahtaların belleği farklı olabilir).
+    // Bellek ölçeği/yüzdesi satırın cihazının belleğine göre (çok cihazda cihazların belleği farklı olabilir).
     const memTotalOf = rowData => {
       const parsed = rowData && this._parseId(rowData[0]);
       return (parsed && parsed.link.getModel().memTotal) || this.__maxMem();
@@ -108,7 +108,7 @@ qx.Class.define("ankamon.ui.taskmgr.ProcessesTab", {
       return Math.max(1, ...this._win.getLinks().map(l => l.getModel().memTotal || 0));
     },
 
-    /** Açılıp kapanabilen satır: grup ("g:apps") ya da uygulama ("<tahta>:a:<pid>"). */
+    /** Açılıp kapanabilen satır: grup ("g:apps") ya da uygulama ("<cihaz>:a:<pid>"). */
     __toggleable(id) {
       return !!id && (/^g:/.test(id) || /^\d+:a:/.test(id));
     },
@@ -122,7 +122,7 @@ qx.Class.define("ankamon.ui.taskmgr.ProcessesTab", {
       this.update();
     },
 
-    /** Süreç satırının tahtası ve PID'i ({link, pid, kind}) ya da null. */
+    /** Süreç satırının cihazı ve PID'i ({link, pid, kind}) ya da null. */
     __proc(id) {
       const parsed = this._parseId(id);
       const m = parsed && /^([acp]):(\d+)$/.exec(parsed.id);
@@ -211,7 +211,7 @@ qx.Class.define("ankamon.ui.taskmgr.ProcessesTab", {
       const F = ankamon.ui.taskmgr.Fmt;
       const S = ankamon.ui.taskmgr.ProcessesTab;
       const q = this._win.getFilter();
-      // Gruplar: apps = pencere sahibi kökler; ağaçları (alt süreçler) uygulamaya aittir. Bütün tahtalar birlikte.
+      // Gruplar: apps = pencere sahibi kökler; ağaçları (alt süreçler) uygulamaya aittir. Bütün cihazlar birlikte.
       const groups = { apps: [], bg: [], sys: [] };
       links.forEach(link => {
         const m = link.getModel();
@@ -288,7 +288,7 @@ qx.Class.define("ankamon.ui.taskmgr.ProcessesTab", {
       });
       this.__rows = rows;
       this._setRows(this.__table, rows);
-      // Başlıklarda toplamlar (Windows: "%12 CPU"); çok tahtada gösterilen tahtaların ortalaması.
+      // Başlıklarda toplamlar (Windows: "%12 CPU"); çok cihazda gösterilen cihazların ortalaması.
       const avg = f => links.reduce((a, l) => a + f(l.getModel()), 0) / links.length;
       const names = ["id", "Ad", "Durum", `CPU ${F.pct(avg(m => m.totals.cpu), 0)}`,
         `Bellek ${F.pct(avg(m => (100 * m.totals.memUsed) / (m.memTotal || 1)), 0)}`, `Disk ${F.pct(avg(m => m.totals.diskBusy), 0)}`,

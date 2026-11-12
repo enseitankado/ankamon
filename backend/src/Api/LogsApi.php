@@ -56,7 +56,7 @@ final class LogsApi
         }
         if ($boardId = $request->query('board_id')) {
             $board = Db::one('SELECT hostname, host(ip) AS ip FROM boards WHERE id = ?', [(int) $boardId])
-                ?? throw ApiError::notFound('Tahta bulunamadı.');
+                ?? throw ApiError::notFound('Cihaz bulunamadı.');
             $where[] = '(host = ? OR from_ip = ?)';
             array_push($params, (string) $board['hostname'], (string) $board['ip']);
         }

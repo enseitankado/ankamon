@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Telegraf için tahta başına okuma hedeflerini üretir.
+"""Telegraf için cihaz başına okuma hedeflerini üretir.
 
 Dosya yalnız içerik değiştiyse, geçici dosya + yeniden adlandırma ile yazılır (yarım dosya okunmaz);
 Telegraf --watch-config ile değişikliği görüp kendini yeniden yükler.
@@ -70,4 +70,4 @@ def run(conn) -> None:
         os.fsync(out.fileno())
     os.chmod(tmp, 0o644)
     os.replace(tmp, path)
-    log.info("Telegraf hedefleri güncellendi: %d tahta", len(boards))
+    log.info("Telegraf hedefleri güncellendi: %d cihaz", len(boards))

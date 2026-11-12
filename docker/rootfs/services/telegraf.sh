@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-# Tahtaların node_exporter uçlarını okuyup Postgres'e yazar. Hedefler worker tarafından
+# Cihazların node_exporter uçlarını okuyup Postgres'e yazar. Hedefler worker tarafından
 # /data/telegraf/targets.conf içine üretilir; --watch-config ile değişince yeniden yüklenir.
 set -eu
 

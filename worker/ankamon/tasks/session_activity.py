@@ -81,7 +81,7 @@ def _save_cursor(conn, name: str, value) -> None:
 
 
 class _Sessions:
-    """Bir zaman aralığındaki oturumlar: tahta/host + an → oturum."""
+    """Bir zaman aralığındaki oturumlar: cihaz/host + an → oturum."""
 
     def __init__(self, conn, start, end):
         rows = conn.execute(
@@ -188,9 +188,9 @@ def _from_logs(conn, by_host) -> None:
 
 
 def _from_ankamon(conn, by_id) -> None:
-    """Ankamon'dan o tahtaya yapılan işlemler: komutlar, ekran izleme, dosya işlemleri, ekran görüntüsü, sohbet.
+    """Ankamon'dan o cihaza yapılan işlemler: komutlar, ekran izleme, dosya işlemleri, ekran görüntüsü, sohbet.
 
-    command_log'un source='local' satırları (028_local_command_log.sql: tahtadaki sudo/pkexec/su) burada ALINMAZ: aynı olaylar
+    command_log'un source='local' satırları (028_local_command_log.sql: cihazdaki sudo/pkexec/su) burada ALINMAZ: aynı olaylar
     _from_logs'ta ham log satırıyla (detail) ve ret bilgisiyle "yetki" türünde üretilir, ikisi birden çift satır olurdu."""
     since = _cursor(conn, "session_activity.ankamon")
     rows = conn.execute(

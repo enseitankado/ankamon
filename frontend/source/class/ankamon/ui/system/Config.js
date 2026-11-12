@@ -68,7 +68,7 @@ qx.Class.define("ankamon.ui.system.Config", {
           title: "Değiştirmek için", rows: [[
             "Yöntem",
             "Proje dizinindeki .env dosyasında değeri düzenleyin, ardından: docker compose up -d " +
-            "(saklama süreleri açılışta veritabanı politikalarına yeniden uygulanır). Tahta SSH/Samba bilgileri Ayarlar sayfasından değişir."
+            "(saklama süreleri açılışta veritabanı politikalarına yeniden uygulanır). Cihaz SSH/Samba bilgileri Ayarlar sayfasından değişir."
           ]]
         }
       ]));

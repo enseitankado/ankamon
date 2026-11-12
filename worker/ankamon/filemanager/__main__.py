@@ -25,10 +25,10 @@
 
 """Dosya yöneticisi köprüsü: http://127.0.0.1:8894 (nginx /filemanager-mount ile vekiller).
 
-POST /mount/<tahta id>  → tahtayı /run/ankamon/filemanager/<takma ad>/ altına sshfs ile bağlar
+POST /mount/<cihaz id>  → cihazı /run/ankamon/filemanager/<takma ad>/ altına sshfs ile bağlar
                           (zaten bağlıysa anında döner), {"ok": true, "path": "<takma ad>/"} döner.
-                          Dizin adı FileBrowser'da tahtanın adı olarak görünür (ör. "A Blok - Lab 1");
-                          aynı adlı iki tahta bağlıysa ikincisine " (<ip>)" eklenir.
+                          Dizin adı FileBrowser'da cihazın adı olarak görünür (ör. "A Blok - Lab 1");
+                          aynı adlı iki cihaz bağlıysa ikincisine " (<ip>)" eklenir.
 
 Tek FileBrowser Quantum örneği (filemanager.sh) /run/ankamon/filemanager/ kökünü sürekli sunar;
 bağlama/ayırma burada, FileBrowser'dan bağımsız olur — yeni bir alt dizin belirince FileBrowser
@@ -64,7 +64,7 @@ IDLE_MINUTES = int(os.environ.get("FILEMANAGER_IDLE_MINUTES", "15"))
 _SSHFS_OPTS = (
     "password_stdin,StrictHostKeyChecking=no,UserKnownHostsFile=/dev/null,LogLevel=ERROR,"
     "reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,"
-    # Sembolik bağlar tahtada çözülür ve hedefleri gibi görünür. sshfs 3.7.6'nın varsayılanı
+    # Sembolik bağlar cihazda çözülür ve hedefleri gibi görünür. sshfs 3.7.6'nın varsayılanı
     # (contain_symlinks) mutlak ya da ".." içeren bağları EPERM ile reddediyor; ör. ETAP'ın her ev
     # dizinindeki "ortak-alan" (/ortak-alan'a bağ) okunamayan bir dosya gibi görünüyor, kopyalama
     # "could not resolve source path" ile düşüyordu. no_contain_symlinks KULLANILMAZ: bağ bu makinede
@@ -85,7 +85,7 @@ _UNSAFE = re.compile(r'[\x00-\x1f\x7f/\\?#%*:|"<>]+')
 
 
 def _mount_point(board_id: int, name: str, ip: str) -> str:
-    """Tahtanın takma adından dizin adı üretir; başka bir bağlı tahtayla çakışırsa IP'yi ekler."""
+    """Cihazın takma adından dizin adı üretir; başka bir bağlı cihazla çakışırsa IP'yi ekler."""
     base = " ".join(_UNSAFE.sub("-", name).split()).strip(" .")[:100] or ip
     taken = {p for b, p in _mount_paths.items() if b != board_id}
     path = os.path.join(ROOT, base)
@@ -117,7 +117,7 @@ def _lookup(board_id: int):
         if not board or not board["ip"]:
             return None
         ssh_user, password = _board_access(conn)
-        # sshfs parolayı stdin'den alır (sshpass süzgecinden geçmez): tahtaya özel root parolası burada.
+        # sshfs parolayı stdin'den alır (sshpass süzgecinden geçmez): cihaza özel root parolası burada.
         own = conn.execute("SELECT root_password FROM board_credentials WHERE board_id = %s", (board_id,)).fetchone()
         return board, ssh_user, (own["root_password"] if own else password)
 
@@ -127,7 +127,7 @@ async def _mount(board_id: int, username: str) -> tuple[bool, str]:
     async with _mount_lock:
         looked_up = await asyncio.to_thread(_lookup, board_id)
         if looked_up is None:
-            return False, "Tahta bulunamadı ya da IP'si yok."
+            return False, "Cihaz bulunamadı ya da IP'si yok."
         board, ssh_user, password = looked_up
 
         old = _mount_paths.get(board_id)
@@ -152,7 +152,7 @@ async def _mount(board_id: int, username: str) -> tuple[bool, str]:
         except asyncio.TimeoutError:
             proc.kill()
             _rmdir_quiet(path)
-            return False, "Tahtaya bağlanırken zaman aşımı."
+            return False, "Cihaza bağlanırken zaman aşımı."
         if proc.returncode != 0:
             _rmdir_quiet(path)
             hint = (out or b"").decode("utf-8", "replace").strip().splitlines()[-1:] or ["sshfs"]
@@ -196,7 +196,7 @@ async def _sweep() -> None:
         await asyncio.sleep(60)
         deadline = time.monotonic() - IDLE_MINUTES * 60
         for board_id in [b for b, t in _last_used.items() if t < deadline]:
-            log.info("boşta kalan tahta #%s ayrılıyor", board_id)
+            log.info("boşta kalan cihaz #%s ayrılıyor", board_id)
             try:
                 await _unmount(board_id)
             except Exception:
@@ -217,7 +217,7 @@ class MountHandler(tornado.web.RequestHandler):
 
 
 def _locate(fb_path: str):
-    """FileBrowser yolu ("/<bağlama dizini>/home/…") → (tahta id, tahtadaki yol, bu makinedeki yol)."""
+    """FileBrowser yolu ("/<bağlama dizini>/home/…") → (cihaz id, cihazdaki yol, bu makinedeki yol)."""
     name, _, rest = fb_path.lstrip("/").partition("/")
     for board_id, path in _mount_paths.items():
         if os.path.basename(path) == name:

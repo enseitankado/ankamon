@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Log olaylarından anomali: aynı tahtada (ve aynı anahtarda, ör. kaynak IP) art arda gelen olaylar bir "atak" olur.
+"""Log olaylarından anomali: aynı cihazda (ve aynı anahtarda, ör. kaynak IP) art arda gelen olaylar bir "atak" olur.
 
 Bir kural yalnız sorgusunu ve eşiklerini verir (bkz. event_rule): sorgu `since`ten sonra gelen olayları
 (host, at, key, message) döndürür. Aralarında `gap`ten uzun boşluk olmayan olaylar tek ataktır; en az `min_count`
@@ -55,7 +55,7 @@ def boards_by_host(conn) -> dict:
 
 
 def board_fields(boards: dict, host: str) -> dict:
-    """Kayıt alanları: tahta kayıtlıysa onun kimliği ve adı, değilse logdaki ad."""
+    """Kayıt alanları: cihaz kayıtlıysa onun kimliği ve adı, değilse logdaki ad."""
     board = boards.get((host or "").lower())
     return {"host": (host or "").lower(), "board_id": board["id"] if board else None,
             "board_name": board["name"] if board else host}

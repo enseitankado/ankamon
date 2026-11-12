@@ -152,7 +152,7 @@ def _shares_loop() -> None:
                         continue
                     _set(conn, shares={"phase": "scanning", "pending": pending, "total": total, "target": dev["ip"]})
                     log.info("paylaşım taraması: %s (%s)", dev["ip"], dev["mac"])
-                    # Tahtaların Samba parolası yalnız kayıtlı tahtalarda denenir (başka cihaza sızmasın).
+                    # Cihazların Samba parolası yalnız kayıtlı cihazlarda denenir (başka cihaza sızmasın).
                     result = probe.smb_shares(dev["ip"], dev["hostname"], creds if dev["is_board"] else None)
                     store.apply_shares(conn, dev, result)
                     log.info("paylaşım taraması bitti: %s — %d paylaşım (%s)", dev["ip"],
@@ -203,7 +203,7 @@ def _flow_loop() -> None:
                         time.sleep(ACTIVITY_PAUSE)
                         continue
                     nets = ifaces.networks()
-                    # Yalnız taraması açık tahta ağlarında dinlenir (bkz. netroles); kendi MAC'lerimiz hepsinden.
+                    # Yalnız taraması açık cihaz ağlarında dinlenir (bkz. netroles); kendi MAC'lerimiz hepsinden.
                     cap = [n["iface"] for n in store.scannable(conn, [dict(n) for n in nets])]
                     exclude = {mac for n in nets for (mac, _name) in n["local_macs"].values()}
                     if not cap:
@@ -273,20 +273,20 @@ def _sweep(conn) -> None:
         conn.execute("UPDATE net_networks SET last_scan_ms = %s WHERE id = %s", (ms, net["id"]))
         log.info("varlık taraması %s: %d cihaz yanıt verdi, %d değişiklik, %.1f sn",
                  net["cidr"], len(found), changes, ms / 1000)
-    # Tarama sonu: boş takma adları Tahtalar'dan ve bilinen takma adlardan (net_known_aliases) doldur.
+    # Tarama sonu: boş takma adları Cihazlar'dan ve bilinen takma adlardan (net_known_aliases) doldur.
     filled = store.fill_labels(conn)
     if filled:
         log.info("takma ad dolduruldu: %d kayıt", filled)
     created = store.boards_from_devices(conn)
     if created:
-        log.info("ağ envanterindeki akıllı tahtalar için tahta kaydı açıldı: %d", created)
+        log.info("ağ envanterindeki akıllı tahtalar için cihaz kaydı açıldı: %d", created)
     ips = store.fill_board_ips(conn)
     moved = store.device_ips_from_boards(conn)
     if moved:
-        log.info("cihaz IP'si tahtanın güncel (log) adresiyle güncellendi: %d", moved)
+        log.info("cihaz IP'si cihazın güncel (log) adresiyle güncellendi: %d", moved)
     if ips:
-        log.info("tahta IP'si ağ taramasından dolduruldu: %d kayıt", ips)
-    # ETAP faz bilgisi (Tahtalar + Ağ grid'leri "Faz" sütunu; bkz. etap_phase.py).
+        log.info("cihaz IP'si ağ taramasından dolduruldu: %d kayıt", ips)
+    # ETAP faz bilgisi (Cihazlar + Ağ grid'leri "Faz" sütunu; bkz. etap_phase.py).
     updated = store.update_etap(conn)
     if updated:
         log.info("ETAP faz bilgisi güncellendi: %d kayıt", updated)

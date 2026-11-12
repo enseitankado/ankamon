@@ -28,7 +28,7 @@
 /**
  * Oturumlar sayfasının "Hareketler" sekmesi: o bilgisayardan gelen log, sensör ve Ankamon işlemlerinden ayıklanan olaylar,
  * kronolojik (bkz. worker tasks/session_activity.py, backend SessionActivityApi). Süzgeçler serbestçe birleşir: tek oturum, bir
- * tahta + kullanıcı, bir tahtanın bütün hareketleri, bir kullanıcının bütün tahtalardaki hareketleri. Zaman çizelgesi ve
+ * cihaz + kullanıcı, bir cihazın bütün hareketleri, bir kullanıcının bütün cihazlardaki hareketleri. Zaman çizelgesi ve
  * Oturumlar grid'inin sağ menüsündeki "Oturum hareketleri" buraya süzülmüş gelir (applyFilter).
  */
 qx.Class.define("ankamon.ui.sessions.Movements", {
@@ -152,7 +152,7 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
       this.load();
     },
 
-    /** Seçenekleri korur: seçili değer listede kalır, yeni tahta/kullanıcı eklenir. */
+    /** Seçenekleri korur: seçili değer listede kalır, yeni cihaz/kullanıcı eklenir. */
     __fill(box, entries, allLabel) {
       const keep = this.__value(box);
       this.__quiet = true;
@@ -202,7 +202,7 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
       this.__rows = data.events.map(e => [e.id, F.dateTime(e.at * 1000), e.board_name, e.username || "", K[e.kind] || e.kind, e.summary, e.detail || ""]);
       this.__apply();
       this.__status.setValue(`${data.events.length} olay` + (data.limited ? " (en yeni kayıtlar; daraltmak için süzgeç kullanın)" : "") +
-        ". Tahta logları her uygulama açılışını kaydetmez: yalnız logda ya da sensörde izi olan hareketler listelenir; " +
+        ". Cihaz logları her uygulama açılışını kaydetmez: yalnız logda ya da sensörde izi olan hareketler listelenir; " +
         "sıradan kabuk komutları logda yoktur, yetkili komutlar (sudo, pkexec, su) görünür.");
     },
 

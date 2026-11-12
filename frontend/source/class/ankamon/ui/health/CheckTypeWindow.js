@@ -99,7 +99,7 @@ qx.Class.define("ankamon.ui.health.CheckTypeWindow", {
             every.setSelection([item]);
           }
         });
-        field("Sıklık", every, "Ankamon bu denetimi ne sıklıkla yeniden hesaplar (tahtaya bağlanmaz).");
+        field("Sıklık", every, "Ankamon bu denetimi ne sıklıkla yeniden hesaplar (cihaza bağlanmaz).");
         const level = new qx.ui.form.SelectBox().set({ width: 180 });
         ["bad", "warn", "info"].forEach(l => {
           const item = new qx.ui.form.ListItem(L[l].text + (l === def.level ? " (varsayılan)" : ""), null, l);
@@ -108,11 +108,11 @@ qx.Class.define("ankamon.ui.health.CheckTypeWindow", {
             level.setSelection([item]);
           }
         });
-        field("Bulgu düzeyi", level, "Durum'da tahtanın genel durumunu ve sıralamayı belirler.");
+        field("Bulgu düzeyi", level, "Durum'da cihazın genel durumunu ve sıralamayı belirler.");
         const scan = new qx.ui.form.CheckBox("Denetle sekmesinde anlık yoklanabilir").set({
           value: !!k.scan, enabled: !!k.scan_supported
         });
-        field("Anlık taranır", scan, k.scan_supported ? "" : "Bu denetimin tahtada anlık yoklaması yok (yalnız sürekli izlemede).");
+        field("Anlık taranır", scan, k.scan_supported ? "" : "Bu denetimin cihazda anlık yoklaması yok (yalnız sürekli izlemede).");
         const pick = box => box.getSelection()[0].getModel();
         collect = () => ({
           path: "/anomaly-kinds",
@@ -131,7 +131,7 @@ qx.Class.define("ankamon.ui.health.CheckTypeWindow", {
         [every, level, scan].forEach(w => w.setEnabled(canEdit && (w !== scan || !!k.scan_supported)));
       } else {
         const days = new qx.ui.form.Spinner(1, row.days || row.daysDefault || 7, 60).set({ width: 90 });
-        field("Sıklık", days, `gün: her tahta en az bu kadar günde bir kendiliğinden denetlenir (varsayılan ${row.daysDefault} gün). ` +
+        field("Sıklık", days, `gün: her cihaz en az bu kadar günde bir kendiliğinden denetlenir (varsayılan ${row.daysDefault} gün). ` +
           "<b>Bütün SSH denetimi başlıkları için ortaktır</b> (hepsine aynı bağlantıda bakılır).");
         info("Bulgu düzeyi", `${row.level} — denetimin sonucuna göre (ölçülen değer ve eşiklerle)`);
         info("Anlık taranır", "Evet — Denetle sekmesinde ② \"Tam SSH denetimi\" ya da ③ SSH denetim raporları ▸ Şimdi tara");

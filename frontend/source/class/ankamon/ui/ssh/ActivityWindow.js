@@ -135,7 +135,7 @@ qx.Class.define("ankamon.ui.ssh.ActivityWindow", {
     const ctable = this.__makeTable(cmodel, ccols);
     ankamon.page.Base.filterTable(ctable, { offset: 1, choicesFor: ["dir", "service", "name", "proc"] });
     ctable.setToolTipText("Ankamon süreçlerinin açık TCP bağlantıları (yalnız bu pencere açıkken 2 sn'de bir ölçülür). " +
-      "Giden: Ankamon'un başlattığı; gelen: tahtaların/tarayıcıların Ankamon'a açtığı (ör. log gönderimi).");
+      "Giden: Ankamon'un başlattığı; gelen: cihazların/tarayıcıların Ankamon'a açtığı (ör. log gönderimi).");
     allPage.add(ctable, { flex: 1 });
     this.__ccount = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true });
     allPage.add(this.__ccount);

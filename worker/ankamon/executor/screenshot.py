@@ -23,9 +23,9 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Sağ menü Ekran ▸ "Ekran görüntüsü al": tahtanın etkin X ekranından tek kare JPEG (tahtadaki ffmpeg, kurulum yok).
+"""Sağ menü Ekran ▸ "Ekran görüntüsü al": cihazın etkin X ekranından tek kare JPEG (cihazdaki ffmpeg, kurulum yok).
 
-Dosya /data/screenshots/<tahta id>/<zaman>-<rastgele>.jpg olarak saklanır, satırı `screenshots` tablosundadır
+Dosya /data/screenshots/<cihaz id>/<zaman>-<rastgele>.jpg olarak saklanır, satırı `screenshots` tablosundadır
 (zaman çizelgesi ve Disk kullanımı oradan okur). Oturum kayıtları silinse de görüntünün kimliği kaybolmasın
 diye bilgiler JPEG'in yorum (COM) bölümüne JSON olarak gömülür: hangi bilgisayar, hangi oturum, ne zaman, kim çekti
 (okumak için: exiftool -Comment, identify -format %c ya da read_embedded_meta).
@@ -49,7 +49,7 @@ BASE_DIR = os.environ.get("SCREENSHOT_DIR", "/data/screenshots")
 META_KEY = "ankamon_screenshot"
 
 _CAPTURE = _ACTIVE_X + r"""
-command -v ffmpeg >/dev/null 2>&1 || { echo "Tahtada ffmpeg yok." >&2; exit 4; }
+command -v ffmpeg >/dev/null 2>&1 || { echo "Cihazda ffmpeg yok." >&2; exit 4; }
 exec ffmpeg -nostdin -hide_banner -loglevel error -f x11grab -i "$DISPLAY" -frames:v 1 -q:v 3 -f image2pipe -c:v mjpeg -
 """
 
@@ -73,7 +73,7 @@ def read_embedded_meta(jpeg: bytes) -> dict | None:
 
 
 def _session_of(conn, board_id: int) -> dict | None:
-    """Tahtadaki açık oturum: log tabanlı kaydın kimliği + kullanıcı; kayıt yoksa anlık yoklamadaki kullanıcı."""
+    """Cihazdaki açık oturum: log tabanlı kaydın kimliği + kullanıcı; kayıt yoksa anlık yoklamadaki kullanıcı."""
     row = conn.execute(
         """SELECT id, username, extract(epoch FROM started_at)::bigint AS started_at FROM board_sessions
            WHERE board_id = %s AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1""", (board_id,)).fetchone()
@@ -105,7 +105,7 @@ def _store(path: str, data: bytes) -> None:
 def take(conn, board: dict, user: str, password: str, taken_by: str) -> dict:
     """Görüntüyü alır, kimliği gömüp kaydeder. Döner: {"status", "rc", "output"} (bkz. accounts._ssh)."""
     if not board.get("ip"):
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", "ConnectTimeout=8", f"{user}@{board['ip']}", "sh -c " + shlex.quote(_CAPTURE)]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:

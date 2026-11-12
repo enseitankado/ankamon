@@ -25,7 +25,7 @@
 
 """Runner dalları: ekran görüntüsü, giriş kilidi, ekran aktarımı, ev dizini boyutları, yönetici parolası.
 
-Hepsi tahta başına bağımsız kısa işlerdir: tahtalar PARALEL çalışır (whoami deseni); SSH iş parçacıklarında,
+Hepsi cihaz başına bağımsız kısa işlerdir: cihazlar PARALEL çalışır (whoami deseni); SSH iş parçacıklarında,
 `conn`'a dokunan her şey ana iş parçacığında sırayla (tek bağlantı paylaşılmaz). Veritabanı gereken işler kendi
 bağlantısını açar.
 """
@@ -68,12 +68,12 @@ def _parallel(conn, job, targets, names, results, work, after=None) -> None:
 
 
 def _own_conn(fn):
-    """Veritabanı da gereken iş: iş parçacığı kendi bağlantısıyla çalışır, hata tahtayı başarısız sayar."""
+    """Veritabanı da gereken iş: iş parçacığı kendi bağlantısıyla çalışır, hata cihazı başarısız sayar."""
     def run(t):
         conn = db.connect()
         try:
             return fn(conn, t)
-        except Exception as e:  # noqa: BLE001 — bir tahtanın hatası diğerlerini düşürmesin
+        except Exception as e:  # noqa: BLE001 — bir cihazın hatası diğerlerini düşürmesin
             return {"status": "failed", "rc": None, "output": f"Hata: {e}"}
         finally:
             conn.close()
@@ -84,7 +84,7 @@ def run(conn, job, targets, names, results) -> None:
     params = job["params"] or {}
     kind = job["type"]
     if kind == "ntfy_test":
-        # Tahtasız: sonuç görev durumu ve bildirim geçmişi.
+        # Cihazsız: sonuç görev durumu ve bildirim geçmişi.
         cfg = ntfy.config(conn)
         if not cfg["topic"]:
             raise RuntimeError("Konu adı kaydedilmemiş.")

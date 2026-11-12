@@ -28,7 +28,7 @@
 /**
  * Uygulama geçmişi (Windows Görev Yöneticisi gibi): uygulamaların (pencereli süreç ağaçları) ve kullanıcı
  * süreçlerinin toplam CPU süresi (süreçlerin başlangıcından beri) ve bu pencere açıldığından beri ağ
- * kullanımı (TCP, ajan ölçümü). "Kullanım geçmişini sil" ağ sayaçlarını sıfırlar. Çok tahtada her tahtanın
+ * kullanımı (TCP, ajan ölçümü). "Kullanım geçmişini sil" ağ sayaçlarını sıfırlar. Çok cihazda her cihazın
  * uygulamaları ayrı satır ("Bilgisayar" sütunu).
  */
 qx.Class.define("ankamon.ui.taskmgr.AppHistoryTab", {
@@ -41,7 +41,7 @@ qx.Class.define("ankamon.ui.taskmgr.AppHistoryTab", {
     this.__info = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
     bar.add(this.__info, { flex: 1 });
     bar.add(this._button("Kullanım geçmişini sil", () => {
-      // Gösterilen (süzgece uyan) tahtaların sayaçları.
+      // Gösterilen (süzgece uyan) cihazların sayaçları.
       this._win.getVisibleLinks().forEach(l => {
         l.getModel().netAcc.clear();
         l.getModel().netSince = Date.now();
@@ -106,7 +106,7 @@ qx.Class.define("ankamon.ui.taskmgr.AppHistoryTab", {
         [...groups.entries()].filter(([name]) => whole || !q || name.toLowerCase().includes(q))
           .forEach(([name, g]) => rows.push([this._rowId(link, name), name, F.cpuTime(g.ticks / hz), g.net, g.procs, g.user || "", board, g.ticks]));
       });
-      // CPU süresine göre azalan (tahtalar arası da); sıralama anahtarı satırın sonundaki gizli tik sayısı, tabloya girmez.
+      // CPU süresine göre azalan (cihazlar arası da); sıralama anahtarı satırın sonundaki gizli tik sayısı, tabloya girmez.
       rows.sort((a, b) => b[b.length - 1] - a[a.length - 1]);
       rows.forEach(r => r.pop());
       const since = Math.min(...links.map(l => l.getModel().netSince));

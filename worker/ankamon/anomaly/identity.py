@@ -23,15 +23,15 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahta kimliği ve ağ yerinden anomaliler (yalnız gönderilen loglardan ve tahta kayıtlarından):
+"""Cihaz kimliği ve ağ yerinden anomaliler (yalnız gönderilen loglardan ve cihaz kayıtlarından):
 
-  - identity_conflict: aynı bilgisayar adı aynı anda birden çok IP'den log gönderiyor (TiHA kalıbından kurulmuş tahtalar
-    ilk açılışta kalıbın adını taşır) ya da iki tahta kaydı aynı IP'yi taşıyor (biri eski IP'de kalmış ya da çakışma).
-  - subnet_changed: tahtanın logları başka bir IP ağından gelmeye başladı (tahta taşındı / yanlış VLAN / Wi-Fi'ye geçti).
+  - identity_conflict: aynı bilgisayar adı aynı anda birden çok IP'den log gönderiyor (TiHA kalıbından kurulmuş cihazlar
+    ilk açılışta kalıbın adını taşır) ya da iki cihaz kaydı aynı IP'yi taşıyor (biri eski IP'de kalmış ya da çakışma).
+  - subnet_changed: cihazın logları başka bir IP ağından gelmeye başladı (cihaz taşındı / yanlış VLAN / Wi-Fi'ye geçti).
     Kalıp adını taşıyan çok IP'li adlar bu kurala girmez (onlar identity_conflict'tir).
-  - clock_skew: tahtanın saati (logun tahta zamanı) sunucunun saatinden kalıcı olarak sapıyor. Kuyruktan geç gelen loglar
+  - clock_skew: cihazın saati (logun cihaz zamanı) sunucunun saatinden kalıcı olarak sapıyor. Kuyruktan geç gelen loglar
     sapmayı büyütür; o yüzden saat diliminin en hızlı gelen %10'una bakılır. NTP eşitlenmemiş kuralı sensör verisi olan
-    tahtaları görür; bu kural log gönderen her tahtayı.
+    cihazları görür; bu kural log gönderen her cihazı.
 """
 
 import datetime
@@ -79,7 +79,7 @@ def _identity_detect(conn, since):
             found.append(dict(board_fields(boards, host), started_at=start, ended_at=None if now - last <= BUCKET else last,
                               detail={"key": "name", "ips": ips[:50],
                                       "text": f"\"{host}\" adı aynı anda {len(ips)} farklı IP'den log gönderdi "
-                                              f"({', '.join(ips[:6])}{'…' if len(ips) > 6 else ''}): aynı adlı birden çok tahta"}))
+                                              f"({', '.join(ips[:6])}{'…' if len(ips) > 6 else ''}): aynı adlı birden çok cihaz"}))
     # Aynı IP'yi taşıyan kayıtlar: şu anki durum. Sürdükçe açık kalır, düzelince kapanır.
     current = set()
     for r in conn.execute(_SAME_IP).fetchall():
@@ -92,7 +92,7 @@ def _identity_detect(conn, since):
             found.append({"host": host, "board_id": board_id, "board_name": name,
                           "started_at": prior["started_at"] if prior else now, "ended_at": None,
                           "detail": {"key": "ip", "ip": r["ip"],
-                                     "text": f"{r['ip']} adresini başka tahta kaydı da taşıyor: {', '.join(others)}"}})
+                                     "text": f"{r['ip']} adresini başka cihaz kaydı da taşıyor: {', '.join(others)}"}})
     for host, records in known.items():
         for k in records:
             d = k["detail"] or {}
@@ -111,7 +111,7 @@ FROM logs WHERE received_at >= %(since)s AND host <> '' AND from_ip IS NOT NULL
 GROUP BY 1, 2, 3, 4
 """
 
-# Pencereden önceki son IP (tahta günlerce kapalı kalıp başka ağda açılmış olabilir); (host, received_at) dizininden.
+# Pencereden önceki son IP (cihaz günlerce kapalı kalıp başka ağda açılmış olabilir); (host, received_at) dizininden.
 _PREVIOUS_IP = """
 SELECT from_ip AS ip FROM logs WHERE host = %(raw)s AND received_at < %(before)s AND from_ip ~ '^[0-9.]+$'
 ORDER BY received_at DESC LIMIT 1
@@ -146,7 +146,7 @@ def _subnet_detect(conn, since):
                 found.append(dict(board_fields(boards, host), started_at=cur["at"], ended_at=cur["at"] + datetime.timedelta(hours=1),
                                   detail={"from": prev_ip, "to": cur["ip"],
                                           "text": f"IP ağı değişti: {prev_net}.x → {cur_net}.x ({prev_ip} → {cur['ip']}); "
-                                                  "tahta taşındı, başka VLAN'a ya da Wi-Fi'ye geçti"}))
+                                                  "cihaz taşındı, başka VLAN'a ya da Wi-Fi'ye geçti"}))
             prev_ip = cur["ip"]
     return found, scopes
 
@@ -190,7 +190,7 @@ def _skew_detect(conn, since):
     for (host, ip), hours in by_host.items():
         board = boards.get(host)
         if board and board["ip"] and board["ip"] != ip:
-            continue   # kayıtlı tahtanın adını taşıyan başka tahta (kalıp kopyası): o tahtanın saati değil
+            continue   # kayıtlı cihazın adını taşıyan başka cihaz (kalıp kopyası): o cihazın saati değil
         scopes.append((host, since, now))
         for ep in episodes(sorted(hours, key=lambda h: h["at"]), datetime.timedelta(hours=2)):
             start = ep[0]["at"]
@@ -199,11 +199,11 @@ def _skew_detect(conn, since):
                 start = prior["started_at"]
             offset = ep[-1]["offset"]
             last = ep[-1]["at"] + datetime.timedelta(hours=1)
-            # offset = sunucu - tahta: pozitifse tahta geride.
+            # offset = sunucu - cihaz: pozitifse cihaz geride.
             found.append(dict(board_fields(boards, host), started_at=start,
                               ended_at=None if now - last <= datetime.timedelta(hours=1) else last,
                               detail={"offset_s": round(offset), "key": "",
-                                      "text": f"Tahtanın saati {_human(offset)} {'geride' if offset > 0 else 'ileride'} "
+                                      "text": f"Cihazın saati {_human(offset)} {'geride' if offset > 0 else 'ileride'} "
                                               "(log zamanına göre); NTP eşitlemesi çalışmıyor olabilir"}))
     return found, scopes
 

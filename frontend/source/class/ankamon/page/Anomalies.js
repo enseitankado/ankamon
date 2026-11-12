@@ -26,27 +26,27 @@
  */
 
 /**
- * Sağlık (sol menüde; eski "Bakım ▸ Bakım" sorun tespiti raporu ile "Anomaliler" tek bölümde): tahtaların donanım,
+ * Sağlık (sol menüde; eski "Bakım ▸ Bakım" sorun tespiti raporu ile "Anomaliler" tek bölümde): cihazların donanım,
  * yazılım ve ağ sorunlarını önden görmek, aksiyon gereken durumları bulmak. Sayfa kimliği "anomalies" kalır (yetki,
  * nav_order, hatırlanan sekme kayıtları).
  *
  * Bulgular iki yoldan gelir; kullanıcı her bulguda hangisinden geldiğini görür (bkz. ui.health.Status):
- *   - Sürekli izleme (yetki "anomalies"): tahtaya bağlanmadan, loglardan/ölçümlerden birkaç dakikada bir (worker/ankamon/anomaly).
- *   - SSH denetimi (yetki "diagnose"): Ankamon tahtaya SSH ile girip ölçer; haftalık otomatik ya da Denetle sekmesinden elle
+ *   - Sürekli izleme (yetki "anomalies"): cihaza bağlanmadan, loglardan/ölçümlerden birkaç dakikada bir (worker/ankamon/anomaly).
+ *   - SSH denetimi (yetki "diagnose"): Ankamon cihaza SSH ile girip ölçer; haftalık otomatik ya da Denetle sekmesinden elle
  *     (worker/ankamon/executor/diagnose.py).
  *
  * Sekmeler (bu sırayla; her biri yalnız kendi yetkisiyle):
- *  - "Durum" (ui.health.Status): her tahtanın şu anki sağlığı, iki yolun bulguları tek tabloda (GET /api/board-health).
+ *  - "Durum" (ui.health.Status): her cihazın şu anki sağlığı, iki yolun bulguları tek tabloda (GET /api/board-health).
  *  - "Denetle" (ui.anomaly.Scan; kimlik "reports"): eski "Denetle" ve "Tara" sekmeleri tek sekmede (kullanıcı isteği
- *    2026-11-12) — tahtaları ve denetimleri seçip o an tarama (anlık yoklama + tam SSH denetimi), altta sonuçlar: SSH
+ *    2026-11-12) — cihazları ve denetimleri seçip o an tarama (anlık yoklama + tam SSH denetimi), altta sonuçlar: SSH
  *    denetim raporları (gömülü page.Diagnose — rapor seçici, "Şimdi tara", grid, bulgular) ve anlık yoklama tablosu.
  *    Durum'un hemen sağında.
- *  - "Geçmiş" (ui.anomaly.Records): sürekli izleme kayıtları, seçili dönem — üstte tahta × bulgu özeti, altta kayıtlar
+ *  - "Geçmiş" (ui.anomaly.Records): sürekli izleme kayıtları, seçili dönem — üstte cihaz × bulgu özeti, altta kayıtlar
  *    (eski "Geçmiş" ve "Özet" sekmeleri birleşti — kullanıcı isteği 2026-11-10). "Rapor dönemi" seçicisi sekmenin içinde.
  *  - "Bildirimler" (ui.anomaly.Notifications).
  *  - "Yardım": iç sekmeler "Kılavuz" (page.MaintenanceHelp) ve "Denetim türleri" (ui.health.Catalog — eski ayrı
  *    "Denetimler" sekmesi; satıra çift tık: ayrıntı ve yöneticiye ayarlar penceresi, bkz. ui.health.CheckTypeWindow).
- * Kayıtlar tahta silinse ya da logları silinse de kalır (bkz. 033_anomalies.sql).
+ * Kayıtlar cihaz silinse ya da logları silinse de kalır (bkz. 033_anomalies.sql).
  */
 qx.Class.define("ankamon.page.Anomalies", {
   extend: ankamon.page.Base,
@@ -238,8 +238,8 @@ qx.Class.define("ankamon.page.Anomalies", {
     },
 
     /**
-     * Durum'da çift tık: sürekli izleme bulgusu → Geçmiş'te o tahta; SSH denetimi bulgusu → Denetle, tahta listesi o
-     * tahtaya süzülmüş (Durum her tahtanın en son denetimini gösterdiğinden Denetle "Son durum"a geçer).
+     * Durum'da çift tık: sürekli izleme bulgusu → Geçmiş'te o cihaz; SSH denetimi bulgusu → Denetle, cihaz listesi o
+     * cihaza süzülmüş (Durum her cihazın en son denetimini gösterdiğinden Denetle "Son durum"a geçer).
      */
     openFinding(f) {
       if (f.path === "watch" && this.__history) {
@@ -250,7 +250,7 @@ qx.Class.define("ankamon.page.Anomalies", {
       }
     },
 
-    /** Durum'dan → o tahtanın Geçmiş'i (çift tık). */
+    /** Durum'dan → o cihazın Geçmiş'i (çift tık). */
     showBoard(board) {
       this.__tabs.setSelection([this.__history]);
       this.__history.showBoard(board);

@@ -37,12 +37,12 @@ use Ankamon\Core\Request;
 use Ankamon\Core\Settings;
 use Ankamon\Core\Storage;
 
-/** Tahta envanteri. Kayıtlar çoğunlukla worker tarafından (log göndereni / ağ taraması) kendiliğinden oluşur. */
+/** Cihaz envanteri. Kayıtlar çoğunlukla worker tarafından (log göndereni / ağ taraması) kendiliğinden oluşur. */
 final class BoardsApi
 {
-    // facts'in disk/UEFI ayrıntıları (tahta başına ~20 KB — bkz. worker executor/hwfacts.py _DETAIL_FIELDS)
+    // facts'in disk/UEFI ayrıntıları (cihaz başına ~20 KB — bkz. worker executor/hwfacts.py _DETAIL_FIELDS)
     // listeye konmaz: grid her yenilemede bunları taşımasın; Bilgi kartı "facts" görevinden okur.
-    // mac = KABLOLU kartın MAC'i (tahtanın kimliği, WoL, ağ taraması — sütun adı tarihsel), wifi_mac = Wi-Fi kartının
+    // mac = KABLOLU kartın MAC'i (cihazın kimliği, WoL, ağ taraması — sütun adı tarihsel), wifi_mac = Wi-Fi kartının
     // kalıcı MAC'i (göç 043; worker oturum yoklaması/donanım bilgisi yazar, elle de girilebilir).
     private const COLUMNS = "b.id, b.hostname, b.mac::text AS mac, b.wifi_mac::text AS wifi_mac, host(b.ip) AS ip, b.label, b.location, b.notes,
         b.source, b.monitor_enabled, b.smart_board, b.exporter_port, b.online,
@@ -53,8 +53,8 @@ final class BoardsApi
             AND COALESCE(d.os_guess, '') <> '' ORDER BY d.last_seen_at DESC NULLS LAST LIMIT 1)) AS os_name,
         b.ssh_ok, b.exporter_ok, b.facts - '{disk_layout,firmware_boot,uefi_vars}'::text[] AS facts, b.etap,
         b.session_username, b.session_locked, extract(epoch FROM b.session_checked_at)::bigint AS session_checked_at,
-        -- Ekran kutucuğunda 'Oturumu açık kullanıcı yok (23 dk)': tahta açık ve taze yoklama (5 dk, no_login
-        -- anomalisiyle aynı) oturum görmüyorsa, oturumsuz durumun başı = tahtanın son açık aralığının başı
+        -- Ekran kutucuğunda 'Oturumu açık kullanıcı yok (23 dk)': cihaz açık ve taze yoklama (5 dk, no_login
+        -- anomalisiyle aynı) oturum görmüyorsa, oturumsuz durumun başı = cihazın son açık aralığının başı
         -- (board_uptime) ile son biten oturumun bitişinin geç olanı. Bilinmiyorsa null.
         CASE WHEN b.online AND b.session_username IS NULL AND b.session_checked_at > now() - interval '5 minutes'
              THEN extract(epoch FROM GREATEST(
@@ -66,22 +66,22 @@ final class BoardsApi
         EXISTS (SELECT 1 FROM screen_relays r WHERE r.source_board_id = b.id) AS relay_is_source,
         extract(epoch FROM b.last_seen_at)::bigint AS last_seen_at,
         extract(epoch FROM GREATEST(b.last_log_at, rl.at))::bigint AS last_log_at,
-        -- Kablo için logdan kanıt (Tahtalar ▸ Kablo, oturum yoklaması yokken/eskiyken): son 2 dk'da tahtanın IP'sinden
-        -- log geldi VE ağ taramasının o IP için gördüğü MAC tahtanın kablolu kartının MAC'i (bkz. netifs) → loglar
+        -- Kablo için logdan kanıt (Cihazlar ▸ Kablo, oturum yoklaması yokken/eskiyken): son 2 dk'da cihazın IP'sinden
+        -- log geldi VE ağ taramasının o IP için gördüğü MAC cihazın kablolu kartının MAC'i (bkz. netifs) → loglar
         -- kablolu karttan, yerel kablolu ağdan geliyor.
         (rl.ip_log AND EXISTS (
             SELECT 1 FROM net_devices d, jsonb_array_elements(b.netifs->'ifaces') i
             WHERE i->>'kind' = 'ethernet' AND d.ip = b.ip AND lower(d.mac::text) = lower(i->>'mac')
         )) AS cable_log,
         -- KALICI KURAL (kullanıcı 2026-11-10): Akıllı Tahtalar Varlıklar'ın alt kümesi; «Çevrimiçi» = cihaz ağda canlı
-        -- (Varlıklar'la aynı ölçü: ağ taraması tahtanın kablolu/kablosuz MAC'ini çevrim içi görüyor) — SSH'e bağlı değil.
+        -- (Varlıklar'la aynı ölçü: ağ taraması cihazın kablolu/kablosuz MAC'ini çevrim içi görüyor) — SSH'e bağlı değil.
         -- SSH/sensör portu erişimi (b.online) ayrı: arayüzde «Yönetilebilir». SSH yanıt veriyorsa cihaz da canlıdır (ARP
         -- turları arasında net_devices gecikebilir), bu yüzden alive = online OR net_online.
-        -- Bayat ağ kaydı sayılmaz (kullanıcı bildirimi 2026-11-10, 192.168.23.181): tahta kapanınca SSH yoklaması hemen
-        -- düşer ama ağ taraması ancak 2 tur sonra çevrim dışı yazar; o arada tahta «açık» görünüyordu. SSH'in son
-        -- yanıtından (b.last_seen_at) sonra ağ taraması tahtayı yeniden görmediyse ağ kaydı canlılık kanıtı değildir.
-        -- Kapatma komutu (kullanıcı isteği 2026-11-11): «Bilgisayarı kapat» tahtada bittiyse (b.shutdown_at — göç 051) ve
-        -- tahta o andan beri SSH'te görünmediyse ağ kaydı canlılık sayılmaz — cihaz beklemeden çevrim dışı. Yeniden
+        -- Bayat ağ kaydı sayılmaz (kullanıcı bildirimi 2026-11-10, 192.168.23.181): cihaz kapanınca SSH yoklaması hemen
+        -- düşer ama ağ taraması ancak 2 tur sonra çevrim dışı yazar; o arada cihaz «açık» görünüyordu. SSH'in son
+        -- yanıtından (b.last_seen_at) sonra ağ taraması cihazı yeniden görmediyse ağ kaydı canlılık kanıtı değildir.
+        -- Kapatma komutu (kullanıcı isteği 2026-11-11): «Bilgisayarı kapat» cihazda bittiyse (b.shutdown_at — göç 051) ve
+        -- cihaz o andan beri SSH'te görünmediyse ağ kaydı canlılık sayılmaz — cihaz beklemeden çevrim dışı. Yeniden
         -- açılıp SSH yanıt verince (last_seen_at ilerler) kural düşer. Süre worker tasks/board_status SHUTDOWN_GRACE ile aynı.
         (EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
                 AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at))
@@ -91,17 +91,17 @@ final class BoardsApi
                 AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at))
          AND NOT (b.shutdown_at IS NOT NULL
                   AND (b.last_seen_at IS NULL OR b.last_seen_at < b.shutdown_at + interval '3 minutes')))) AS alive,
-        -- «Yönetilebilir» TEK ölçüt (kullanıcı isteği 2026-11-10): tahtaya SSH ile root girişi BAŞARILI — son 3 dakikada
-        -- başarılı oturum yoklaması (worker tasks/session_probe: SSH portu açık her tahtaya 30 sn'de bir ssh_access
-        -- kullanıcısıyla — root — ve tahtaya özel parola varsa onunla giriş yapar). Port açıklığı, sensör toplama vb. sayılmaz.
-        -- Yoklama başarısı SSH portu şu an yanıt verirken geçerlidir (ssh_ok, board_status): tahta kapanınca 3 dk boyunca
+        -- «Yönetilebilir» TEK ölçüt (kullanıcı isteği 2026-11-10): cihaza SSH ile root girişi BAŞARILI — son 3 dakikada
+        -- başarılı oturum yoklaması (worker tasks/session_probe: SSH portu açık her cihaza 30 sn'de bir ssh_access
+        -- kullanıcısıyla — root — ve cihaza özel parola varsa onunla giriş yapar). Port açıklığı, sensör toplama vb. sayılmaz.
+        -- Yoklama başarısı SSH portu şu an yanıt verirken geçerlidir (ssh_ok, board_status): cihaz kapanınca 3 dk boyunca
         -- «Evet» kalıyor, ekran kutucuğu ise «yönetilemiyor» diyordu (kullanıcı bildirimi 2026-11-10).
         COALESCE(b.ssh_ok AND b.session_checked_at > now() - interval '3 minutes', false) AS manageable,
         COALESCE((b.ssh_ok AND (b.session_checked_at IS NULL OR b.session_checked_at < now() - interval '3 minutes')), false)
             AS ssh_login_failing";
 
     /**
-     * boards + "şu anda log mu geliyor" (rl) — yalnız last_log_at'i hemen göstermek için (bir tahta
+     * boards + "şu anda log mu geliyor" (rl) — yalnız last_log_at'i hemen göstermek için (bir cihaz
      * log göndermeye başladığında, worker'ın last_log_at'i yazmasını beklemeden). "online" bilerek
      * buna bakmaz, yalnız board_status'ın yoklamasına (ssh_ok/exporter_ok, en hızlı STATUS_TICK_SECONDS'ta
      * bir güncellenir — bkz. worker/__main__.py) dayanır: SSH/sensör portu asıl erişilebilirlik,
@@ -114,14 +114,14 @@ final class BoardsApi
           AND (lower(host) = lower(b.hostname) OR from_ip = host(b.ip))
     ) rl ON true";
 
-    /** Ağ ▸ Varlıklar'daki türün tahta karşılığı (bkz. worker netscan/classify.py BOARD). */
+    /** Ağ ▸ Varlıklar'daki türün cihaz karşılığı (bkz. worker netscan/classify.py BOARD). */
     private const BOARD_TYPE = 'Akıllı tahta';
 
     /**
-     * Ağ ▸ Akıllı Tahtalar listesi Ağ ▸ Varlıklar'dan belirlenir (kullanıcı isteği 2026-11-10): tahta, MAC'i (kablolu
+     * Ağ ▸ Akıllı Tahtalar listesi Ağ ▸ Varlıklar'dan belirlenir (kullanıcı isteği 2026-11-10): cihaz, MAC'i (kablolu
      * ya da kablosuz) Varlıklar'da türü "Akıllı tahta" olan bir satıra düşüyorsa listededir; Varlıklar'da türü başka
      * bir şeye çevrilirse listeden kendiliğinden çıkar (kayıt, geçmişi/oturumları için silinmez — tür geri alınınca
-     * döner). Varlıklar'da henüz hiç görülmemiş kayıt (elle eklenmiş, ağda henüz taranmamış tahta) listede kalır.
+     * döner). Varlıklar'da henüz hiç görülmemiş kayıt (elle eklenmiş, ağda henüz taranmamış cihaz) listede kalır.
      * Varlıklar'da türü "Akıllı tahta" olup kaydı olmayan cihaza kayıt worker'da açılır (netscan store.boards_from_devices).
      */
     private const LISTED = "(EXISTS (SELECT 1 FROM net_devices d WHERE d.mac IN (b.mac, b.wifi_mac)
@@ -146,8 +146,8 @@ final class BoardsApi
     public function create(Request $request, array $user): array
     {
         $fields = self::validatedBoardFields($request);
-        // Takma ad ve kablolu MAC zorunlu (Tahta ekle penceresi): kablolu MAC tahtayı ağ taramasında bulur ve uzaktan
-        // uyandırmayı sağlar (WoL kablolu kartla; Wi-Fi WoL tahtalarda genelde çalışmaz); kablosuz MAC isteğe bağlı.
+        // Takma ad ve kablolu MAC zorunlu (Cihaz ekle penceresi): kablolu MAC cihazı ağ taramasında bulur ve uzaktan
+        // uyandırmayı sağlar (WoL kablolu kartla; Wi-Fi WoL cihazlarda genelde çalışmaz); kablosuz MAC isteğe bağlı.
         // Bilgisayar adı elle girilmez (loglardan / donanım bilgisinden öğrenilir).
         if (($fields['label'] ?? '') === '') {
             throw ApiError::badRequest('Takma ad gerekli.');
@@ -156,7 +156,7 @@ final class BoardsApi
             throw ApiError::badRequest('Kablolu MAC adresi gerekli (de:ad:de:ad:de:ad).');
         }
         if (Db::value('SELECT 1 FROM boards WHERE mac = ?', [$fields['mac']])) {
-            throw ApiError::badRequest('Bu kablolu MAC adresiyle kayıtlı bir tahta zaten var.');
+            throw ApiError::badRequest('Bu kablolu MAC adresiyle kayıtlı bir cihaz zaten var.');
         }
         // IP girilmediyse ağ taramasının bu MAC için bildiği adres — önce kablolu, yoksa kablosuz MAC (yoksa tarama
         // sonunda dolar — bkz. worker netscan/store.py fill_board_ips).
@@ -173,7 +173,7 @@ final class BoardsApi
             'INSERT INTO boards (' . implode(', ', $columns) . ') VALUES (' . implode(', ', array_fill(0, count($columns), '?')) . ') RETURNING id',
             array_values($fields)
         );
-        // Tahta ekle = "bu cihaz akıllı tahtadır": Varlıklar'da bu MAC'lerle görülmüş cihazın türü başka bir şeyse
+        // Cihaz ekle = "bu cihaz akıllı tahtadır": Varlıklar'da bu MAC'lerle görülmüş cihazın türü başka bir şeyse
         // "Akıllı tahta" yapılır — yoksa liste (LISTED) yeni kaydı hemen gizlerdi.
         Db::exec(
             "UPDATE net_devices SET device_type = ? WHERE mac IN (?, ?) AND COALESCE(NULLIF(device_type, ''), type_auto) <> ?",
@@ -197,9 +197,9 @@ final class BoardsApi
     }
 
     /**
-     * Tahtayı, loglarını ve sensör geçmişini TAMAMEN siler (geri alınamaz). `logs` tablosunda
+     * Cihazı, loglarını ve sensör geçmişini TAMAMEN siler (geri alınamaz). `logs` tablosunda
      * board_id yoktur; ilişki yalnız hostname eşleşmesiyle kurulur (bkz. sınıf başı not). Silinen
-     * tahta engellenmez (kullanıcı isteği, 2026-10-22): hâlâ log gönderiyorsa worker
+     * cihaz engellenmez (kullanıcı isteği, 2026-10-22): hâlâ log gönderiyorsa worker
      * (boards_from_logs) kaydı kendiliğinden yeniden açar.
      */
     public function delete(Request $request, array $user): array
@@ -231,7 +231,7 @@ final class BoardsApi
             [$request->arg('id')]
         ) ?? throw ApiError::notFound();
         if (empty($board['ip'])) {
-            throw ApiError::badRequest('Bu tahtanın IP adresi yok; web terminal açılamaz.');
+            throw ApiError::badRequest('Bu cihazın IP adresi yok; web terminal açılamaz.');
         }
         $access = Settings::get('ssh_access');
         if (($access['password'] ?? '') === '') {
@@ -256,7 +256,7 @@ final class BoardsApi
             'port' => 22,
             'username' => $access['user'] ?: 'root',
             // webssh URL parametresinde parolayı base64 bekler.
-            // Tahtaya özel root parolası varsa o (bkz. worker executor/board_password.py).
+            // Cihaza özel root parolası varsa o (bkz. worker executor/board_password.py).
             'password' => base64_encode((string) (Db::value(
                 'SELECT root_password FROM board_credentials WHERE board_id = ?', [$board['id']]
             ) ?: $access['password'])),
@@ -265,7 +265,7 @@ final class BoardsApi
 
     /**
      * Dosya yöneticisi bağlantı bilgisi (yalnız "filemanager" yetkisi) — açılış köprüsü
-     * (/filemanager-open/) bununla tahtayı sshfs ile bağlar. Oturum açılışı, bağlama gerçekten
+     * (/filemanager-open/) bununla cihazı sshfs ile bağlar. Oturum açılışı, bağlama gerçekten
      * başarılı olunca komut loguna işlenir (bkz. worker/ankamon/filemanager) — burada değil,
      * başarısız denemeler log'u kirletmesin diye (screen() ile aynı desen).
      */
@@ -275,7 +275,7 @@ final class BoardsApi
             "SELECT id, host(ip) AS ip FROM boards WHERE id = ?", [$request->arg('id')]
         ) ?? throw ApiError::notFound();
         if (empty($board['ip'])) {
-            throw ApiError::badRequest('Bu tahtanın IP adresi yok; dosya yöneticisi açılamaz.');
+            throw ApiError::badRequest('Bu cihazın IP adresi yok; dosya yöneticisi açılamaz.');
         }
         if ((Settings::get('ssh_access')['password'] ?? '') === '') {
             throw ApiError::badRequest('SSH parolası tanımlı değil (Ayarlar → SSH erişimi).');
@@ -322,7 +322,7 @@ final class BoardsApi
         if ($request->has('monitor_enabled')) {
             $fields['monitor_enabled'] = (bool) $request->input('monitor_enabled');
         }
-        // "Bu bir akıllı tahtadır": MAC'i tahta MAC'i olmasa da tahta sayılır (bkz. migration 046, worker boards_from_logs).
+        // "Bu bir akıllı tahtadır": MAC'i cihaz MAC'i olmasa da cihaz sayılır (bkz. migration 046, worker boards_from_logs).
         if ($request->has('smart_board')) {
             $fields['smart_board'] = (bool) $request->input('smart_board');
         }

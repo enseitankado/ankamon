@@ -26,20 +26,20 @@
  */
 
 /**
- * Sağlık ▸ Durum: her tahtanın şu anki sağlığı tek yerde (bkz. backend BoardHealthApi, GET /api/board-health).
+ * Sağlık ▸ Durum: her cihazın şu anki sağlığı tek yerde (bkz. backend BoardHealthApi, GET /api/board-health).
  *
  * Bulgular iki yoldan gelir ve her satırda hangisinden geldiği yazar:
- *   - Sürekli izleme: Ankamon tahtaya BAĞLANMADAN, tahtanın gönderdiği loglardan, kendi okuduğu ölçümlerden ve daha önce
+ *   - Sürekli izleme: Ankamon cihaza BAĞLANMADAN, cihazın gönderdiği loglardan, kendi okuduğu ölçümlerden ve daha önce
  *     toplanmış verilerden birkaç dakikada bir çıkarır (anomali kuralları). Yalnız şu an SÜRENLER.
- *   - SSH denetimi: Ankamon tahtaya SSH ile girip ölçer (haftalık otomatik ya da Denetle sekmesinden elle). Her tahtanın EN SON
- *     denetiminin Acil/Dikkat bulguları ve denetlenemeyen tahtalar.
+ *   - SSH denetimi: Ankamon cihaza SSH ile girip ölçer (haftalık otomatik ya da Denetle sekmesinden elle). Her cihazın EN SON
+ *     denetiminin Acil/Dikkat bulguları ve denetlenemeyen cihazlar.
  *
- * Üst tablo tahta başına bir satır (en kötü düzey, iki yolun özeti); alttaki tablo seçili tahtanın (seçim yoksa hepsinin)
- * bulguları: Yol, Kaynak, Nasıl bakıldı, Sıklık, Zaman. Çift tık: sürekli izleme bulgusu → o tahtanın Geçmiş'i; SSH denetimi
- * bulgusu → Denetle (o tahtaya süzülmüş). İki tablo da sütun süzgeçli (az çeşitli sütunlarda hazır değer listesi).
+ * Üst tablo cihaz başına bir satır (en kötü düzey, iki yolun özeti); alttaki tablo seçili cihazın (seçim yoksa hepsinin)
+ * bulguları: Yol, Kaynak, Nasıl bakıldı, Sıklık, Zaman. Çift tık: sürekli izleme bulgusu → o cihazın Geçmiş'i; SSH denetimi
+ * bulgusu → Denetle (o cihaza süzülmüş). İki tablo da sütun süzgeçli (az çeşitli sütunlarda hazır değer listesi).
  * İki yolun açıklaması yalnız ipucunda: sekme kulakçığı ve özet satırının solundaki "ⓘ Bulgular nereden gelir?" (kullanıcı
  * isteği: sayfada ikinci kez yazılmaz). İki tablo arasındaki ayırıcı kalın (SPLITTER px); üst ve alt bölmenin ayırıcıya
- * bakan iç boşlukları eşit (PANE_GAP — ayırıcı üst tablonun son satırını kesmesin). Alt tablo yalnız bir tahta seçilince
+ * bakan iç boşlukları eşit (PANE_GAP — ayırıcı üst tablonun son satırını kesmesin). Alt tablo yalnız bir cihaz seçilince
  * dolar (sekmeye girişte boş; başlık satırı yok — kullanıcı isteği).
  */
 qx.Class.define("ankamon.ui.health.Status", {
@@ -68,13 +68,13 @@ qx.Class.define("ankamon.ui.health.Status", {
     this.add(split, { flex: 1 });
 
     this.__boardColumns = [
-      { id: "board", label: "Tahta", width: 200 },
+      { id: "board", label: "Cihaz", width: 200 },
       { id: "online", label: "Açık mı", width: 90 },
       { id: "level", label: "Durum", width: 90 },
       // Durum = iki yolun EN KÖTÜSÜ; her yolun kendi sütunu düzeyiyle yazılır (kullanıcı isteği 2026-11-10: Durum "Acil"
       // iken sürekli izleme "Sorun yok" diyordu — acil bulgu SSH denetimindendi ve hiçbir sütunda görünmüyordu).
       { id: "watch", label: "Sürekli izleme (şu an)", width: 260 },
-      { id: "ssh", label: "SSH denetimi (son)", width: 260, hint: "Tahtanın en son SSH denetiminin Acil/Dikkat bulguları" },
+      { id: "ssh", label: "SSH denetimi (son)", width: 260, hint: "Cihazın en son SSH denetiminin Acil/Dikkat bulguları" },
       // İki yolun en yeni bakışı (SSH denetimi zamanı ya da sürekli izlemenin en yeni bulgusu) ve toplam bulgu sayıları;
       // 10 saatten yeniyse geçen süre ("2 saat 23 dk önce" — kullanıcı isteği).
       { id: "last", label: "Son denetim / bulgu", width: 300, hint: "Son SSH denetimi ya da sürekli izlemenin en yeni bulgusu" },
@@ -85,14 +85,14 @@ qx.Class.define("ankamon.ui.health.Status", {
       { rows: () => (this.__boardRows || []).map(r => r.cells), persist: true });
     this.__levelRenderer(this.__boardTable, 3);
     this.__boardTable.getSelectionModel().addListener("changeSelection", () => this.__applyFindings());
-    this.__boardTable.setToolTipText("Bir tahtayı seçin: aşağıda yalnız onun bulguları görünür");
+    this.__boardTable.setToolTipText("Bir cihazı seçin: aşağıda yalnız onun bulguları görünür");
     const gap = ankamon.ui.health.Status.PANE_GAP;
     const top = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ paddingBottom: gap });
     top.add(this.__boardTable, { flex: 1 });
     split.add(top, 1);
 
     this.__findingColumns = [
-      { id: "board", label: "Tahta", width: 180 },
+      { id: "board", label: "Cihaz", width: 180 },
       { id: "level", label: "Düzey", width: 80 },
       { id: "check", label: "Bulgu", width: 220 },
       { id: "path", label: "Yol", width: 130 },
@@ -116,7 +116,7 @@ qx.Class.define("ankamon.ui.health.Status", {
         this.__page.openFinding(row.finding);
       }
     });
-    this.__findingTable.setToolTipText("Çift tıklayın: sürekli izleme bulgusu → Geçmiş'te o tahta; SSH denetimi bulgusu → Denetle (o tahta)");
+    this.__findingTable.setToolTipText("Çift tıklayın: sürekli izleme bulgusu → Geçmiş'te o cihaz; SSH denetimi bulgusu → Denetle (o cihaz)");
     const bottom = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ paddingTop: gap });
     bottom.add(this.__findingTable, { flex: 1 });
     split.add(bottom, 1);
@@ -188,10 +188,10 @@ qx.Class.define("ankamon.ui.health.Status", {
       const badge = key => `<span style="display:inline-block;padding:0 7px;border-radius:9px;background:${P[key].color};color:#fff;font-weight:600">${P[key].text}</span>`;
       return `<div style="max-width:560px;white-space:normal;line-height:1.5">` +
         "Bulgular iki yoldan gelir; her satırda hangisinden geldiği yazar. " +
-        (paths.includes("watch") ? `${badge("watch")} Ankamon tahtaya bağlanmadan, tahtanın gönderdiği loglardan ve kendi ` +
+        (paths.includes("watch") ? `${badge("watch")} Ankamon cihaza bağlanmadan, cihazın gönderdiği loglardan ve kendi ` +
           "okuduğu ölçümlerden birkaç dakikada bir çıkarır; burada yalnız şu an sürenler. " : "") +
-        (paths.includes("ssh") ? `${badge("ssh")} Ankamon tahtaya SSH ile girip ölçer (haftada bir kendiliğinden ya da Tara ` +
-          "sekmesinden elle); her tahtanın en son denetimi. " : "") +
+        (paths.includes("ssh") ? `${badge("ssh")} Ankamon cihaza SSH ile girip ölçer (haftada bir kendiliğinden ya da Tara ` +
+          "sekmesinden elle); her cihazın en son denetimi. " : "") +
         "Her denetimin ne olduğu, nasıl ve ne sıklıkla bakıldığı: <b>Yardım ▸ Denetim türleri</b>.</div>";
     },
 
@@ -229,14 +229,14 @@ qx.Class.define("ankamon.ui.health.Status", {
         if (ssh === false) {
           sshText = "Hiç denetlenmedi";
         } else if (ssh) {
-          // Denetlenemeyen tahtada "Denetlenemedi" bilgi bulgusu ayrıca sayılmaz (nedeni ipucunda/alt tabloda).
+          // Denetlenemeyen cihazda "Denetlenemedi" bilgi bulgusu ayrıca sayılmaz (nedeni ipucunda/alt tabloda).
           const sshFindings = list.filter(f => f.path === "ssh" && f.check !== "Denetlenemedi");
           sshText = ssh.status === "ok" ? this.__pathText(sshFindings)
             : ["Denetlenemedi"].concat(sshFindings.length ? [this.__pathText(sshFindings)] : []).join(" · ");
         }
         return { id: b.id, name: b.name, cells: [b.id, b.name, b.online ? "Açık" : "Kapalı", text(worst), watchText, sshText, last, list.length] };
       });
-      // Kaydı silinmiş tahtanın süren bulguları da görünsün.
+      // Kaydı silinmiş cihazın süren bulguları da görünsün.
       byBoard.forEach((list, key) => {
         if (typeof key === "number" && boardIds.has(key)) {
           return;
@@ -261,16 +261,16 @@ qx.Class.define("ankamon.ui.health.Status", {
       const color = boardsBad ? "#c5221f" : boardsWarn ? "#e37400" : "#1e8e3e";
       this.__summary.setValue(`<span style="font-size:14px;font-weight:bold;color:${color}">` +
         (boardsBad || boardsWarn
-          ? [boardsBad && `${boardsBad} tahtada acil`, boardsWarn && `${boardsWarn} tahtada dikkat gerektiren`].filter(Boolean).join(", ") + " bulgu var"
+          ? [boardsBad && `${boardsBad} cihazda acil`, boardsWarn && `${boardsWarn} cihazda dikkat gerektiren`].filter(Boolean).join(", ") + " bulgu var"
           : "Şu an acil ya da dikkat gerektiren bulgu yok") +
-        `</span> <span style="opacity:.7">· ${esc(String(this.__boardRows.length))} tahta · güncellendi ${F.dateTime(data.generated_at * 1000)}</span>`);
+        `</span> <span style="opacity:.7">· ${esc(String(this.__boardRows.length))} cihaz · güncellendi ${F.dateTime(data.generated_at * 1000)}</span>`);
       this.__applyBoards();
     },
 
     /**
      * "Son denetim / bulgu" hücresi: iki yolun en yeni zamanı (SSH denetimi ya da sürekli izlemenin en yeni bulgusu)
-     * + tahtanın iki yoldaki bulgu sayıları; SSH denetimi yapılamadıysa/hiç yapılmadıysa o da yazılır.
-     * @param list {Array} tahtanın bulguları @param ssh {Map|false|null} son SSH denetimi (false: hiç; null: yetki yok)
+     * + cihazın iki yoldaki bulgu sayıları; SSH denetimi yapılamadıysa/hiç yapılmadıysa o da yazılır.
+     * @param list {Array} cihazın bulguları @param ssh {Map|false|null} son SSH denetimi (false: hiç; null: yetki yok)
      */
     __lastText(list, ssh, when) {
       const times = list.filter(f => f.path === "watch" && f.since).map(f => f.since);
@@ -345,7 +345,7 @@ qx.Class.define("ankamon.ui.health.Status", {
       }
       const board = this.__selectedBoard();
       const filters = this.__filtersOf(this.__findingColumns, this.__findingFilters);
-      // Tahta seçilmeden boş (kullanıcı isteği: sekmeye girişte alt tablo boş gelsin).
+      // Cihaz seçilmeden boş (kullanıcı isteği: sekmeye girişte alt tablo boş gelsin).
       this.__shownFindings = board === null ? [] : this.__findingRows.filter(({ cells }) =>
         cells[0] === board && filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
       this.__findingTable.getTableModel().setData(this.__shownFindings.map(r => r.cells));

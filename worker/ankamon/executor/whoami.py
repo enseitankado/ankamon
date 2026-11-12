@@ -23,15 +23,15 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtada o anda oturum açmış GERÇEK kullanıcıyı SSH ile anlık sorgular.
+"""Cihazda o anda oturum açmış GERÇEK kullanıcıyı SSH ile anlık sorgular.
 
 board_sessions.py'nin logs tablosundan (lightdm PAM mesajlarından) türettiği kayıt bazen YANLIŞ/eski
-kalabilir (kapanış mesajı kaybolmuşsa, ya da tahta loglamadan yeniden kullanılmışsa — kullanıcı
+kalabilir (kapanış mesajı kaybolmuşsa, ya da cihaz loglamadan yeniden kullanılmışsa — kullanıcı
 bildirdi). Bu modül onun yerine "Kullanıcı sorgula" / "Tüm kullanıcıları sorgula" (bkz. page.Boards,
 docker/rootfs/screen/index.html) için ANLIK, gerçek zamanlı bir yoklamadır; sonuç hiçbir tabloya
 yazılmaz, yalnız o an için görüntülenir.
 
-Tahtada aynı anda birden fazla oturum olabilir (kullanıcı değiştir / kilit ekranından başka hesapla
+Cihazda aynı anda birden fazla oturum olabilir (kullanıcı değiştir / kilit ekranından başka hesapla
 giriş: her oturum kendi X'inde kalır). Bu yüzden `who`nun ilk satırı yerine SÜREÇLERE bakılır: uid'si
 1000'den büyük (kullanıcı isteği; 1000 = etapadmin hariç) ve 60000'den küçük (nobody vb. hariç) her
 kullanıcının en eski sürecinin yaşı onun oturum açma anı sayılır; kullanıcılar buna göre (ilk açan
@@ -62,7 +62,7 @@ def query(board: dict, user: str, password: str, timeout: int = 8) -> dict:
     """Döner: {"status": ok|unreachable|failed, "rc": int|None, "output": "ali, veli" (oturum açma
     sırasıyla; boşsa açık oturum yok)}."""
     if not board.get("ip"):
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     target = f"{user}@{board['ip']}"
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", f"ConnectTimeout={min(timeout, 8)}", target, _WHO_CMD]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
@@ -79,7 +79,7 @@ def query(board: dict, user: str, password: str, timeout: int = 8) -> dict:
 
 
 def dynamic_concurrency(min_n: int = 2, max_n: int = 20) -> int:
-    """Şu anki CPU/RAM yüküne göre kaç tahtaya aynı anda bağlanılacağını belirler (kullanıcı isteği:
+    """Şu anki CPU/RAM yüküne göre kaç cihaza aynı anda bağlanılacağını belirler (kullanıcı isteği:
     sabit bir sayı değil, konteynerin o anki yoğunluğuna göre). SSH sorgusu G/Ç ağırlıklı olduğundan
     (CPU'yu değil ağ gecikmesini bekler), boşta kalan CPU payı başına birkaç eşzamanlı iş kaldırılır;
     kullanılabilir bellek azsa (yoğun bir anda yeni süreç açmak riskli) sıkı bir üst sınıra düşülür."""

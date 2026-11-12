@@ -19,12 +19,12 @@ for U in $ADLAR; do
         [a-z_]*) ;;
         *) echo "✗ $U: geçersiz kullanıcı adı"; hata=$((hata + 1)); continue ;;
     esac
-    # Tahtanın yönetici hesabı korunur (API de reddeder — bkz. JobsApi::UNDELETABLE_USERS).
+    # Cihazın yönetici hesabı korunur (API de reddeder — bkz. JobsApi::UNDELETABLE_USERS).
     case "$U" in
         etapadmin|root) echo "✗ $U: korunan hesap, silinmez"; hata=$((hata + 1)); continue ;;
     esac
     if ! uid=$(id -u -- "$U" 2>/dev/null); then
-        echo "– $U: bu tahtada yok, atlandı"
+        echo "– $U: bu cihazda yok, atlandı"
         atlanan=$((atlanan + 1))
         continue
     fi
@@ -108,5 +108,5 @@ for U in $ADLAR; do
 done
 
 echo
-echo "Özet: $silinen silindi, $atlanan bu tahtada yoktu, $hata silinemedi."
+echo "Özet: $silinen silindi, $atlanan bu cihazda yoktu, $hata silinemedi."
 [ "$hata" -eq 0 ]

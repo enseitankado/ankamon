@@ -26,8 +26,8 @@
  */
 
 /**
- * Tahtalar ▸ Ekranlar "?" yardım penceresi: ekran önizlemesi ve tahtalardan veri toplama hangi bağlantılarla yapılır —
- * kullanıcı sayısı tahtalara ne yük getirir (kullanıcı isteği, 2026-11-05). Metin koddaki davranışı anlatır; davranış
+ * Cihazlar ▸ Ekranlar "?" yardım penceresi: ekran önizlemesi ve cihazlardan veri toplama hangi bağlantılarla yapılır —
+ * kullanıcı sayısı cihazlara ne yük getirir (kullanıcı isteği, 2026-11-05). Metin koddaki davranışı anlatır; davranış
  * değişince burası da güncellenir: worker/ankamon/screen/shared_feed.py (paylaşılan yayın), screen/__main__.py
  * (müdahale, sınır), docker/rootfs/screen/index.html (görünmeyen kutucuk/gizli sekme), page.Boards SCREENS_STOP_MS,
  * worker tasks (session_probe 30 sn, board_status), telegraf SCRAPE_INTERVAL.
@@ -63,34 +63,34 @@ qx.Class.define("ankamon.ui.boards.ScreenFeedHelp", {
         .sfh .note{border-left:5px solid #3b82f6;padding:6px 10px;margin:10px 0;background:rgba(59,130,246,.08);border-radius:3px}
       </style><div class="sfh">
       <h3>Ekran önizlemesi paylaşılır</h3>
-      <p>Önizleme kutucukları, ekranı izleme ve sohbet sırasındaki görüntü <b>salt izlemedir</b> ve <b>paylaşılır</b>: bir tahtaya
-      kaç kullanıcı bakarsa baksın, tahtaya <b>tek</b> bağlantı açılır (tahtada tek ekran paylaşım süreci, tek SSH tüneli).
-      Ankamon gelen görüntüyü kendi içinde çoğaltıp her izleyiciye ayrı sunar. Böylece tahtanın işlemcisi ve ağ trafiği
+      <p>Önizleme kutucukları, ekranı izleme ve sohbet sırasındaki görüntü <b>salt izlemedir</b> ve <b>paylaşılır</b>: bir cihaza
+      kaç kullanıcı bakarsa baksın, cihaza <b>tek</b> bağlantı açılır (cihazda tek ekran paylaşım süreci, tek SSH tüneli).
+      Ankamon gelen görüntüyü kendi içinde çoğaltıp her izleyiciye ayrı sunar. Böylece cihazın işlemcisi ve ağ trafiği
       izleyici sayısından etkilenmez.</p>
-      <p><b>Bilgisayarı yönet</b> (fare/klavye ile müdahale) paylaşılmaz: o kullanıcıya özel, tahtada girdi kabul eden ayrı bir
+      <p><b>Bilgisayarı yönet</b> (fare/klavye ile müdahale) paylaşılmaz: o kullanıcıya özel, cihazda girdi kabul eden ayrı bir
       bağlantı açılır ve pencere kapanınca biter.</p>
-      <div class="note">Tahtadaki ekran yeniden başlarsa (oturum değişti, ekran kilitlendi) yayın yenilenir; kutucuklar
+      <div class="note">Cihazdaki ekran yeniden başlarsa (oturum değişti, ekran kilitlendi) yayın yenilenir; kutucuklar
       kendiliğinden yeniden bağlanır.</div>
 
       <h3>Görüntü ne zaman alınmaz?</h3>
       <ul>
         <li>Tarayıcı simge durumundaysa ya da başka bir sekme öndeyse akışlar <b>hemen</b> durur.</li>
         <li>Liste görünümüne ya da başka bir sayfaya geçilince <b>${stopSec} sn</b> sonra durur (hızlı gidip gelmede yeniden bağlanmasın diye).</li>
-        <li>Kaydırınca görünür alanın dışında kalan kutucuk bağlantısını kapatır; kapalı tahtaya bağlanılmaz.</li>
-        <li>Bir tahtayı son izleyen de ayrılınca paylaşılan yayın kısa bir bekleme sonrası kapanır.</li>
+        <li>Kaydırınca görünür alanın dışında kalan kutucuk bağlantısını kapatır; kapalı cihaza bağlanılmaz.</li>
+        <li>Bir cihazı son izleyen de ayrılınca paylaşılan yayın kısa bir bekleme sonrası kapanır.</li>
       </ul>
       Durunca kutucukta son görüntü kalır; geri dönülünce akış kaldığı yerden sürer.
 
-      <h3>Tahtalardan veri toplama (kullanıcı sayısından bağımsız)</h3>
+      <h3>Cihazlardan veri toplama (kullanıcı sayısından bağımsız)</h3>
       <table>
         <tr><th>Veri</th><th>Nasıl toplanır</th></tr>
-        <tr><td>Metrikler ve sensörler (işlemci, bellek, disk, ağ, sıcaklık, fan, pil)</td><td>Sunucu tahtanın sensör portunu dakikada bir okur, veritabanına yazar.</td></tr>
-        <tr><td>Oturum açmış kullanıcı, kilit, ekran uykusu</td><td>30 sn'de bir tahta başına tek SSH yoklaması.</td></tr>
+        <tr><td>Metrikler ve sensörler (işlemci, bellek, disk, ağ, sıcaklık, fan, pil)</td><td>Sunucu cihazın sensör portunu dakikada bir okur, veritabanına yazar.</td></tr>
+        <tr><td>Oturum açmış kullanıcı, kilit, ekran uykusu</td><td>30 sn'de bir cihaz başına tek SSH yoklaması.</td></tr>
         <tr><td>Açık/kapalı durumu</td><td>Birkaç saniyede bir kısa bağlantı denemesi.</td></tr>
-        <tr><td>Loglar</td><td>Tahtalar kendileri gönderir.</td></tr>
+        <tr><td>Loglar</td><td>Cihazlar kendileri gönderir.</td></tr>
       </table>
-      <p>Kullanıcıların ekranları bu bilgileri tahtalardan değil Ankamon'un veritabanından okur: kullanıcı sayısı artınca
-      tahtalara giden yük artmaz.</p>
+      <p>Kullanıcıların ekranları bu bilgileri cihazlardan değil Ankamon'un veritabanından okur: kullanıcı sayısı artınca
+      cihazlara giden yük artmaz.</p>
 
       <h3>Kullanıcı başına ayrı bağlantı açanlar</h3>
       <ul>

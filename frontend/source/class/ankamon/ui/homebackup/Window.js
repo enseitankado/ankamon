@@ -26,7 +26,7 @@
  */
 
 /**
- * "Yedekle/Geri al" (sağ menü → Dosyalar): iki sekmeli pencere — "Yedekle" (seçilen tahtalardan seçilen hesapların
+ * "Yedekle/Geri al" (sağ menü → Dosyalar): iki sekmeli pencere — "Yedekle" (seçilen cihazlardan seçilen hesapların
  * ev dizini + hesap bilgisi + PIN anahtarı, tar.gz) ve "Geri al" (yedek dosyasından hesabı yeniden oluşturma).
  * Sekmeler yetkiye göre: boards.backup / boards.restore. İşler görev penceresinde yürür (bkz. ui.Jobs).
  */
@@ -35,7 +35,7 @@ qx.Class.define("ankamon.ui.homebackup.Window", {
 
   statics: {
     /**
-     * @param boards {Array} sağ menünün uygulandığı tahtalar (çoklu seçim) — iki sekmede de işaretli gelir
+     * @param boards {Array} sağ menünün uygulandığı cihazlar (çoklu seçim) — iki sekmede de işaretli gelir
      * @param user {Map} oturum sahibi
      */
     async open(boards, user) {
@@ -46,7 +46,7 @@ qx.Class.define("ankamon.ui.homebackup.Window", {
         const online = res.boards.filter(b => b.online).map(b => ({ id: b.id, name: name(b) }));
         all = online.concat(all.filter(b => !online.some(o => o.id === b.id)));
       } catch (e) {
-        // Tahta listesi okunamadı: yalnız seçili tahtalar sunulur.
+        // Cihaz listesi okunamadı: yalnız seçili cihazlar sunulur.
       }
       all.sort((a, b) => a.name.localeCompare(b.name, "tr", { numeric: true }));
       const win = new ankamon.ui.homebackup.Window(all, boards.filter(b => b.online).map(b => b.id), user);

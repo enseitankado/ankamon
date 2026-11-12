@@ -23,15 +23,15 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Sorun tespiti: seçilen tahtaları denetler (runner PARALEL çalıştırır — whoami.dynamic_concurrency), tahta başına bulgu listesi üretir.
+"""Sorun tespiti: seçilen cihazları denetler (runner PARALEL çalıştırır — whoami.dynamic_concurrency), cihaz başına bulgu listesi üretir.
 
-Arayüz: "Sorun tespiti" sayfası (frontend page/Diagnose.js — Tahtalar grid'inin kendisinden türetilmiş).
-Görev türü "diagnose" (bkz. runner, backend JobsApi). Her tahtaya TEK SSH turu: hwfacts.SCRIPT (donanım
+Arayüz: "Sorun tespiti" sayfası (frontend page/Diagnose.js — Cihazlar grid'inin kendisinden türetilmiş).
+Görev türü "diagnose" (bkz. runner, backend JobsApi). Her cihaza TEK SSH turu: hwfacts.SCRIPT (donanım
 + SMART — Bilgi kartıyla aynı; sonuç boards.facts'e de yazılır, önbellek tazelenir) + CHECK_SCRIPT (ek
 sistem denetimleri). Filo karşılaştırmaları (RAM/disk ortalaması, sıcaklık ortalaması) veritabanından:
-kayıtlı TÜM tahtaların son donanım bilgisi ve son 24 saatin sensör verisi — yalnız seçilenler değil.
+kayıtlı TÜM cihazların son donanım bilgisi ve son 24 saatin sensör verisi — yalnız seçilenler değil.
 
-Bulgu düzeyleri: ok (sorun yok), info (bilgi), warn (dikkat), bad (acil). Tahtanın genel düzeyi en kötü
+Bulgu düzeyleri: ok (sorun yok), info (bilgi), warn (dikkat), bad (acil). Cihazın genel düzeyi en kötü
 bulgusudur. Sonuç job_targets.output'a JSON olarak yazılır: {"level", "checks": [{group, title, level,
 detail, advice}], "collected_at"}.
 """
@@ -45,20 +45,20 @@ import time
 
 from . import hwfacts
 
-# Kernel günlüğü SON 7 GÜNDEN okunur (yalnız bu açılıştan değil): disk takılıp tahta yeniden
+# Kernel günlüğü SON 7 GÜNDEN okunur (yalnız bu açılıştan değil): disk takılıp cihaz yeniden
 # başlatılınca hata kanıtı önceki açılışta kalır — yine de görünmeli.
 # "Başarısız servisler" denetiminde sayılmayan servisler (kullanıcı isteği): openipmi sunucu donanımı
-# (IPMI) içindir, tahtalarda BMC olmadığından her açılışta başarısız görünür — sorun değildir.
+# (IPMI) içindir, cihazlarda BMC olmadığından her açılışta başarısız görünür — sorun değildir.
 _IGNORED_UNITS = {"openipmi.service"}
 
 _IO_RE = r"I/O error|ata[0-9.]+: (failed command|exception)|EXT4-fs error|link is slow to respond|Buffer I/O error|blk_update_request"
-# Disk G/Ç hatası satırları tahtanın KENDİ diski ile tahtaya takılan USB bellek / harici disk diye ayrılır (kullanıcı
+# Disk G/Ç hatası satırları cihazın KENDİ diski ile cihaza takılan USB bellek / harici disk diye ayrılır (kullanıcı
 # bildirimi 2026-11-09: B-ELK.ATL3'te "6 disk G/Ç hatası … sdb1" Acil görünüp SATA kablosu önerilmişti; sdb1 düzgün
 # çıkarılmadan sökülen FAT/exFAT USB bellekti — "device offline error … lost async page write"). Aygıt adı (sda/sdb)
 # açılıştan açılışa değişir (USB bellek takılıyken açılınca sda olabiliyor), bu yüzden ayrım HER AÇILIŞIN kendi çekirdek
 # günlüğünden yapılır ("Linux version" satırı yeni açılış): o açılışta "scsi hostN: usb-storage" ile bağlanan ya da
-# "Attached SCSI removable disk" denen aygıt ve exFAT birimi USB'dir. FAT tek başına kanıt DEĞİL: tahtanın kendi
-# diskindeki EFI bölümü (sda1) de FAT'tır. Kanıtı olmayan her satır (ataN, kök disk…) tahtanın diski sayılır.
+# "Attached SCSI removable disk" denen aygıt ve exFAT birimi USB'dir. FAT tek başına kanıt DEĞİL: cihazın kendi
+# diskindeki EFI bölümü (sda1) de FAT'tır. Kanıtı olmayan her satır (ataN, kök disk…) cihazın diski sayılır.
 # Çıktı: dahili sayı, dahili son satır, USB sayı, USB son satır, hatalı bellek(ler)in kimliği (alt alta; ";" ayraçlı). LC_ALL=C şart: Türkçe yerelde tolower("I")
 # "ı" verir ve "I/O error" hiç eşleşmezdi.
 _IO_AWK = r"""
@@ -141,7 +141,7 @@ echo "DG_REBOOT_REQUIRED=$([ -f /var/run/reboot-required ] && echo 1 || echo 0)"
 echo "DG_LOAD15=$(awk '{print $3}' /proc/loadavg)"
 echo "DG_DPKG_BROKEN=$(dpkg --audit 2>/dev/null | grep -c '^ ')"
 echo "DG_SWAP=$(swapon --show=NAME --noheadings 2>/dev/null | paste -sd, -)"
-# Güncellemesi gelen paketler: tahtadaki MEVCUT paket listesinden (apt update ÇALIŞTIRILMAZ — tarama ağa
+# Güncellemesi gelen paketler: cihazdaki MEVCUT paket listesinden (apt update ÇALIŞTIRILMAZ — tarama ağa
 # bağlı kalmasın, MEB filtresinde takılmasın). Listenin yaşı ayrıca bildirilir: eskiyse sayı eksik olabilir.
 u=$(apt list --upgradable 2>/dev/null | grep -F '[upgradable from')
 echo "DG_UPG_COUNT=$(printf '%s' "$u" | grep -c .)"
@@ -161,7 +161,7 @@ for h in /sys/class/hwmon/hwmon*; do
 done
 # O anki en çok işlemci kullanan süreçler (1 sn'lik örnek — top'un 2. turu): "DGP %cpu komut".
 top -b -n 2 -d 1 -o %CPU -w 200 2>/dev/null | awk '/^top -/{n++} n==2 && /^ *PID/{p=1; next} n==2 && p && c<3 {c++; print "DGP", $9, $12}'
-# Saat sapması için: açılıştan beri geçen süre ve tahtanın saati — EN SONDA (yukarıdaki komutlar birkaç sn
+# Saat sapması için: açılıştan beri geçen süre ve cihazın saati — EN SONDA (yukarıdaki komutlar birkaç sn
 # sürer; sunucu saati SSH döner dönmez alınır, bkz. _ssh DG_SERVER_EPOCH) ki fark gerçek sapmayı versin.
 echo "DG_UPTIME=$(cut -d. -f1 /proc/uptime)"
 echo "DG_EPOCH=$(date +%s)"
@@ -186,20 +186,20 @@ GIB = 1024 ** 3
 
 def _ssh(board: dict, user: str, password: str, timeout: int = 60) -> dict:
     if not board.get("ip"):
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     cmd = ["sshpass", "-e", "ssh", *hwfacts._SSH_OPTS, "-o", "ConnectTimeout=8",
            f"{user}@{board['ip']}", SCRIPT]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=timeout)
     except subprocess.TimeoutExpired:
-        return {"status": "failed", "rc": None, "output": f"Zaman aşımı ({timeout} sn) — tahta yanıt vermiyor."}
+        return {"status": "failed", "rc": None, "output": f"Zaman aşımı ({timeout} sn) — cihaz yanıt vermiyor."}
     if proc.returncode == 5:
         return {"status": "unreachable", "rc": 5, "output": "SSH parolası reddedildi."}
     if proc.returncode != 0:
         err = proc.stderr.decode("utf-8", "replace").strip()
         return {"status": "unreachable", "rc": proc.returncode, "output": err or f"ssh çıkış kodu {proc.returncode}"}
-    # Sunucunun saati SSH döner dönmez (tahtanın DG_EPOCH'u betiğin son satırı): fark = saat sapması.
+    # Sunucunun saati SSH döner dönmez (cihazın DG_EPOCH'u betiğin son satırı): fark = saat sapması.
     return {"status": "ok", "rc": 0,
             "output": proc.stdout.decode("utf-8", "replace") + f"\nDG_SERVER_EPOCH={int(time.time())}\n"}
 
@@ -270,7 +270,7 @@ def _sensors(output: str) -> dict:
 
 
 def history(conn, board_id: int) -> dict:
-    """Tahtanın sensör geçmişi (veritabanı): fan başına bugüne dek en yüksek devir (fan "bağlı mı" —
+    """Cihazın sensör geçmişi (veritabanı): fan başına bugüne dek en yüksek devir (fan "bağlı mı" —
     hiç dönmemiş giriş boştur), son 24 saatte kasa içi en yüksek sıcaklık, son 15 dk işlemci kullanımı."""
     bid = str(board_id)
     fans = {r["sensor"]: float(r["mx"] or 0) for r in conn.execute(
@@ -299,8 +299,8 @@ def history(conn, board_id: int) -> dict:
     }
 
 
-# Son 24 saatte tahta başına işlemci sıcaklığı: her ölçüm anında CPU algılayıcılarının en yükseği,
-# bunların ortalaması ve tepesi. CPU algılayıcısı (coretemp/k10temp/zenpower) olmayan tahtada tüm
+# Son 24 saatte cihaz başına işlemci sıcaklığı: her ölçüm anında CPU algılayıcılarının en yükseği,
+# bunların ortalaması ve tepesi. CPU algılayıcısı (coretemp/k10temp/zenpower) olmayan cihazda tüm
 # sıcaklık serilerine (termal bölgeler) düşülür. Fiziksel olmayan değerler (≤0, >120) atılır.
 _TEMP_SQL = """
 WITH s AS (
@@ -322,7 +322,7 @@ SELECT board_id, avg(v) AS avg24, max(v) AS max24, count(*) AS n FROM per_time G
 
 
 def fleet(conn) -> dict:
-    """Karşılaştırma tabanı: kayıtlı TÜM tahtaların son bilinen RAM/disk kapasitesi ve 24 sa sıcaklığı."""
+    """Karşılaştırma tabanı: kayıtlı TÜM cihazların son bilinen RAM/disk kapasitesi ve 24 sa sıcaklığı."""
     mem, disk = [], []
     for row in conn.execute("SELECT facts FROM boards").fetchall():
         f = row["facts"] or {}
@@ -355,7 +355,7 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
     g = "Donanım kapasitesi"
     for key, avg_key, n_key, label, advice in (
         ("mem_total_bytes", "mem_avg", "mem_n", "RAM",
-         "RAM yükseltmesi önerilir: tarayıcı, EBA ve video gibi uygulamalar bu tahtada belirgin biçimde yavaş çalışır."),
+         "RAM yükseltmesi önerilir: tarayıcı, EBA ve video gibi uygulamalar bu cihazda belirgin biçimde yavaş çalışır."),
         ("disk_total_bytes", "disk_avg", "disk_n", "Disk kapasitesi",
          "Daha büyük bir SSD ile değiştirmeyi planlayın: güncellemeler, önbellek ve kullanıcı dosyaları için alan çabuk daralır."),
     ):
@@ -363,11 +363,11 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
         if not val:
             add(g, label, "info", "Okunamadı.")
         elif n < 2 or not avg:
-            add(g, label, "info", f"{_gb(val)} — karşılaştırma için en az 2 tahtanın donanım bilgisi gerekir.")
+            add(g, label, "info", f"{_gb(val)} — karşılaştırma için en az 2 cihazın donanım bilgisi gerekir.")
         elif val < 0.8 * avg:
-            add(g, label, "warn", f"{_gb(val)}; tahtaların ortalaması {_gb(avg)} — ortalamanın %{round(100 - 100 * val / avg)} altında.", advice)
+            add(g, label, "warn", f"{_gb(val)}; cihazların ortalaması {_gb(avg)} — ortalamanın %{round(100 - 100 * val / avg)} altında.", advice)
         else:
-            add(g, label, "ok", f"{_gb(val)} (tahtaların ortalaması {_gb(avg)}).")
+            add(g, label, "ok", f"{_gb(val)} (cihazların ortalaması {_gb(avg)}).")
 
     # 2) Disk sağlığı — SMART + son 7 günün çekirdek disk hataları
     g = "Disk sağlığı (SMART)"
@@ -409,16 +409,16 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
     if extra.get("io_errors"):
         add(g, "Çekirdek disk hataları (son 7 gün)", "bad",
             f"{extra['io_errors']} disk G/Ç hatası kaydı. Son: {extra['io_sample'] or '—'}",
-            "Disk bir süre yanıt vermemiş (tahta donmuş ya da SSH'a cevap vermemiş olabilir). SMART temiz olsa bile "
+            "Disk bir süre yanıt vermemiş (cihaz donmuş ya da SSH'a cevap vermemiş olabilir). SMART temiz olsa bile "
             "SATA kablosu/bağlantısı, güç beslemesi ya da disk denetleyicisi sorunlu olabilir: kabloyu yeniden "
             "takın ya da değiştirin; tekrarlarsa diski değiştirin.")
     if extra.get("usb_io_errors"):
-        # Tahtanın diskiyle ilgisi yok (bkz. _IO_AWK) ama bellekteki dosyalar bozulmuş olabilir: Dikkat (kullanıcı isteği
+        # Cihazın diskiyle ilgisi yok (bkz. _IO_AWK) ama bellekteki dosyalar bozulmuş olabilir: Dikkat (kullanıcı isteği
         # 2026-11-09; önce Bilgi'ydi). Bellek kimliği ve birim adı günlükten (çekirdek USB satırları + udisksd).
         devs = extra.get("usb_io_devices") or []
         which = f" ({'; '.join(devs)})" if devs else ""
         add(g, "USB bellek / harici disk hataları (son 7 gün)", "warn",
-            f"Tahtaya takılan çıkarılabilir diskte{which} {extra['usb_io_errors']} G/Ç hatası kaydı; tahtanın kendi diski "
+            f"Cihaza takılan çıkarılabilir diskte{which} {extra['usb_io_errors']} G/Ç hatası kaydı; cihazın kendi diski "
             f"değil. Son: {extra['usb_io_sample'] or '—'}",
             "USB bellek ya da harici disk, yazma sürerken (ör. dosya kopyalandıktan hemen sonra) çıkarılmış. "
             "Kullanıcılara belleği çıkarmadan önce \"Güvenli kaldır\"ı hatırlatın; bellekteki son kopyalanan dosyalar "
@@ -427,25 +427,25 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
     # 3) İşlemci sıcaklığı — son 24 saat ortalaması, filo ortalamasından %20+ yüksek
     g = "İşlemci sıcaklığı"
     t = fl["temps"].get(str(board_id))
-    cause = ("Soğutucu ve fan tozlanmış, termal macun kurumuş ya da fan arızalı/yavaş olabilir: tahtanın içini "
+    cause = ("Soğutucu ve fan tozlanmış, termal macun kurumuş ya da fan arızalı/yavaş olabilir: cihazın içini "
              "temizletin, fanın döndüğünü kontrol edin, gerekirse termal macunu yenileyin.")
     if not t:
         cur = facts.get("cpu_temp_c")
         add(g, "Son 24 saat", "info",
-            "Sensör verisi yok (tahta kapalıydı ya da \"Metrik izlemeyi kur\" yapılmamış)"
+            "Sensör verisi yok (cihaz kapalıydı ya da \"Metrik izlemeyi kur\" yapılmamış)"
             + (f"; şu an {cur} °C." if cur else "."))
     else:
         avg = fl["temp_avg"]
         detail = f"ortalama {t['avg']:.1f} °C, en yüksek {t['max']:.0f} °C".replace(".", ",", 1)
         if fl["temp_n"] >= 2 and avg and t["avg"] > 1.2 * avg:
             add(g, "Son 24 saat", "warn",
-                f"{detail}; tahtaların ortalaması {avg:.1f} °C — %{round(100 * t['avg'] / avg - 100)} daha sıcak.".replace(".", ",", 1),
+                f"{detail}; cihazların ortalaması {avg:.1f} °C — %{round(100 * t['avg'] / avg - 100)} daha sıcak.".replace(".", ",", 1),
                 cause)
         elif t["max"] >= 90:
             add(g, "Son 24 saat", "bad", f"{detail} — tehlikeli düzey.", cause)
         else:
             add(g, "Son 24 saat", "ok",
-                detail + (f" (tahtaların ortalaması {avg:.1f} °C)".replace(".", ",", 1) if fl["temp_n"] >= 2 and avg else "") + ".")
+                detail + (f" (cihazların ortalaması {avg:.1f} °C)".replace(".", ",", 1) if fl["temp_n"] >= 2 and avg else "") + ".")
     if extra.get("throttle"):
         add(g, "Isıdan yavaşlatma", "warn", f"Son 7 günde {extra['throttle']} kez işlemci aşırı ısındığı için yavaşlatılmış.", cause)
 
@@ -454,7 +454,7 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
     sens = extra.get("sensors") or {"superio": False, "fans": {}, "vbat": None, "case": []}
     g = "Soğutma ve kasa"
     no_sio = ("Anakartın donanım izleme yongası (Super I/O) sürücüsü yüklü değil; fan devri ve CMOS pili okunamıyor.",
-              "Komut çalıştır → hazır işlemlerden \"Metrik izlemeyi kur (fan/pil/anakart sensörleri dahil)\" komutunu bu tahtaya uygulayın.")
+              "Komut çalıştır → hazır işlemlerden \"Metrik izlemeyi kur (fan/pil/anakart sensörleri dahil)\" komutunu bu cihaza uygulayın.")
     if not sens["superio"]:
         add(g, "İşlemci fanı", "info", *no_sio)
     else:
@@ -471,14 +471,14 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
                 unknown.append(sensor)   # hiç dönmemiş giriş: büyük olasılıkla fan bağlı değil
         if stopped:
             add(g, "Fan durmuş", "bad", "; ".join(stopped) + "." + temp_note,
-                "Fan dönmüyor: işlemci aşırı ısınıp tahta kendini kapatabilir ya da kalıcı hasar görebilir. Tahtayı "
+                "Fan dönmüyor: işlemci aşırı ısınıp cihaz kendini kapatabilir ya da kalıcı hasar görebilir. Cihazı "
                 "kapatın; fanın toz/kıl ile sıkışmadığını ve kablosunun takılı olduğunu kontrol edin, gerekirse fanı değiştirin.")
         elif running:
             add(g, "İşlemci fanı", "ok", ", ".join(running) + ".")
         else:
             add(g, "İşlemci fanı", "info",
                 "Hiçbir fan girişinde devir okunmadı ve geçmişte de dönme kaydı yok." + temp_note,
-                "Fan bu girişe bağlı olmayabilir (bazı tahtalarda devir sinyali yoktur); emin olmak için fanın döndüğünü "
+                "Fan bu girişe bağlı olmayabilir (bazı cihazlarda devir sinyali yoktur); emin olmak için fanın döndüğünü "
                 "yerinde kontrol edin.")
     case_now = max(sens["case"], key=lambda c: c[1]) if sens["case"] else None
     case_max = hist["case_max24"]
@@ -489,7 +489,7 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
         peak = max([v for v in (case_now[1] if case_now else None, case_max) if v is not None])
         if peak >= CASE_WARN_C:
             add(g, "Kasa içi sıcaklık", "warn", detail,
-                "Kasa içi sıcak: havalandırma ızgaraları tıkalı, fan(lar) zayıf ya da tahta güneş/kalorifer gibi bir ısı "
+                "Kasa içi sıcak: havalandırma ızgaraları tıkalı, fan(lar) zayıf ya da cihaz güneş/kalorifer gibi bir ısı "
                 "kaynağına yakın olabilir. Arkasındaki hava boşluğunu, toz birikimini ve fanları kontrol edin.")
         else:
             add(g, "Kasa içi sıcaklık", "ok", detail)
@@ -497,7 +497,7 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
         add(g, "Kasa içi sıcaklık", "info", "Kasa içi sıcaklık sensörü okunamadı.")
 
     # BIOS (CMOS) pili burada denetlenmez: sürekli izlemede (anomali "BIOS pili zayıf", Ankamon'un 60 sn'de bir okuduğu
-    # ölçümden) — aynı soruya iki ayrı cevap verilmesin (Tahta sağlığı ▸ Denetimler).
+    # ölçümden) — aynı soruya iki ayrı cevap verilmesin (Cihaz sağlığı ▸ Denetimler).
 
     # 4) Boş disk alanı — toplamın %15'inin altı
     g = "Boş disk alanı"
@@ -549,10 +549,10 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
             "zram (sıkıştırılmış RAM takası) ya da bir takas dosyası etkinleştirin.")
     if facts.get("disk_rotational") == 1:
         add(g, "Mekanik disk (HDD)", "warn", "Açılış, oturum açma ve uygulama başlatma belirgin biçimde yavaş.",
-            "SSD'ye geçiş bu tahtada en büyük hız kazancını sağlar.")
+            "SSD'ye geçiş bu cihazda en büyük hız kazancını sağlar.")
     if extra.get("root_ro"):
         add(g, "Salt-okunur dosya sistemi", "bad", "Kök dosya sistemi salt-okunur bağlı — genellikle disk hatası sonrası koruma.",
-            "Tahtayı yeniden başlatıp dosya sistemi denetimi (fsck) yaptırın; tekrarlıyorsa diski değiştirin.")
+            "Cihazı yeniden başlatıp dosya sistemi denetimi (fsck) yaptırın; tekrarlıyorsa diski değiştirin.")
     if extra.get("oom"):
         add(g, "Bellek yetersizliği (son 7 gün)", "warn", f"{extra['oom']} kez bellek bittiği için çekirdek uygulama sonlandırmış.",
             "RAM yükseltin ya da takas (zram) ayarını gözden geçirin.")
@@ -561,8 +561,8 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
             "Gereksizse devre dışı bırakın (systemctl disable), gerekliyse günlüğünü inceleyin (journalctl -u <servis>).")
     if extra.get("dpkg_broken"):
         add(g, "Yarım kalmış paket kurulumu", "warn", f"{extra['dpkg_broken']} paket yarım kalmış — güncellemeler çalışmaz.",
-            "Tahtada \"dpkg --configure -a\" çalıştırın.")
-    # Saat eşitlemesi burada denetlenmez: sürekli izlemede ("NTP eşitlenmemiş" ölçümden, "Tahta saati yanlış" loglardan).
+            "Cihazda \"dpkg --configure -a\" çalıştırın.")
+    # Saat eşitlemesi burada denetlenmez: sürekli izlemede ("NTP eşitlenmemiş" ölçümden, "Cihaz saati yanlış" loglardan).
     cores = facts.get("cpu_cores")
     if extra.get("load15") is not None and cores and extra["load15"] > cores:
         add(g, "Sürekli yüksek yük", "warn", f"Son 15 dk yük ortalaması {extra['load15']:.2f} ({cores} iş parçacığı).",
@@ -584,7 +584,7 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
 
 
 def run(conn, board: dict, user: str, password: str) -> dict:
-    """Tek tahtayı denetler. Döner: {"status", "rc", "output"} — output bulguların JSON'u (başarılıysa)."""
+    """Tek cihazı denetler. Döner: {"status", "rc", "output"} — output bulguların JSON'u (başarılıysa)."""
     res = _ssh(board, user, password)
     if res["status"] != "ok":
         return res

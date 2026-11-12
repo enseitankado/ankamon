@@ -19,7 +19,7 @@ MEM_WARN, MEM_ERROR, MEM_CLEAR = 90.0, 97.0, 80.0
 DISK_WARN_PCT, DISK_ERROR_PCT = 10.0, 3.0  # /data'da boş yer yüzdesi
 DISK_WARN_GB, DISK_ERROR_GB = 2.0, 0.5
 PG_WARN, PG_CLEAR = 0.8, 0.6  # bağlantı sayısı / max_connections
-QUEUE_WARN_MB = 50  # rsyslog disk kuyruğu (veritabanına yazılamayan tahta logları)
+QUEUE_WARN_MB = 50  # rsyslog disk kuyruğu (veritabanına yazılamayan cihaz logları)
 SPOOL = "/data/rsyslog"
 
 
@@ -124,14 +124,14 @@ class Health:
         size = sum(os.path.getsize(p) for p in glob.glob(f"{SPOOL}/ankamon_pg.*") if os.path.isfile(p))
         mb = size / 1024 ** 2
         self._state(out, "queue", "warn" if mb >= QUEUE_WARN_MB else None,
-                    f"Log kuyruğu birikiyor: {mb:.0f} MB tahta logu veritabanına yazılmayı bekliyor",
+                    f"Log kuyruğu birikiyor: {mb:.0f} MB cihaz logu veritabanına yazılmayı bekliyor",
                     "Veritabanı yavaş ya da erişilemiyor olabilir (bkz. Sistem ▸ Disk kullanımı ▸ Log kuyruğu).",
                     cleared="Log kuyruğu boşaldı")
         dirs = {os.path.basename(p) for p in glob.glob(f"{SPOOL}/bozuk-*") if os.path.isdir(p)}
         if self._quarantine_seen is not None:
             for name in sorted(dirs - self._quarantine_seen):
                 out.append(("error", f"Log kuyruğunda bozuk dosyalar karantinaya alındı: {name}",
-                            "Bu dosyalardaki tahta logları veritabanına yazılamadı (bkz. Sistem ▸ Disk kullanımı)."))
+                            "Bu dosyalardaki cihaz logları veritabanına yazılamadı (bkz. Sistem ▸ Disk kullanımı)."))
         self._quarantine_seen = dirs
 
     def _postgres(self, conn, out):

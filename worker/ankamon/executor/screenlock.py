@@ -23,11 +23,11 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Sağ menü Ekran ▸ "Kilitle" / "Kilidi aç": tahtanın ekranını Ankamon'dan açılana dek kilitler.
+"""Sağ menü Ekran ▸ "Kilitle" / "Kilidi aç": cihazın ekranını Ankamon'dan açılana dek kilitler.
 
 Kilitliyken etkin VT'deki X ekranının tamamını büyük "Kilitli" yazısı ve kilit simgesi kaplar; klavye,
 fare ve dokunmatik bu pencerede yakalanır (Gdk seat grab), alttaki masaüstüne ya da giriş ekranına
-ulaşmaz. Oturum açık olsun olmasın aynı çalışır; kilit tahtanın yeniden açılmasından sonra da sürer.
+ulaşmaz. Oturum açık olsun olmasın aynı çalışır; kilit cihazın yeniden açılmasından sonra da sürer.
 
 Neden ETAP'ın kendi araçları değil (2026-10-30, Arge 2'de kaynaktan okundu):
   - pardus-lightdm-greeter'ın denetim soketi (/var/lib/lightdm/pardus-greeter, daemon.py) "block-gui"
@@ -35,7 +35,7 @@ Neden ETAP'ın kendi araçları değil (2026-10-30, Arge 2'de kaynaktan okundu):
     açar; açık masaüstü oturumunda işlemez; "message" yalnız küçük bir bildirim gösterir.
   - `dm-tool lock` (ETAP'ın oturum kilidi) parolayla açılır — kullanıcı aşabilir.
   - eta-screen-cover kapatma düğmeli, taşınabilir bir perdedir.
-Tahtadaki paket dosyalarına dokunulmaz; kurulanlar Ankamon'un kendi dosyalarıdır ve kilit açılınca silinir:
+Cihazdaki paket dosyalarına dokunulmaz; kurulanlar Ankamon'un kendi dosyalarıdır ve kilit açılınca silinir:
   /var/lib/ankamon-lock/{lock.py,cover.py,info.json,locked,log}, /etc/systemd/system/ankamon-screen-lock.service.
 
 Bekçi (lock.py, root, systemd Restart=always): yarım saniyede bir etkin VT'ye bakar.
@@ -53,12 +53,12 @@ açılınca pencere en üstte görünse de ekrana çizilmiyordu (Arge 1'de 2026-
 pencere bileşim durumu değişince kapanır, bekçi onu hemen yeniden açar.
 
 Kilit yazısının altında "Cihaz kilitlenmiştir." (kullanıcı isteği 2026-11-11; önce "yönetici tarafından" yazıyordu) ve
-tahtanın kimliği (info.json, kilitlerken Ankamon'daki kayıttan): takma ad (kod adı) büyükçe, altında eklentilerin
+cihazın kimliği (info.json, kilitlerken Ankamon'daki kayıttan): takma ad (kod adı) büyükçe, altında eklentilerin
 satırları (ör. envanter numarası — ankamon.ext.device_identity_rows), bilgisayar adı, ETAP modeli/fazı, kablolu/kablosuz
-MAC ve IP — kilitli tahtayı bulmak/bildirmek için.
+MAC ve IP — kilitli cihazı bulmak/bildirmek için.
 
 Oturum yoklaması (executor/session_probe.py) SCRIPT'teki "L" satırıyla kilit durumunu okur
-(boards.screen_locked — göç 035); Tahtalar grid'inin "Oturum" hücresi "… / Kilitli" yazar.
+(boards.screen_locked — göç 035); Cihazlar grid'inin "Oturum" hücresi "… / Kilitli" yazar.
 """
 
 from __future__ import annotations
@@ -73,7 +73,7 @@ DIR = "/var/lib/ankamon-lock"
 UNIT = "ankamon-screen-lock.service"
 
 # Oturum yoklamasına eklenen satır: kilit kurulu ise "L 1" (bkz. session_probe.py). if/fi: yoklama betiğinin
-# son satırı — "[ … ] && echo" kilitsiz tahtada betiği 1 koduyla bitirir, yoklama başarısız sayılırdı.
+# son satırı — "[ … ] && echo" kilitsiz cihazda betiği 1 koduyla bitirir, yoklama başarısız sayılırdı.
 SCRIPT = f"""
 if [ -e {DIR}/locked ]; then echo "L 1"; fi
 """
@@ -249,7 +249,7 @@ win.move(0, 0)
 win.set_default_size(W, H)
 win.resize(W, H)
 
-# Tahtanın kimliği (bkz. modül notu): kod adı büyükçe, ayrıntılar alt yazı boyunda.
+# Cihazın kimliği (bkz. modül notu): kod adı büyükçe, ayrıntılar alt yazı boyunda.
 try:
     with open("/var/lib/ankamon-lock/info.json", encoding="utf-8") as f:
         info = json.load(f)
@@ -348,7 +348,7 @@ WantedBy=graphical.target
 
 _LOCK = f"""
 command -v python3 >/dev/null 2>&1 && python3 -c 'import gi; gi.require_version("Gtk", "3.0"); from gi.repository import Gtk' 2>/dev/null \\
-  || {{ echo "Tahtada python3-gi (Gtk 3) yok — kilit ekranı çizilemez." >&2; exit 3; }}
+  || {{ echo "Cihazda python3-gi (Gtk 3) yok — kilit ekranı çizilemez." >&2; exit 3; }}
 D={DIR}
 mkdir -p "$D"; chmod 700 "$D"
 cat > "$D/lock.py" <<'ANKAMON_EOF'
@@ -421,7 +421,7 @@ systemctl daemon-reload
 pkill -f "^/usr/bin/python3 $D/lock.py" 2>/dev/null
 pkill -f "^/usr/bin/python3 $D/cover.py" 2>/dev/null
 rm -rf "$D"
-if [ -n "$was" ]; then echo "Ekran kilidi açıldı."; else echo "Tahtada ekran kilidi yoktu."; fi
+if [ -n "$was" ]; then echo "Ekran kilidi açıldı."; else echo "Cihazda ekran kilidi yoktu."; fi
 """.replace("__DIR__", DIR).replace("__UNIT__", UNIT).replace("__XKB_RESTORE__", _XKB_RESTORE)
 
 
@@ -435,7 +435,7 @@ def identities(conn, board_ids: list[int]) -> dict[int, dict]:
     for r in rows:
         etap = r["etap"] or {}
         model = ""
-        if etap.get("tahta"):
+        if etap.get("cihaz"):
             # util.Format.etap ile aynı ad: model (yoksa marka) ve FATİH fazı.
             model = " · ".join(x for x in (etap.get("ad") or etap.get("marka") or "",
                                             f"Faz {etap['faz']}" if etap.get("faz") else "") if x)

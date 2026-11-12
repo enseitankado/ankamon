@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahta (greeter) oturumlarını logs tablosundan çıkarıp board_sessions'a işler.
+"""Cihaz (greeter) oturumlarını logs tablosundan çıkarıp board_sessions'a işler.
 
 Gerçek kullanıcı girişi/çıkışı lightdm'in PAM mesajlarından okunur:
     pam_unix(lightdm:session): session opened for user <ad>(uid=<uid>) by (uid=0)
@@ -41,11 +41,11 @@ satır iki kez işlenmez, büyük geçmiş birikintisi birkaç tura yayılarak i
 
 Kapanış mesajı HER ZAMAN gelmez (elektrik kesintisi, fiziksel güç düğmesiyle zorla kapatma, çok
 hızlı "Kapat" komutu — PAM'ın kapanış mesajı sunucuya yetişemeyebilir). Bu yüzden ayrıca:
-  - tahtası ÇEVRİMDIŞI olan ama hâlâ "açık" görünen oturumlar en iyi tahminle kapatılır
+  - cihazı ÇEVRİMDIŞI olan ama hâlâ "açık" görünen oturumlar en iyi tahminle kapatılır
     (end_reason='offline', bkz. _close_offline) — elektrik kesintisi/zorla kapatma/çok hızlı
     kapanma hep burada toplanır;
-  - kapanış mesajı hiç gelmeden AYNI tahtada yeni bir oturum açılırsa öncekini "superseded"
-    sayıp yeninin başlangıcında kapatır (kapanış mesajı kaybolmuş, tahta hemen yeniden kullanılmış).
+  - kapanış mesajı hiç gelmeden AYNI cihazda yeni bir oturum açılırsa öncekini "superseded"
+    sayıp yeninin başlangıcında kapatır (kapanış mesajı kaybolmuş, cihaz hemen yeniden kullanılmış).
 
 __main__.py'de board_status ile AYNI hızlı döngüde (STATUS_TICK_SECONDS) çalışır ki oturum
 açma/kapama grid'e "anında" yansısın, TICK_SECONDS'ı (varsayılan 60 sn) beklemesin.
@@ -89,13 +89,13 @@ def run(conn) -> None:
 
 
 def _link_orphans(conn) -> None:
-    """Tahta kaydı oturumdan SONRA açılmışsa (silinip loglardan yeniden açılan ya da elle eklenen tahta)
-    o adın tahtasız oturumlarını tahtaya bağlar — Oturumlar'da tahtanın takma adıyla görünsünler."""
+    """Cihaz kaydı oturumdan SONRA açılmışsa (silinip loglardan yeniden açılan ya da elle eklenen cihaz)
+    o adın cihazsız oturumlarını cihaza bağlar — Oturumlar'da cihazın takma adıyla görünsünler."""
     linked = conn.execute(
         """UPDATE board_sessions s SET board_id = b.id FROM boards b
            WHERE s.board_id IS NULL AND lower(b.hostname) = lower(s.host)""").rowcount
     if linked:
-        log.info("%d tahtasız oturum tahtasına bağlandı", linked)
+        log.info("%d cihazsız oturum cihazına bağlandı", linked)
 
 
 def _cursor(conn):
@@ -128,7 +128,7 @@ def _apply_pam_session_log_line(conn, row) -> None:
                 """SELECT 1 FROM board_sessions WHERE host = %s AND username = %s AND started_at = %s""",
                 (host, username, when)).fetchone():
             return
-        # Bu tahtada hâlâ "açık" görünen başka bir oturum varsa: kapanış mesajı kaybolmuş sayılır.
+        # Bu cihazda hâlâ "açık" görünen başka bir oturum varsa: kapanış mesajı kaybolmuş sayılır.
         conn.execute(
             """UPDATE board_sessions SET ended_at = %s, end_reason = 'superseded'
                WHERE host = %s AND ended_at IS NULL""",
@@ -159,15 +159,15 @@ _STALE = "15 minutes"  # boards_from_logs.py'nin RECENT penceresiyle aynı eşik
 
 
 def _close_offline(conn) -> None:
-    """Tahtası çevrimdışı olan ama hâlâ 'açık' görünen oturumları en iyi tahminle kapatır.
+    """Cihazı çevrimdışı olan ama hâlâ 'açık' görünen oturumları en iyi tahminle kapatır.
 
     board_status (aynı hızlı döngüde, bu görevden önce — bkz. tasks/__init__.py sırası)
     `boards.online`'ı STATUS_TICK_SECONDS'ta bir günceller; bu yüzden bir oturumun "fark
     edilmeden" açık kalma süresi en kötü durumda bir STATUS_TICK_SECONDS kadardır.
 
-    İki durum ayrı ele alınır: (1) oturumun board_id'si var ve o tahta artık çevrimdışı
+    İki durum ayrı ele alınır: (1) oturumun board_id'si var ve o cihaz artık çevrimdışı
     (board_status'a göre); (2) hostname `boards`'ta hiç yok (ör. kaydı henüz açılmamış
-    ya da silinmiş ama cihaz hâlâ log gönderiyor) — bu durumda tahtanın kendi
+    ya da silinmiş ama cihaz hâlâ log gönderiyor) — bu durumda cihazın kendi
     "online" kaydı olmadığından, hostname'in son _STALE süresinde hiç log göndermemiş olması
     çevrimdışı sayılır.
     """

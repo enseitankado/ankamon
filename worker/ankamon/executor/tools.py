@@ -23,14 +23,14 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtalara taşınan dış araçlar (ör. eta-112): sunucuda önbellek + günlük sürüm denetimi + SFTP ile kopyalama.
+"""Cihazlara taşınan dış araçlar (ör. eta-112): sunucuda önbellek + günlük sürüm denetimi + SFTP ile kopyalama.
 
 Bir hazır işlem action.json'da "tools": ["eta-112"] derse runner işlemden ÖNCE:
   1. ensure(): aracın sunucudaki kopyasını hazırlar (/data/tools/<ad>/). Günün ilk kullanımında
      (TOOLS'ta "check_every_run" ise her kullanımda) GitHub'da yeni sürüm (son commit) var mı bakar,
-     varsa indirir. Tahta her seferinde internetten
+     varsa indirir. Cihaz her seferinde internetten
      indirmez — kopya ana makinede durur.
-  2. upload(): her tahtada uzak kopyanın sha256'sını karşılaştırır; farklıysa (ya da yoksa) SSH
+  2. upload(): her cihazda uzak kopyanın sha256'sını karşılaştırır; farklıysa (ya da yoksa) SSH
      üzerinden SFTP ile kopyalar (geçici ad → atomik yeniden adlandırma), aynıysa atlar.
 Her adım görev olayına yazılır (kullanıcı canlı çıktı penceresinde görür).
 
@@ -56,7 +56,7 @@ BASE_DIR = "/data/tools"
 MEB_CA = "/opt/ankamon/certs/meb-ca.crt"
 _HTTP_TIMEOUT = 20
 
-# ad → kaynak depo, taşınacak dosya ve tahtadaki yeri. remote_dir: tahtada kalıcı, yerel olarak
+# ad → kaynak depo, taşınacak dosya ve cihazdaki yeri. remote_dir: cihazda kalıcı, yerel olarak
 # yönetilen yazılımlar için FHS'nin öngördüğü /opt/<paket> (aracın kendi başlatıcısı baslat.sh her
 # çalıştırmada /tmp'ye geçici kopya açar; biz kalıcı tutup yalnız sürüm değişince yeniden kopyalarız).
 TOOLS = {
@@ -74,7 +74,7 @@ TOOLS = {
 # adıyla bilmez). Biçim: {"<araç-adı>": {title, repo, branch, file, remote_dir, check_every_run?}}.
 # Çok dosyalı araçlar için "kind": "archive" (bkz. _ensure_archive): {title, kind, remote_dir, sources: [
 #   {repo, ref: "release" | <dal>, include: [yollar], dest?: <alt dizin>}]} — kaynaklar tek arşivde birleşir,
-#   tahtada remote_dir bütünüyle (atomik) değiştirilir.
+#   cihazda remote_dir bütünüyle (atomik) değiştirilir.
 def _load_ext_tools() -> None:
     import glob
     for path in glob.glob("/opt/ankamon/ext/*/worker/tools.json"):
@@ -164,7 +164,7 @@ def ensure(name: str, events) -> dict:
     if have and state.get("checked") == today and not tool.get("check_every_run"):
         events.add("info", f"{tool['title']}: sunucudaki kopya kullanılıyor (sürüm {state['commit'][:7]}, "
                            f"bugün denetlendi)")
-        events.flush()  # genel olay tahta olaylarından önce görünsün
+        events.flush()  # genel olay cihaz olaylarından önce görünsün
         _write_version(name, state)
         return {"path": local, "commit": state["commit"], "sha256": state["sha256"]}
 
@@ -186,7 +186,7 @@ def ensure(name: str, events) -> dict:
                 raise ToolError("dosya API'den doğrudan gelmedi (1 MB sınırı aşılmış olabilir)")
             else:
                 raise ToolError("dosya içeriği alınamadı")
-            ast.parse(data.decode("utf-8"))  # yarım/bozuk indirme tahtaya gitmesin
+            ast.parse(data.decode("utf-8"))  # yarım/bozuk indirme cihaza gitmesin
             with open(local + ".tmp", "wb") as f:
                 f.write(data)
             os.chmod(local + ".tmp", 0o755)
@@ -209,14 +209,14 @@ def ensure(name: str, events) -> dict:
 
 
 def _write_version(name: str, state: dict) -> None:
-    """Tahtaya araçla birlikte giden VERSION dosyası: hangi commit'in kurulu olduğu tahtada da okunsun."""
+    """Cihaza araçla birlikte giden VERSION dosyası: hangi commit'in kurulu olduğu cihazda da okunsun."""
     tool = TOOLS[name]
     with open(os.path.join(_local_dir(name), "VERSION"), "w", encoding="utf-8") as f:
         f.write(f"{tool['repo']} {state['commit']} {state.get('updated_at') or ''}\n")
 
 
 def upload(board: dict, user: str, password: str, name: str, local: dict, events, timeout: int = 60) -> None:
-    """Aracı tahtaya kopyalar (yalnız gerekiyorsa). Hata olursa ToolError."""
+    """Aracı cihaza kopyalar (yalnız gerekiyorsa). Hata olursa ToolError."""
     tool = TOOLS[name]
     if tool.get("kind") == "archive":
         return _upload_archive(board, user, password, name, local, events, timeout)
@@ -227,9 +227,9 @@ def upload(board: dict, user: str, password: str, name: str, local: dict, events
         ["sshpass", "-e", "ssh", "-T", *_SSH_OPTS, target, f"sha256sum {dst} 2>/dev/null | cut -d' ' -f1"],
         stdin=subprocess.DEVNULL, capture_output=True, env=env, timeout=timeout)
     if probe.returncode != 0:
-        raise ToolError(f"tahtaya bağlanılamadı: {probe.stderr.decode('utf-8', 'replace').strip() or probe.returncode}")
+        raise ToolError(f"cihaza bağlanılamadı: {probe.stderr.decode('utf-8', 'replace').strip() or probe.returncode}")
     if probe.stdout.decode().strip() == local["sha256"]:
-        events.add("info", f"{tool['title']}: tahtadaki kopya güncel ({dst}, sürüm {local['commit'][:7]}) — kopyalama atlandı")
+        events.add("info", f"{tool['title']}: cihazdaki kopya güncel ({dst}, sürüm {local['commit'][:7]}) — kopyalama atlandı")
         return
 
     events.add("info", f"{tool['title']}: SFTP ile kopyalanıyor → {dst} (sürüm {local['commit'][:7]})")
@@ -254,7 +254,7 @@ def upload(board: dict, user: str, password: str, name: str, local: dict, events
 # Örnek: bir eklentinin GUI'siz kullanılan sihirbazı (paket dizini + yardımcı araçlar). Kaynak başına sürüm
 # "release" ise son GitHub sürümünün etiketi, değilse dalın son commit'idir; günün ilk kullanımında (yerel
 # tarih) denetlenir, biri değişmişse bütün kaynaklar o sürümleriyle indirilip TEK arşivde birleştirilir.
-# Tahta her seferinde indirmez: tahtadaki kopyanın arşiv özeti (remote_dir/.ankamon-arsiv-sha256) aynıysa atlanır.
+# Cihaz her seferinde indirmez: cihazdaki kopyanın arşiv özeti (remote_dir/.ankamon-arsiv-sha256) aynıysa atlanır.
 
 _ARCHIVE_NAME = "arsiv.tar.gz"
 _ARCHIVE_MAX_BYTES = 64 << 20        # tek kaynak tarball'ının üst sınırı (yanlış depo/ref koruması)
@@ -380,7 +380,7 @@ def _ensure_archive(name: str, events) -> dict:
 
 
 def _upload_archive(board: dict, user: str, password: str, name: str, local: dict, events, timeout: int) -> None:
-    """Arşivi tahtaya kopyalayıp remote_dir'i atomik olarak değiştirir (yalnız arşiv özeti farklıysa)."""
+    """Arşivi cihaza kopyalayıp remote_dir'i atomik olarak değiştirir (yalnız arşiv özeti farklıysa)."""
     tool = TOOLS[name]
     dst = tool["remote_dir"].rstrip("/")
     target = f"{user}@{board['ip']}"
@@ -392,9 +392,9 @@ def _upload_archive(board: dict, user: str, password: str, name: str, local: dic
 
     probe = ssh(f"cat {dst}/{_ARCHIVE_MARK} 2>/dev/null; true")
     if probe.returncode != 0:
-        raise ToolError(f"tahtaya bağlanılamadı: {probe.stderr.decode('utf-8', 'replace').strip() or probe.returncode}")
+        raise ToolError(f"cihaza bağlanılamadı: {probe.stderr.decode('utf-8', 'replace').strip() or probe.returncode}")
     if probe.stdout.decode().strip() == local["sha256"]:
-        events.add("info", f"{tool['title']}: tahtadaki kopya güncel ({dst}, sürüm {local['commit']}) — kopyalama atlandı")
+        events.add("info", f"{tool['title']}: cihazdaki kopya güncel ({dst}, sürüm {local['commit']}) — kopyalama atlandı")
         return
 
     events.add("info", f"{tool['title']}: SFTP ile kopyalanıyor → {dst} (sürüm {local['commit']})")
@@ -410,5 +410,5 @@ def _upload_archive(board: dict, user: str, password: str, name: str, local: dic
             f'if [ -d "$d" ]; then mv "$d" "$d.old"; fi; mv "$d.new" "$d"; rm -rf "$d.old" "$t"')
     r = ssh(swap)
     if r.returncode != 0:
-        raise ToolError("arşiv tahtada açılamadı: " + (r.stderr.decode("utf-8", "replace").strip() or str(r.returncode)))
+        raise ToolError("arşiv cihazda açılamadı: " + (r.stderr.decode("utf-8", "replace").strip() or str(r.returncode)))
     events.add("info", f"{tool['title']}: kopyalandı ({os.path.getsize(local['path']) // 1024} KB)")

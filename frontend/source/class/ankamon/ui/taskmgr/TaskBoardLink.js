@@ -26,9 +26,9 @@
  */
 
 /**
- * Görev yöneticisinde TEK tahtanın canlı bağı: tahtaya Connection (WebSocket → SSH → tahta ajanı) ve ajan
+ * Görev yöneticisinde TEK cihazın canlı bağı: cihaza Connection (WebSocket → SSH → cihaz ajanı) ve ajan
  * çerçevelerinden kurulan model (süreç haritası, ağaç, uygulamalar, toplamlar, 60 sn geçmiş). Pencere (ui.taskmgr.Window)
- * seçili her tahta için bir bağ tutar — çoklu seçimde tek pencere, tahta başına bir bağ. Durum: "connecting" |
+ * seçili her cihaz için bir bağ tutar — çoklu seçimde tek pencere, cihaz başına bir bağ. Durum: "connecting" |
  * "open" | "closed" (closed'da getError() kapanış nedeni). Model değişince "updated" ({kind: snap|services|startup}),
  * bağlantı durumu değişince "changeLinkState" yayılır.
  */

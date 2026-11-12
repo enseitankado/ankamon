@@ -6,7 +6,7 @@ export DEBIAN_FRONTEND=noninteractive
 PORT="${PORT:-9100}"
 
 apt-get update -q || echo "Uyarı: paket listesi güncellenemedi, mevcut listeyle deneniyor." >&2
-# Önerilen paketler bilinçli olarak alınmaz: tahtaya sunucu donanımı yığını (ipmitool, openipmi) getirir.
+# Önerilen paketler bilinçli olarak alınmaz: cihaza sunucu donanımı yığını (ipmitool, openipmi) getirir.
 apt-get install -y --no-install-recommends prometheus-node-exporter lm-sensors
 
 DEFAULTS=/etc/default/prometheus-node-exporter
@@ -24,7 +24,7 @@ systemctl restart systemd-modules-load.service lm-sensors.service 2>/dev/null ||
 # (/etc/modules-load.d/ankamon-sensors.conf). node_exporter yeniden başlamadan ÖNCE yapılır ki fan devri,
 # CMOS pil gerilimi ve anakart sıcaklığı ilk okumadan itibaren sunulsun. Yonga desteklenmiyorsa hiçbir
 # şey kalıcı yazılmaz; bu adımın başarısızlığı kurulumu bozmaz. Çıktıdaki "[Super I/O]" satırı
-# MetricsApi::coverage'ın "bu tahtada denendi" işaretidir — metni değiştirirken orayı da güncelleyin.
+# MetricsApi::coverage'ın "bu cihazda denendi" işaretidir — metni değiştirirken orayı da güncelleyin.
 SUPERIO_CONF=/etc/modules-load.d/ankamon-sensors.conf
 superio_hwmon() {  # $1 = hwmon adı öneki → bulunan ilk hwmon adı
     for h in /sys/class/hwmon/hwmon*; do
@@ -51,8 +51,8 @@ for pair in it87:it87 nct6775:nct67 f71882fg:f71; do
         modprobe -r "$mod" 2>/dev/null || true
     fi
 done
-# Eski ad (tiha-mon) döneminin dosyası: kalıptan gelen tahtalarda başka anakartın modülünü (ör. AMD
-# tahtadan nct6775) taşıyabilir; açılışta "Failed to insert module ... No such device" bırakır. Bu tahtada
+# Eski ad (tiha-mon) döneminin dosyası: kalıptan gelen cihazlarda başka anakartın modülünü (ör. AMD
+# cihazdan nct6775) taşıyabilir; açılışta "Failed to insert module ... No such device" bırakır. Bu cihazda
 # çalışan sürücü zaten yukarıda bulunup yeni dosyaya yazıldığından eski dosya silinir.
 if [ -e /etc/modules-load.d/tiha-mon-sensors.conf ]; then
     rm -f /etc/modules-load.d/tiha-mon-sensors.conf
@@ -67,8 +67,8 @@ if [ -n "$superio_found" ]; then
     mv "$SUPERIO_CONF.tmp" "$SUPERIO_CONF"
     echo "[Super I/O] fan/pil/anakart sensörleri etkin:$superio_found (açılışta yüklenir: $SUPERIO_CONF)."
 else
-    rm -f "$SUPERIO_CONF"  # bu tahtada yüklenemeyen modül açılışa kalmasın
-    echo "[Super I/O] desteklenen anakart sensör yongası bulunamadı; fan devri, CMOS pili ve anakart sıcaklığı bu tahtada okunamaz."
+    rm -f "$SUPERIO_CONF"  # bu cihazda yüklenemeyen modül açılışa kalmasın
+    echo "[Super I/O] desteklenen anakart sensör yongası bulunamadı; fan devri, CMOS pili ve anakart sıcaklığı bu cihazda okunamaz."
 fi
 
 systemctl enable prometheus-node-exporter >/dev/null 2>&1

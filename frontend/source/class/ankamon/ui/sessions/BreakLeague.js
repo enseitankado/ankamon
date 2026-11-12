@@ -27,18 +27,18 @@
 
 /**
  * Oturumlar sayfasının "Teneffüs Ligi" sekmesi: ders aralarında (teneffüsler ve öğle arası — Ayarlar ▸ Ders saatleri'ndeki
- * ardışık dersler arası) en çok açık kalan tahtalar; günün, haftanın, ayın, dönemin ve eğitim-öğretim yılının sıralaması
- * (Şampiyonlar Ligi'nin tahta karşılığı — bkz. ui.sessions.ChampionsLeague, görünümü ortak). Açık kalınan süre ikiye
+ * ardışık dersler arası) en çok açık kalan cihazlar; günün, haftanın, ayın, dönemin ve eğitim-öğretim yılının sıralaması
+ * (Şampiyonlar Ligi'nin cihaz karşılığı — bkz. ui.sessions.ChampionsLeague, görünümü ortak). Açık kalınan süre ikiye
  * ayrılır: oturum AÇIKKEN (turuncu) ve oturum KAPALIYKEN, giriş ekranında (mavi); çubuk ikisinin toplamı. Sıralama ölçütü
  * seçilebilir (toplam / oturum açık / oturum kapalı). Veri /break-league'den (bkz. backend BreakLeagueApi). Sekme
- * göründükçe ve görünürken dakikada bir tazelenir. Görev gereği sürekli açık kalan tahtalar lig dışı bırakılabilir
+ * göründükçe ve görünürken dakikada bir tazelenir. Görev gereği sürekli açık kalan cihazlar lig dışı bırakılabilir
  * (ui.sessions.LeagueExclusions): varsayılan görünümde sayılmazlar, "Lig dışındakileri de göster" ile katılırlar;
- * tahta satırına sağ tıklayınca "Lig dışı bırak" / "Lige geri al".
+ * cihaz satırına sağ tıklayınca "Lig dışı bırak" / "Lige geri al".
  *
  * Bilgisayarlar / Kullanıcılar sekmesi (page.Leagues TABS): aynı üç ölçü (oturum açıkken / kapalıyken / toplam) kullanıcı adı bazında da
- * sıralanır (/break-league?by=users). Kullanıcı bazında oturum kapalı süre, tahtayı o açılışta oturumunu en son kapatıp
+ * sıralanır (/break-league?by=users). Kullanıcı bazında oturum kapalı süre, cihazı o açılışta oturumunu en son kapatıp
  * giriş ekranında açık bırakan kullanıcıya yazılır; açılıştan beri kimse oturum açmadıysa kimseye yazılmaz (kart
- * altında ayrıca gösterilir). etapadmin/root sayılmaz; kullanıcı lig dışı listesi tahta listesinden ayrıdır.
+ * altında ayrıca gösterilir). etapadmin/root sayılmaz; kullanıcı lig dışı listesi cihaz listesinden ayrıdır.
  */
 qx.Class.define("ankamon.ui.sessions.BreakLeague", {
   extend: qx.ui.tabview.Page,
@@ -78,7 +78,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
 
     this.__html = new qx.ui.embed.Html("").set({ overflowY: "auto" });
     this.add(this.__html, { flex: 1 });
-    // Tahta satırlarına sağ tık: "Lig dışı bırak" / "Lige geri al" (bkz. LeagueExclusions.attachRowMenu).
+    // Cihaz satırlarına sağ tık: "Lig dışı bırak" / "Lige geri al" (bkz. LeagueExclusions.attachRowMenu).
     ankamon.ui.sessions.LeagueExclusions.attachRowMenu(this.__html, { league: "break", page, onChange: () => this.load() });
 
     this.addListener("appear", () => this.load());
@@ -113,7 +113,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
     __loading: false,
     __reloadAfter: false,
 
-    /** "boards" (bilgisayar/tahta bazında) | "users" (kullanıcı adı bazında). */
+    /** "boards" (bilgisayar/cihaz bazında) | "users" (kullanıcı adı bazında). */
     __byKey() {
       return this.__byFixed;
     },
@@ -126,9 +126,9 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
       this.__legend.setValue(`${dot(C.session)} oturum açık &nbsp; ${dot(C.idle)} ` +
         (users ? "oturum kapalı (çıkışta açık bıraktığı)" : "oturum kapalı (giriş ekranı)"));
       this.__legend.setToolTipText(users
-        ? "Kullanıcı bazında: oturum açık = teneffüste kullanıcının kendi oturumu. Oturum kapalı = tahta giriş " +
-          "ekranında açık kalırken, tahtanın o açılışında oturumu en son kapatan kullanıcıya yazılan süre (tahtayı " +
-          "kapatmadan çıkan). Açıldığından beri kimsenin oturum açmadığı tahtanın süresi kimseye yazılmaz. " +
+        ? "Kullanıcı bazında: oturum açık = teneffüste kullanıcının kendi oturumu. Oturum kapalı = cihaz giriş " +
+          "ekranında açık kalırken, cihazın o açılışında oturumu en son kapatan kullanıcıya yazılan süre (cihazı " +
+          "kapatmadan çıkan). Açıldığından beri kimsenin oturum açmadığı cihazın süresi kimseye yazılmaz. " +
           "etapadmin ve root sayılmaz."
         : null);
     },
@@ -182,8 +182,8 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
         return `${rank}. ${r.full_name || r.username}` + (r.full_name ? ` (${r.username})` : "") +
           `\nTeneffüste: ${F.duration(r.seconds)}` +
           `\n  oturumu açıkken: ${F.duration(r.session_seconds)}` +
-          `\n  oturumu kapattıktan sonra tahtayı açık bıraktığı: ${F.duration(r.idle_seconds)}` +
-          `\n${r.days} gün · ${r.boards} tahta` + (r.board ? `\nEn çok: ${r.board}` : "") + (r.excluded ? "\n(sıralama dışı)" : "");
+          `\n  oturumu kapattıktan sonra cihazı açık bıraktığı: ${F.duration(r.idle_seconds)}` +
+          `\n${r.days} gün · ${r.boards} cihaz` + (r.board ? `\nEn çok: ${r.board}` : "") + (r.excluded ? "\n(sıralama dışı)" : "");
       }
       const share = r.break_seconds ? Math.round(r.seconds / r.break_seconds * 100) : 0;
       return `${rank}. ${r.board}` + (r.board !== r.host ? ` (${r.host})` : "") +
@@ -193,8 +193,8 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
     },
 
     /**
-     * Kartlar; users: kullanıcı adı bazında (satır = kullanıcı, alt satırda gün/tahta sayısı ve en çok süre biriktirdiği
-     * tahta; mavi kısım oturumunu kapatıp tahtayı açık bıraktığı süre). Görsel dil iki kipte aynı.
+     * Kartlar; users: kullanıcı adı bazında (satır = kullanıcı, alt satırda gün/cihaz sayısı ve en çok süre biriktirdiği
+     * cihaz; mavi kısım oturumunu kapatıp cihazı açık bıraktığı süre). Görsel dil iki kipte aynı.
      */
     __renderBreakLeague(periods, sort, boardCount, users) {
       const F = ankamon.util.Format;
@@ -210,7 +210,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
         : ankamon.ui.sessions.LeagueExclusions.rowAttrs("board", r.host, r.board, r.excluded);
       // "%24'ü/%51'i" ekleri sayıya göre değişir (ses uyumu): eksiz yazılır.
       const sub = r => users
-        ? `${r.days} gün · ${r.boards} tahta` + (r.board ? ` · en çok ${r.board}` : "")
+        ? `${r.days} gün · ${r.boards} cihaz` + (r.board ? ` · en çok ${r.board}` : "")
         : `${r.days} gün · teneffüs payı %${r.break_seconds ? Math.round(r.seconds / r.break_seconds * 100) : 0}`;
       const tip = (r, rank) => this.__breakTip(r, rank, users);
       // Tarih biçimleri Şampiyonlar Ligi ile aynı (ortak yardımcı yok: o sınıfın üyeleri; küçük kopya).
@@ -231,7 +231,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
           `<div class="lg-sub">${esc(p.label)} · ${esc(range(p))}</div></div>`;
         if (!rows.length) {
           return `<div class="lg-card">${head}<div class="lg-empty">` +
-            (users ? "Bu dönemde teneffüste süresi olan kullanıcı yok." : "Bu dönemde teneffüste açık kalan tahta yok.") +
+            (users ? "Bu dönemde teneffüste süresi olan kullanıcı yok." : "Bu dönemde teneffüste açık kalan cihaz yok.") +
             (p.excluded_count ? ` (${p.excluded_count} sıralama dışı sayılmadı)` : "") + `</div></div>`;
         }
         const scale = Math.max(...rows.map(r => r.seconds), 1);
@@ -252,10 +252,10 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
           `<span class="lg-time">${esc(F.duration(this.__metric(r, sort)))}</span></div>`).join("");
         const idle = p.total_seconds - p.total_session_seconds;
         const foot = `<div class="lg-foot">` +
-          (users ? `${p.participants} kullanıcı · ` : `${p.participants}${boardCount ? ` / ${boardCount}` : ""} tahta teneffüste açık kaldı · `) +
+          (users ? `${p.participants} kullanıcı · ` : `${p.participants}${boardCount ? ` / ${boardCount}` : ""} cihaz teneffüste açık kaldı · `) +
           `toplam ${esc(F.duration(p.total_seconds))} (oturum açık ${esc(F.duration(p.total_session_seconds))}, ` +
           `kapalı ${esc(F.duration(idle))})` +
-          // Kullanıcı bazında: tahta açıldığından beri kimse oturum açmadıysa oturumsuz süre kimseye yazılamaz.
+          // Kullanıcı bazında: cihaz açıldığından beri kimse oturum açmadıysa oturumsuz süre kimseye yazılamaz.
           (users && p.unassigned_idle_seconds
             ? ` · kimseye yazılamayan oturumsuz süre ${esc(F.duration(p.unassigned_idle_seconds))} (açılıştan beri oturum açılmamış)`
             : "") +

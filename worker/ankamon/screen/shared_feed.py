@@ -23,23 +23,23 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Salt izleme akışının paylaşımı: tahta başına TEK VNC bağlantısı, Ankamon'da bütün izleyicilere çoğaltılır.
+"""Salt izleme akışının paylaşımı: cihaz başına TEK VNC bağlantısı, Ankamon'da bütün izleyicilere çoğaltılır.
 
-Eskiden her tarayıcı kutucuğu tahtada kendi x11vnc'sini ve kendi SSH tünelini açıyordu: 5 kullanıcı aynı tahtaya
-bakınca tahtada 5 x11vnc ekranı ayrı ayrı yakalıyor, ağdan 5 kat görüntü geçiyordu. Şimdi salt izleme
-(önizleme kutucukları, tek tahta izleme, sohbet) için (tahta, profil) başına tek bir "yayın" kurulur:
+Eskiden her tarayıcı kutucuğu cihazda kendi x11vnc'sini ve kendi SSH tünelini açıyordu: 5 kullanıcı aynı cihaza
+bakınca cihazda 5 x11vnc ekranı ayrı ayrı yakalıyor, ağdan 5 kat görüntü geçiyordu. Şimdi salt izleme
+(önizleme kutucukları, tek cihaz izleme, sohbet) için (cihaz, profil) başına tek bir "yayın" kurulur:
 
-  tahta x11vnc (127.0.0.1, -once)  ←ssh -W→  yerel TCP ucu  ←  x11vnc -reflect (Ankamon'da, 127.0.0.1)
+  cihaz x11vnc (127.0.0.1, -once)  ←ssh -W→  yerel TCP ucu  ←  x11vnc -reflect (Ankamon'da, 127.0.0.1)
                                                                     ↑ izleyici başına bir TCP bağlantısı
                                                                     ↑ WebSocket köprüsü (bkz. __main__.py)
 
-Çoğaltıcı x11vnc'nin kendi "-reflect" kipidir (tahtadakiyle aynı açık kaynak paket): tahtaya tek istemci
+Çoğaltıcı x11vnc'nin kendi "-reflect" kipidir (cihazdakiyle aynı açık kaynak paket): cihaza tek istemci
 olarak bağlanır, gelen ekranı kendi çerçeve belleğinde tutar ve her izleyiciye ayrı ayrı (her birinin istediği
 kodlamayla, yeni katılana tam kare) sunar — RFB'yi elle çoğaltmak yerine. Yalnız 127.0.0.1'i dinler ve
 salt izlemedir (-viewonly). Müdahale (fare/klavye) bu yoldan geçmez: kullanıcının kendi özel bağlantısıdır.
 
 Son izleyici ayrılınca yayın LINGER_SECONDS bekler (sekmeler arası hızlı gidip gelme yayını yeniden kurmasın),
-sonra kapanır; tahtadaki x11vnc tünel kapanınca kendiliğinden biter. Yayın biterse (tahtada X yeniden başladı,
+sonra kapanır; cihazdaki x11vnc tünel kapanınca kendiliğinden biter. Yayın biterse (cihazda X yeniden başladı,
 ağ koptu) izleyicilerin bağlantısı 4010 ile kapanır, tarayıcı hemen yeniden bağlanır ve yeni yayın kurulur.
 "Tazele" (fresh — ör. ekran kilidi teyidi, bkz. screen/index.html refreshStream) yeni yayın kurar; hazır olunca
 eskisindeki izleyiciler 4010 ile yenisine geçer.
@@ -71,7 +71,7 @@ class FeedRefused(Exception):
 
 
 class ScreenFeed:
-    """(tahta, profil) başına tek yayın. start(): tahtada x11vnc + SSH tüneli + yerel çoğaltıcı."""
+    """(cihaz, profil) başına tek yayın. start(): cihazda x11vnc + SSH tüneli + yerel çoğaltıcı."""
 
     def __init__(self, key: tuple[int, str], name: str):
         self.key = key
@@ -88,10 +88,10 @@ class ScreenFeed:
         self._writers: set[asyncio.StreamWriter] = set()
 
     async def start(self, upstream, wait_ms: int, dim: str | None, ssh_argv: list[str], env: dict) -> None:
-        """upstream: tahtadaki x11vnc'nin portu. ssh_argv: `ssh -W 127.0.0.1:<port> hedef` komutu."""
+        """upstream: cihazdaki x11vnc'nin portu. ssh_argv: `ssh -W 127.0.0.1:<port> hedef` komutu."""
 
         async def tunnel(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-            # Yerel uca yalnız çoğaltıcı bağlanır (tek bağlantı; tahtadaki x11vnc -once).
+            # Yerel uca yalnız çoğaltıcı bağlanır (tek bağlantı; cihazdaki x11vnc -once).
             proc = await asyncio.create_subprocess_exec(
                 *ssh_argv, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL, env=env)
@@ -117,10 +117,10 @@ class ScreenFeed:
                     proc.kill()
                 self._tunnels.discard(proc)
                 writer.close()
-                # Tahta tarafı bitti (X yeniden başladı, ağ koptu, x11vnc çıktı): çoğaltıcı bunu fark edip
+                # Cihaz tarafı bitti (X yeniden başladı, ağ koptu, x11vnc çıktı): çoğaltıcı bunu fark edip
                 # kendiliğinden çıkmıyor (2026-11-05 denendi), son kareyi sonsuza dek sunardı — yayın burada biter.
                 if not self.ended:
-                    log.info("%s: tahta bağlantısı bitti, paylaşılan yayın kapanıyor (%s)", self.name, self.key[1])
+                    log.info("%s: cihaz bağlantısı bitti, paylaşılan yayın kapanıyor (%s)", self.name, self.key[1])
                     asyncio.ensure_future(self.stop())
 
         self._server = await asyncio.start_server(tunnel, "127.0.0.1", 0)
@@ -195,7 +195,7 @@ def _forget(feed: ScreenFeed) -> None:
 
 
 def active_count() -> int:
-    """Tahtaya açık (ya da açılmakta olan) paylaşılan yayın sayısı — eşzamanlı akış sınırına sayılır."""
+    """Cihaza açık (ya da açılmakta olan) paylaşılan yayın sayısı — eşzamanlı akış sınırına sayılır."""
     return len(_feeds)
 
 

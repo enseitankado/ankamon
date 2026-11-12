@@ -35,8 +35,8 @@ use Ankamon\Core\Db;
 use Ankamon\Core\Request;
 
 /**
- * Komut logları: tahtalarda çalıştırılan komutların kaydı; tahta/kullanıcı/zaman/metin ile süzülür.
- * Kaynak "local": tahtadaki kullanıcının kendi sudo/pkexec/su komutu — syslog gelirken tetikleyiciyle
+ * Komut logları: cihazlarda çalıştırılan komutların kaydı; cihaz/kullanıcı/zaman/metin ile süzülür.
+ * Kaynak "local": cihazdaki kullanıcının kendi sudo/pkexec/su komutu — syslog gelirken tetikleyiciyle
  * kopyalanır (bkz. db/migrations/028_local_command_log.sql), syslog silinse de burada kalır.
  * Sayfalama `offset` + `limit` ile; `more` sonraki sayfayı, `count=1` toplamı bildirir (bkz. LogsApi).
  */

@@ -27,16 +27,16 @@
 
 /**
  * Bilgisayar ayrıntıları penceresi (kullanıcı isteği 2026-11-09): Ağ ▸ Varlıklar'da satıra çift tıklama / sağ menü
- * "Bilgisayar ayrıntıları" / "Düzenle" ve Ağ ▸ Akıllı Tahtalar'daki "Düzenle" (eski "Tahtayı düzenle" penceresinin
+ * "Bilgisayar ayrıntıları" / "Düzenle" ve Ağ ▸ Akıllı Tahtalar'daki "Düzenle" (eski "Cihazı düzenle" penceresinin
  * yerini aldı — bkz. ui.BoardOps.editBoard). Düzenle kipinde açılır, alttaki düğme "Kaydet".
  *
  * Sekmeler:
  *  - Genel: cihazın ağ envanteri kaydının düzenlenebilir alanları (network.manage) + bütün bilgiler (salt okunur,
  *    seçilip kopyalanabilir)
- *  - Tahta: cihaz Tahtalar'da kayıtlıysa tahtaya özel düzenlenebilir alanlar (kablosuz MAC, konum, sensör portu…;
- *    boards.manage). Alanlar ui.BoardOps.boardForm'dan gelir — tahtaya eklenen yeni alan burada kendiliğinden görünür.
+ *  - Cihaz: cihaz Cihazlar'da kayıtlıysa cihaza özel düzenlenebilir alanlar (kablosuz MAC, konum, sensör portu…;
+ *    boards.manage). Alanlar ui.BoardOps.boardForm'dan gelir — cihaza eklenen yeni alan burada kendiliğinden görünür.
  *  - Portlar ve paylaşımlar: açık portlar/servisler ve ağ paylaşımları (varsa)
- * Kaydet yalnız değişen kaydı (cihaz ve/veya tahta) yazar.
+ * Kaydet yalnız değişen kaydı (cihaz ve/veya cihaz) yazar.
  */
 qx.Class.define("ankamon.ui.network.DeviceWindow", {
   type: "static",
@@ -52,7 +52,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
     },
 
     /**
-     * @param opts {Map} {device?: ağ envanteri satırı (NetworkApi devices), board?: tahta ({id} yeter),
+     * @param opts {Map} {device?: ağ envanteri satırı (NetworkApi devices), board?: cihaz ({id} yeter),
      *   user?: oturum sahibi (yoksa /auth/me), onSaved?: Function}
      */
     async open(opts) {
@@ -101,7 +101,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         ["Son log", d.last_log_at ? F.dateTime(d.last_log_at * 1000) : "log gelmedi"],
         ["Keşif", discovery || "—"],
         ["Faz", F.etap(d.etap) || "—"],
-        ["Tahta kaydı", d.board_name ? `${d.board_name} (Akıllı Tahtalar'da kayıtlı)` : "yok"],
+        ["Cihaz kaydı", d.board_name ? `${d.board_name} (Akıllı Tahtalar'da kayıtlı)` : "yok"],
         ["Not", d.notes || "—"]
       ].map(([k, v]) => [k, String(v ?? "").replace(/<[^>]+>/g, "").trim() || "—"]);
     },
@@ -131,7 +131,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
     __show(device, board, user, onSaved) {
       const can = f => user.is_admin || (user.features || []).includes(f);
       const Ops = ankamon.ui.network.Ops;
-      // Tahtaya bağlı cihazda başlık da grid'deki tahta adı (tek takma ad — Genel ▸ Takma ad ile aynı).
+      // Cihaza bağlı cihazda başlık da grid'deki cihaz adı (tek takma ad — Genel ▸ Takma ad ile aynı).
       const name = (board && board.label) || (device ? (Ops.deviceName(device) || device.ip || device.mac) : (board.hostname || board.ip || board.mac));
       const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
       const win = ankamon.ui.Dialog.window("Bilgisayar ayrıntıları — " + name, Math.min(760, root.width - 40), { maximizable: true });
@@ -148,13 +148,13 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         if (can("network.manage")) {
           deviceForm = new ankamon.ui.Form();
           // Tek takma ad (kullanıcı bildirimi 2026-11-10: pencerede düzenlenen ad Akıllı Tahtalar grid'ine yansımıyordu — Genel'deki
-          // ağ envanteri adı, Tahta'daki tahta kaydı adıydı). Tahtaya bağlı cihazda değer grid'deki tahta adıdır; kaydedince
+          // ağ envanteri adı, Cihaz'daki cihaz kaydı adıydı). Cihaza bağlı cihazda değer grid'deki cihaz adıdır; kaydedince
           // ikisine de yazılır (Varlıklar ve Akıllı Tahtalar aynı adı gösterir).
           deviceForm.text("label", "Takma ad", board ? (board.label || device.label) : device.label, "ör. Müdür odası yazıcısı")
             .setToolTipText(board ? "Varlıklar ve Akıllı Tahtalar'da aynı ad (ikisine de kaydedilir)" : null);
           // Salt okunur (kullanıcı isteği 2026-11-11): keşiften gelir, Kaydet göndermez.
           deviceForm.text("ip", "IP adresi", device.ip).set({ readOnly: true, toolTipText:
-            "En son keşifte (ağ taraması ya da tahtanın logları) görülen adres; cihaz yeni adreste görülünce kendiliğinden güncellenir." });
+            "En son keşifte (ağ taraması ya da cihazın logları) görülen adres; cihaz yeni adreste görülünce kendiliğinden güncellenir." });
           deviceForm.text("hostname", "Bilgisayar adı", device.hostname);
           typeBox = new qx.ui.form.ComboBox().set({ value: device.device_type_manual || "",
             placeholder: device.type_auto ? `otomatik: ${device.type_auto}` : "otomatik" });
@@ -171,10 +171,10 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         tabs.add(general);
       }
 
-      // Tahta: tahtaya özel düzenlenebilir alanlar (boardForm — tek liste).
+      // Cihaz: cihaza özel düzenlenebilir alanlar (boardForm — tek liste).
       let boardFields = null;
       if (board) {
-        const page = this.__page("Tahta");
+        const page = this.__page("Cihaz");
         const body = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
         if (can("boards.manage")) {
           boardFields = ankamon.ui.BoardOps.boardForm(board, { noLabel: !!deviceForm });
@@ -186,7 +186,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
           ["Bilgisayar adı", board.hostname || "—"],
           ["Durum", (board.alive ?? board.online) ? "Çevrim içi" : "Çevrim dışı"],
           ["Yönetilebilir", (board.manageable ?? board.online) ? "Evet (SSH ile oturum açılabiliyor)"
-            : board.ssh_login_failing ? "Hayır — SSH portu açık ama root girişi reddediliyor (tahtanın parolası farklı; Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları)"
+            : board.ssh_login_failing ? "Hayır — SSH portu açık ama root girişi reddediliyor (cihazın parolası farklı; Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları)"
               : "Hayır (SSH yanıt vermiyor)"],
           ["Son log", board.last_log_at ? F.dateTime(board.last_log_at * 1000) : "—"],
           ["Model", facts.product || "—"],
@@ -200,7 +200,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
           ["Wi-Fi kartı", [facts.wifi_chip, facts.wifi_driver ? `(${facts.wifi_driver} sürücüsü)` : ""].filter(Boolean).join(" ") || "—"],
           ["Wi-Fi bantları", ankamon.ui.network.DeviceWindow.bands(facts)]
         ];
-        body.add(new qx.ui.basic.Label("Tahta bilgileri").set({ font: "bold", marginTop: 6 }));
+        body.add(new qx.ui.basic.Label("Cihaz bilgileri").set({ font: "bold", marginTop: 6 }));
         body.add(this.__htmlTable(null, ["Alan", "Değer"], info, [170, "1*"], plain));
         page.add(new qx.ui.container.Scroll(body), { flex: 1 });
         tabs.add(page);
@@ -232,14 +232,14 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         tabs.add(page);
       }
       if (!device) {
-        win.add(new qx.ui.basic.Label("Bu tahta ağ taramasında henüz görülmedi; yalnız tahta kaydı gösteriliyor.")
+        win.add(new qx.ui.basic.Label("Bu cihaz ağ taramasında henüz görülmedi; yalnız cihaz kaydı gösteriliyor.")
           .set({ textColor: "app-muted", rich: true, wrap: true, padding: [0, 0, 4, 0] }));
       }
       win.add(tabs, { flex: 1 });
 
       const buttons = [];
-      // Loglar (kullanıcı isteği 2026-11-11: Tahtalar/Varlıklar sağ menüsünden buraya taşındı): Loglar sayfasını bu
-      // tahtaya süzülmüş açar (bkz. ui.Shell.OPEN_LOGS).
+      // Loglar (kullanıcı isteği 2026-11-11: Cihazlar/Varlıklar sağ menüsünden buraya taşındı): Loglar sayfasını bu
+      // cihaza süzülmüş açar (bkz. ui.Shell.OPEN_LOGS).
       if (board && can("logs")) {
         const logs = new qx.ui.form.Button("Loglar").set({ toolTipText: "Loglar sayfasını bu bilgisayarın loglarına süzülmüş açar" });
         logs.addListener("execute", () => {
@@ -262,7 +262,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
           if (boardFields) {
             boardValues = boardFields.read();
             if (!boardValues) {
-              tabs.setSelection([tabs.getChildren().find(p => p.getLabel() === "Tahta")]);
+              tabs.setSelection([tabs.getChildren().find(p => p.getLabel() === "Cihaz")]);
               return;
             }
           }
@@ -277,10 +277,10 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
             }
             if (boardValues) {
               if (label !== null) {
-                boardValues.label = label; // tek takma ad: tahta kaydına da
+                boardValues.label = label; // tek takma ad: cihaz kaydına da
               }
-              // Varlık türü "Akıllı tahta" → tahta kaydı da tahta sayılır (eski "Bu bir akıllı tahtadır" işaretinin yerine;
-              // MAC'i ETAP öneklerine uymayan tahtanın IP'si loglarından güncellensin — worker tasks/boards_from_logs).
+              // Varlık türü "Akıllı tahta" → cihaz kaydı da cihaz sayılır (eski "Bu bir akıllı tahtadır" işaretinin yerine;
+              // MAC'i ETAP öneklerine uymayan cihazın IP'si loglarından güncellensin — worker tasks/boards_from_logs).
               if (typeBox && (typeBox.getValue() || "").trim() === "Akıllı tahta") {
                 boardValues.smart_board = true;
               }

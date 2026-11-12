@@ -29,7 +29,7 @@
  * "Durum" sütunu için hücre çizici: çevrim içi metni (ve soluna konan küçük yuvarlak) yeşil, çevrim
  * dışı metni kırmızı çizilir — renkler etkin temadan (app-ok / app-error; koyu temalarda da okunur).
  * Alt satırlar (port/paylaşım — "açık"/"paylaşım") renk almaz, metni olduğu gibi gösterilir. Değere
- * göre karar verir: Ağ "Çevrim içi"/"Çevrim dışı", Tahtalar "Çevrimiçi"/"Kapalı".
+ * göre karar verir: Ağ "Çevrim içi"/"Çevrim dışı", Cihazlar "Çevrimiçi"/"Kapalı".
  *
  * İpucu (kullanıcı isteği 2026-11-10: Varlıklar, Akıllı Tahtalar ve varlık gruplarında Durum hücresinin ipucu = o satırın
  * "Son görülme" hücresi): seenColumn verilirse satırın o model sütunundaki değer title olarak yazılır (ui.ToolTipPolicy gösterir).

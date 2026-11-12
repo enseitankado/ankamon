@@ -26,13 +26,13 @@
  */
 
 /**
- * Oturumlar sayfasının "Şampiyonlar Ligi" sekmesi: tahtalarda en uzun süre oturum açık tutan kullanıcılar — günün,
+ * Oturumlar sayfasının "Şampiyonlar Ligi" sekmesi: cihazlarda en uzun süre oturum açık tutan kullanıcılar — günün,
  * haftanın, ayın, dönemin ve eğitim-öğretim yılının şampiyonları. Her dönem bir kart: üstte ilk üç kürsüde
- * (altın/gümüş/bronz), altta ilk on yatay çubukla (çubuk boyu liderin süresine göre; lider vurgulu). Tahtanın yönetici
+ * (altın/gümüş/bronz), altta ilk on yatay çubukla (çubuk boyu liderin süresine göre; lider vurgulu). Cihazın yönetici
  * ve sistem hesabı (etapadmin, root) sıralamaya girmez. Veri /session-league'den (bkz. backend SessionLeagueApi):
  * oturum kayıtları ya da loglar silinse de korunan ayrı tablodan (session_league_parts) gelir. Sekme göründükçe ve
- * görünürken dakikada bir tazelenir. Kullanıcılar ya da tahtalar (en uzun süre oturumlu kalan tahtalar) ayrı sekmede
- * sıralanır (page.Leagues TABS). Görev gereği sürekli oturumlu kalan kullanıcı/tahtalar lig dışı bırakılabilir (ui.sessions.LeagueExclusions):
+ * görünürken dakikada bir tazelenir. Kullanıcılar ya da cihazlar (en uzun süre oturumlu kalan cihazlar) ayrı sekmede
+ * sıralanır (page.Leagues TABS). Görev gereği sürekli oturumlu kalan kullanıcı/cihazlar lig dışı bırakılabilir (ui.sessions.LeagueExclusions):
  * varsayılan görünümde sayılmazlar, "Lig dışındakileri de göster" ile soluk ve etiketli katılırlar. Kart satırına sağ
  * tıklayınca "Lig dışı bırak" / "Lige geri al".
  */
@@ -138,7 +138,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
         const data = await ankamon.io.Api.get(`/session-league?by=${by}` + (this.__out.withExcluded() ? "&with_excluded=1" : ""));
         this.__out.setInfo(data.excluded);
         this.__renderLeague(data.periods || [], by === "boards");
-        this.__status.setValue("Tahtalarda açık kalınan toplam oturum süresine göre · etapadmin ve root sayılmaz · " +
+        this.__status.setValue("Cihazlarda açık kalınan toplam oturum süresine göre · etapadmin ve root sayılmaz · " +
           "güncelleme: " + new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
       } catch (e) {
         this.__status.setValue("Yüklenemedi: " + (e.message || e));
@@ -178,8 +178,8 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
           (r.top_user ? `\nEn çok kullanan: ${r.top_user}` : "") + out;
       }
       return `${rank}. ${r.full_name || r.username}` + (r.full_name ? ` (${r.username})` : "") +
-        `\nToplam: ${F.duration(r.seconds)}\n${r.days} gün · ${r.sessions} oturum · ${r.boards} tahta` +
-        (r.board ? `\nEn çok kullandığı tahta: ${r.board}` : "") + out;
+        `\nToplam: ${F.duration(r.seconds)}\n${r.days} gün · ${r.sessions} oturum · ${r.boards} cihaz` +
+        (r.board ? `\nEn çok kullandığı cihaz: ${r.board}` : "") + out;
     },
 
     /** Kart altı: dönemde süresi olan lig dışı sayısı (gizliyse "sayılmadı", gösteriliyorsa "dahil"). */
@@ -195,7 +195,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
       const name = r => esc(boards ? r.board : (r.full_name || r.username));
       const sub = r => boards ? r.top_user : r.board;
       const shown = this.__out.withExcluded();
-      // Sağ tık menüsünün kimliği: kullanıcı adı ya da tahta host adı (league_exclusions.value).
+      // Sağ tık menüsünün kimliği: kullanıcı adı ya da cihaz host adı (league_exclusions.value).
       const menuAttrs = r => ankamon.ui.sessions.LeagueExclusions.rowAttrs(boards ? "board" : "user",
         boards ? r.host : r.username, boards ? r.board : (r.full_name || r.username), r.excluded);
 
@@ -222,7 +222,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
           `<span class="lg-name">${name(r)}${sub(r) || r.excluded ? `<small>${outTag(r)}${esc(sub(r) || "")}</small>` : ""}</span>` +
           `<span class="lg-track"><span class="lg-bar" style="width:${Math.max(2, r.seconds / top * 100).toFixed(1)}%"></span></span>` +
           `<span class="lg-time">${esc(F.duration(r.seconds))}</span></div>`).join("");
-        const foot = `<div class="lg-foot">${p.participants} ${boards ? "tahta" : "kullanıcı"} · toplam ${esc(F.duration(p.total_seconds))}` +
+        const foot = `<div class="lg-foot">${p.participants} ${boards ? "cihaz" : "kullanıcı"} · toplam ${esc(F.duration(p.total_seconds))}` +
           (p.participants > rows.length ? ` · ilk ${rows.length} gösteriliyor` : "") + this.leagueOutNote(p, shown) + `</div>`;
         return `<div class="lg-card">${head}<div class="lg-podium">${podium}</div><div class="lg-bars">${bars}</div>${foot}</div>`;
       };

@@ -29,8 +29,8 @@
  * Ayrıntılar (Windows Görev Yöneticisi gibi): her süreç bir satır — Ad, PID, Durum, Kullanıcı adı, CPU, Bellek,
  * Açıklama (komut satırı); isteğe bağlı sütunlar (sütun menüsü): Öncelik, İş parçacıkları, Disk, Ağ, Üst PID,
  * CPU süresi, Görüntü yolu. Sağ menü: Görevi sonlandır, İşlem ağacını sonlandır, Önceliği ayarla, Benzeşimi
- * ayarla, Verimlilik modu, Hizmetlere git, Dosya konumunu aç, Çevrimiçi ara, Özellikler. Çok tahtada bütün
- * tahtaların süreçleri tek tabloda ("Bilgisayar" sütunu); işlemler satırın tahtasına gider.
+ * ayarla, Verimlilik modu, Hizmetlere git, Dosya konumunu aç, Çevrimiçi ara, Özellikler. Çok cihazda bütün
+ * cihazların süreçleri tek tabloda ("Bilgisayar" sütunu); işlemler satırın cihazına gider.
  */
 qx.Class.define("ankamon.ui.taskmgr.DetailsTab", {
   extend: ankamon.ui.taskmgr.Tab,
@@ -167,7 +167,7 @@ qx.Class.define("ankamon.ui.taskmgr.DetailsTab", {
             F.cpuTime(p.ticks / (m.hz || 100)), p.exe || "", board]);
         });
       });
-      // Kullanıcı sütun başlığından sıralama seçmediyse ada göre (Windows varsayılanı; çok tahtada aynı ad tahtaya
+      // Kullanıcı sütun başlığından sıralama seçmediyse ada göre (Windows varsayılanı; çok cihazda aynı ad cihaza
       // göre); seçtiyse o sıralama korunur (tablo modeli uygular).
       const tm = this.__table.getTableModel();
       if (tm.getSortColumnIndex() < 0) {

@@ -23,16 +23,16 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Sağ menü Ekran ▸ Klavye / Fare / Dokunmatik kilitle: tahtanın giriş aygıtlarını Ankamon'dan açılana dek kapatır.
+"""Sağ menü Ekran ▸ Klavye / Fare / Dokunmatik kilitle: cihazın giriş aygıtlarını Ankamon'dan açılana dek kapatır.
 
-Tahtada xinput yok; X'ten bağımsız, daha güçlü yol kullanılır: bekçi (systemd, root) /dev/input/event* aygıtlarını
+Cihazda xinput yok; X'ten bağımsız, daha güçlü yol kullanılır: bekçi (systemd, root) /dev/input/event* aygıtlarını
 EVIOCGRAB ile tek başına tutar — olaylar X'e de metin konsoluna da ulaşmaz; X yeniden başlasa, oturum değişse ya da aygıt
 sonradan takılsa da (2 sn'de bir yeniden taranır) kilit sürer, yeniden açılışta da devam eder.
 Kilitler birbirinden bağımsızdır, birkaçı birlikte tutulabilir:
   keyboard: klavye sınıfı aygıtlar, aynı USB klavyenin ses/medya/uyku düğümleri + ekran klavyesi (eta-keyboard çalışmaz).
   mouse:    fare + dokunma (fare kilidi dokunmayı da kapatır).
   touch:    yalnız dokunma; fare çalışır.
-"Ekranı yönet" (x11vnc, XTEST) bu kilitlerden etkilenmez: yönetici kilitli tahtaya müdahale edebilir.
+"Ekranı yönet" (x11vnc, XTEST) bu kilitlerden etkilenmez: yönetici kilitli cihaza müdahale edebilir.
 
 Kurulum: /var/lib/ankamon-input/{lock.py, keyboard|mouse|touch (bayrak dosyaları), log} ve
 /etc/systemd/system/ankamon-input-lock.service; son kilit açılınca hepsi silinir. Oturum yoklaması SCRIPT'teki "I"
@@ -47,7 +47,7 @@ DIR = "/var/lib/ankamon-input"
 UNIT = "ankamon-input-lock.service"
 DEVICES = ("keyboard", "mouse", "touch")
 
-# if/fi: yoklama betiğinin son satırları kilitsiz tahtada betiği hata koduyla bitirmesin (bkz. screenlock.SCRIPT).
+# if/fi: yoklama betiğinin son satırları kilitsiz cihazda betiği hata koduyla bitirmesin (bkz. screenlock.SCRIPT).
 SCRIPT = f"""
 if [ -d {DIR} ]; then echo "I $(cd {DIR} && ls keyboard mouse touch 2>/dev/null | xargs)"; fi
 """
@@ -201,7 +201,7 @@ WantedBy=multi-user.target
 """
 
 _LOCK = f"""
-command -v python3 >/dev/null 2>&1 || {{ echo "Tahtada python3 yok." >&2; exit 3; }}
+command -v python3 >/dev/null 2>&1 || {{ echo "Cihazda python3 yok." >&2; exit 3; }}
 D={DIR}
 mkdir -p "$D"; chmod 700 "$D"
 cat > "$D/lock.py" <<'ANKAMON_EOF'

@@ -23,20 +23,20 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Ekran köprüsü: ws://127.0.0.1:8890/screen/ws/<tahta id>?q=view|thumb (nginx /screen/ws/ vekiller).
+"""Ekran köprüsü: ws://127.0.0.1:8890/screen/ws/<cihaz id>?q=view|thumb (nginx /screen/ws/ vekiller).
 
-Salt izleme (q=thumb|view|chat) paylaşılır: (tahta, profil) başına tek yayın — tahtada tek x11vnc, tek
+Salt izleme (q=thumb|view|chat) paylaşılır: (cihaz, profil) başına tek yayın — cihazda tek x11vnc, tek
 `ssh -W` tüneli, Ankamon'da x11vnc -reflect çoğaltıcısı; her WebSocket çoğaltıcıya bir TCP bağlantısıdır
 (bkz. shared_feed.py; `fresh=1` yeni yayın kurdurur). Müdahale (control=1) paylaşılmaz: bağlantı başına
-tahtada girdi kabul eden ayrı bir x11vnc (remote.start_command) ve `ssh -W 127.0.0.1:<port>` tüneli;
+cihazda girdi kabul eden ayrı bir x11vnc (remote.start_command) ve `ssh -W 127.0.0.1:<port>` tüneli;
 tünelin stdout'u WebSocket'e, tarayıcıdan gelen baytlar tünelin stdin'ine yazılır. Yetki nginx auth_request'te (oturum + "screen") denetlenir; köprü yalnız
 127.0.0.1'i dinler. `control=1` (fare/klavye ile müdahale) yalnız nginx'in oturumdan doldurduğu
 X-Auth-Control: 1 başlığı varsa ("screen.control" yetkisi) kabul edilir; yoksa 4030 ile kapanır.
-Tek tahta izleme ve müdahale oturumları komut loglarına (source=screen) ve etkinlik günlüğüne yazılır.
+Tek cihaz izleme ve müdahale oturumları komut loglarına (source=screen) ve etkinlik günlüğüne yazılır.
 
 Kapanış kodları (tarayıcıdaki /screen/ sayfası bunları Türkçe iletiye çevirir):
-  4001 tahta yok/IP'si yok · 4002 SSH ile ulaşılamadı · 4003 SSH girişi reddedildi
-  4004 tahtada x11vnc kurulu değil (otomatik kurulum kapalı) · 4005 x11vnc hatası
+  4001 cihaz yok/IP'si yok · 4002 SSH ile ulaşılamadı · 4003 SSH girişi reddedildi
+  4004 cihazda x11vnc kurulu değil (otomatik kurulum kapalı) · 4005 x11vnc hatası
   4006 x11vnc otomatik kuruluyor ("job <id>") · 4007 otomatik kurulum yakın zamanda başarısız oldu
   4010 paylaşılan yayın bitti/tazelendi (tarayıcı hemen yeniden bağlanır)
   4029 eşzamanlı izleme sınırı aşıldı (paylaşılan yayın + müdahale bağlantısı sayısı) · 4030 müdahale yetkisi yok
@@ -75,7 +75,7 @@ _streams = 0
 
 
 def _lookup(board_id: int):
-    """Tahta adresi + SSH erişimi."""
+    """Cihaz adresi + SSH erişimi."""
     with db.connect() as conn:
         board = conn.execute(
             "SELECT host(ip) AS ip, coalesce(nullif(label, ''), hostname, host(ip)) AS name FROM boards WHERE id = %s",
@@ -88,7 +88,7 @@ def _lookup(board_id: int):
 
 
 def _record(board_id: int, name: str, user: str, control: bool) -> None:
-    """Başarıyla açılan tek tahta izleme/müdahale oturumunu komut loglarına ve etkinlik günlüğüne yazar."""
+    """Başarıyla açılan tek cihaz izleme/müdahale oturumunu komut loglarına ve etkinlik günlüğüne yazar."""
     what = "ekran yönetimi (fare/klavye) oturumu açıldı" if control else "ekran izleme oturumu açıldı"
     with db.connect() as conn:
         conn.execute(
@@ -105,11 +105,11 @@ VNC_RETRY_AFTER_FAIL_MIN = 10       # başarısız otomatik kurulum bu kadar dak
 
 
 def _autoinstall(board_id: int, name: str, username: str) -> tuple[int, str]:
-    """Tahtada x11vnc yok (4004): ayar açıksa kurulumu arka plan görevi olarak başlatır.
+    """Cihazda x11vnc yok (4004): ayar açıksa kurulumu arka plan görevi olarak başlatır.
 
     Döner: (4006, "job <id>") kurulum sürüyor/başlatıldı · (4007, "job <id>") son
     VNC_RETRY_AFTER_FAIL_MIN dakikada başarısız olmuş (sonsuz döngüye girmesin) · (4004, ...) ayar kapalı.
-    Aynı tahtanın onlarca kutucuğu aynı anda buraya gelebilir: görev tahta başına danışma kilidi
+    Aynı cihazın onlarca kutucuğu aynı anda buraya gelebilir: görev cihaz başına danışma kilidi
     altında, tek transaction'da açılır — yinelenen kurulum olmaz. Görev olağan "action" görevidir
     (runner çalıştırır; Görevler/komut loglarında görünür) ama arayüzde çıktı penceresi açılmaz.
     """
@@ -137,15 +137,15 @@ def _autoinstall(board_id: int, name: str, username: str) -> tuple[int, str]:
             ).fetchone()["id"]
             conn.execute("INSERT INTO job_targets (job_id, board_id) VALUES (%s, %s)", (job_id, board_id))
             conn.execute("SELECT pg_notify('ankamon_jobs', %s)", (str(job_id),))
-            activity.record(conn, f"Ekranlar: {name} tahtasında x11vnc yok — ekran istemcisi otomatik kuruluyor")
+            activity.record(conn, f"Ekranlar: {name} cihazında x11vnc yok — ekran istemcisi otomatik kuruluyor")
     log.info("%s: x11vnc yok, otomatik kurulum görevi #%s başlatıldı", name, job_id)
     return 4006, f"job {job_id}"
 
 
 class ScreenSocket(tornado.websocket.WebSocketHandler):
-    """Salt izleme (önizleme, tek tahta izleme, sohbet) paylaşılan yayına katılır — tahta başına tek VNC
+    """Salt izleme (önizleme, tek cihaz izleme, sohbet) paylaşılan yayına katılır — cihaz başına tek VNC
     bağlantısı, bütün izleyicilere Ankamon'da çoğaltılır (bkz. shared_feed.py). Müdahale (control=1)
-    kullanıcının kendi özel bağlantısıdır: tahtada girdi kabul eden ayrı bir x11vnc + kendi SSH tüneli."""
+    kullanıcının kendi özel bağlantısıdır: cihazda girdi kabul eden ayrı bir x11vnc + kendi SSH tüneli."""
 
     proc: asyncio.subprocess.Process | None = None
     counted = False
@@ -171,9 +171,9 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
         board, ssh_user, password = found
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
         target = f"{ssh_user}@{board['ip']}"
-        # Önizleme kutucukları (onlarca tahta) günlüğü doldurmasın; yalnız tek tahta izlemesi ve
+        # Önizleme kutucukları (onlarca cihaz) günlüğü doldurmasın; yalnız tek cihaz izlemesi ve
         # müdahale yazılır — ve yalnız ekran paylaşımı gerçekten başladıysa (başarısız denemeler değil).
-        # nolog=1: Tahtalar sayfasının "Ekranlar" önizleme sekmesi (kullanıcı isteği: önizleme komut
+        # nolog=1: Cihazlar sayfasının "Ekranlar" önizleme sekmesi (kullanıcı isteği: önizleme komut
         # loguna yansımaz — oradan tam ekrana büyütülen kutucuk da). Müdahale her durumda yazılır.
         nolog = self.get_argument("nolog", "0") == "1"
         if control:
@@ -211,7 +211,7 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
 
     async def _start_remote(self, board_id: int, board: dict, user: str, env: dict, target: str,
                             profile: str, control: bool) -> tuple[int, str | None]:
-        """Tahtada x11vnc'yi 127.0.0.1'inde başlatır; (port, gerçek çözünürlük) döner. Hata: FeedRefused."""
+        """Cihazda x11vnc'yi 127.0.0.1'inde başlatır; (port, gerçek çözünürlük) döner. Hata: FeedRefused."""
         start = await asyncio.create_subprocess_exec(
             "sshpass", "-e", "ssh", *_SSH_OPTS, target, remote.start_command(profile, control),
             stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
@@ -228,7 +228,7 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
             err_text = err.decode(errors="replace").strip()
             code, reason = self._close_reason(start.returncode or 4, err_text)
             if code == 4004:
-                # Tahta ağda ve SSH çalışıyor ama x11vnc yok: ayara göre arka planda kur (bkz. _autoinstall).
+                # Cihaz ağda ve SSH çalışıyor ama x11vnc yok: ayara göre arka planda kur (bkz. _autoinstall).
                 code, reason = await asyncio.to_thread(_autoinstall, board_id, board["name"], user)
             else:
                 log.info("%s: ekran paylaşımı başlatılamadı (çıkış %s): %s", board["name"], start.returncode, err_text[-200:])
@@ -261,7 +261,7 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
 
     async def _pump_shared(self, reader: asyncio.StreamReader, name: str):
         """Çoğaltıcı → WebSocket. Yayın biterse tarayıcı 4010 ile hemen yeniden bağlanır (yeni yayın kurulur);
-        yayın hemen bittiyse (tahtada sorun) 4005 — olağan aralıkla yeniden denenir, döngüye girmez."""
+        yayın hemen bittiyse (cihazda sorun) 4005 — olağan aralıkla yeniden denenir, döngüye girmez."""
         feed = self.feed
         try:
             while data := await reader.read(65536):
@@ -339,7 +339,7 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
             _streams -= 1
         proc = self.proc
         if proc and proc.returncode is None:
-            proc.kill()  # SSH kapanınca tahtadaki x11vnc stdin'i kapanır ve kendiliğinden çıkar
+            proc.kill()  # SSH kapanınca cihazdaki x11vnc stdin'i kapanır ve kendiliğinden çıkar
 
 
 async def main():
@@ -348,7 +348,7 @@ async def main():
         [(r"/screen/ws/(\d+)", ScreenSocket),
          # Ekranlar sekmesinin "Başarım" görünümü (htop üst panelleri, saniyelik) — bkz. perf.py.
          (r"/screen/ws/perf/(\d+)", perf.PerfSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),
-         # Tahtalar/Ekranlar sağ menüsü "Görev yöneticisi" (canlı SSH + tahtada ajan) — bkz. taskmgr.py.
+         # Cihazlar/Ekranlar sağ menüsü "Görev yöneticisi" (canlı SSH + cihazda ajan) — bkz. taskmgr.py.
          (r"/screen/ws/taskmgr/(\d+)", taskmgr.TaskMgrSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),
          # Ekran penceresindeki hoparlör düğmesi (bkz. audio.py) ve sağ menü "Sohbet" (bkz. chat.py).
          (r"/screen/ws/audio/(\d+)", audio.AudioSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),

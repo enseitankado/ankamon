@@ -26,10 +26,10 @@
  */
 
 /**
- * Kullanıcılar (Windows Görev Yöneticisi gibi): tahtadaki oturumlar (loginctl) — Kullanıcı, Durum, Oturum,
+ * Kullanıcılar (Windows Görev Yöneticisi gibi): cihazdaki oturumlar (loginctl) — Kullanıcı, Durum, Oturum,
  * CPU/Bellek/Disk/Ağ toplamı (o kullanıcının süreçleri). Satır açılınca kullanıcının en çok kaynak kullanan
- * süreçleri görünür. Eylemler: Bağlantıyı kes (oturumu kilitle — ETAP kilit ekranı), Oturumu kapat. Çok tahtada
- * bütün tahtaların oturumları tek tabloda ("Bilgisayar" sütunu); eylem satırın tahtasına gider.
+ * süreçleri görünür. Eylemler: Bağlantıyı kes (oturumu kilitle — ETAP kilit ekranı), Oturumu kapat. Çok cihazda
+ * bütün cihazların oturumları tek tabloda ("Bilgisayar" sütunu); eylem satırın cihazına gider.
  */
 qx.Class.define("ankamon.ui.taskmgr.UsersTab", {
   extend: ankamon.ui.taskmgr.Tab,
@@ -82,7 +82,7 @@ qx.Class.define("ankamon.ui.taskmgr.UsersTab", {
     __info: null,
     __expanded: null,
 
-    /** Oturum satırı mı ("<tahta>:s:<oturum>"). */
+    /** Oturum satırı mı ("<cihaz>:s:<oturum>"). */
     __isSession(id) {
       return /^\d+:s:/.test(String(id ?? ""));
     },
@@ -110,13 +110,13 @@ qx.Class.define("ankamon.ui.taskmgr.UsersTab", {
       }
       const F = ankamon.ui.taskmgr.Fmt;
       if (s.self) {
-        ankamon.ui.Dialog.alert("Bu, görev yöneticisinin tahtaya kendi bağlantısı. Kapatmak için pencereyi kapatın.");
+        ankamon.ui.Dialog.alert("Bu, görev yöneticisinin cihaza kendi bağlantısı. Kapatmak için pencereyi kapatın.");
         return;
       }
       const where = this._win.isMulti() ? ` (${F.esc(link.getDisplay())})` : "";
       const text = op === "logout"
         ? `<b>${F.esc(s.user)}</b> kullanıcısının oturumu${where} kapatılsın mı?<br><br>Kaydedilmemiş veriler kaybolabilir.`
-        : `<b>${F.esc(s.user)}</b> kullanıcısının bağlantısı${where} kesilsin (ekran kilitlensin) mi?<br>Oturum açık kalır; tahtada parola ile açılır.`;
+        : `<b>${F.esc(s.user)}</b> kullanıcısının bağlantısı${where} kesilsin (ekran kilitlensin) mi?<br>Oturum açık kalır; cihazda parola ile açılır.`;
       if (!(await ankamon.ui.Dialog.confirm(text, op === "logout" ? "Oturumu kapat" : "Bağlantıyı kes"))) {
         return;
       }
@@ -142,7 +142,7 @@ qx.Class.define("ankamon.ui.taskmgr.UsersTab", {
       links.forEach(link => {
         const m = link.getModel();
         const board = link.getDisplay();
-        // Arama: çok tahtada bilgisayar adı ya da kullanıcı adı (tek tahtada eskisi gibi süzülmez).
+        // Arama: çok cihazda bilgisayar adı ya da kullanıcı adı (tek cihazda eskisi gibi süzülmez).
         const users = !this._win.isMulti() || !q || this._win.boardMatches(link, q) ? m.users
           : m.users.filter(u => String(u.user).toLowerCase().includes(q));
         sessions += users.length;
@@ -170,7 +170,7 @@ qx.Class.define("ankamon.ui.taskmgr.UsersTab", {
           }
         });
       });
-      this.__info.setValue(`${sessions} oturum` + (this._win.isMulti() ? ` · ${links.length} tahta` : ""));
+      this.__info.setValue(`${sessions} oturum` + (this._win.isMulti() ? ` · ${links.length} cihaz` : ""));
       this._setRows(this.__table, rows);
     }
   }

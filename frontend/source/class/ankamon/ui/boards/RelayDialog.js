@@ -26,16 +26,16 @@
  */
 
 /**
- * Sağ menü Ekran ▸ "Ekranı başka bilgisayara aktar": sağ tıklanan tahtanın ekranı işaretlenen tahtalarda tam ekran görünür
- * (bkz. worker executor/relay.py). Çoklu seçimde öteki seçili tahtalar işaretli gelir. "Ekran aktarımını durdur" normale döndürür.
+ * Sağ menü Ekran ▸ "Ekranı başka bilgisayara aktar": sağ tıklanan cihazın ekranı işaretlenen cihazlarda tam ekran görünür
+ * (bkz. worker executor/relay.py). Çoklu seçimde öteki seçili cihazlar işaretli gelir. "Ekran aktarımını durdur" normale döndürür.
  */
 qx.Class.define("ankamon.ui.boards.RelayDialog", {
   type: "static",
 
   statics: {
     /**
-     * @param source {Map} görüntüsü aktarılacak tahta
-     * @param selected {Array} sağ menünün uygulandığı tahtalar
+     * @param source {Map} görüntüsü aktarılacak cihaz
+     * @param selected {Array} sağ menünün uygulandığı cihazlar
      * @param user {Map?} oturum sahibi (çıktı penceresindeki "bir daha gösterme" tercihi)
      */
     async open(source, selected, user) {

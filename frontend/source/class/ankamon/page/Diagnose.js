@@ -27,25 +27,25 @@
 
 /**
  * Sağlık ▸ Denetle (kimlik "reports"; eski "Denetim raporları", "Bakım ▸ Bakım", "Sorun tespiti"; bkz. page.Anomalies): SSH denetimi
- * raporları. YALNIZ tespit raporu (kullanıcı isteği — Tahtalar grid'i, Ekranlar vb. yok).
+ * raporları. YALNIZ tespit raporu (kullanıcı isteği — Cihazlar grid'i, Ekranlar vb. yok).
  *
  * Taramalar "diagnose" görevleridir (bkz. worker/ankamon/executor/diagnose.py): "Şimdi tara" o an
- * çevrimiçi TÜM tahtaları paralel denetler (aynı anda kaç tahta: konteynerin CPU/RAM boşluğuna göre); ayrıca worker kaynaklar müsaitken her tahtayı haftada en az
+ * çevrimiçi TÜM cihazları paralel denetler (aynı anda kaç cihaz: konteynerin CPU/RAM boşluğuna göre); ayrıca worker kaynaklar müsaitken her cihazı haftada en az
  * bir kez kendiliğinden tarar (bkz. worker/ankamon/tasks/diagnose_schedule.py). Raporlar /api/diagnose'dan
  * gelir (bkz. backend DiagnoseApi); "Rapor" seçicisinden önceki taramalar da açılabilir.
  *
- * Açılışta "Son durum" görünür: her tahtanın EN SON denetimi tek tabloda (GET /api/diagnose/latest). Otomatik
- * zamanlayıcı yalnız vadesi gelen tahtaları taradığından tek bir otomatik tarama çoğu kez 1-2 tahtalıktır; açılışta
- * en son taramayı göstermek "yalnız bu tahta mı taranıyor?" karışıklığı yaratıyordu (kullanıcı geri bildirimi).
+ * Açılışta "Son durum" görünür: her cihazın EN SON denetimi tek tabloda (GET /api/diagnose/latest). Otomatik
+ * zamanlayıcı yalnız vadesi gelen cihazları taradığından tek bir otomatik tarama çoğu kez 1-2 cihazlıktır; açılışta
+ * en son taramayı göstermek "yalnız bu cihaz mı taranıyor?" karışıklığı yaratıyordu (kullanıcı geri bildirimi).
  * Tek tek taramalar seçicide kalır. Sayfanın ne yaptığı ve otomatik tarama takvimi "Bakım" sekme kulakçığının
  * ipucunda (bindTabButton), ayrıntısı Sağlık ▸ Yardım sekmesinde (bkz. page.MaintenanceHelp).
  *
- * Rapor bir grid'dir: her tahta bir satır (Tahta, IP, Genel durum, Acil, Dikkat, Bilgi, Başlıca bulgu, Denetim zamanı,
- * Başlatan). Sütunlar sıralanabilir ve başlıktaki kutuyla süzülür (serbest yazım + hazır değer listesi; Tahta, Genel durum,
- * Acil, Dikkat, Bilgi'de liste her zaman — kullanıcı isteği, eski "Tahta" seçicisinin yerine). Altta seçili tahtanın
- * bulguları ve önerileri (tahta seçilmeden boş, başlık satırı yok); ayırıcı Durum'daki gibi kalın. Düzeye göre süzme
+ * Rapor bir grid'dir: her cihaz bir satır (Cihaz, IP, Genel durum, Acil, Dikkat, Bilgi, Başlıca bulgu, Denetim zamanı,
+ * Başlatan). Sütunlar sıralanabilir ve başlıktaki kutuyla süzülür (serbest yazım + hazır değer listesi; Cihaz, Genel durum,
+ * Acil, Dikkat, Bilgi'de liste her zaman — kullanıcı isteği, eski "Cihaz" seçicisinin yerine). Altta seçili cihazın
+ * bulguları ve önerileri (cihaz seçilmeden boş, başlık satırı yok); ayırıcı Durum'daki gibi kalın. Düzeye göre süzme
  * grid'in Genel durum / Acil / Dikkat / Bilgi sütunlarında (üstteki eski "Göster" kutuları kalktı — kullanıcı isteği). Hepsi sunucuya gitmeden son rapor verisinden yeniden çizilir (bkz. __render / __apply).
- * Durum'daki SSH bulgusuna çift tık → showBoard(): "Son durum" + grid o tahtaya süzülür.
+ * Durum'daki SSH bulgusuna çift tık → showBoard(): "Son durum" + grid o cihaza süzülür.
  */
 qx.Class.define("ankamon.page.Diagnose", {
   extend: ankamon.page.Base,
@@ -69,7 +69,7 @@ qx.Class.define("ankamon.page.Diagnose", {
     button("Yenile", () => this.refresh());
     if (this._can("diagnose")) {
       button("Şimdi tara", () => this.__start())
-        .set({ toolTipText: "O an çevrimiçi olan tüm tahtaları denetler (sistem kaynaklarına göre birden çok tahta aynı anda)" });
+        .set({ toolTipText: "O an çevrimiçi olan tüm cihazları denetler (sistem kaynaklarına göre birden çok cihaz aynı anda)" });
     }
     top.add(new qx.ui.basic.Label("Rapor:").set({ marginLeft: 8 }));
     this.__runBox = new qx.ui.form.SelectBox().set({ width: 480 });
@@ -97,9 +97,9 @@ qx.Class.define("ankamon.page.Diagnose", {
     split.getChildControl("splitter").set({ height: thick, minHeight: thick, maxHeight: thick });
     this.add(split, { flex: 1 });
 
-    // Sayı sütunları (Acil/Dikkat/Bilgi) da hazır listeli: "kaç acil bulgusu olan tahtalar" seçilebilsin.
+    // Sayı sütunları (Acil/Dikkat/Bilgi) da hazır listeli: "kaç acil bulgusu olan cihazlar" seçilebilsin.
     this.__columns = [
-      { id: "board", label: "Tahta", width: 180, choices: true },
+      { id: "board", label: "Cihaz", width: 180, choices: true },
       { id: "ip", label: "IP", width: 120, choices: false },
       { id: "state", label: "Genel durum", width: 130, choices: true },
       { id: "bad", label: "Acil", width: 75, choices: true },
@@ -125,9 +125,9 @@ qx.Class.define("ankamon.page.Diagnose", {
       }
       this.__renderDetail();
     });
-    // Sütuna göre sıralanınca qx seçimi satır NUMARASIYLA tutar (vurgu başka tahtaya kayardı): seçili tahta yeniden bulunur.
+    // Sütuna göre sıralanınca qx seçimi satır NUMARASIYLA tutar (vurgu başka cihaza kayardı): seçili cihaz yeniden bulunur.
     model.addListener("metaDataChanged", () => this.__reselect());
-    this.__table.setToolTipText("Bir tahtayı seçin: aşağıda yalnız onun bulguları ve önerileri görünür");
+    this.__table.setToolTipText("Bir cihazı seçin: aşağıda yalnız onun bulguları ve önerileri görünür");
     const top2 = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ paddingBottom: ankamon.ui.health.Status.PANE_GAP });
     top2.add(this.__table, { flex: 1 });
     // Grid 2 pay, bulgular 1 pay: Denetle sekmesine gömülünce (③ Sonuçlar — bkz. ui.anomaly.Scan) alan küçüldü, 1:1 grid'e
@@ -152,7 +152,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       ok: { text: "Sorun yok", color: "#1e8e3e" }
     },
     ORDER: ["bad", "warn", "info", "ok"],
-    /** Tablo modeli sütunları (0 = tahta anahtarı); ts ve rank görünmeyen sıralama değerleri. */
+    /** Tablo modeli sütunları (0 = cihaz anahtarı); ts ve rank görünmeyen sıralama değerleri. */
     COL: { board: 1, ip: 2, state: 3, bad: 4, warn: 5, info: 6, top: 7, at: 8, by: 9, ts: 10, rank: 11 }
   },
 
@@ -210,13 +210,13 @@ qx.Class.define("ankamon.page.Diagnose", {
       const keep = this.__jobId;
       this.__silent = true;
       this.__runBox.removeAll().forEach(it => it.dispose());
-      // İlk seçenek ve varsayılan: her tahtanın en son denetimi (bkz. DiagnoseApi::latest).
+      // İlk seçenek ve varsayılan: her cihazın en son denetimi (bkz. DiagnoseApi::latest).
       const latest = new qx.ui.form.ListItem("", null, "latest");
       latest.setRich(true);
-      latest.setLabel("<b>Son durum — tüm tahtalar</b> (her tahtanın en son denetimi)");
+      latest.setLabel("<b>Son durum — tüm cihazlar</b> (her cihazın en son denetimi)");
       this.__runBox.add(latest);
       runs.forEach(r => {
-        // Otomatik tarama yalnız vadesi gelen tahtaları kapsar; az tahtalıysa adları da yazılsın.
+        // Otomatik tarama yalnız vadesi gelen cihazları kapsar; az cihazlıysa adları da yazılsın.
         const who = r.auto ? "otomatik" : "elle: " + esc(r.created_by || "—");
         const names = r.targets <= 3 && r.names ? ": " + esc(r.names) : "";
         const failed = r.failed ? ` · <span style="color:#c5221f">${r.failed} denetlenemedi</span>` : "";
@@ -228,7 +228,7 @@ qx.Class.define("ankamon.page.Diagnose", {
         // modified after initial creation" — sayfa açılışını kırıyordu). Önce boş madde + rich, sonra yazı.
         const item = new qx.ui.form.ListItem("", null, r.id);
         item.setRich(true);
-        item.setLabel(`${F.dateTime(r.created_at * 1000)} · ${who} · ${r.targets} tahta${names}${failed}${repeat}${state}`);
+        item.setLabel(`${F.dateTime(r.created_at * 1000)} · ${who} · ${r.targets} cihaz${names}${failed}${repeat}${state}`);
         this.__runBox.add(item);
       });
       const items = this.__runBox.getChildren();
@@ -268,7 +268,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       const done = targets.filter(t => !["queued", "running"].includes(t.status)).length;
       const running = ["queued", "running"].includes(res.job.status);
       this.__progress.set({ maximum: Math.max(1, targets.length), value: done, visibility: running ? "visible" : "excluded" });
-      this.__status.setValue(running ? ankamon.ui.JobSpinner.label(`Denetleniyor: ${done} / ${targets.length} tahta tamamlandı…`) : "");
+      this.__status.setValue(running ? ankamon.ui.JobSpinner.label(`Denetleniyor: ${done} / ${targets.length} cihaz tamamlandı…`) : "");
       this.__render();
       if (running) {
         qx.event.Timer.once(() => this.__follow(jobId), this, 1000);
@@ -293,10 +293,10 @@ qx.Class.define("ankamon.page.Diagnose", {
         return "Henüz tarama yapılmadı.";
       }
       if (j.latest) {
-        return `<span style="opacity:.8">${j.targets.length} / ${j.boards} tahtanın en son denetimi — ` +
+        return `<span style="opacity:.8">${j.targets.length} / ${j.boards} cihazın en son denetimi — ` +
           "tarihi her satırın sağında</span>";
       }
-      return j.auto ? "Otomatik tarama (yalnız denetim zamanı gelen tahtalar)"
+      return j.auto ? "Otomatik tarama (yalnız denetim zamanı gelen cihazlar)"
         : `Elle başlatan: <b>${qx.bom.String.escape(String(j.created_by || "—"))}</b>`;
     },
 
@@ -316,15 +316,15 @@ qx.Class.define("ankamon.page.Diagnose", {
       const F = ankamon.util.Format;
       const esc = s => qx.bom.String.escape(String(s ?? ""));
       const sc = this.__schedule;
-      let s = "<b>SSH denetimi</b>: Ankamon tahtaya SSH ile girip donanım ve sistem sağlığını ölçer: disk (SMART) ve boş alan, " +
-        "işlemci ve kasa sıcaklığı, fan, RAM, güncellemeler, başarısız servisler… Her tahta bir " +
-        "satırdır (sütunlar süzülür ve sıralanır); tahtayı seçince bulguları ve önerileri altta görünür. <b>Şimdi tara</b> açık tüm tahtaları hemen denetler " +
-        "(seçili tahtalar: üstte ① tahtaları, ② <i>Tam SSH denetimi</i>ni seçip <b>Tara</b>). BIOS pili ve saat sürekli izlemededir.";
-      s += `<br><br><b>Otomatik tarama:</b> her tahta en az ${esc(sc ? sc.interval_days : 7)} günde bir, sunucu yükü ve ` +
-        "ağ trafiği düşükken; tahta yalnız açıkken taranabilir. Her tahtanın zamanı ayrı işlediğinden otomatik " +
-        "taramalar çoğu kez yalnız birkaç tahtayı kapsar.";
+      let s = "<b>SSH denetimi</b>: Ankamon cihaza SSH ile girip donanım ve sistem sağlığını ölçer: disk (SMART) ve boş alan, " +
+        "işlemci ve kasa sıcaklığı, fan, RAM, güncellemeler, başarısız servisler… Her cihaz bir " +
+        "satırdır (sütunlar süzülür ve sıralanır); cihazı seçince bulguları ve önerileri altta görünür. <b>Şimdi tara</b> açık tüm cihazları hemen denetler " +
+        "(seçili cihazlar: üstte ① cihazları, ② <i>Tam SSH denetimi</i>ni seçip <b>Tara</b>). BIOS pili ve saat sürekli izlemededir.";
+      s += `<br><br><b>Otomatik tarama:</b> her cihaz en az ${esc(sc ? sc.interval_days : 7)} günde bir, sunucu yükü ve ` +
+        "ağ trafiği düşükken; cihaz yalnız açıkken taranabilir. Her cihazın zamanı ayrı işlediğinden otomatik " +
+        "taramalar çoğu kez yalnız birkaç cihazı kapsar.";
       if (sc && sc.never_scanned) {
-        s += ` Hiç taranmamış ${sc.never_scanned} tahta ilk uygun anda taranacak.`;
+        s += ` Hiç taranmamış ${sc.never_scanned} cihaz ilk uygun anda taranacak.`;
       } else if (sc && sc.next_from) {
         s += ` Sıradaki: ${esc(F.dateTime(sc.next_from * 1000))} sonrasında uygun ilk an, en geç ${esc(F.dateTime(sc.next_by * 1000))}.`;
       }
@@ -333,8 +333,8 @@ qx.Class.define("ankamon.page.Diagnose", {
     },
 
     /**
-     * Durum'daki SSH bulgusundan gelince: "Son durum" raporu (Durum her tahtanın en son denetimini gösterir) ve grid o
-     * tahtaya süzülür; satır gelince seçilir (bulguları altta açılsın).
+     * Durum'daki SSH bulgusundan gelince: "Son durum" raporu (Durum her cihazın en son denetimini gösterir) ve grid o
+     * cihaza süzülür; satır gelince seçilir (bulguları altta açılsın).
      */
     showBoard(name) {
       this.__pendingBoard = name;
@@ -363,7 +363,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       return !!this.__job && ["queued", "running"].includes(this.__job.status);
     },
 
-    /** Tahtanın bütün bulguları (düzey süzgeci grid sütunlarında). */
+    /** Cihazın bütün bulguları (düzey süzgeci grid sütunlarında). */
     __visibleChecks(t) {
       const r = this.__parse(t);
       return r ? r.checks : [];
@@ -395,7 +395,7 @@ qx.Class.define("ankamon.page.Diagnose", {
         } else if (halted) {
           state = S.HALTED;
           rank = 1.5;
-          top = "Görev bu tahtada tamamlanamadan kesildi (ör. Ankamon yeniden başlatıldı); denetimi yeniden çalıştırın.";
+          top = "Görev bu cihazda tamamlanamadan kesildi (ör. Ankamon yeniden başlatıldı); denetimi yeniden çalıştırın.";
         } else if (!r) {
           state = S.UNREACHABLE;
           rank = -1; // bağlanılamayanlar en üstte
@@ -442,7 +442,7 @@ qx.Class.define("ankamon.page.Diagnose", {
           break;
         }
       }
-      // Bekleyen tahta "Son durum" geldiğinde bulunduysa ya da o raporda hiç yoksa bırakılır.
+      // Bekleyen cihaz "Son durum" geldiğinde bulunduysa ya da o raporda hiç yoksa bırakılır.
       if (this.__pendingBoard !== null && (index >= 0 || (this.__job && this.__job.latest))) {
         this.__pendingBoard = null;
       }
@@ -455,7 +455,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       this.__renderDetail();
     },
 
-    /** Sıralamadan sonra seçili tahtanın (__selKey) satırını yeniden seçer. */
+    /** Sıralamadan sonra seçili cihazın (__selKey) satırını yeniden seçer. */
     __reselect() {
       const tm = this.__table.getTableModel();
       const sm = this.__table.getSelectionModel();
@@ -487,7 +487,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       return row ? row[0] : null;
     },
 
-    /** Alt bölme: seçili tahtanın bulguları ve önerileri; tahta seçilmeden boş (başlık satırı yok — kullanıcı isteği). */
+    /** Alt bölme: seçili cihazın bulguları ve önerileri; cihaz seçilmeden boş (başlık satırı yok — kullanıcı isteği). */
     __renderDetail() {
       const esc = s => qx.bom.String.escape(String(s ?? ""));
       const L = ankamon.page.Diagnose.LEVEL;
@@ -504,7 +504,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       const keys = [selected];
       const many = false;
       let h = `<div style="${css}"><table style="border-collapse:collapse;width:100%"><tr>` +
-        (many ? `<th style="${th}">Tahta</th>` : "") +
+        (many ? `<th style="${th}">Cihaz</th>` : "") +
         `<th style="${th}">Düzey</th><th style="${th}">Denetim</th><th style="${th}">Bulgu</th><th style="${th}">Öneri</th></tr>`;
       let any = false;
       keys.forEach(key => {

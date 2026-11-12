@@ -29,14 +29,14 @@
  * Sağlık ▸ Denetle (kullanıcı isteği 2026-11-12: eski "Denetle" ve "Tara" sekmeleri birleşti; kimlik "reports", eski "Tarama"
  * kimliği buraya yönlenir — bkz. page.Anomalies OLD_TABS). İki yol da buradan başlatılır ve sonuçları buradadır:
  *   - Sürekli izleme denetimlerinin anlık yoklaması ("anomaly_scan" görevi — bkz. worker/ankamon/anomaly/scan.py): kuralın
- *     tahtada çalışan küçük betiği SSH ile o an çalışır; kayıt tutulmaz.
+ *     cihazda çalışan küçük betiği SSH ile o an çalışır; kayıt tutulmaz.
  *   - Tam denetim ("diagnose" görevi — bkz. worker/ankamon/executor/diagnose.py; yalnız "diagnose" yetkisiyle): haftalık
- *     otomatik denetimin aynısı; seçili tahtalarda ② ile ya da açık tüm tahtalarda "Şimdi tara" ile. Durum'a yansır.
+ *     otomatik denetimin aynısı; seçili cihazlarda ② ile ya da açık tüm cihazlarda "Şimdi tara" ile. Durum'a yansır.
  * ②'de iki yolun ayrımı vurgulanmaz (kullanıcı isteği 2026-11-12) — her sonucun kaynağı ③'ün Kaynak sütununda.
  *
- * Yerleşim: üstte ① tahtalar (onay kutulu; arama, Tümü / Çevrim içi / Hiçbiri) | ② denetim türleri ve Tara; altta tam
+ * Yerleşim: üstte ① cihazlar (onay kutulu; arama, Tümü / Çevrim içi / Hiçbiri) | ② denetim türleri ve Tara; altta tam
  * genişlikte ③ Sonuçlar — TEK grid: tam denetim raporunun kontrolleri (gömülü page.Diagnose'un yalnız üst satırı: Yenile,
- * Şimdi tara, Rapor seçici), son anlık yoklama ve süren sürekli izleme bulguları; Kaynak sütunu (uzak bağlantı / tahtanın
+ * Şimdi tara, Rapor seçici), son anlık yoklama ve süren sürekli izleme bulguları; Kaynak sütunu (uzak bağlantı / cihazın
  * gönderdiği loglar), "Yalnız sorunlular" (varsayılan), çift tık → satırın tamamı (ui.anomaly.RowDetail). Son seçimler
  * ve ayırıcı konumları kullanıcı başına sunucuda hatırlanır. Son anlık yoklamanın sonucu sekme yeniden açılınca gösterilir.
  */
@@ -89,7 +89,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     boards.addListener("changeWidth", e => this.__saveSplit("left", e.getData()));
     outer.add(this.__createResultsPane(), 1);
 
-    // Sekme ilk kez açılınca tahtalar yüklenir (sayfa 30 sn'de bir yenilense de liste yalnız açıkken tazelenir).
+    // Sekme ilk kez açılınca cihazlar yüklenir (sayfa 30 sn'de bir yenilense de liste yalnız açıkken tazelenir).
     this.addListener("appear", () => this.__loadBoards());
   },
 
@@ -103,10 +103,10 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     RESULT_TAB_PREF: "anomalies.denetle.results",
     /** Kaynak sütunu metinleri (sonucun nereden elde edildiği). */
     SOURCE: {
-      ssh: "Uzak bağlantı (SSH ile tahtadan okundu)",
+      ssh: "Uzak bağlantı (SSH ile cihazdan okundu)",
       quick: "Uzak bağlantı (SSH, anlık yoklama)",
       metric: "Uzak bağlantı (Ankamon'un topladığı sensör ölçümleri)",
-      log: "Tahtanın gönderdiği loglar"
+      log: "Cihazın gönderdiği loglar"
     }
   },
 
@@ -136,14 +136,14 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
 
     // Adımlar "Dosyaları dağıt"taki numaralı kutularla aynı görünümde (bkz. ui.StepBox).
     __createBoardsPane() {
-      const box = ankamon.ui.StepBox.create(1, "Tahtaları seç").set({ marginRight: 5 });
+      const box = ankamon.ui.StepBox.create(1, "Cihazları seç").set({ marginRight: 5 });
       const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(4).set({ alignY: "middle" }));
       this.__search = new qx.ui.form.TextField().set({ placeholder: "Ara: ad, konum, IP…", liveUpdate: true });
       this.__search.addListener("changeValue", () => this.__renderBoards());
       bar.add(this.__search, { flex: 1 });
-      [["Tümü", "Listede görünen tüm tahtaları seç", b => true],
-        ["Çevrim içi", "Listede görünen çevrim içi tahtaları seç (diğerlerinin seçimi kalkar)", b => b.online],
-        ["Hiçbiri", "Listede görünen tahtaların seçimini kaldır", b => false]].forEach(([label, tip, pick]) => {
+      [["Tümü", "Listede görünen tüm cihazları seç", b => true],
+        ["Çevrim içi", "Listede görünen çevrim içi cihazları seç (diğerlerinin seçimi kalkar)", b => b.online],
+        ["Hiçbiri", "Listede görünen cihazların seçimini kaldır", b => false]].forEach(([label, tip, pick]) => {
         const button = new qx.ui.form.Button(label).set({ toolTipText: tip });
         button.addListener("execute", () => this.__pickVisible(pick));
         bar.add(button);
@@ -151,7 +151,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       box.add(bar);
 
       const columns = [
-        { id: "name", label: "Tahta", width: 180 },
+        { id: "name", label: "Cihaz", width: 180 },
         { id: "location", label: "Konum", width: 120 },
         { id: "status", label: "Durum", width: 100 },
         { id: "ip", label: "IP" }
@@ -211,7 +211,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
 
     /** ② Denetimleri seç ve tara: denetim türleri (kaydırmalı), Tara düğmesi, ilerleme, SSH denetimi notu. */
     __createKindPane() {
-      const box = ankamon.ui.StepBox.create(2, "Denetimleri seç ve tara", "seçili tahtalara şu an bakılır").set({ marginLeft: 5 });
+      const box = ankamon.ui.StepBox.create(2, "Denetimleri seç ve tara", "seçili cihazlara şu an bakılır").set({ marginLeft: 5 });
       this.__kindBox = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
       // Tür listesi kaydırmalı: üst bölümün en küçük yüksekliği listeye bağlı değil, ayırıcı serbestçe çekilebilir; liste
       // sığmazsa dikey kaydırma çubuğu çıkar. Başlıkla ilk tür arasında boşluk (kullanıcı isteği).
@@ -240,8 +240,8 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
      * ③ Sonuçlar (tam genişlik) — TEK grid (kullanıcı isteği 2026-11-12: eski "SSH denetim raporları" ve "Anlık yoklama"
      * iç sekmeleri birleşti). Satırlar: tam denetim raporunun kontrolleri (üstteki rapor seçicide seçili rapor — gömülü
      * page.Diagnose'un yalnız üst satırı görünür), son anlık yoklamanın sonuçları ve sürmekte olan sürekli izleme
-     * bulguları. Kaynak sütunu sonucun nereden elde edildiğini yazar: uzak bağlantıyla (Ankamon tahtaya SSH ile girip
-     * okudu / Ankamon'un tahtadan topladığı sensör ölçümleri) mı, tahtanın gönderdiği loglardan mı. Çift tıklama: satırın
+     * bulguları. Kaynak sütunu sonucun nereden elde edildiğini yazar: uzak bağlantıyla (Ankamon cihaza SSH ile girip
+     * okudu / Ankamon'un cihazdan topladığı sensör ölçümleri) mı, cihazın gönderdiği loglardan mı. Çift tıklama: satırın
      * tamamı (ui.anomaly.RowDetail).
      */
     __createResultsPane() {
@@ -263,12 +263,12 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       results.add(head);
 
       this.__resultColumns = [
-        { id: "board", label: "Tahta", width: 170 },
+        { id: "board", label: "Cihaz", width: 170 },
         { id: "check", label: "Denetim", width: 210 },
         { id: "result", label: "Sonuç", width: 100, choices: true },
         { id: "detail", label: "Ayrıntı", width: 420 },
         { id: "source", label: "Kaynak", width: 210, choices: true,
-          hint: "Sonucun nereden elde edildiği: uzak bağlantıyla (Ankamon tahtaya bağlanıp okudu) mı, tahtanın gönderdiği loglardan mı" },
+          hint: "Sonucun nereden elde edildiği: uzak bağlantıyla (Ankamon cihaza bağlanıp okudu) mı, cihazın gönderdiği loglardan mı" },
         { id: "at", label: "Zaman", width: 140 }
       ];
       this.__resultTable = this.__page._createTable(this.__resultColumns, { prefsKey: "anomalies.denetle.merged.columns" });
@@ -280,7 +280,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         const row = (this.__mergedRows || []).find(r => r.cells[0] === id);
         if (row) {
           ankamon.ui.anomaly.RowDetail.open(`${row.plain.check} — ${row.plain.board}`, [
-            ["Tahta", row.plain.board], ["Denetim", row.plain.check], ["Sonuç", row.plain.result], ["Ayrıntı", row.plain.detail],
+            ["Cihaz", row.plain.board], ["Denetim", row.plain.check], ["Sonuç", row.plain.result], ["Ayrıntı", row.plain.detail],
             ["Öneri", row.plain.advice], ["Kaynak", row.plain.source], ["Zaman", row.plain.at]
           ]);
         }
@@ -292,7 +292,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       return results;
     },
 
-    /** ③'te raporu gösterir; board verilirse grid o tahtaya süzülür (Durum'dan bulguya çift tık — page.Anomalies.openFinding). */
+    /** ③'te raporu gösterir; board verilirse grid o cihaza süzülür (Durum'dan bulguya çift tık — page.Anomalies.openFinding). */
     showReport(board) {
       if (this.__reports) {
         this.__reports.refresh();
@@ -329,8 +329,8 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
           });
           this.__sshCheck.addListener("changeValue", () => this.__updateButton());
           this.__kindBox.add(this.__sshCheck);
-          this.__kindBox.add(new qx.ui.basic.Label("Haftada bir kendiliğinden de yapılır; tahtada yalnız okuma yapılır, " +
-            "tahta başına 1-2 sn sürer.").set({ rich: true, wrap: true, allowGrowX: true, textColor: "app-muted", marginLeft: 22, marginBottom: 6 }));
+          this.__kindBox.add(new qx.ui.basic.Label("Haftada bir kendiliğinden de yapılır; cihazda yalnız okuma yapılır, " +
+            "cihaz başına 1-2 sn sürer.").set({ rich: true, wrap: true, allowGrowX: true, textColor: "app-muted", marginLeft: 22, marginBottom: 6 }));
         }
         scannable.forEach(kind => {
           const check = new qx.ui.form.CheckBox(kinds[kind].label).set({
@@ -359,7 +359,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       try {
         data = await ankamon.io.Api.get("/boards");
       } catch (e) {
-        this.__selCount.setValue("Tahtalar alınamadı: " + (e.message || e));
+        this.__selCount.setValue("Cihazlar alınamadı: " + (e.message || e));
         return;
       }
       if (this.isDisposed()) {
@@ -372,12 +372,12 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         ip: b.ip || "",
         online: !!b.online
       }));
-      // İlk kullanımda (kayıtlı seçim yok) çevrim içi tahtalar seçili gelir.
+      // İlk kullanımda (kayıtlı seçim yok) çevrim içi cihazlar seçili gelir.
       if (!this.__hasBoardPref && !this.__checked.size) {
         this.__boards.filter(b => b.online).forEach(b => this.__checked.add(b.id));
       }
       const ids = new Set(this.__boards.map(b => b.id));
-      [...this.__checked].filter(id => !ids.has(id)).forEach(id => this.__checked.delete(id)); // silinmiş tahtalar
+      [...this.__checked].filter(id => !ids.has(id)).forEach(id => this.__checked.delete(id)); // silinmiş cihazlar
       this.__renderBoards();
     },
 
@@ -436,13 +436,13 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     __updateButton() {
       const boards = (this.__boards || []).filter(b => this.__checked.has(b.id));
       const offline = boards.filter(b => !b.online).length;
-      this.__selCount.setValue(`${boards.length} tahta seçili` +
+      this.__selCount.setValue(`${boards.length} cihaz seçili` +
         (offline ? ` (${offline} tanesi çevrim dışı — taranamaz)` : ""));
       const kinds = this.__selectedKinds().length + (this.__sshSelected() ? 1 : 0);
       const running = this.__job && ["queued", "running"].includes(this.__job.status);
       this.__scanButton.set({
         enabled: !running && boards.length > 0 && kinds > 0,
-        label: running ? "Taranıyor…" : (boards.length && kinds ? `Tara (${boards.length} tahta, ${kinds} denetim)` : "Tara")
+        label: running ? "Taranıyor…" : (boards.length && kinds ? `Tara (${boards.length} cihaz, ${kinds} denetim)` : "Tara")
       });
     },
 
@@ -457,15 +457,15 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         S.savePref(this.__page._user, "anomalies.scan.ssh", this.__sshSelected());
       }
       if (this.__sshSelected()) {
-        // Kapalı tahta SSH ile denetlenemez: yalnız çevrim içi olanlar.
+        // Kapalı cihaz SSH ile denetlenemez: yalnız çevrim içi olanlar.
         const online = (this.__boards || []).filter(b => this.__checked.has(b.id) && b.online).map(b => b.id);
         this.__sshRow.setVisibility("visible");
         if (!online.length) {
-          this.__sshNote.setValue("Tam denetim: seçili tahtaların hiçbiri açık değil; kapalı tahta denetlenemez.");
+          this.__sshNote.setValue("Tam denetim: seçili cihazların hiçbiri açık değil; kapalı cihaz denetlenemez.");
         } else {
           try {
             const job = await ankamon.io.Api.post("/jobs", { type: "diagnose", board_ids: online });
-            this.__sshNote.setValue(`Tam denetim başlatıldı (${online.length} açık tahta, görev #${job.id}); ` +
+            this.__sshNote.setValue(`Tam denetim başlatıldı (${online.length} açık cihaz, görev #${job.id}); ` +
               "sonuçlar aşağıda ve Durum'da görünür.");
             this.showReport(); // süren denetim raporu ③'e gelsin
           } catch (e) {
@@ -517,7 +517,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       }
     },
 
-    /** Görevin tahta sonuçları → satırlar [{board, kind, state: found|clear|unknown, text}]. */
+    /** Görevin cihaz sonuçları → satırlar [{board, kind, state: found|clear|unknown, text}]. */
     __resultRows() {
       const job = this.__job;
       if (!job) {
@@ -545,7 +545,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
             state = r.anomaly === true ? "found" : (r.anomaly === false ? "clear" : "unknown");
             text = r.summary;
           } else {
-            text = t.status === "unreachable" ? "Tahtaya ulaşılamadı (kapalı olabilir): " + (t.output || "") : (t.output || "Taranamadı");
+            text = t.status === "unreachable" ? "Cihaza ulaşılamadı (kapalı olabilir): " + (t.output || "") : (t.output || "Taranamadı");
           }
           rows.push({ id: t.board_id + ":" + kind, board: t.board, kind, state, text, running: t.status === "running" });
         });
@@ -596,7 +596,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         (r.checks || []).forEach((c, i) => {
           const level = L[c.level] || { text: c.level };
           const rank = { bad: 0, warn: 2, info: 3, ok: 6 }[c.level] ?? 5;
-          // Son 24 saatin sıcaklığı tahtaya bağlanılarak değil, Ankamon'un sürekli topladığı ölçümlerden hesaplanır.
+          // Son 24 saatin sıcaklığı cihaza bağlanılarak değil, Ankamon'un sürekli topladığı ölçümlerden hesaplanır.
           const source = c.group === "İşlemci sıcaklığı" ? SRC.metric : SRC.ssh;
           add(`ssh:${t.board_id}:${i}`, rank, { board: t.board, check: `${c.group} › ${c.title}`, result: level.text,
             detail: c.detail || "", advice: c.advice || "", source, at },
@@ -626,7 +626,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       if (this.__job) {
         this.__updateQuickStatus();
       } else {
-        this.__status.setValue("Tahtaları ve denetimleri seçip Tara'ya basın.");
+        this.__status.setValue("Cihazları ve denetimleri seçip Tara'ya basın.");
       }
     },
 
@@ -663,10 +663,10 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       const found = all.filter(r => r.state === "found").length;
       const unreachable = job.targets.filter(t => !["queued", "running", "ok"].includes(t.status)).length;
       const when = ankamon.util.Format.dateTime((job.finished_at || job.created_at) * 1000);
-      let html = pending ? ankamon.ui.JobSpinner.label(`Taranıyor: ${boards - pending} / ${boards} tahta tamamlandı…`)
+      let html = pending ? ankamon.ui.JobSpinner.label(`Taranıyor: ${boards - pending} / ${boards} cihaz tamamlandı…`)
         : `<span style="font-weight:bold;color:${found ? red : green}">` +
-          (found ? `${foundBoards} tahtada ${found} anomali bulundu` : "Anomali bulunmadı") + "</span>";
-      html += ` <span style="opacity:.75">· ${boards} tahta` + (unreachable ? `, ${unreachable} tanesine ulaşılamadı` : "") +
+          (found ? `${foundBoards} cihazda ${found} anomali bulundu` : "Anomali bulunmadı") + "</span>";
+      html += ` <span style="opacity:.75">· ${boards} cihaz` + (unreachable ? `, ${unreachable} tanesine ulaşılamadı` : "") +
         (pending ? "" : ` · ${esc(String(when))}`) + "</span>";
       this.__status.setValue(html);
     },

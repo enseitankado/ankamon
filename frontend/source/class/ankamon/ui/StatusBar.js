@@ -534,7 +534,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
     /**
      * Bu oturumun o an Ankamon'da baktığı yer (alt çubuk ipucunda "Aktif"in sağında gösterilir): gezinme
      * ağacında seçili düğümün yolu + görünen sayfadaki seçili iç sekmeler + öndeki pencerenin başlığı,
-     * ör. "Tahtalar · Web terminal — B Blok - Arge 2". Kabuğa (ui.Shell) bağımlılık olmasın diye
+     * ör. "Cihazlar · Web terminal — B Blok - Arge 2". Kabuğa (ui.Shell) bağımlılık olmasın diye
      * görünür widget ağacından okunur: Stack'te gizli sayfalar görünür olmadığından atlanır.
      */
     __currentView() {
@@ -611,7 +611,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
         return;
       }
       // Satır = kullanıcı + IP (sunucu gruplar); aynı yerden birden çok açık oturum varsa sayısı yazılır.
-      // Bilgisayar: tahta/ağ envanterindeki takma ad (sunucu eşler), yoksa IP adresi.
+      // Bilgisayar: cihaz/ağ envanterindeki takma ad (sunucu eşler), yoksa IP adresi.
       const rows = res.sessions.map(s => {
         const who = esc(s.username) + (s.full_name ? ` <span style="opacity:.7">(${esc(s.full_name)})</span>` : "");
         // Sunucu yalnız BAĞLI oturumları verir (çıkış yapmadan kapanmış tarayıcılar sayılmaz — bkz.

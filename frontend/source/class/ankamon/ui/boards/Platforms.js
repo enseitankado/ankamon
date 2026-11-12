@@ -83,7 +83,7 @@ qx.Class.define("ankamon.ui.boards.Platforms", {
       return fam ? fam.label : family || "bilinmiyor";
     },
 
-    /** Menü anahtarının (etiketi, tahta sayısı eki olmadan) katalogdaki işlevi; yoksa null. */
+    /** Menü anahtarının (etiketi, cihaz sayısı eki olmadan) katalogdaki işlevi; yoksa null. */
     functionOf(key) {
       this.catalog();
       return (this.__byKey && this.__byKey[key]) || null;
@@ -123,7 +123,7 @@ qx.Class.define("ankamon.ui.boards.Platforms", {
 
     /**
      * Menü maddelerini seçili cihazların işletim sistemine göre işaretler (alt menüler dahil). Desteklemeyen
-     * maddeler devre dışı + ipucu; kısmen desteklenenlerde ipucu ve sayı eki (N tahta) desteklenenlere göre.
+     * maddeler devre dışı + ipucu; kısmen desteklenenlerde ipucu ve sayı eki (N cihaz) desteklenenlere göre.
      */
     decorate(menu, boards) {
       if (!menu || !boards || !boards.length) {
@@ -155,12 +155,12 @@ qx.Class.define("ankamon.ui.boards.Platforms", {
           return;
         }
         item.setToolTipText(`Yalnız ${this.summary(yes)} cihazda uygulanır; ${missing} cihazda bu işlev tanımlı değil, atlanır.`);
-        // "… (N tahta)" ekini desteklenen sayıya indir (etiket ilk N'yi tüm seçimden saymıştı).
+        // "… (N cihaz)" ekini desteklenen sayıya indir (etiket ilk N'yi tüm seçimden saymıştı).
         const icon = item.getUserData("ankamon.menuIcon");
         const label = String(item.getLabel() || "");
-        const m = /\((\d+) tahta\)\s*$/.exec(label.replace(/<[^>]+>/g, ""));
+        const m = /\((\d+) cihaz\)\s*$/.exec(label.replace(/<[^>]+>/g, ""));
         if (m && Number(m[1]) === boards.length) {
-          const text = yes.length > 1 ? `${key} (${yes.length} tahta)` : key;
+          const text = yes.length > 1 ? `${key} (${yes.length} cihaz)` : key;
           item.setLabel(`<span style="display:inline-block;width:1.4em;text-align:center">${icon || ""}</span>` + qx.bom.String.escape(text));
         }
       });

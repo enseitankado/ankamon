@@ -28,8 +28,8 @@
 /**
  * Hizmetler (Windows Görev Yöneticisi gibi): systemd hizmetleri — Ad, PID, Açıklama, Durum, Başlangıç türü.
  * Sağ menü: Başlat, Durdur, Yeniden başlat, Ayrıntılara git. Liste yalnız sekme görünürken 5 sn'de bir gelir
- * (ajan "want": services). Çok tahtada bütün tahtaların hizmetleri tek tabloda ("Bilgisayar" sütunu); işlem
- * satırın tahtasına gider.
+ * (ajan "want": services). Çok cihazda bütün cihazların hizmetleri tek tabloda ("Bilgisayar" sütunu); işlem
+ * satırın cihazına gider.
  */
 qx.Class.define("ankamon.ui.taskmgr.ServicesTab", {
   extend: ankamon.ui.taskmgr.Tab,
@@ -96,7 +96,7 @@ qx.Class.define("ankamon.ui.taskmgr.ServicesTab", {
       const where = this._win.isMulti() ? ` (${link.getDisplay()})` : "";
       const verb = { start: "başlatılsın", stop: "durdurulsun", restart: "yeniden başlatılsın" }[action];
       if (action !== "start" && !(await ankamon.ui.Dialog.confirm(
-        `<b>${ankamon.ui.taskmgr.Fmt.esc(name)}</b> hizmeti${ankamon.ui.taskmgr.Fmt.esc(where)} ${verb} mı?<br><br>Tahtadaki bağımlı işlevler etkilenebilir.`, "Evet"))) {
+        `<b>${ankamon.ui.taskmgr.Fmt.esc(name)}</b> hizmeti${ankamon.ui.taskmgr.Fmt.esc(where)} ${verb} mı?<br><br>Cihazdaki bağımlı işlevler etkilenebilir.`, "Evet"))) {
         return;
       }
       this.__msgAt = Date.now();
@@ -112,7 +112,7 @@ qx.Class.define("ankamon.ui.taskmgr.ServicesTab", {
       }
     },
 
-    /** Belirtilen tahtanın belirtilen hizmetlerini seçer (Ayrıntılar ▸ Hizmetlere git). */
+    /** Belirtilen cihazın belirtilen hizmetlerini seçer (Ayrıntılar ▸ Hizmetlere git). */
     reveal(link, names) {
       this.update();
       const ids = names.map(n => this._rowId(link, n));
@@ -150,7 +150,7 @@ qx.Class.define("ankamon.ui.taskmgr.ServicesTab", {
       });
       // İşlem iletisi (__act) 6 sn görünür, sonra özet.
       if (!this.__msgAt || Date.now() - this.__msgAt > 6000) {
-        this.__info.setValue(`${total} hizmet · ${running} çalışıyor` + (this._win.isMulti() ? ` · ${links.length} tahta` : ""));
+        this.__info.setValue(`${total} hizmet · ${running} çalışıyor` + (this._win.isMulti() ? ` · ${links.length} cihaz` : ""));
       }
       this._setRows(this.__table, rows);
     }

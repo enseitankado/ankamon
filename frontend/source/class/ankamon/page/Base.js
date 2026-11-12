@@ -81,7 +81,7 @@ qx.Class.define("ankamon.page.Base", {
     TAB_CHANGED: "ankamon.tabChanged",
 
     /**
-     * Kullanıcının seçtiği sütun sıralaması veri yenilenince kaybolmasın (kullanıcı bildirimi: Tahtalar sıralaması kısa
+     * Kullanıcının seçtiği sütun sıralaması veri yenilenince kaybolmasın (kullanıcı bildirimi: Cihazlar sıralaması kısa
      * süre sonra varsayılana dönüyordu). qx Simple.setData() varsayılan olarak sıralamayı siler; sayfalar kendini
      * tazeledikçe sıralama gidiyordu. Bu sarmalayıcıyla parametresiz setData(rows) sıralamayı korur ve yeni veriyi aynı
      * sütun/yönde yeniden dizer. Açık parametre verenler değişmez: setData(rows, true) siler, setData(rows, false) korur
@@ -306,7 +306,7 @@ qx.Class.define("ankamon.page.Base", {
 
     /**
      * Sütun başlığıyla yapılan sıralama kullanıcı başına sunucuda (users.ui_prefs["<key>.sort"] = {id, asc}, bkz.
-     * AuthApi::prefs) saklanır ve tablo kurulurken geri yüklenir (kullanıcı isteği: Tahtalar). Sıralama kalkınca
+     * AuthApi::prefs) saklanır ve tablo kurulurken geri yüklenir (kullanıcı isteği: Cihazlar). Sıralama kalkınca
      * (clearSorting) kayıt silinir. Model keepSortOnReload'lu olmalı (veri gelince kayıtlı sıra korunur).
      * @param columns {Array} kullanıcı sütunları [{id}] — tablo modelinde `offset`'ten itibaren bu sırayla
      */
@@ -428,7 +428,7 @@ qx.Class.define("ankamon.page.Base", {
     super(new qx.ui.layout.VBox(12));
     this._user = user;
 
-    // Sayfa başlığı gösterilmez: üst başlıktaki yol gösterimi ("Ankamon > Tahtalar", bkz. ui.ShellNavPath) yerini
+    // Sayfa başlığı gösterilmez: üst başlıktaki yol gösterimi ("Ankamon > Cihazlar", bkz. ui.ShellNavPath) yerini
     // tuttu, dikey alan kazanıldı (kullanıcı isteği). Etiket yine kurulur (sayfalar değerini değiştirebiliyor, ör. Logs).
     this._toolbar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
     if (title) {
@@ -484,7 +484,7 @@ qx.Class.define("ankamon.page.Base", {
 
     /**
      * Düğme satırına (sarılabilir) bir düğme ekler. `this._compact = true` ayarlanmış sayfalarda
-     * (çok düğmeli, kalabalık araç çubukları — ör. Tahtalar) düğmeler küçük dolgu + küçük yazı
+     * (çok düğmeli, kalabalık araç çubukları — ör. Cihazlar) düğmeler küçük dolgu + küçük yazı
      * tipiyle eklenir, satır daha az yer kaplar.
      */
     _addButton(label, handler) {
@@ -588,7 +588,7 @@ qx.Class.define("ankamon.page.Base", {
           litId = modifier ? null : id;
           anchor = row;
         });
-        // Çift tıklama (ör. Tahtalar'da Düzenle) iki tıklama üretir; bunlar yukarıdaki kurala göre işareti
+        // Çift tıklama (ör. Cihazlar'da Düzenle) iki tıklama üretir; bunlar yukarıdaki kurala göre işareti
         // bir ya da iki kez değiştirmiş olabilir — çift tıklamanın amacı işaretlemek olmadığından net
         // değişiklik (tek sayıda değişiklik) geri alınır. Onay kutusu sütunundaki çift tıklama hariç.
         table.addListener("cellDbltap", e => {

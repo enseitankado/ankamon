@@ -11,7 +11,7 @@ görevi değeri şöyle okur:
     enabled = setting(conn, "<ad>", "<key>", default=False)
 
 Cihaz kimliği satırları (device_identity_rows): ext/<ad>/worker/device_identity.py içinde
-ROWS(conn, board_ids) → {board_id: [[ad, değer], …]} tanımlayan eklenti, tahtanın kilit ekranındaki kimlik
+ROWS(conn, board_ids) → {board_id: [[ad, değer], …]} tanımlayan eklenti, cihazın kilit ekranındaki kimlik
 bilgisine satır ekler (ör. envanter numarası). Çekirdek hiçbir eklentiyi adıyla bilmez.
 """
 
@@ -60,7 +60,7 @@ def _load_identity_modules() -> list:
 
 
 def device_identity_rows(conn, board_ids: list[int]) -> dict[int, list]:
-    """Eklentilerin tahta başına kimlik satırları: {board_id: [[ad, değer], …]} (boş değerler atlanır)."""
+    """Eklentilerin cihaz başına kimlik satırları: {board_id: [[ad, değer], …]} (boş değerler atlanır)."""
     out: dict[int, list] = {}
     for mod in _load_identity_modules():
         try:

@@ -27,14 +27,14 @@
 
 /**
  * Parola ayarla penceresinin "Yönetici hesapları" sekmesi: seçilen TEK bilgisayarda root ve etapadmin parolası (bkz. worker
- * executor/board_password.py). Tahtadaki parola genel paroladan (Ayarlar ▸ SSH erişimi) farklıysa mevcut parola kutusu çıkar:
- * "Doğrula" tahtada sınar, doğrulanmadan yeni parola verilemez. Hesaplar yetkiye göre (boards.passwords.<hesap>).
+ * executor/board_password.py). Cihazdaki parola genel paroladan (Ayarlar ▸ SSH erişimi) farklıysa mevcut parola kutusu çıkar:
+ * "Doğrula" cihazda sınar, doğrulanmadan yeni parola verilemez. Hesaplar yetkiye göre (boards.passwords.<hesap>).
  */
 qx.Class.define("ankamon.ui.boards.AdminPasswordPanel", {
   extend: qx.ui.tabview.Page,
 
   /**
-   * @param boards {Array} çevrim içi tahtalar (birden çoksa seçim kutusu)
+   * @param boards {Array} çevrim içi cihazlar (birden çoksa seçim kutusu)
    * @param accounts {Array} yetkili hesaplar ("root", "etapadmin")
    */
   construct(boards, accounts) {
@@ -83,7 +83,7 @@ qx.Class.define("ankamon.ui.boards.AdminPasswordPanel", {
     },
 
     __section(name) {
-      const group = new qx.ui.groupbox.GroupBox(name === "root" ? "⚠ root (sistem yöneticisi)" : "⚠ etapadmin (tahtanın yönetici hesabı)")
+      const group = new qx.ui.groupbox.GroupBox(name === "root" ? "⚠ root (sistem yöneticisi)" : "⚠ etapadmin (cihazın yönetici hesabı)")
         .set({ layout: new qx.ui.layout.VBox(6) });
       const state = new qx.ui.basic.Label("Durum okunuyor…").set({ rich: true, wrap: true, textColor: "app-muted", allowGrowX: true });
       group.add(state);
@@ -191,7 +191,7 @@ qx.Class.define("ankamon.ui.boards.AdminPasswordPanel", {
       }
       this.__sections.forEach(sec => {
         if (!data) {
-          sec.state.setValue(sec.red("Durum okunamadı: " + (target.output || "tahtaya ulaşılamadı")));
+          sec.state.setValue(sec.red("Durum okunamadı: " + (target.output || "cihaza ulaşılamadı")));
           return;
         }
         const info = data[sec.name] || {};

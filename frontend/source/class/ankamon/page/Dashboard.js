@@ -26,7 +26,7 @@
  */
 
 /**
- * Genel bakış: tahta sayıları, son 24 saatin log yoğunluğu, son hatalar ve görevler. Her bilgi
+ * Genel bakış: cihaz sayıları, son 24 saatin log yoğunluğu, son hatalar ve görevler. Her bilgi
  * kartının ipucu yalnız kendi konusunu, güncel değerlerle anlatır (bkz. __tip).
  *
  * Kartların altında yan yana (kullanıcı isteği 2026-11-06), her biri yalnız yetkisi olana:
@@ -213,7 +213,7 @@ qx.Class.define("ankamon.page.Dashboard", {
         const box = this.__panel("Sağlık — acil bulgular");
         this.__urgentTitle = box.getChildren()[0].getChildren()[0];
         this.__urgent = this._createTable([
-          { id: "board", label: "Tahta", width: 150 },
+          { id: "board", label: "Cihaz", width: 150 },
           { id: "check", label: "Bulgu", width: 220 },
           { id: "path", label: "Yol", width: 110 },
           { id: "at", label: "Zaman", width: 140 },
@@ -340,7 +340,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       }
       const bad = (data.findings || []).filter(f => f.level === "bad");
       const boards = new Set(bad.map(f => f.board_id ?? f.board));
-      this.__urgentTitle.setValue(bad.length ? `Sağlık — acil bulgular (${boards.size} tahtada ${bad.length})`
+      this.__urgentTitle.setValue(bad.length ? `Sağlık — acil bulgular (${boards.size} cihazda ${bad.length})`
         : "Sağlık — acil bulgu yok");
       this.__urgent.getTableModel().setData(bad.map((f, i) => [i, f.board || "?", f.check, P[f.path] ? P[f.path].text : f.path,
         f.since ? ankamon.ui.health.Status.when(f.since) : "", (f.text || "") + (f.advice ? ` — Öneri: ${f.advice}` : "")]));
@@ -361,10 +361,10 @@ qx.Class.define("ankamon.page.Dashboard", {
       // [başlık, değer, renk, alt satır, ipucu anahtarı] — ipucu her kartın KENDİ konusunu anlatır
       // (bkz. __tip); her yenilemede güncel değerlerle yeniden kurulur.
       [
-        ["Kayıtlı tahta", n(bt.total), null, `${n(bt.total - bt.online)} kapalı`, "boards"],
+        ["Kayıtlı cihaz", n(bt.total), null, `${n(bt.total - bt.online)} kapalı`, "boards"],
         ["Çevrimiçi", n(bt.online), "app-ok", bt.total ? `%${Math.round(bt.online * 100 / bt.total)}` : null, "online"],
-        ["Sensör verisi gelen", n(bt.exporter_ok), null, `${n(bt.total - bt.exporter_ok)} tahtadan gelmiyor`, "exporter"],
-        ["Log gönderen (24 sa)", n(bt.logging), null, `${n(bt.total - bt.logging)} tahtadan gelmiyor`, "logging"],
+        ["Sensör verisi gelen", n(bt.exporter_ok), null, `${n(bt.total - bt.exporter_ok)} cihazdan gelmiyor`, "exporter"],
+        ["Log gönderen (24 sa)", n(bt.logging), null, `${n(bt.total - bt.logging)} cihazdan gelmiyor`, "logging"],
         ["Log (24 sa)", n(logs), null, F.bytes(data.storage.tables.logs.bytes) + " (tümü)", "logs"],
         ["Hata (24 sa)", n(errors), errors ? "error" : null, logs ? `logların %${(errors * 100 / logs).toFixed(1)}'i` : null, "errors"],
         ["Sensör kaydı", this.__millions(data.metrics_rows), null, F.bytes(data.metrics_bytes), "metrics"],
@@ -389,9 +389,9 @@ qx.Class.define("ankamon.page.Dashboard", {
     },
 
     /**
-     * Satır sağ menüsü: "Hata loglarını göster" — Loglar sayfasını o tahtaya ve "Hata ve üstü"
-     * önem düzeyine süzülmüş açar (bkz. ui.Shell.OPEN_LOGS). Görevlerin birden çok hedef tahtası
-     * olabildiğinden, birden fazlaysa her tahta için ayrı madde (alt menü) çıkar.
+     * Satır sağ menüsü: "Hata loglarını göster" — Loglar sayfasını o cihaza ve "Hata ve üstü"
+     * önem düzeyine süzülmüş açar (bkz. ui.Shell.OPEN_LOGS). Görevlerin birden çok hedef cihazı
+     * olabildiğinden, birden fazlaysa her cihaz için ayrı madde (alt menü) çıkar.
      * @param boardsOf {Function} satırın kimlik değeri → [{id, name}]
      */
     __addLogsMenu(table, boardsOf) {
@@ -424,7 +424,7 @@ qx.Class.define("ankamon.page.Dashboard", {
             item.addListener("execute", () => open(b.id));
             sub.add(item);
           });
-          menu.add(new qx.ui.menu.Button(`${label} (${boards.length} tahta)`, null, null, sub));
+          menu.add(new qx.ui.menu.Button(`${label} (${boards.length} cihaz)`, null, null, sub));
         }
         table.setContextMenu(menu);
       });
@@ -442,8 +442,8 @@ qx.Class.define("ankamon.page.Dashboard", {
       const disk = (text, tab) => this._can("logs.manage") ? { text, open: send(Shell.OPEN_PAGE, { diskUsage: tab }) } : null;
       const logs = (text, open) => this._can("logs") ? { text, open } : null;
       switch (key) {
-        case "boards": return page("Tahtalar listesi", { page: "boards", status: "" }, "boards");
-        case "online": return page("Çevrimiçi tahtalar", { page: "boards", status: "Çevrimiçi" }, "boards");
+        case "boards": return page("Cihazlar listesi", { page: "boards", status: "" }, "boards");
+        case "online": return page("Çevrimiçi cihazlar", { page: "boards", status: "Çevrimiçi" }, "boards");
         case "exporter": return page("Sensörler", { page: "metrics" }, "metrics");
         case "logging":
         case "logs": return logs("Sistem logları", send(Shell.OPEN_LOGS_MODE, "system"));
@@ -489,36 +489,36 @@ qx.Class.define("ankamon.page.Dashboard", {
 
       switch (key) {
         case "boards":
-          title = "Kayıtlı tahta";
-          body = `Ankamon'un tanıdığı tahtaların tamamı: <b>${n(bt.total)}</b><br>` +
+          title = "Kayıtlı cihaz";
+          body = `Ankamon'un tanıdığı cihazların tamamı: <b>${n(bt.total)}</b><br>` +
             `├ çevrimiçi: ${n(bt.online)}<br>└ kapalı: ${n(off)}<br><br>` +
-            "Tahta log göndermeye başlayınca (TiHA merkezi log ayarı) en geç ~1 dk içinde kendiliğinden<br>" +
-            "kaydedilir; Tahtalar → Ekle ile elle de eklenebilir. Silinen bir tahta log göndermeyi<br>" +
+            "Cihaz log göndermeye başlayınca (TiHA merkezi log ayarı) en geç ~1 dk içinde kendiliğinden<br>" +
+            "kaydedilir; Cihazlar → Ekle ile elle de eklenebilir. Silinen bir cihaz log göndermeyi<br>" +
             "sürdürse de yeniden eklenmez — yalnız elle eklenirse.";
           break;
         case "online":
           title = "Çevrimiçi";
-          body = `Şu an açık olan tahtalar: <b>${n(bt.online)}</b> / ${n(bt.total)}` +
+          body = `Şu an açık olan cihazlar: <b>${n(bt.online)}</b> / ${n(bt.total)}` +
             (bt.total ? ` (%${Math.round(bt.online * 100 / bt.total)})` : "") + `, kapalı: ${n(off)}<br><br>` +
-            "Bir tahta şu durumda çevrimiçi sayılır:<br>" +
+            "Bir cihaz şu durumda çevrimiçi sayılır:<br>" +
             "├ son 2 dakikada log geldiyse, ya da<br>" +
             "└ SSH / sensör portu yoklamasına yanıt veriyorsa (yaklaşık 10 sn'de bir).<br>" +
             "Kapalıya dönmesi için üst üste 2 yoklamanın başarısız olması gerekir (anlık kopmalar sayılmaz).<br>" +
-            "Kapalı tahtalar Tahtalar sayfasından \"Uyandır\" (WoL) ile açılabilir.";
+            "Kapalı cihazlar Cihazlar sayfasından \"Uyandır\" (WoL) ile açılabilir.";
           break;
         case "exporter":
           title = "Sensör verisi gelen";
-          body = `Sensör portu (node_exporter, varsayılan 9100) yanıt veren tahtalar: <b>${n(bt.exporter_ok)}</b> / ${n(bt.total)}<br>` +
-            `Veri gelmeyen: ${n(bt.total - bt.exporter_ok)} tahta — kapalı, sensör toplama kapatılmış ya da port yanıt vermiyor.<br><br>` +
-            "Telegraf bu tahtaların CPU, bellek, disk, ağ ve sıcaklık değerlerini dakikada bir okuyup<br>" +
+          body = `Sensör portu (node_exporter, varsayılan 9100) yanıt veren cihazlar: <b>${n(bt.exporter_ok)}</b> / ${n(bt.total)}<br>` +
+            `Veri gelmeyen: ${n(bt.total - bt.exporter_ok)} cihaz — kapalı, sensör toplama kapatılmış ya da port yanıt vermiyor.<br><br>` +
+            "Telegraf bu cihazların CPU, bellek, disk, ağ ve sıcaklık değerlerini dakikada bir okuyup<br>" +
             "veritabanına yazar (bkz. \"Sensör kaydı\" kartı).";
           break;
         case "logging":
           title = "Log gönderen (24 sa)";
-          body = `Son 24 saatte en az bir log gönderen tahta: <b>${n(bt.logging)}</b> / ${n(bt.total)}<br>` +
-            `24 saattir log gelmeyen: ${n(bt.total - bt.logging)} tahta — kapalı kalmış ya da TiHA'nın merkezi log<br>` +
-            "sunucusu ayarı o tahtada etkin değil.<br>" +
-            pre("tahta ─(514/tcp,udp)─► rsyslog ─► veritabanı (logs tablosu)");
+          body = `Son 24 saatte en az bir log gönderen cihaz: <b>${n(bt.logging)}</b> / ${n(bt.total)}<br>` +
+            `24 saattir log gelmeyen: ${n(bt.total - bt.logging)} cihaz — kapalı kalmış ya da TiHA'nın merkezi log<br>` +
+            "sunucusu ayarı o cihazda etkin değil.<br>" +
+            pre("cihaz ─(514/tcp,udp)─► rsyslog ─► veritabanı (logs tablosu)");
           break;
         case "logs":
           title = "Log (24 sa)";
@@ -544,13 +544,13 @@ qx.Class.define("ankamon.page.Dashboard", {
         }
         case "metrics":
           title = "Sensör kaydı";
-          body = "Telegraf'ın tahtalardan okuduğu ölçümler (log değildir): " +
+          body = "Telegraf'ın cihazlardan okuduğu ölçümler (log değildir): " +
             `<b>≈${n(t.metrics.rows)}</b> satır, ${F.bytes(t.metrics.bytes)}<br>` +
             "Saklandığı yer: <b>data/postgres</b> → metrics tablosu. Disk tasarrufu için yaşlandıkça seyreltilir:" +
             pre(`ayrıntılı (dakikalık) ── ${gun(p.metrics?.drop_after)} tutulur, ${gun(p.metrics?.compress_after)} sonra sıkıştırılır\n` +
               `   └► 5 dk ortalama ─── ${gun(p.metrics_5m?.drop_after)}\n` +
               `        └► saatlik ──── ${gun(p.metrics_1h?.drop_after)}`) +
-            muted("Grafik ve tahta ayrıntıları: Grafana / Sensörler");
+            muted("Grafik ve cihaz ayrıntıları: Grafana / Sensörler");
           break;
         case "queue":
           title = "Log kuyruğu";
@@ -593,7 +593,7 @@ qx.Class.define("ankamon.page.Dashboard", {
           };
           body = `<b>data/backups</b>: toplam <b>${F.bytes(b.bytes)}</b> · ${n(b.files)} dosya` +
             pre(kind("full", `tam yedek (loglar + sensör dahil) · günde 1 (${esc(b.full_at)}), son ${b.keep_full} tutulur`) +
-              kind("config", `ayarlar/kullanıcılar/tahtalar · ${b.config_every_hours} saatte 1, son ${b.keep_config} tutulur`) +
+              kind("config", `ayarlar/kullanıcılar/cihazlar · ${b.config_every_hours} saatte 1, son ${b.keep_config} tutulur`) +
               kind("grafana", "Grafana pano ayarları · config ile birlikte") +
               kind("files", `/data dosya depoları (tar.gz) · günde 1 (${esc(b.files_at || "")}), son ${b.keep_files} tutulur`, true)) +
             muted("Plan: Sistem ▸ Yedekler") + "<br>" +

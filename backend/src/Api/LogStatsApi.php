@@ -37,10 +37,10 @@ use Ankamon\Core\Request;
 use Ankamon\Core\Storage;
 
 /**
- * Tahta/tür bazında log alanı: kayıt sayısı, tarih aralığı, diskteki yaklaşık boyut — ve kalıcı silme.
+ * Cihaz/tür bazında log alanı: kayıt sayısı, tarih aralığı, diskteki yaklaşık boyut — ve kalıcı silme.
  *
  * "logs" (sistem logları) TimescaleDB hypertable'ı, sıkıştırılmış saklanır (bkz. 001_core.sql);
- * sıkıştırılmış bir yığın birden çok tahtanın satırlarını birlikte tutar, bu yüzden tahta başına
+ * sıkıştırılmış bir yığın birden çok cihazın satırlarını birlikte tutar, bu yüzden cihaz başına
  * GERÇEK disk boyutu ayrıştırılamaz. Boyut, tablonun toplam fiziksel boyutunun (Storage::relationBytes
  * — hypertable'da hypertable_size) satır sayısına ORANTILI PAYLAŞTIRILMASIYLA tahmin edilir — arayüzde
  * "~" ile işaretlenmeli.
@@ -55,15 +55,15 @@ final class LogStatsApi
     }
 
     /**
-     * Kalıcı silme. Kapsam: type (system|command, zorunlu) + board (tahta id'si, "unmatched"
-     * — tahtasız/eşleşmeyen kayıtlar — ya da boş bırakılırsa TÜM kayıtlar) + isteğe bağlı from/to
+     * Kalıcı silme. Kapsam: type (system|command, zorunlu) + board (cihaz id'si, "unmatched"
+     * — cihazsız/eşleşmeyen kayıtlar — ya da boş bırakılırsa TÜM kayıtlar) + isteğe bağlı from/to
      * (ISO 8601; verilmezse tarih sınırı yok — o kapsamdaki HER ŞEY silinir). Geri alınamaz;
      * ne silindiği etkinlik denetim kaydına (audit_log) yazılır.
      */
     public function delete(Request $request, array $user): array
     {
         $type = $this->type($request);
-        $board = $request->query('board'); // id (sayısal), "unmatched" ya da null (tüm tahtalar)
+        $board = $request->query('board'); // id (sayısal), "unmatched" ya da null (tüm cihazlar)
         $from = $request->query('from');
         $to = $request->query('to');
 
@@ -91,7 +91,7 @@ final class LogStatsApi
                 $where[] = 'NOT EXISTS (SELECT 1 FROM boards b WHERE lower(b.hostname) = lower(logs.host) OR host(b.ip) = logs.from_ip)';
             } elseif ($board !== null) {
                 $b = Db::one('SELECT hostname, host(ip) AS ip FROM boards WHERE id = ?', [(int) $board])
-                    ?? throw ApiError::notFound('Tahta bulunamadı.');
+                    ?? throw ApiError::notFound('Cihaz bulunamadı.');
                 $where[] = '(lower(host) = lower(?) OR from_ip = ?)';
                 array_push($params, (string) $b['hostname'], (string) $b['ip']);
             }

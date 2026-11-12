@@ -27,15 +27,15 @@
 
 /**
  * Lig dışı bırakılanlar (Şampiyonlar Ligi ve Teneffüs Ligi ortak): görev gereği sürekli açık / sürekli oturumlu kalan
- * tahtalar ve kullanıcılar listenin başını hep tuttuğundan sıralamanın dışında bırakılabilir. Liste her lig için ayrı tutulur
+ * cihazlar ve kullanıcılar listenin başını hep tuttuğundan sıralamanın dışında bırakılabilir. Liste her lig için ayrı tutulur
  * (backend LeagueExclusionsApi, /league-exclusions) ve her zaman düzenlenebilir; veri silinmez. Lig görünümleri
  * varsayılan olarak lig dışılarını saymaz; "Sıralama dışındakileri de göster" kutusuyla onlar da (soluk ve "lig dışı"
  * etiketli) sıralamaya katılır.
  *
  * toolbar(): lig sekmesinin düğme satırına kutuyu ve (leagues.exclude yetkisiyle) "Lig dışı…" düğmesini ekler.
  * attachRowMenu(): kart satırlarında sağ tık "Lig dışı bırak" / "Lige geri al" (pencerenin kısayolu).
- * open(): seçim penceresi — bu eğitim-öğretim yılında ligde süresi olanlar (yıl toplamı çoktan aza) ve Tahtalar'daki
- * bütün tahtalar onay kutusuyla listelenir; arama kutusu ad/kullanıcı adı/bilgisayar adında arar.
+ * open(): seçim penceresi — bu eğitim-öğretim yılında ligde süresi olanlar (yıl toplamı çoktan aza) ve Cihazlar'daki
+ * bütün cihazlar onay kutusuyla listelenir; arama kutusu ad/kullanıcı adı/bilgisayar adında arar.
  */
 qx.Class.define("ankamon.ui.sessions.LeagueExclusions", {
   type: "static",
@@ -44,8 +44,8 @@ qx.Class.define("ankamon.ui.sessions.LeagueExclusions", {
     /** Lig (league, kind) → pencere başlığı ve aday türünün adı. */
     LEAGUE_EXCLUSION_TEXTS: {
       "session/user": { title: "Kullanım sıralaması — sıralama dışı kullanıcılar", noun: "kullanıcı" },
-      "session/board": { title: "Kullanım sıralaması — sıralama dışı tahtalar", noun: "tahta" },
-      "break/board": { title: "Teneffüsler — sıralama dışı tahtalar", noun: "tahta" },
+      "session/board": { title: "Kullanım sıralaması — sıralama dışı cihazlar", noun: "cihaz" },
+      "break/board": { title: "Teneffüsler — sıralama dışı cihazlar", noun: "cihaz" },
       "break/user": { title: "Teneffüsler — sıralama dışı kullanıcılar", noun: "kullanıcı" }
     },
 
@@ -56,14 +56,14 @@ qx.Class.define("ankamon.ui.sessions.LeagueExclusions", {
      */
     toolbar(bar, opts) {
       const check = new qx.ui.form.CheckBox("Sıralama dışındakileri de göster").set({ alignY: "middle", marginLeft: 8, allowShrinkX: false });
-      check.setToolTipText("Sıralama dışı bırakılan tahta/kullanıcılar varsayılan olarak sıralamaya ve toplamlara girmez; " +
+      check.setToolTipText("Sıralama dışı bırakılan cihaz/kullanıcılar varsayılan olarak sıralamaya ve toplamlara girmez; " +
         "işaretlenince onlar da soluk ve \"sıralama dışı\" etiketiyle katılır.");
       check.addListener("changeValue", () => opts.onChange());
       bar.add(check);
       let button = null;
       if (opts.page && opts.page._can("leagues.exclude")) {
         button = new qx.ui.form.Button("Sıralama dışı…").set({ alignY: "middle", allowShrinkX: false });
-        button.setToolTipText("Görev gereği sürekli açık kalan tahtaları / kullanıcıları sıralamanın dışında bırak " +
+        button.setToolTipText("Görev gereği sürekli açık kalan cihazları / kullanıcıları sıralamanın dışında bırak " +
           "(her zaman düzenlenebilir; veri silinmez)");
         button.addListener("execute", () =>
           ankamon.ui.sessions.LeagueExclusions.open(opts.league, opts.kind(), opts.onChange));
@@ -82,7 +82,7 @@ qx.Class.define("ankamon.ui.sessions.LeagueExclusions", {
     /**
      * Lig kartındaki satırın (kürsü basamağı ya da çubuk satırı) sağ menü kimliği: HTML öznitelikleri. attachRowMenu()
      * sağ tıklanan öğeden yukarı çıkarak bu öznitelikleri arar. @param kind {String} 'user' | 'board'
-     * @param value {String} kullanıcı adı / tahta host adı (league_exclusions.value) @param name {String} görünen ad
+     * @param value {String} kullanıcı adı / cihaz host adı (league_exclusions.value) @param name {String} görünen ad
      */
     rowAttrs(kind, value, name, excluded) {
       if (!value) {
@@ -188,7 +188,7 @@ qx.Class.define("ankamon.ui.sessions.LeagueExclusions", {
       }
       const excluded = new Set(data.excluded || []);
       const candidates = data.candidates || [];
-      // Lig dışı olup adaylarda bulunmayan (bu yıl süresi olmayan, Tahtalar'dan silinmiş) değerler de listelenir.
+      // Lig dışı olup adaylarda bulunmayan (bu yıl süresi olmayan, Cihazlar'dan silinmiş) değerler de listelenir.
       excluded.forEach(v => {
         if (!candidates.some(c => c.value === v)) {
           candidates.push({ value: v, label: null, seconds: 0 });

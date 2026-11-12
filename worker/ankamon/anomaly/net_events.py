@@ -25,12 +25,12 @@
 
 """Ağla ilgili log olaylarından anomaliler (bkz. log_events.event_rule): SSH kaba kuvvet, DHCP sorunu, ağ kartı hatası.
 
-Her biri yalnız tahtanın gönderdiği loglardan, art arda gelen olay ataklarıyla saptanır:
+Her biri yalnız cihazın gönderdiği loglardan, art arda gelen olay ataklarıyla saptanır:
   - ssh_bruteforce: aynı kaynaktan kısa sürede çok başarısız SSH girişi ("Failed password", "Invalid user"). Kaynak
-    Ankamon'un kendisi de olabilir (ayarlardaki SSH parolası tahtanınkinden farklıysa): ayrıntıda kaynak adres ve — ağ
+    Ankamon'un kendisi de olabilir (ayarlardaki SSH parolası cihazınkinden farklıysa): ayrıntıda kaynak adres ve — ağ
     envanterinde (net_devices, ağ taraması) varsa — o adresin MAC adresi ve üreticisi yazar (kullanıcı isteği).
   - dhcp_issue: NetworkManager adres alamadı (no lease, zaman aşımı, başarısız). TiHA'nın bakım profili NetworkManager'ın
-    bilgi satırlarını iletmez: yalnız bu satırları gönderen tahtalarda görülür.
+    bilgi satırlarını iletmez: yalnız bu satırları gönderen cihazlarda görülür.
   - nic_error: ağ kartı sürücüsünün zaman aşımı / takılma satırları (kern.warning düzeyinde, bakım profilinde de gelir).
 """
 

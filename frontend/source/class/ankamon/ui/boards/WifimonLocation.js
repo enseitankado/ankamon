@@ -26,7 +26,7 @@
  */
 
 /**
- * Wi-Fi Monitör güvenilir vericilerinin fiziksel konumu (kullanıcı isteği 2026-11-11): sensör (tahta) başına bant bant sinyal
+ * Wi-Fi Monitör güvenilir vericilerinin fiziksel konumu (kullanıcı isteği 2026-11-11): sensör (cihaz) başına bant bant sinyal
  * istatistiğinden (GET /api/wifimon/locations — worker screen/wifimon_signal_log.py, göç 050) "hangi sensörün yanında" önerisi.
  * Güvenilir cihazlar bir sensörün birkaç metre yakınında sabittir; kullanıcı öneriye bakıp Güvenilir listesi penceresinde açılır
  * listeden sensörü seçer (ui.boards.WifimonFixedDialog).
@@ -56,7 +56,7 @@ qx.Class.define("ankamon.ui.boards.WifimonLocation", {
       return kind === "bssid" ? a.slice(0, 14) : a;
     },
 
-    /** Sensörün açılır listedeki adı: kod adı (tahta takma adı); yoksa bilgisayar adı / kablolu MAC. */
+    /** Sensörün açılır listedeki adı: kod adı (cihaz takma adı); yoksa bilgisayar adı / kablolu MAC. */
     sensorName(s) {
       if (!s) {
         return "?";
@@ -138,7 +138,7 @@ qx.Class.define("ankamon.ui.boards.WifimonLocation", {
         ? `5 GHz'i güçlü duyuyor (ort ${five.avg} dBm) — aynı oda / görüş hattı olası.` : "";
       const tip = `Öneri: ${name} — en yüksek puan ${top.score} (bant ortalaması; 5 GHz +7 dB düzeltmeli).` +
         (margin !== null ? ` İkinci sensörden ${margin} dB önde (${this.sensorName(sensorsById.get(second.boardId))}).` :
-          " Bu cihazı yalnız bu sensör duydu; karşı/yan sınıftaki tahtayı da sensör olarak açın.") +
+          " Bu cihazı yalnız bu sensör duydu; karşı/yan sınıftaki cihazı da sensör olarak açın.") +
         (fiveNote ? "\n" + fiveNote : "") +
         `\nGüven: ${level} (≥ 6 dB fark güçlü, 3–6 orta; en iyi sensörde ${top.n} ölçüm, ${this.ENOUGH_SAMPLES}'dan azı "veri az").`;
       return { boardId: top.boardId, level, margin, text: `${name} (${level}${margin !== null ? `, +${margin} dB` : ""})`, tip };

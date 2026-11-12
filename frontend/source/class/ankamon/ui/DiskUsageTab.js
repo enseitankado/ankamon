@@ -27,7 +27,7 @@
 
 /**
  * Disk kullanımı sayfasının (bkz. page.DiskUsage, ui.DiskUsage) tek bir veri sekmesi: bir veri türünün kapsamlarını
- * (tahta, görev, "tümü"…) kayıt sayısı ve YAKLAŞIK boyutuyla listeler; Ctrl/Shift ile tekli ya da
+ * (cihaz, görev, "tümü"…) kayıt sayısı ve YAKLAŞIK boyutuyla listeler; Ctrl/Shift ile tekli ya da
  * çoklu seçilen kapsamları sağ menüden veya "Seçilenleri sil" düğmesinden KALICI olarak siler ya da "İndir" ile
  * dosya olarak indirir (satırın scope'u silme ve indirme isteğinde aynıdır — bkz. backend StorageExportApi).
  * Türün kendine özgü kısmı (sütunlar, yükleme, silme isteği) `spec` ile verilir:

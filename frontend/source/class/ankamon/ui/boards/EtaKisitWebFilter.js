@@ -27,8 +27,8 @@
 
 /**
  * Sağ menü Yönet ▸ "Web filtresi": ETAP Pardus'taki eta-kisit uygulamasıyla kara/beyaz liste ve adres başına DNS sayıları
- * (bkz. worker executor/eta_kisit_webfilter.py). Çoklu seçimde liste ilk uygun tahtadan yüklenir, sayılar toplanır, uygulama bütün
- * uygun tahtalara gider. ETAP dışı ya da eta-kisit'siz tahta atlanır, nedeni pencerede yazar.
+ * (bkz. worker executor/eta_kisit_webfilter.py). Çoklu seçimde liste ilk uygun cihazdan yüklenir, sayılar toplanır, uygulama bütün
+ * uygun cihazlara gider. ETAP dışı ya da eta-kisit'siz cihaz atlanır, nedeni pencerede yazar.
  */
 qx.Class.define("ankamon.ui.boards.EtaKisitWebFilter", {
   type: "static",
@@ -42,9 +42,9 @@ qx.Class.define("ankamon.ui.boards.EtaKisitWebFilter", {
       not_etap: "ETAP Pardus değil, Web Filtre uygulanmaz.",
       no_eta_kisit: "eta-kisit kurulu değil, Web Filtre uygulanmaz."
     },
-    COUNT_NOTE: "Sayılar tahtanın DNS sorgularıdır, sayfa ziyareti değil: tek sayfa birkaç sorgu üretir, tarayıcı önbelleği sorguyu " +
+    COUNT_NOTE: "Sayılar cihazın DNS sorgularıdır, sayfa ziyareti değil: tek sayfa birkaç sorgu üretir, tarayıcı önbelleği sorguyu " +
       "azaltır, Chrome kara listedeki adresi kendisi de keser. Alt alan adları dahildir. Kayıtlar onar onar yazılır: son birkaç sorgu " +
-      "henüz görünmeyebilir. Tahtada son 8 MB kayıt tutulur; filtre kapatılınca silinir.",
+      "henüz görünmeyebilir. Cihazda son 8 MB kayıt tutulur; filtre kapatılınca silinir.",
     LIST_NOTE: "ntp.org, eba.gov.tr ve etap.org.tr hep açıktır: kara listede etkisiz, beyaz listeye kendiliğinden eklenir. Beyaz " +
       "listede youtubekids.com ve turkiye.gov.tr gereken alan adlarını da açar. Filtre açıkken eta-kisit DNS olarak sabit " +
       "195.175.37.137/138 kullanır.",
@@ -78,14 +78,14 @@ qx.Class.define("ankamon.ui.boards.EtaKisitWebFilter", {
         }
         await new Promise(r => setTimeout(r, 600));
       }
-      throw new Error("Tahtalardan yanıt alınamadı (zaman aşımı).");
+      throw new Error("Cihazlardan yanıt alınamadı (zaman aşımı).");
     },
 
-    /** "Web filtresini kapat": pencere açmadan, onayla (listeler tahtada saklı kalır). */
+    /** "Web filtresini kapat": pencere açmadan, onayla (listeler cihazda saklı kalır). */
     async turnOff(boards) {
       const ok = await ankamon.ui.Dialog.confirm(
         `<b>${boards.length} bilgisayarda</b> Web Filtre kapatılsın mı?<br>Sayım kayıtları silinir, adres listeleri eta-kisit profilinde kalır. ` +
-        "ETAP dışı ya da eta-kisit'siz tahtada işlem yapılmaz.", "Kapat");
+        "ETAP dışı ya da eta-kisit'siz cihazda işlem yapılmaz.", "Kapat");
       if (ok) {
         ankamon.ui.Jobs.show(
           ankamon.io.Api.post("/jobs", { type: "webfilter_apply", mode: "off", board_ids: boards.map(b => b.id) }).then(res => res.id),
@@ -94,9 +94,9 @@ qx.Class.define("ankamon.ui.boards.EtaKisitWebFilter", {
     },
 
     /**
-     * @param online {Array} uygulanacak (çevrim içi) tahtalar
-     * @param selected {Array} sağ menünün uygulandığı bütün tahtalar (çevrim dışı olanlar pencerede yazılır)
-     * @param mode {String?} açılışta seçili mod ("denylist", "allowlist"); verilmezse tahtadaki mod
+     * @param online {Array} uygulanacak (çevrim içi) cihazlar
+     * @param selected {Array} sağ menünün uygulandığı bütün cihazlar (çevrim dışı olanlar pencerede yazılır)
+     * @param mode {String?} açılışta seçili mod ("denylist", "allowlist"); verilmezse cihazdaki mod
      */
     open(online, selected, mode) {
       const esc = qx.bom.String.escape;
@@ -105,7 +105,7 @@ qx.Class.define("ankamon.ui.boards.EtaKisitWebFilter", {
       const win = ankamon.ui.Dialog.window(`Web Filtre — ${title}`, 780, { maximizable: true });
       win.setHeight(680);
 
-      const boardStates = new qx.ui.basic.Label(ankamon.ui.JobSpinner.label("Tahtalar okunuyor…")).set({ rich: true, wrap: true, selectable: true, allowGrowX: true });
+      const boardStates = new qx.ui.basic.Label(ankamon.ui.JobSpinner.label("Cihazlar okunuyor…")).set({ rich: true, wrap: true, selectable: true, allowGrowX: true });
       win.add(boardStates);
 
       const modeRow = new qx.ui.container.Composite(new qx.ui.layout.HBox(16));
@@ -157,7 +157,7 @@ qx.Class.define("ankamon.ui.boards.EtaKisitWebFilter", {
       });
       const lists = { denylist: [], allowlist: [] };
       let counts = {};
-      let usable = [];   // eta-kisit'i olan tahtalar
+      let usable = [];   // eta-kisit'i olan cihazlar
       let wanted = mode || null; // kullanıcının seçtiği mod; yenileme bunu ezmez
       let setting = false;
 
@@ -300,7 +300,7 @@ qx.Class.define("ankamon.ui.boards.EtaKisitWebFilter", {
           const differ = ready.some(r => signature(r.data) !== signature(first));
           const lines = results.map(({ t, data }) => `<b>${esc(t.board)}</b>: ${data ? describe(data) : failText(t)}`).concat(offlineLines());
           if (differ) {
-            lines.unshift(`<span style="color:#e37400">Tahtalardaki mod ya da listeler farklı: gösterilen ${esc(ready[0].t.board)} tahtasınınki, sayılar toplam. Uygula hepsine bunu yazar.</span>`);
+            lines.unshift(`<span style="color:#e37400">Cihazlardaki mod ya da listeler farklı: gösterilen ${esc(ready[0].t.board)} cihazınınki, sayılar toplam. Uygula hepsine bunu yazar.</span>`);
           }
           boardStates.setValue((notes ? notes.concat(lines) : lines).join("<br>"));
           const key = wanted || (first.mode === "none" ? "off" : first.mode);

@@ -25,16 +25,16 @@
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
 # Ekran yansıtma aktarıcısı (MediaMTX): yöneticinin tarayıcısı ekranını WebRTC/WHIP ile buraya yollar
-# (nginx /cast/mtx/ → 127.0.0.1:8897, oturum + "cast" yetkisiyle), tahtalardaki mpv aynı yayını RTSP
+# (nginx /cast/mtx/ → 127.0.0.1:8897, oturum + "cast" yetkisiyle), cihazlardaki mpv aynı yayını RTSP
 # ile okur. Görüntü yeniden kodlanmaz, yalnız aktarılır (işlemci yükü çok düşük).
 #
 # Erişim kuralları:
 #   - yayınlama yalnız 127.0.0.1'den (yani yalnız nginx vekili üzerinden, yetki denetiminden geçmiş);
 #   - okuma yalnız "c-<rastgele 24+ karakter>" adlı yollardan — yol adını yalnız yayını başlatan sayfa
-#     ve o yayının tahtaları bilir (bkz. docker/rootfs/cast/index.html, worker/ankamon/executor/cast.py);
-#   - ekran aktarımı (tahtadan tahtaya, bkz. worker/ankamon/executor/relay.py): "r-<rastgele>" yolları tahtadan
-#     da yayınlanır ve okunur — yol adını yalnız o aktarımın tahtaları bilir.
-# Dışa açık portlar: RTSP 8554/tcp (tahtalar okur), WebRTC ICE 8189/udp+tcp (tarayıcının medya akışı).
+#     ve o yayının cihazları bilir (bkz. docker/rootfs/cast/index.html, worker/ankamon/executor/cast.py);
+#   - ekran aktarımı (cihazdan cihaza, bkz. worker/ankamon/executor/relay.py): "r-<rastgele>" yolları cihazdan
+#     da yayınlanır ve okunur — yol adını yalnız o aktarımın cihazları bilir.
+# Dışa açık portlar: RTSP 8554/tcp (cihazlar okur), WebRTC ICE 8189/udp+tcp (tarayıcının medya akışı).
 set -eu
 
 CONF=/run/ankamon/mediamtx.yml

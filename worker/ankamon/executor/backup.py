@@ -23,17 +23,17 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtadaki bir hesabın ev dizinini, erişim izinleri ve dosya/dizin sahiplikleriyle tar.gz olarak yedekler.
+"""Cihazdaki bir hesabın ev dizinini, erişim izinleri ve dosya/dizin sahiplikleriyle tar.gz olarak yedekler.
 
-Tahtalar/Ekranlar sağ menüsü "Yedekle/Geri al" ▸ Yedekle sekmesi (bkz. frontend ui/homebackup) "backup_home"
-görevini açar (seçilen tahtalar × seçilen hesaplar); runner tahtaları SIRAYLA bu modülle işler (bkz.
+Cihazlar/Ekranlar sağ menüsü "Yedekle/Geri al" ▸ Yedekle sekmesi (bkz. frontend ui/homebackup) "backup_home"
+görevini açar (seçilen cihazlar × seçilen hesaplar); runner cihazları SIRAYLA bu modülle işler (bkz.
 runner/__main__.py). Geri alma: bkz. home_restore.py.
 
-Tek SSH oturumu: tahtada önce `du` ile ev dizininin toplam boyutu ölçülür, ardından GNU tar arşivi
-gzip'leyip stdout'a yazar — sıkıştırma tahtada yapılır (ağ ve konteyner CPU'su az kullanılır), akış
+Tek SSH oturumu: cihazda önce `du` ile ev dizininin toplam boyutu ölçülür, ardından GNU tar arşivi
+gzip'leyip stdout'a yazar — sıkıştırma cihazda yapılır (ağ ve konteyner CPU'su az kullanılır), akış
 doğrudan sunucudaki dosyaya iner (Python belleğinden geçmez). tar'ın --checkpoint'i her CHECKPOINT
 kayıtta (kayıt = 10240 bayt, sıkıştırılmamış) stderr'e bir satır yazar; ilerleme yüzdesi buradan,
-du'nun toplamına oranla hesaplanır. Tahtada nice/ionice ile en düşük öncelikte çalışır.
+du'nun toplamına oranla hesaplanır. Cihazda nice/ionice ile en düşük öncelikte çalışır.
 
 Arşiv: izinler, sahiplik (ad + sayısal kimlik), ACL ve genişletilmiş öznitelikler korunur. Arşivin İLK üyesi
 hesap bilgisidir (HOME_BACKUP_META, JSON: kimlikler, tam ad, kabuk, gruplar, parola özeti ve varsa PIN anahtarı —
@@ -97,7 +97,7 @@ env LC_ALL=C nice -n 19 ionice -c3 tar --create --gzip --file=- \
   -C "$T" "{meta}" -C "$(dirname "$H")" "$(basename "$H")"
 """
 
-# Tahtada çalışır: hesap bilgisini kök dışına kapalı geçici dosyaya yazar (arşive ilk üye olarak girer).
+# Cihazda çalışır: hesap bilgisini kök dışına kapalı geçici dosyaya yazar (arşive ilk üye olarak girer).
 _META_PY = r"""
 import grp, json, os, pwd, sys, time
 name, out = sys.argv[1:3]
@@ -174,14 +174,14 @@ def cleanup(now: float | None = None, keep_job: int | None = None) -> int:
 
 def _safe(text: str) -> str:
     # "A Blok - Lab 1" → "A-Blok-Lab-1" (ardışık ayraçlar tek tireye iner).
-    return re.sub(r"[^A-Za-z0-9._]+", "-", text or "").strip("-")[:60] or "tahta"
+    return re.sub(r"[^A-Za-z0-9._]+", "-", text or "").strip("-")[:60] or "cihaz"
 
 
 def backup(board: dict, user: str, password: str, username: str, job_id: int, events, part: tuple = (0, 1)) -> dict:
     """Yedekler; olayları `events`'e yazar ("info"/"err"/"ok"/"fail" satırları + ilerleme çubuğu için
     "progress" ve indirilecek dosya için "file" — ikisi de JSON metinli, bkz. frontend ui/Jobs.js).
-    part: (sıra, toplam) — tahtada birden çok hesap yedeklenirken çubuk tahtanın toplamını göstersin.
-    Döner: {"status", "rc", "output"} (job_targets için); hesap bu tahtada yoksa status "skipped"."""
+    part: (sıra, toplam) — cihazda birden çok hesap yedeklenirken çubuk cihazın toplamını göstersin.
+    Döner: {"status", "rc", "output"} (job_targets için); hesap bu cihazda yoksa status "skipped"."""
     def progress(pct, done, size_total, gz):
         _progress(events, (part[0] * 100 + pct) // part[1], done, size_total, gz)
 
@@ -189,8 +189,8 @@ def backup(board: dict, user: str, password: str, username: str, job_id: int, ev
         events.add("fail", f"Geçersiz kullanıcı adı: {username}")
         return {"status": "failed", "rc": None, "output": "Geçersiz kullanıcı adı."}
     if not board.get("ip"):
-        events.add("fail", "Tahtanın IP adresi yok.")
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        events.add("fail", "Cihazın IP adresi yok.")
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
 
     out_dir = job_dir(job_id)
     os.makedirs(out_dir, mode=0o755, exist_ok=True)
@@ -277,7 +277,7 @@ def backup(board: dict, user: str, password: str, username: str, job_id: int, ev
     except OSError:
         pass
     if missing:
-        events.add("info", f"{username}: bu tahtada böyle bir hesap yok, atlandı.")
+        events.add("info", f"{username}: bu cihazda böyle bir hesap yok, atlandı.")
         return {"status": "skipped", "rc": rc, "output": f"{username} hesabı yok"}
     if rc == 5:
         status, text = "unreachable", "Bağlanılamadı: SSH parolası reddedildi (Ayarlar → SSH erişimi)."

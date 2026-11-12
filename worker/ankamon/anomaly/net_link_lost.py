@@ -23,31 +23,31 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Anomali: tahta açıkken ağ bağlantısı koptu (ağ kablosu çıkarıldı, ağ anahtarı/port kesildi).
+"""Anomali: cihaz açıkken ağ bağlantısı koptu (ağ kablosu çıkarıldı, ağ anahtarı/port kesildi).
 
-Tahta kopukken log gönderemez; kopukluk bağlantı geri gelince, tahtanın gönderdiği loglardan anlaşılır:
-  - Tahtanın rsyslog'u (TiHA, 90-tiha-remote.conf) iletemediği logları diskte kuyruğa alır, bağlantı gelince topluca
-    yollar. Bu loglar tahtanın saatiyle (device_time) üretildikleri ana göre geç gelir: tahta o aralıkta AÇIKTI ve
+Cihaz kopukken log gönderemez; kopukluk bağlantı geri gelince, cihazın gönderdiği loglardan anlaşılır:
+  - Cihazın rsyslog'u (TiHA, 90-tiha-remote.conf) iletemediği logları diskte kuyruğa alır, bağlantı gelince topluca
+    yollar. Bu loglar cihazın saatiyle (device_time) üretildikleri ana göre geç gelir: cihaz o aralıkta AÇIKTI ve
     sunucuya ulaşamadı.
-  - Aynı aralıkta Ankamon da tahtadan sensör verisi alamadıysa (tarama sunucudan IP ile yapılır) sorun log yolunda
-    (ör. istiklal.local ad çözümü) değil tahtanın ağ bağlantısındadır.
-  - Diğer tahtaların logları zamanında geliyorduysa sorun sunucuda ya da bütün ağda değildir.
+  - Aynı aralıkta Ankamon da cihazdan sensör verisi alamadıysa (tarama sunucudan IP ile yapılır) sorun log yolunda
+    (ör. istiklal.local ad çözümü) değil cihazın ağ bağlantısındadır.
+  - Diğer cihazların logları zamanında geliyorduysa sorun sunucuda ya da bütün ağda değildir.
   - NetworkManager/çekirdek taşıyıcı satırı (carrier, "Link is Down") geldiyse kablo çıkarıldığı kesindir. Bu satırlar
-    TiHA'nın bakım profilinde iletilmez, çoğu tahtada yoktur: o durumda kayıt "kablo ya da port" olasılığıyla yazılır.
+    TiHA'nın bakım profilinde iletilmez, çoğu cihazda yoktur: o durumda kayıt "kablo ya da port" olasılığıyla yazılır.
 
-Sınırlar: kopukluk sürerken saptanamaz (tahta kapalıdan ayırt edilmez), bağlantı gelince geriye dönük yazılır. Arada
-tahta yeniden açıldıysa (rsyslog başlangıç satırı) yalnız açılıştan önceki, logla kanıtlı kısım sayılır. Aynı kalıptan
-kurulmuş tahtalar ilk açılışta kalıbın adıyla log gönderebilir: tahta yalnız adı VE IP'si kayıtla eşleşince sayılır.
+Sınırlar: kopukluk sürerken saptanamaz (cihaz kapalıdan ayırt edilmez), bağlantı gelince geriye dönük yazılır. Arada
+cihaz yeniden açıldıysa (rsyslog başlangıç satırı) yalnız açılıştan önceki, logla kanıtlı kısım sayılır. Aynı kalıptan
+kurulmuş cihazlar ilk açılışta kalıbın adıyla log gönderebilir: cihaz yalnız adı VE IP'si kayıtla eşleşince sayılır.
 """
 
 import datetime
 from types import SimpleNamespace
 
 KIND = "net_link_lost"
-LATE = 120                                  # sn: tahtanın olağan saat farkının üstünde bu kadar geç gelen log kuyruktan gelmiştir
+LATE = 120                                  # sn: cihazın olağan saat farkının üstünde bu kadar geç gelen log kuyruktan gelmiştir
 FLUSH_GAP = datetime.timedelta(seconds=120) # kuyruk boşaltması: ardışık geç loglar arasında bundan uzun ara yoksa tek boşaltma
 THRESHOLD = datetime.timedelta(minutes=5)
-SCRAPED_MAX = 0.2                           # aralığın en çok bu kadarında sensör verisi alındıysa tahta erişilebilirdi: sayılmaz
+SCRAPED_MAX = 0.2                           # aralığın en çok bu kadarında sensör verisi alındıysa cihaz erişilebilirdi: sayılmaz
 WINDOW = datetime.timedelta(hours=2)
 EVERY = 300                                  # sn: kuyruk taraması pahalı, 5 dk'da bir yeter (kayıt zaten geriye dönük)
 
@@ -55,7 +55,7 @@ _BURSTS = """
 WITH l AS (
     SELECT host, from_ip, received_at, device_time, extract(epoch FROM received_at - device_time) AS lag
     FROM logs WHERE received_at >= %(since)s AND device_time IS NOT NULL AND host <> '' AND from_ip IS NOT NULL
-), base AS (       -- tahtanın olağan farkı (saat kayması dahil): zamanında gelen logların alt dilimi
+), base AS (       -- cihazın olağan farkı (saat kayması dahil): zamanında gelen logların alt dilimi
     SELECT host, from_ip, percentile_cont(0.1) WITHIN GROUP (ORDER BY lag) AS off FROM l GROUP BY host, from_ip
 ), late AS (
     SELECT l.* FROM l JOIN base b USING (host, from_ip) WHERE l.lag - b.off > %(late)s
@@ -74,7 +74,7 @@ SELECT id, lower(hostname) AS host, host(ip) AS ip, monitor_enabled,
 FROM boards WHERE hostname IS NOT NULL AND hostname <> '' AND ip IS NOT NULL
 """
 
-# Kopukluktan önce zamanında gelen son log (yoksa tahta Ankamon'a yeni yönlendirilmiştir: ilk temas, kopukluk değil).
+# Kopukluktan önce zamanında gelen son log (yoksa cihaz Ankamon'a yeni yönlendirilmiştir: ilk temas, kopukluk değil).
 _LAST_OK = """
 SELECT max(received_at) AS at FROM logs
 WHERE host = %(host)s AND from_ip = %(ip)s AND received_at <= %(first)s + interval '60 seconds'
@@ -100,7 +100,7 @@ FROM metrics m JOIN metrics_tag t USING (tag_id)
 WHERE t.board_id = %(board)s AND t.name = 'node_boot_time_seconds' AND m.time BETWEEN %(s)s AND %(e)s
 """
 
-# Sunucu o aralıkta başka tahtalardan log ya da sensör verisi alıyordu (sunucu ya da bütün ağ kapalı değildi).
+# Sunucu o aralıkta başka cihazlardan log ya da sensör verisi alıyordu (sunucu ya da bütün ağ kapalı değildi).
 _OTHERS = """
 SELECT (SELECT count(DISTINCT host) FROM logs WHERE received_at BETWEEN %(s)s AND %(e)s AND host <> %(host)s)
      + (SELECT count(DISTINCT t.board_id) FROM metrics m JOIN metrics_tag t USING (tag_id)
@@ -124,7 +124,7 @@ def _minutes(delta) -> int:
     return max(1, int(delta.total_seconds() // 60))
 
 
-# Log iletimi gecikti: tahtaya aynı aralıkta sensör verisi için ulaşılabildi (en az bu oranında) ama logları geç geldi.
+# Log iletimi gecikti: cihaza aynı aralıkta sensör verisi için ulaşılabildi (en az bu oranında) ama logları geç geldi.
 DELAY_SCRAPED_MIN = 0.5
 DELAY_THRESHOLD = datetime.timedelta(minutes=10)
 
@@ -136,7 +136,7 @@ WHERE host = %(host)s AND from_ip = %(ip)s AND program = 'rsyslogd' AND device_t
 
 
 def _candidates(conn, since, delayed: bool):
-    """Kuyruk boşaltmaları → kayıtlar. delayed=False: tahtaya ulaşılamadı (ağ koptu); True: ulaşılabiliyordu (log yolu)."""
+    """Kuyruk boşaltmaları → kayıtlar. delayed=False: cihaza ulaşılamadı (ağ koptu); True: ulaşılabiliyordu (log yolu)."""
     boards = {}
     for r in conn.execute(_BOARDS).fetchall():
         boards[(r["host"], r["ip"])] = r
@@ -145,7 +145,7 @@ def _candidates(conn, since, delayed: bool):
     for b in conn.execute(_BURSTS, {"since": since, "late": LATE, "gap": FLUSH_GAP}).fetchall():
         board = boards.get(((b["host"] or "").lower(), b["from_ip"]))
         if not board:
-            continue   # kayıtsız ad ya da kalıbın adını taşıyan başka tahta
+            continue   # kayıtsız ad ya da kalıbın adını taşıyan başka cihaz
         key = (board["host"], b["from_ip"])
         if key not in seen:
             seen.add(key)
@@ -157,7 +157,7 @@ def _candidates(conn, since, delayed: bool):
             continue
         start = b["first_dev"]
         boot = conn.execute(_BOOT, {**args, "s": start, "e": b["delivered"]}).fetchone()["at"]
-        # Arada yeniden açıldıysa tahta bir süre kapalıydı: yalnız logla kanıtlı açık kısım.
+        # Arada yeniden açıldıysa cihaz bir süre kapalıydı: yalnız logla kanıtlı açık kısım.
         end = b["last_dev"] if boot else b["delivered"]
         if end - start < (DELAY_THRESHOLD if delayed else THRESHOLD):
             continue
@@ -170,7 +170,7 @@ def _candidates(conn, since, delayed: bool):
         window = {"s": start, "e": end}
         if not board["monitor_enabled"]:
             if delayed:
-                continue   # sensör verisi yok: tahtaya ulaşılabildiği bilinemez
+                continue   # sensör verisi yok: cihaza ulaşılabildiği bilinemez
             reachable = False
         else:
             scraped = conn.execute(_SCRAPED, {**window, "board": str(board["id"])}).fetchone()["n"]
@@ -179,25 +179,25 @@ def _candidates(conn, since, delayed: bool):
                 continue
             reachable = ratio > SCRAPED_MAX
         if not delayed and reachable:
-            continue       # Ankamon tahtaya ulaşabiliyordu: gecikme log yolunda (log_delayed), ağ bağlantısında değil
+            continue       # Ankamon cihaza ulaşabiliyordu: gecikme log yolunda (log_delayed), ağ bağlantısında değil
         if conn.execute(_OTHERS, {**window, "host": b["host"], "board": str(board["id"])}).fetchone()["n"] == 0:
-            continue       # hiçbir tahtanın logu zamanında gelmedi: sorun sunucuda ya da bütün ağda
+            continue       # hiçbir cihazın logu zamanında gelmedi: sorun sunucuda ya da bütün ağda
         common = {"queued": b["n"], "last_ok": last_ok, "delivered": b["delivered"], "rebooted": bool(boot)}
         if delayed:
             resolve = conn.execute(_RESOLVE, {**args, **window}).fetchone()["n"]
-            text = (f"Tahtaya ulaşılabiliyordu ama logları {_minutes(end - start)} dk geç geldi ({b['n']} log, "
+            text = (f"Cihaza ulaşılabiliyordu ama logları {_minutes(end - start)} dk geç geldi ({b['n']} log, "
                     f"{_fmt(b['delivered'])}'de): log iletim yolu sorunu"
-                    + (f" — tahta log sunucusunun adını ({resolve} kez) çözemedi" if resolve
-                       else " — log sunucusu adı/portu ya da tahtanın rsyslog'u"))
+                    + (f" — cihaz log sunucusunun adını ({resolve} kez) çözemedi" if resolve
+                       else " — log sunucusu adı/portu ya da cihazın rsyslog'u"))
             detail = dict(common, text=text, resolve_failures=resolve)
         else:
             carrier = conn.execute(_CARRIER, {**args, "s": start - datetime.timedelta(minutes=5),
                                               "e": end + datetime.timedelta(minutes=15)}).fetchall()
             cable = bool(carrier)
-            text = ("Ağ kablosu çıkarıldı (tahta taşıyıcı sinyalini kaybettiğini bildirdi)" if cable
+            text = ("Ağ kablosu çıkarıldı (cihaz taşıyıcı sinyalini kaybettiğini bildirdi)" if cable
                     else "Ağ bağlantısı koptu: kablo çıkarılmış ya da ağ anahtarı/port kesilmiş olabilir")
-            text += (f" · {_minutes(end - start)} dk ulaşılamadı; tahtada bekleyen {b['n']} log {_fmt(b['delivered'])}'de geldi"
-                     + (" · arada tahta yeniden açıldı" if boot else ""))
+            text += (f" · {_minutes(end - start)} dk ulaşılamadı; cihazda bekleyen {b['n']} log {_fmt(b['delivered'])}'de geldi"
+                     + (" · arada cihaz yeniden açıldı" if boot else ""))
             detail = dict(common, text=text, cable=cable,
                           carrier=[f"{c['device_time']:%H:%M:%S} {c['message'][:120]}" for c in carrier[:4]])
         record = {"host": board["host"], "board_id": board["id"], "board_name": board["name"],
@@ -215,12 +215,12 @@ def _detect_delayed(conn, since):
     return _candidates(conn, since, delayed=True)
 
 
-# "Log iletimi gecikti": aynı kuyruk izinden, tahtaya ulaşılabildiği aralıklar (log yolu: mDNS adı, sunucu portu, rsyslog).
+# "Log iletimi gecikti": aynı kuyruk izinden, cihaza ulaşılabildiği aralıklar (log yolu: mDNS adı, sunucu portu, rsyslog).
 delayed_rule = SimpleNamespace(KIND="log_delayed", WINDOW=WINDOW, EVERY=EVERY, detect=_detect_delayed)
 
 
 # Anlık tarama: kablolu arabirimlerin şu anki durumu ("ad:taşıyıcı:hız") ve son 7 günde NetworkManager günlüğündeki kablo
-# kopmaları (tahtanın kendi günlüğü taşıyıcı satırlarını tutar; bunlar sunucuya iletilmiyor olabilir).
+# kopmaları (cihazın kendi günlüğü taşıyıcı satırlarını tutar; bunlar sunucuya iletilmiyor olabilir).
 PROBE = r"""
 links=
 for d in /sys/class/net/*; do

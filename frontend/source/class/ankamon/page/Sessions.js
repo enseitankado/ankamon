@@ -26,16 +26,16 @@
  */
 
 /**
- * Oturumlar: tahtalarda greeter (lightdm) ile oturum açan gerçek kullanıcıların açma/kapama
+ * Oturumlar: cihazlarda greeter (lightdm) ile oturum açan gerçek kullanıcıların açma/kapama
  * kayıtları — worker/ankamon/tasks/board_sessions.py'nin logs'tan çıkardığı veri (bkz.
- * db/migrations/007_board_sessions.sql) — ve Ankamon üzerinden tahtalara açılan web terminal
+ * db/migrations/007_board_sessions.sql) — ve Ankamon üzerinden cihazlara açılan web terminal
  * oturumları (kullanıcı adı orada Ankamon kullanıcısıdır — bkz. db/migrations/011_webshell_sessions.sql).
  * Ankamon'un kendi arayüz kullanıcılarıyla (page.Users, sol menüdeki "Kullanıcılar") KARIŞTIRILMASIN
  * diye ağaçta "Oturumlar" adıyla ayrı bir yaprak — bkz. ui.Shell.PAGES.
  *
  * İki sekme, tek veri: sayfa /board-sessions'ı kısa aralıkla çeker ve iki sekmeye de verir.
  *  - "Oturumlar" (ui.sessions.List): tüm kayıtların süzülebilir grid'i.
- *  - "Zaman çizelgesi" (ui.sessions.Users): kullanıcı/tahta bazında zaman çizelgesi ve özet. Grid'de
+ *  - "Zaman çizelgesi" (ui.sessions.Users): kullanıcı/cihaz bazında zaman çizelgesi ve özet. Grid'de
  *    sağ tık → "Oturum geçmişi" buraya, o kullanıcı seçili olarak geçer (showUserHistory).
  * Sıralamalar (eski "Şampiyonlar Ligi" / "Teneffüs Ligi") ayrı sayfada: Ligler (bkz. page.Leagues).
  *
@@ -94,8 +94,8 @@ qx.Class.define("ankamon.page.Sessions", {
     },
 
     /**
-     * Shell.OPEN_PAGE {page: "sessions", board: {id, name}} — Tahtalar/Ekranlar sağ menüsü "Oturum geçmişi":
-     * Kullanıcılar sekmesi (zaman çizelgesi) o tahtaya süzülmüş açılır (kullanıcı isteği).
+     * Shell.OPEN_PAGE {page: "sessions", board: {id, name}} — Cihazlar/Ekranlar sağ menüsü "Oturum geçmişi":
+     * Kullanıcılar sekmesi (zaman çizelgesi) o cihaza süzülmüş açılır (kullanıcı isteği).
      */
     openWith(data) {
       if (data && data.movements) {

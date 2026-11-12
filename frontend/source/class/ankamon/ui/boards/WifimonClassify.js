@@ -26,12 +26,12 @@
  */
 
 /**
- * Wi-Fi Monitör: sensörlerin (seçili tahtaların) duyduğu vericileri "güvenilir" (sabit) listesine ve telefon kanıtlarına göre
+ * Wi-Fi Monitör: sensörlerin (seçili cihazların) duyduğu vericileri "güvenilir" (sabit) listesine ve telefon kanıtlarına göre
  * ayırır (bkz. ui.boards.WifiMonitor).
  *
  * Düzeyler (öne çıkma sırasıyla): phone (güvenilir değil + güçlü telefon kanıtı), maybe (güvenilir değil + zayıf kanıt),
  * foreign (güvenilir değil, kanıt yok), common (güvenilir değil ama AYNI erişim noktası — aynı MAC/BSSID — sensörlerin çoğunca
- * duyuluyor: okulun AP'si olası), fixed (güvenilir listesinde, sensörün bağlı olduğu ağ ya da bir Ankamon tahtasının kendisi).
+ * duyuluyor: okulun AP'si olası), fixed (güvenilir listesinde, sensörün bağlı olduğu ağ ya da bir Ankamon cihazının kendisi).
  * Güven ve ortaklık yalnız MAC adresiyle kurulur (kullanıcı isteği 2026-11-06): aynı adı taşıyan bir telefon paylaşım noktası
  * okulun ağı sayılmaz. Eski "ağ adı" (ssid) güven kayıtları uygulanmaz (Güvenilir listesinde eski kayıt olarak görünür).
  * Telefon kanıtları worker'dan gelir (screen/wifimon_phone_hints.py).
@@ -42,7 +42,7 @@ qx.Class.define("ankamon.ui.boards.WifimonClassify", {
   statics: {
     LEVEL_ORDER: { phone: 0, maybe: 1, foreign: 2, common: 3, fixed: 4 },
 
-    /** Güvenilir listesinden arama dizini: "tür|değer|tahta" (tahta 0 = okul geneli). */
+    /** Güvenilir listesinden arama dizini: "tür|değer|cihaz" (cihaz 0 = okul geneli). */
     index(fixed) {
       const map = new Map();
       (fixed || []).forEach(f => map.set(`${f.kind}|${f.value}|${f.board_id || 0}`, f));

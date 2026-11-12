@@ -37,7 +37,7 @@ use Ankamon\Core\Request;
  * Üst çubuktaki Ankamon simgesi → "Geliştiriciye yaz" (bkz. frontend ui/DeveloperContactWindow.js): mesaj ntfy.sh'nin
  * ankamon-iletisim konusuna gider, geliştiricinin (Özgür Koca) telefonuna düşer.
  *
- * Anonim: ntfy'ye yalnız kullanıcının yazdığı metin gider; kullanıcı adı, kurum adı, tahta ya da sunucu bilgisi eklenmez.
+ * Anonim: ntfy'ye yalnız kullanıcının yazdığı metin gider; kullanıcı adı, kurum adı, cihaz ya da sunucu bilgisi eklenmez.
  * Metin Ankamon'da da saklanmaz (görev, denetim kaydı, bildirim geçmişi yok). ntfy.sh yalnız isteğin geldiği ağ adresini görür.
  */
 final class DeveloperContactApi

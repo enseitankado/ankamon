@@ -52,8 +52,8 @@ log = logging.getLogger("ankamon.runner")
 def _load_job_done_hooks() -> tuple[dict, dict]:
     """Eklentilerin iş-bitiş kancaları: ext/<ad>/worker/job_hooks.py içindeki
     JOB_DONE = {action_id: fn}: fn(conn, board, user, password, job_id, events) — ilgili işlem 'ok' bitince;
-    JOB_FINISHED = {action_id: fn}: fn(conn, board, user, password, job_id, events, result) — betik tahtada
-    çalışıp bittiğinde ('ok' ya da 'failed'; bağlanılamayan tahtada çağrılmaz). Tahtadaki aracın kendi çıkış
+    JOB_FINISHED = {action_id: fn}: fn(conn, board, user, password, job_id, events, result) — betik cihazda
+    çalışıp bittiğinde ('ok' ya da 'failed'; bağlanılamayan cihazda çağrılmaz). Cihazdaki aracın kendi çıkış
     kodunu taşıyan işlemler başarısızlıkta da sonuç dosyasını okuyabilsin diye. Çekirdek hiçbir eklentiyi
     adıyla bilmez; bir action id için kayıtlı callback varsa çalıştırır (ör. rapor okuyup yazma).
     """
@@ -81,9 +81,9 @@ def _load_job_done_hooks() -> tuple[dict, dict]:
 _JOB_DONE_HOOKS, _JOB_FINISHED_HOOKS = _load_job_done_hooks()
 
 JOB_THREADS = int(os.environ.get("RUNNER_JOB_THREADS", "8"))  # aynı anda çalışan görev
-# Tahta iş parçacıklarının (her biri kendi bağlantısı, SSH süresince tutar) TÜM görevler toplamında aynı anda
+# Cihaz iş parçacıklarının (her biri kendi bağlantısı, SSH süresince tutar) TÜM görevler toplamında aynı anda
 # tutabileceği veritabanı bağlantısı. Paralellik görev başına yüke göre 20'ye çıkar, görevler de 8'e kadar eşzamanlı:
-# kotasız, açık tahtalarla 5 toplu işte tepe 89/100 ölçüldü (2026-11-05). Kota dolunca sıradaki tahta bekler.
+# kotasız, açık cihazlarla 5 toplu işte tepe 89/100 ölçüldü (2026-11-05). Kota dolunca sıradaki cihaz bekler.
 # Bütçe: 40 + görevlerin kendi bağlantıları (~16) + diğer servisler (~14) + PHP-FPM (12) < max_connections 100.
 BOARD_DB_SLOTS = int(os.environ.get("RUNNER_BOARD_DB_SLOTS", "40"))
 _board_db_slots = threading.BoundedSemaphore(BOARD_DB_SLOTS)
@@ -118,7 +118,7 @@ def _command_for(params: dict, family: str) -> str | None:
 
 
 def _job_text(job, family: str = "linux") -> tuple[str, dict | None, int]:
-    """Görev türüne ve hedefin işletim sistemi ailesine göre tahtada çalışacak betik, ortam değişkenleri ve zaman aşımı
+    """Görev türüne ve hedefin işletim sistemi ailesine göre cihazda çalışacak betik, ortam değişkenleri ve zaman aşımı
     (kullanıcı isteği 2026-11-12: işlev adı aynı, uygulaması aileye göre — run.sh | run.ps1 | run.macos.sh)."""
     params = job["params"] or {}
     if job["type"] == "command":
@@ -176,7 +176,7 @@ def _scrub_secrets(conn, job) -> None:
 
 
 def _board_event(conn, job_id: int, board_id: int, kind: str, text: str) -> None:
-    """Paralel çalışan dallarda (whoami/login/logout) canlı pencereye tahta başına satır yazar —
+    """Paralel çalışan dallarda (whoami/login/logout) canlı pencereye cihaz başına satır yazar —
     yoksa bu görevlerin penceresi boş kalıyordu (kullanıcı bildirdi). Ana iş parçacığında çağrılır."""
     ev = stream.Events(conn, job_id, board_id)
     ev.add(kind, text)
@@ -189,7 +189,7 @@ def _run_job(job) -> None:
     try:
         targets = _targets(conn, job["id"])
         names = {t["board_id"]: t["name"] for t in targets}
-        general.add("info", f"Görev başladı: {job['title']} — {len(targets)} tahta")
+        general.add("info", f"Görev başladı: {job['title']} — {len(targets)} cihaz")
         # İşletim sistemine göre (kullanıcı isteği 2026-11-12; platforms/README.md): işlevin hedefin ailesinde uygulaması
         # yoksa o hedef çalıştırılmaz, "Atlandı" yazılır; kalanlar aşağıdaki dallarda kendi ailelerine göre çalışır.
         families = platforms.families(conn, [t["board_id"] for t in targets])
@@ -213,7 +213,7 @@ def _run_job(job) -> None:
                 f"{n} {platforms.label(f)}" for f, n in by_family.items()) + " cihaz (bu işlevin o sistemde uygulaması yok)")
         targets = runnable
         general.flush()
-        # Komut/hazır işlemde tahtalar grup grup çalışır: sıra gelene kadar "queued" kalır, her tahta
+        # Komut/hazır işlemde cihazlar grup grup çalışır: sıra gelene kadar "queued" kalır, her cihaz
         # kendi işi başlarken "running" olur (canlı pencerede çalışan/sırada/biten ayrımı — bkz. ui/Jobs.js).
         if job["type"] not in ("command", "action"):
             conn.execute("UPDATE job_targets SET status = 'running', started_at = now() WHERE job_id = %s AND board_id = ANY(%s)",
@@ -243,8 +243,8 @@ def _run_job(job) -> None:
             except (OSError, ValueError, KeyError):
                 secret_keys = []
             secrets = [env[k] for k in secret_keys if env and env.get(k)]
-            # Tahtaya taşınacak dış araçlar (action.json "tools", ör. eta-112): sunucu kopyası bir kez
-            # hazırlanır (günün ilk kullanımında sürüm denetimi), her tahtaya gerekirse SFTP ile gider.
+            # Cihaza taşınacak dış araçlar (action.json "tools", ör. eta-112): sunucu kopyası bir kez
+            # hazırlanır (günün ilk kullanımında sürüm denetimi), her cihaza gerekirse SFTP ile gider.
             try:
                 # Dış araçlar Linux ikilileridir (ör. eta-112): yalnız Linux hedef varsa hazırlanır ve yalnız onlara gider.
                 need_tools = any(families[t["board_id"]] == "linux" for t in targets)
@@ -252,12 +252,12 @@ def _run_job(job) -> None:
             except tools.ToolError as e:
                 raise RuntimeError(str(e)) from e
 
-            # Tahtalar PARALEL çalışır, aynı anda en çok `n` tahta (kullanıcı isteği): n konteynerin o anki
-            # CPU/RAM boşluğuna göre (whoami.dynamic_concurrency) — kaynak azsa tahtalar grup grup işlenir,
-            # biten tahtanın yerine sıradaki başlar. Her iş parçacığı KENDİ veritabanı bağlantısını açar:
+            # Cihazlar PARALEL çalışır, aynı anda en çok `n` cihaz (kullanıcı isteği): n konteynerin o anki
+            # CPU/RAM boşluğuna göre (whoami.dynamic_concurrency) — kaynak azsa cihazlar grup grup işlenir,
+            # biten cihazın yerine sıradaki başlar. Her iş parçacığı KENDİ veritabanı bağlantısını açar:
             # tek bağlantının iş parçacıkları arasında paylaşılması güvenli değildi (eskiden bu yüzden
-            # sıralıydı — birden fazla tahtada yalnız biri tamamlanıyordu). Çıktı tahta başına ayrı tutulur
-            # (job_events.board_id), pencerede tahta seçilerek okunur.
+            # sıralıydı — birden fazla cihazda yalnız biri tamamlanıyordu). Çıktı cihaz başına ayrı tutulur
+            # (job_events.board_id), pencerede cihaz seçilerek okunur.
             action = (job["params"] or {}).get("action") if job["type"] == "action" else None
 
             def work(t):
@@ -268,8 +268,8 @@ def _run_job(job) -> None:
                     ev = stream.Events(wconn, job["id"], t["board_id"])
                     try:
                         if not t["ip"]:
-                            ev.add("fail", "Tahtanın IP adresi yok.")
-                            result = {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+                            ev.add("fail", "Cihazın IP adresi yok.")
+                            result = {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
                         else:
                             result = None
                             family = families[t["board_id"]]
@@ -278,7 +278,7 @@ def _run_job(job) -> None:
                                 try:
                                     tools.upload(t, user, password, name, local, ev)
                                 except (tools.ToolError, OSError, subprocess.TimeoutExpired) as e:
-                                    ev.add("fail", f"{tools.TOOLS[name]['title']} tahtaya kopyalanamadı: {e}")
+                                    ev.add("fail", f"{tools.TOOLS[name]['title']} cihaza kopyalanamadı: {e}")
                                     result = {"status": "unreachable", "rc": None, "output": f"Araç kopyalanamadı: {e}"}
                                     break
                             if result is None:
@@ -287,7 +287,7 @@ def _run_job(job) -> None:
                                 # İşlem bitiş kancaları (eklenti-farkında): bir eklenti worker'ı bir action id
                                 # için callback kaydettiyse 'ok' bitişte çalıştırılır (ör. rapor okuyup tabloya
                                 # yazma). Çekirdek hiçbir eklentiyi adıyla bilmez (bkz. _JOB_DONE_HOOKS).
-                                # Kapatma tahtada başarıyla bitti: SSH'e ulaşılamayınca cihaz beklemeden çevrim dışı
+                                # Kapatma cihazda başarıyla bitti: SSH'e ulaşılamayınca cihaz beklemeden çevrim dışı
                                 # sayılsın (bkz. tasks/board_status SHUTDOWN_GRACE, BoardsApi alive; göç 051).
                                 if result["status"] == "ok" and action == "shutdown":
                                     wconn.execute("UPDATE boards SET shutdown_at = now() WHERE id = %s", (t["board_id"],))
@@ -301,8 +301,8 @@ def _run_job(job) -> None:
                                         _JOB_FINISHED_HOOKS[action](wconn, t, user, password, job["id"], ev, result)
                                     except Exception:
                                         log.exception("işlem bitiş kancası hatası: %s", action)
-                    except Exception as e:  # tek tahtanın beklenmedik hatası diğerlerini durdurmasın
-                        log.exception("görev #%s tahta %s", job["id"], t["board_id"])
+                    except Exception as e:  # tek cihazın beklenmedik hatası diğerlerini durdurmasın
+                        log.exception("görev #%s cihaz %s", job["id"], t["board_id"])
                         ev.add("fail", f"Beklenmeyen hata: {e}")
                         result = {"status": "failed", "rc": None, "output": f"Beklenmeyen hata: {e}"}
                     finally:
@@ -315,7 +315,7 @@ def _run_job(job) -> None:
                     # göstersin (kısmi başarıda da — bazı hesaplar silinmiş olabilir).
                     if action in ("user-add", "user-delete"):
                         accounts.invalidate(wconn, t["board_id"])
-                    # Parola ayarla ile root değişti: Ankamon'un bağlantısı kopmasın, tahtaya özel kaydedilir.
+                    # Parola ayarla ile root değişti: Ankamon'un bağlantısı kopmasın, cihaza özel kaydedilir.
                     if action == "user-password" and result["status"] == "ok" and user == "root":
                         values = (job["params"] or {}).get("values") or {}
                         if "root" in str(values.get("KULLANICILAR", "")).split():
@@ -326,7 +326,7 @@ def _run_job(job) -> None:
 
             n = max(1, min(whoami.dynamic_concurrency(), len(targets)))
             if len(targets) > 1:
-                general.add("info", f"{len(targets)} tahtada paralel çalışıyor — aynı anda en çok {n} tahta"
+                general.add("info", f"{len(targets)} cihazda paralel çalışıyor — aynı anda en çok {n} cihaz"
                             + (" (sistem kaynaklarına göre; diğerleri sırada bekler)" if n < len(targets) else ""))
                 general.flush()
             with ThreadPoolExecutor(max_workers=n) as pool:
@@ -337,7 +337,7 @@ def _run_job(job) -> None:
             user, password = _board_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
-            # Burada (command/action'ın aksine) tahtalar PARALEL sorgulanır: her tahta bağımsız,
+            # Burada (command/action'ın aksine) cihazlar PARALEL sorgulanır: her cihaz bağımsız,
             # tek satırlık bir sonuç üretir — sırayla okunacak bir çıktı akışı yok, önizleme
             # kutucuklarının hepsi aynı anda "sorgulanıyor" göstermesi de bunu gerektiriyor (bkz.
             # frontend). Eşzamanlılık konteynerin o anki CPU/RAM yüküne göre dinamik (kullanıcı
@@ -360,12 +360,12 @@ def _run_job(job) -> None:
                     elif result["output"]:
                         _board_event(conn, job["id"], t["board_id"], "ok", f"Açık oturum: {result['output']}")
                     else:
-                        _board_event(conn, job["id"], t["board_id"], "ok", "Açık kullanıcı oturumu yok (tahta giriş ekranında).")
+                        _board_event(conn, job["id"], t["board_id"], "ok", "Açık kullanıcı oturumu yok (cihaz giriş ekranında).")
                     if result["status"] == "ok":   # grid'in "Oturum" sütunu (kilidi `who` bilmez: None)
                         session_probe.store(conn, t["board_id"], result["output"], None)
         elif job["type"] == "anomaly_scan":
-            # Anomaliler ▸ Tarama (bkz. anomaly/scan.py): seçilen kurallar seçilen tahtalarda anlık yoklanır.
-            # whoami/facts deseni: tahtalar PARALEL (dinamik eşzamanlılık); her iş parçacığı evaluate'in
+            # Anomaliler ▸ Tarama (bkz. anomaly/scan.py): seçilen kurallar seçilen cihazlarda anlık yoklanır.
+            # whoami/facts deseni: cihazlar PARALEL (dinamik eşzamanlılık); her iş parçacığı evaluate'in
             # okumaları için kendi bağlantısını açar, job_targets'a yazmak ana iş parçacığında sırayla.
             user, password = _board_access(conn)
             if not password:
@@ -378,8 +378,8 @@ def _run_job(job) -> None:
                 wconn = _board_conn()
                 try:
                     return anomaly_scan_mod.run(wconn, dict(t, hostname=hostnames.get(t["board_id"])), kinds, user, password)
-                except Exception as e:  # noqa: BLE001 — bir tahtanın hatası diğerlerini düşürmesin
-                    log.exception("anomali taraması: tahta %s", t["board_id"])
+                except Exception as e:  # noqa: BLE001 — bir cihazın hatası diğerlerini düşürmesin
+                    log.exception("anomali taraması: cihaz %s", t["board_id"])
                     return {"status": "failed", "rc": None, "output": f"Hata: {e}"}
                 finally:
                     _board_conn_close(wconn)
@@ -393,7 +393,7 @@ def _run_job(job) -> None:
                     _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
                     results[t["board_id"]] = result
         elif job["type"] == "facts":
-            # "Bilgi kartı": tahta başına 60dk önbellek (bkz. hwfacts.CACHE_SECONDS) — önbellekte
+            # "Bilgi kartı": cihaz başına 60dk önbellek (bkz. hwfacts.CACHE_SECONDS) — önbellekte
             # taze bir değer varsa SSH'a hiç gidilmez, hemen o değer yazılır. Geri kalanlar whoami ile
             # aynı desende PARALEL toplanır (bağımsız, kısa, tek betiklik sorgular).
             now_ts = int(time.time())
@@ -438,9 +438,9 @@ def _run_job(job) -> None:
                 _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
                 results[t["board_id"]] = result
         elif job["type"] in ("login", "logout", "lock", "wake", "sleep", "screen_lock", "screen_unlock"):
-            # Seçilen hesapla oturum açma / açık oturumu kapatma ya da kilitleme — tahtalar bağımsız,
+            # Seçilen hesapla oturum açma / açık oturumu kapatma ya da kilitleme — cihazlar bağımsız,
             # PARALEL (whoami deseni). logout/lock'ta username isteğe bağlı (Oturumlar grid'i belirli
-            # kullanıcıyı hedefler; boşsa tahtadaki etkin oturum).
+            # kullanıcıyı hedefler; boşsa cihazdaki etkin oturum).
             username = (job["params"] or {}).get("username", "")
             user, password = _board_access(conn)
             if not password:
@@ -456,7 +456,7 @@ def _run_job(job) -> None:
                     return accounts.lock(t, user, password, username)
             elif job["type"] == "screen_lock":
                 # Ekran ▸ Kilitle: "Kilidi aç"a dek tam ekran "Kilitli", giriş yakalanır (bkz. executor/screenlock.py).
-                # Kilit ekranı tahtanın kimliğini de yazar (takma ad, bilgisayar adı, ETAP, MAC, IP).
+                # Kilit ekranı cihazın kimliğini de yazar (takma ad, bilgisayar adı, ETAP, MAC, IP).
                 identities = screenlock.identities(conn, [t["board_id"] for t in targets])
 
                 def work(t):
@@ -494,7 +494,7 @@ def _run_job(job) -> None:
                     ev.add("ok" if result["status"] == "ok" else "fail",
                            "Bitti." if result["status"] == "ok" else f"Başarısız ({result['status']}).")
                     ev.close()
-                    # Tahtalar grid'inin "Oturum" sütunu hemen güncellensin (bkz. executor/session_probe.py).
+                    # Cihazlar grid'inin "Oturum" sütunu hemen güncellensin (bkz. executor/session_probe.py).
                     if result["status"] == "ok" and job["type"] in ("wake", "sleep"):
                         # Ekranlar'daki "güç tasarrufu" yazısı bir sonraki yoklamayı beklemeden kalksın / çıksın.
                         session_probe.store_display(conn, t["board_id"], "On" if job["type"] == "wake" else "Off")
@@ -514,8 +514,8 @@ def _run_job(job) -> None:
                                 session_probe.store(conn, t["board_id"], st["user"], st["locked"])
                                 session_probe.store_display(conn, t["board_id"], st["display"])
         elif job["type"] == "backup_home":
-            # "Yedekle/Geri al" ▸ Yedekle: tahtalar SIRAYLA (command/action gibi) — her tahtanın canlı raporu ve ilerlemesi
-            # okunaklı aksın, aynı anda onlarca tahtanın ağ/disk yükü birikmesin; `conn` da yalnız bu
+            # "Yedekle/Geri al" ▸ Yedekle: cihazlar SIRAYLA (command/action gibi) — her cihazın canlı raporu ve ilerlemesi
+            # okunaklı aksın, aynı anda onlarca cihazın ağ/disk yükü birikmesin; `conn` da yalnız bu
             # iş parçacığında kullanılır (bkz. yukarıdaki not). Eski yedekler önce temizlenir.
             usernames = (job["params"] or {}).get("usernames") or []
             user, password = _board_access(conn)
@@ -536,7 +536,7 @@ def _run_job(job) -> None:
                 _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
                 results[t["board_id"]] = result
         elif job["type"] == "restore_home":
-            # "Yedekle/Geri al" ▸ Geri al: yüklenen yedekten hesap + ev dizini + PIN anahtarı, tahtalar SIRAYLA.
+            # "Yedekle/Geri al" ▸ Geri al: yüklenen yedekten hesap + ev dizini + PIN anahtarı, cihazlar SIRAYLA.
             params = job["params"] or {}
             user, password = _board_access(conn)
             if not password:
@@ -560,7 +560,7 @@ def _run_job(job) -> None:
             finally:
                 home_restore.discard_upload(params.get("token", ""))
         elif job["type"] in ("cast_start", "cast_stop", "cast_volume"):
-            # "Ekranımı yansıt" (bkz. executor/cast.py): tahtalar bağımsız, PARALEL (login deseni) —
+            # "Ekranımı yansıt" (bkz. executor/cast.py): cihazlar bağımsız, PARALEL (login deseni) —
             # yayın bütün sınıflarda aynı anda başlasın. conn yalnız bu iş parçacığında kullanılır.
             params = job["params"] or {}
             user, password = _board_access(conn)
@@ -593,10 +593,10 @@ def _run_job(job) -> None:
         elif job["type"] in board_media_jobs.TYPES:
             board_media_jobs.run(conn, job, targets, names, results)
         elif job["type"] == "diagnose":
-            # "Bakım" taraması (bkz. executor/diagnose.py; elle "Şimdi tara" ya da haftalık otomatik): tahtalar
-            # PARALEL, aynı anda en çok `n` tahta — n konteynerin o anki CPU/RAM boşluğuna göre
-            # (whoami.dynamic_concurrency, kullanıcı isteği); biten tahtanın yerine sıradaki başlar. Her
-            # tahta bitince sonucu hemen yazılır (arayüzdeki ilerleme çubuğu job_targets durumlarından
+            # "Bakım" taraması (bkz. executor/diagnose.py; elle "Şimdi tara" ya da haftalık otomatik): cihazlar
+            # PARALEL, aynı anda en çok `n` cihaz — n konteynerin o anki CPU/RAM boşluğuna göre
+            # (whoami.dynamic_concurrency, kullanıcı isteği); biten cihazın yerine sıradaki başlar. Her
+            # cihaz bitince sonucu hemen yazılır (arayüzdeki ilerleme çubuğu job_targets durumlarından
             # ilerler). Her iş parçacığı KENDİ veritabanı bağlantısını açar (command/action'daki not).
             user, password = _board_access(conn)
             if not password:
@@ -615,8 +615,8 @@ def _run_job(job) -> None:
                         ev.flush()
                         try:
                             result = diagnose.run(wconn, t, user, password)
-                        except Exception as e:  # bir tahtanın hatası diğerlerinin taramasını düşürmesin
-                            log.exception("bakım taraması: tahta %s", t["board_id"])
+                        except Exception as e:  # bir cihazın hatası diğerlerinin taramasını düşürmesin
+                            log.exception("bakım taraması: cihaz %s", t["board_id"])
                             result = {"status": "failed", "rc": None, "output": f"Denetim hatası: {e}"}
                         if result["status"] == "ok":
                             report = json.loads(result["output"])
@@ -634,7 +634,7 @@ def _run_job(job) -> None:
 
             n = max(1, min(whoami.dynamic_concurrency(), len(targets)))
             if len(targets) > 1:
-                general.add("info", f"{len(targets)} tahta paralel denetleniyor — aynı anda en çok {n} tahta"
+                general.add("info", f"{len(targets)} cihaz paralel denetleniyor — aynı anda en çok {n} cihaz"
                             + (" (sistem kaynaklarına göre; diğerleri sırada bekler)" if n < len(targets) else ""))
                 general.flush()
             with ThreadPoolExecutor(max_workers=n) as pool:
@@ -672,17 +672,17 @@ def main() -> None:
             " WHERE status = 'running'").rowcount
         if n:
             log.warning("%d yarım görev başarısız işaretlendi", n)
-        # Tahta satırları da kapatılır: yoksa görev "başarısız" olsa da satır sonsuza dek "running" kalıyor,
-        # Bakım raporu tahtayı "Denetleniyor…" gösteriyordu (2026-10-16, yeniden build sırasında yaşandı).
+        # Cihaz satırları da kapatılır: yoksa görev "başarısız" olsa da satır sonsuza dek "running" kalıyor,
+        # Bakım raporu cihazı "Denetleniyor…" gösteriyordu (2026-10-16, yeniden build sırasında yaşandı).
         # Yürütücü yeni açıldı: biten (kuyrukta olmayan) görevlerin queued/running satırları kesinlikle yarımdır.
         n = conn.execute(
             "UPDATE job_targets t SET status = 'failed', finished_at = coalesce(t.finished_at, now()),"
-            " output = coalesce(nullif(t.output, ''), 'Yürütücü yeniden başladı; bu tahtada görev yarıda kaldı.')"
+            " output = coalesce(nullif(t.output, ''), 'Yürütücü yeniden başladı; bu cihazda görev yarıda kaldı.')"
             " FROM jobs j WHERE j.id = t.job_id AND j.status NOT IN ('queued', 'running')"
             " AND t.status IN ('queued', 'running')").rowcount
         if n:
-            log.warning("%d yarım tahta sonucu başarısız işaretlendi", n)
-        # Eski görev olayları birikmesin (görevin kendisi ve tahta sonuçları kalır).
+            log.warning("%d yarım cihaz sonucu başarısız işaretlendi", n)
+        # Eski görev olayları birikmesin (görevin kendisi ve cihaz sonuçları kalır).
         conn.execute("DELETE FROM job_events WHERE job_id IN (SELECT id FROM jobs WHERE created_at < now() - interval '30 days')")
     log.info("görev yürütücüsü hazır (LISTEN ankamon_jobs; %d görev eşzamanlı)", JOB_THREADS)
 

@@ -26,11 +26,11 @@
  */
 
 /**
- * Görev yöneticisinin "Bilgisayar" süzgeci (birden çok tahtayla açılan pencerede üst çubukta, arama kutusunun
- * yanında): onay kutulu tahta listesi — birden çok seçim (VEYA), "Tümü" (üç durumlu), "Temizle"; seçim
- * hemen uygulanır ve bütün sekmelere (tablolardaki "Bilgisayar" sütunu, Performans'taki tahta seçici) yansır.
- * Hiçbiri seçili değilse bütün tahtalar gösterilir. Listede her tahtanın bağlantı durumu ve işlem sayısı görünür;
- * bağlanamayan tahta listeden yeniden bağlanabilir. Satır sağ menüsündeki "Yalnız bu bilgisayarı göster" de
+ * Görev yöneticisinin "Bilgisayar" süzgeci (birden çok cihazla açılan pencerede üst çubukta, arama kutusunun
+ * yanında): onay kutulu cihaz listesi — birden çok seçim (VEYA), "Tümü" (üç durumlu), "Temizle"; seçim
+ * hemen uygulanır ve bütün sekmelere (tablolardaki "Bilgisayar" sütunu, Performans'taki cihaz seçici) yansır.
+ * Hiçbiri seçili değilse bütün cihazlar gösterilir. Listede her cihazın bağlantı durumu ve işlem sayısı görünür;
+ * bağlanamayan cihaz listeden yeniden bağlanabilir. Satır sağ menüsündeki "Yalnız bu bilgisayarı göster" de
  * buraya yazar (bkz. ui.taskmgr.Tab._rowMenu).
  */
 qx.Class.define("ankamon.ui.taskmgr.TaskBoardPicker", {
@@ -134,7 +134,7 @@ qx.Class.define("ankamon.ui.taskmgr.TaskBoardPicker", {
       });
       syncAll();
       popup.add(all);
-      // Kaydırma alanı içeriğe göre büyümez (qx): yükseklik tahta sayısından, en çok 600 px.
+      // Kaydırma alanı içeriğe göre büyümez (qx): yükseklik cihaz sayısından, en çok 600 px.
       // Genişlik de içeriğe göre büyümez: en uzun satırın (ad + durum [+ Yeniden bağlan]) ölçülen genişliği
       // + kaydırma çubuğu; 420–820 px arası (satırlar kırılmasın/kesilmesin — kullanıcı isteği).
       const textW = html => qx.bom.Label.getHtmlSize(html, { fontSize: "13px" }).width;

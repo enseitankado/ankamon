@@ -27,8 +27,8 @@
 
 /**
  * Loglar: iki tür — "Sistem logları" (ham syslog, /api/logs) ve "Komut logları"
- * (tahtalarda çalıştırılan komutlar, /api/command-logs — ankamon'dan gidenler ve tahtadaki kullanıcıların
- * kendi sudo/pkexec/su komutları, kaynak "local"; "Kullanıcı" orada tahtadaki hesaptır). Tür sayfadaki sekmelerden
+ * (cihazlarda çalıştırılan komutlar, /api/command-logs — ankamon'dan gidenler ve cihazdaki kullanıcıların
+ * kendi sudo/pkexec/su komutları, kaynak "local"; "Kullanıcı" orada cihazdaki hesaptır). Tür sayfadaki sekmelerden
  * ya da sol ağaçtaki Loglar alt seçeneklerinden seçilir (ikisi eşzamanlı; bkz. KINDS, setMode).
  *
  * Sayfalı: altta sayfa boyutu + önceki/sonraki (sunucuda offset/limit; toplam yalnız ilk sayfada
@@ -133,8 +133,8 @@ qx.Class.define("ankamon.page.Logs", {
 
     /**
      * Boards grid'inin satır menüsündeki "Logları göster" ve Genel bakış'taki hata/görev satırlarının
-     * sağ menüsü buradan çağrılır (bkz. ui.Shell OPEN_LOGS): Sistem logları moduna geçer ve tahta
-     * süzgecini bu tahtaya ayarlar. Süzgeç kutusu tahta listesini _refresh()'in başındaki
+     * sağ menüsü buradan çağrılır (bkz. ui.Shell OPEN_LOGS): Sistem logları moduna geçer ve cihaz
+     * süzgecini bu cihaza ayarlar. Süzgeç kutusu cihaz listesini _refresh()'in başındaki
      * __loadBoardFilter() ile (yeniden) doldurduğundan, seçim de oradan hemen sonra (API
      * isteklerinden ÖNCE) uygulanır — bkz. __pendingBoardId.
      * @param severity {String?} verilirse önem süzgeci de ("3" = Hata ve üstü) ayarlanır
@@ -180,7 +180,7 @@ qx.Class.define("ankamon.page.Logs", {
     },
 
     /**
-     * Ardışık, anahtarı birebir aynı kayıtları tek satıra indirger (ör. bir tahtanın aralıksız
+     * Ardışık, anahtarı birebir aynı kayıtları tek satıra indirger (ör. bir cihazın aralıksız
      * ürettiği onlarca özdeş log satırı) — grid'de yer tasarrufu için. Sıra bozulmaz; yalnız
      * BİRBİRİNİ İZLEYEN aynı kayıtlar birleşir, araya farklı bir kayıt girerse yeni grup başlar.
      * @return {Array} [{record, count}] — count birden fazlaysa görüntüde "Nx " ön eki eklenir.
@@ -211,7 +211,7 @@ qx.Class.define("ankamon.page.Logs", {
       this.__raw = null; // önceki türün sayfası yeni sütunlarla çizilmesin
 
       const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-      this.__board = this.__select([["", "Tüm tahtalar"]]);
+      this.__board = this.__select([["", "Tüm cihazlar"]]);
       this.__range = this.__select([["-1 hour", "Son 1 saat"], ["-24 hours", "Son 24 saat"], ["-7 days", "Son 7 gün"], ["-30 days", "Son 30 gün"]]);
       this.__range.setSelection([this.__range.getSelectables()[command ? 2 : 1]]);
       this.__query = new qx.ui.form.TextField().set({ placeholder: command ? "Komutta ara…" : "Mesajda ara…", width: 220 });
@@ -221,8 +221,8 @@ qx.Class.define("ankamon.page.Logs", {
       let columns;
       if (command) {
         this.__extra = this.__select([["", "Tüm kaynaklar"], ["action", "Hazır işlem"], ["command", "Serbest komut"], ["webshell", "Web terminal"], ["screen", "Ekran izleme / yönetim"],
-          // Tahtadaki kullanıcının kendi çalıştırdığı sudo/pkexec/su (syslog'dan kopyalanır — bkz. db/migrations/028).
-          ["local", "Tahtada yerel (sudo/pkexec/su)"]]);
+          // Cihazdaki kullanıcının kendi çalıştırdığı sudo/pkexec/su (syslog'dan kopyalanır — bkz. db/migrations/028).
+          ["local", "Cihazda yerel (sudo/pkexec/su)"]]);
         bar.add(this.__extra);
         columns = [
           { id: "time", label: "Zaman", width: 160 },
@@ -478,9 +478,9 @@ qx.Class.define("ankamon.page.Logs", {
     /**
      * Son çekilen sayfayı (__raw) tabloya yazar. Normalde ardışık aynı kayıtlar "N× " ile tek satıra
      * iner (__collapseConsecutive). "En sık tekrarlananlar" işaretliyse sayfadaki TÜM kayıtlar aynı
-     * mesaja (sistem logu: program + mesaj; komut logu: komut) göre gruplanır — hangi tahtadan geldiğine
+     * mesaja (sistem logu: program + mesaj; komut logu: komut) göre gruplanır — hangi cihazdan geldiğine
      * bakılmaz — ve tekrar sayısına göre büyükten küçüğe sıralanır (eşitlikte en son görülen önde).
-     * Grup satırı: son görülme zamanı, tek tahtaysa onun adı yoksa "N tahta", en ağır önem derecesi.
+     * Grup satırı: son görülme zamanı, tek cihazsa onun adı yoksa "N cihaz", en ağır önem derecesi.
      */
     __render() {
       const logs = this.__raw;
@@ -523,7 +523,7 @@ qx.Class.define("ankamon.page.Logs", {
         this.__table.getTableModel().setData(groups.map((g, i) => {
           const r = g.record;
           return [
-            i, F.dateTime(r.ts), several(g) ? `${g.boards.size} tahta` : r.board_name, r.username, r.source,
+            i, F.dateTime(r.ts), several(g) ? `${g.boards.size} cihaz` : r.board_name, r.username, r.source,
             prefix(g) + r.command,
             r.status + (r.exit_code === null || r.exit_code === undefined ? "" : " (" + r.exit_code + ")")
           ];
@@ -534,7 +534,7 @@ qx.Class.define("ankamon.page.Logs", {
           const r = g.record;
           return [
             i, F.dateTime(r.ts),
-            several(g) ? `${g.boards.size} tahta` : (map[(r.host || "").toLowerCase()] || map[r.from_ip] || ""),
+            several(g) ? `${g.boards.size} cihaz` : (map[(r.host || "").toLowerCase()] || map[r.from_ip] || ""),
             several(g) ? [...g.hosts].join(", ") : r.host,
             F.severity(frequent ? g.worst : r.severity), r.program, prefix(g) + r.message
           ];

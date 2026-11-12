@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtanın fiziksel ağ arabirimleri (kablolu, kablosuz, diğer) ve yapılandırmaları.
+"""Cihazın fiziksel ağ arabirimleri (kablolu, kablosuz, diğer) ve yapılandırmaları.
 
 Ekranlar önizlemesinin alt barındaki ağ simgeleri ve ipuçları için (bkz. boards.netifs, göç 026). Betik
 oturum yoklamasının SSH turuna eklenir (bkz. session_probe._SCRIPT) — ayrı bağlantı açılmaz. Yalnız
@@ -36,7 +36,7 @@ Satırlar:  NI ad|tür|operstate|carrier|mac|hız|sürücü|kalıcı_mac      ND
 
 mac = arabirimin O ANKİ adresi; Wi-Fi'de NetworkManager tarama sırasında rastgele (yerel yönetimli) adres
 takar. kalıcı_mac (perm_mac) yalnız Wi-Fi'de: kartın fabrika adresi (/sys/class/ieee80211/<phy>/macaddress) —
-Tahtalar ▸ "Kablosuz MAC" (boards.wifi_mac, göç 043) bundan yazılır (bkz. session_probe.store_extras).
+Cihazlar ▸ "Kablosuz MAC" (boards.wifi_mac, göç 043) bundan yazılır (bkz. session_probe.store_extras).
 """
 
 from __future__ import annotations

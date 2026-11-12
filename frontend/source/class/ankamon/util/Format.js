@@ -41,18 +41,18 @@ qx.Class.define("ankamon.util.Format", {
       unreachable: "Ulaşılamadı"
     },
 
-    // Tahta oturumlarının nasıl kapandığı (bkz. worker/ankamon/tasks/board_sessions.py).
+    // Cihaz oturumlarının nasıl kapandığı (bkz. worker/ankamon/tasks/board_sessions.py).
     SESSION_END_REASON: {
       logout: "Çıkış yapıldı",
-      offline: "Bağlantı kesildi (tahta çevrimdışı oldu)",
-      // Tahta yeniden erişilebilir olunca açılış günlüğünden netleşenler (bkz. worker tasks/session_end.py, göç 023);
+      offline: "Bağlantı kesildi (cihaz çevrimdışı oldu)",
+      // Cihaz yeniden erişilebilir olunca açılış günlüğünden netleşenler (bkz. worker tasks/session_end.py, göç 023);
       // grid ayrıntılı metni (end_detail, ör. "20 dk işlem yapılmadı") varsa onu gösterir.
-      shutdown: "Tahta kapatıldı",
-      reboot: "Tahta yeniden başlatıldı",
+      shutdown: "Cihaz kapatıldı",
+      reboot: "Cihaz yeniden başlatıldı",
       auto_idle: "Otomatik kapandı (işlem yapılmadı)",
       auto_timed: "Otomatik kapandı (zamanlı)",
       power_loss: "Elektrik kesintisi / zorla kapatma",
-      network: "Ağ bağlantısı kesildi (tahta kapanmadı)",
+      network: "Ağ bağlantısı kesildi (cihaz kapanmadı)",
       superseded: "Kapanmadan yeni oturum açıldı",
       // Web terminal oturumları (bkz. db/migrations/011_webshell_sessions.sql)
       closed: "Kapatıldı",
@@ -74,10 +74,10 @@ qx.Class.define("ankamon.util.Format", {
 
     /**
      * ETAP faz bilgisinin grid metni (bkz. worker netscan/etap_phase.py, migration 017): "Faz 2 · Vestel",
-     * "Faz 3 · Arçelik? (tahmin)", ETAP'a kayıtlı ama tahta olduğu bilinmeyen cihazda "ETAP cihazı".
+     * "Faz 3 · Arçelik? (tahmin)", ETAP'a kayıtlı ama cihaz olduğu bilinmeyen cihazda "ETAP cihazı".
      * "(tahmin)": faz eşlemesi çıkarım (doğrulanmadı) ya da yalnız MAC önekinden (donanım okunmadı).
      * Faz 2'de marka yerine işlemci üreticisi yazılır (kullanıcı isteği): "Faz 2 - Intel" / "Faz 2 - AMD" —
-     * Faz 2 tahtalarının Intel ve AMD sürümleri ayrı bakım/sürücü ister. Kaynak önce tahtanın okunan
+     * Faz 2 cihazlarının Intel ve AMD sürümleri ayrı bakım/sürücü ister. Kaynak önce cihazın okunan
      * işlemcisi (cpu: boards.facts.cpu_model), yoksa faz kaydındaki işlemci; ikisi de yoksa marka.
      * @param info {Map|null} boards.etap / net_devices.etap
      * @param cpu {String?} okunan işlemci adı
@@ -86,7 +86,7 @@ qx.Class.define("ankamon.util.Format", {
       if (!info) {
         return "";
       }
-      if (!info.tahta) {
+      if (!info.cihaz) {
         return "ETAP cihazı";
       }
       const faz = info.faz ? `Faz ${info.faz}` : "Faz ?";

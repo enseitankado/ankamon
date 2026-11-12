@@ -3,7 +3,7 @@
 
 # node_exporter ölçümlerini (inputs.prometheus, metric_version = 1) tek ölçüme indirir:
 #   metrics, etiketler: board_id, name ve aşağıdaki KEEP_TAGS; alan: value
-# Listede olmayan her şey atılır — tahta başına seri sayısı düşük kalsın diye.
+# Listede olmayan her şey atılır — cihaz başına seri sayısı düşük kalsın diye.
 
 KEEP = {
     "node_load1": True,
@@ -26,7 +26,7 @@ KEEP = {
     "node_hwmon_fan_rpm": True,
     # Super I/O (it87/nct6775/f71882fg) gerilimlerinden yalnız CMOS pili (in8 = Vbat) — bkz. apply().
     "node_hwmon_in_volts": True,
-    # Disk sıcaklığı: tahtadaki prometheus-node-exporter-collectors zamanlayıcılarının textfile
+    # Disk sıcaklığı: cihazdaki prometheus-node-exporter-collectors zamanlayıcılarının textfile
     # çıktısı (smartmon 15 dk'da bir; SATA'da 194 ya da 190 numaralı öznitelik, NVMe'de nvme_).
     "smartmon_temperature_celsius_raw_value": True,
     "smartmon_airflow_temperature_cel_raw_value": True,

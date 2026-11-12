@@ -93,7 +93,7 @@ qx.Class.define("ankamon.page.Users", {
         { id: "features", label: "Yetkiler" },
         { id: "login", label: "Son giriş", width: 130 }
       ], { prefsKey: "users.columns", filterable: true });
-      // Satıra çift tıklama = Düzenle (Tahtalar'daki gibi).
+      // Satıra çift tıklama = Düzenle (Cihazlar'daki gibi).
       this.__table.addListener("cellDbltap", e => {
         const row = e.getRow();
         const target = row === null ? null : this.__users && this.__users.get(this.__table.getTableModel().getValue(0, row));

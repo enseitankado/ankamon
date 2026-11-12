@@ -27,7 +27,7 @@
 
 /**
  * Wi-Fi Monitör grid'lerinin modeli (bkz. ui.boards.WifiMonitor). Pencerede iki sekme (kullanıcı isteği 2026-11-10):
- * "Tespitler" (varsayılan; bulgular, satır başında onay kutusu) ve "Sensörler" (seçili tahtaların tarama/izleme durumu).
+ * "Tespitler" (varsayılan; bulgular, satır başında onay kutusu) ve "Sensörler" (seçili cihazların tarama/izleme durumu).
  * Hücre değerleri düz metindir (sütun süzgeçleri, hazır değer listeleri ve sıralama onu kullanır); renkli/zengin görünüm ve
  * ipuçları satır kimliğine bağlı ek veriden (ui.boards.WifimonCellRenderer).
  */
@@ -40,24 +40,24 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
       maybe: { label: "Olası", color: "#e8710a", tip: "Güvenilir değil; telefon/tablet olabilir (zayıf kanıt)." },
       foreign: { label: "Yabancı", color: "#b08000", tip: "Güvenilir listesinde değil." },
       common: { label: "Ortak", color: "#6b7280", tip: "Güvenilir değil ama aynı erişim noktası (aynı MAC) sensörlerin çoğunca duyuluyor: okulun AP'si olası." },
-      fixed: { label: "Güvenilir", color: "#6b7280", tip: "Güvenilir listesinde (MAC adresiyle), sensörün bağlı olduğu ağ ya da bir Ankamon tahtası." }
+      fixed: { label: "Güvenilir", color: "#6b7280", tip: "Güvenilir listesinde (MAC adresiyle), sensörün bağlı olduğu ağ ya da bir Ankamon cihazı." }
     },
     KIND_LABEL: { wifi: "Wi-Fi ağı", probe: "Wi-Fi arayan cihaz", client: "Wi-Fi'ye bağlı cihaz" },
     PROBE_NOTE: {
       nodev: "Wi-Fi kartı yok; Wi-Fi trafiği dinlenemedi.",
-      tools: "Tahtada iw ya da python3 yok; Wi-Fi trafiği dinlenemedi.",
+      tools: "Cihazda iw ya da python3 yok; Wi-Fi trafiği dinlenemedi.",
       radio: "Wi-Fi açılamadığından Wi-Fi trafiği dinlenemedi.",
       busy: "Wi-Fi kartı bir ağa bağlı/bağlanıyor; bağlantı kesilmesin diye Wi-Fi trafiği dinlenmedi.",
       nomon: "Wi-Fi kartı monitör kipini desteklemiyor; Wi-Fi trafiği dinlenemedi.",
-      shared: "Bu tahtada başka bir pencere Wi-Fi trafiğini dinliyor; bu turda atlandı.",
+      shared: "Bu cihazda başka bir pencere Wi-Fi trafiğini dinliyor; bu turda atlandı.",
       monfail: "Monitör arabirimi kurulamadı; Wi-Fi trafiği dinlenemedi.",
-      sshwifi: "Tahtaya SSH bağlantısı Wi-Fi kartı üzerinden; erişim kesilmesin diye monitör kipine alınmadı."
+      sshwifi: "Cihaza SSH bağlantısı Wi-Fi kartı üzerinden; erişim kesilmesin diye monitör kipine alınmadı."
     },
 
     /** "Tespitler" grid'inin sütunları (sırası kullanıcıca değiştirilebilir — "wifimon.columns" tercihi). */
     COLUMNS: [
       { id: "level", label: "Durum", width: 110, choices: true, hint: "Bulgunun öne çıkma düzeyi" },
-      { id: "sensor", label: "Sensör", width: 150, choices: true, hint: "Vericiyi duyan Ankamon tahtası (Wi-Fi kartıyla dinleyen)" },
+      { id: "sensor", label: "Sensör", width: 150, choices: true, hint: "Vericiyi duyan Ankamon cihazı (Wi-Fi kartıyla dinleyen)" },
       { id: "device", label: "Tespit edilen cihaz", width: 150,
         hint: "Duyulan vericinin MAC adresi (satıra çift tıklayın: bütün ayrıntılar)" },
       // Eskiden cihaz adının başındaki "N×" (kullanıcı isteği 2026-11-11: ayrı sütun). Görülme sayısı DEĞİL: aynı cihaz
@@ -75,7 +75,7 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
     /** "Sensörler" grid'inin sütunları ("wifimon.sensors.columns" tercihi). */
     SENSOR_COLUMNS: [
       { id: "state", label: "Durum", width: 130, choices: true, hint: "Tarama/izleme durumu" },
-      { id: "sensor", label: "Sensör", width: 160, choices: true, hint: "Wi-Fi kartıyla çevreyi dinleyen Ankamon tahtası" },
+      { id: "sensor", label: "Sensör", width: 160, choices: true, hint: "Wi-Fi kartıyla çevreyi dinleyen Ankamon cihazı" },
       { id: "mode", label: "Kip", width: 150, choices: true, hint: "Monitör kipi: Wi-Fi trafiği dinleniyor; Ağ taraması: yalnız çevredeki Wi-Fi ağları listeleniyor" },
       { id: "card", label: "Wi-Fi kartı", width: 190, choices: true, hint: "Kart adı ve bağlı olduğu ağ" },
       { id: "findings", label: "Bulgular", width: 260, hint: "Bu sensörün tespitlerinin düzeylere göre sayısı" },
@@ -266,7 +266,7 @@ qx.Class.define("ankamon.ui.boards.WifimonRender", {
           },
           hint: {
             state: [feed.watching ? "Sürekli izleniyor (liste kendiliğinden tazelenir)." : "Tek tarama."].concat(notes).join("\n"),
-            mode: feed.sniffing ? "Wi-Fi kartı dinleme süresince monitör kipinde (Tahtalar listesinin Wi-Fi sütununda 'Monitör modu')."
+            mode: feed.sniffing ? "Wi-Fi kartı dinleme süresince monitör kipinde (Cihazlar listesinin Wi-Fi sütununda 'Monitör modu')."
               : "Kart monitör kipinde değil: yalnız çevredeki Wi-Fi ağları listeleniyor.",
             card: card || null,
             findings: parts.length ? parts.map(p => `${p.text}: ${p.tip}`).join("\n") : null,

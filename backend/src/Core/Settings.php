@@ -46,14 +46,14 @@ final class Settings
         // Eğitim-öğretim yılı term1_start'ta başlar, 1. dönem term2_start'a dek sürer, 2. dönem term2_end'de biter
         // (yaz tatilinde "dönem" biten 2. dönemdir). Arayüzü yok; MEB takvimi farklıysa settings tablosuna yazılır.
         'school_calendar' => ['term1_start' => '09-01', 'term2_start' => '02-01', 'term2_end' => '06-30'],
-        // Ekranlar: tahtada x11vnc yoksa "Ekran istemcisini kur" (actions/vnc-install) arka planda
+        // Ekranlar: cihazda x11vnc yoksa "Ekran istemcisini kur" (actions/vnc-install) arka planda
         // kendiliğinden çalıştırılsın mı (bkz. worker/ankamon/screen/__main__.py). Varsayılan: evet.
         'screen_vnc_autoinstall' => true,
         // Kuruluş (Ayarlar ▸ Kuruluş): bildirim başlıklarında görünür, ntfy konu önerisi bundan türer.
         'organization' => ['name' => '', 'code' => ''],
         // ntfy bildirimleri (Anomaliler ▸ Bildirimler; bkz. worker executor/ntfy.py).
         'ntfy' => ['server' => 'https://ntfy.sh', 'topic' => ''],
-        // Tahta sağlığı ▸ Yardım ▸ Denetim türleri (bkz. Api\AnomaliesApi::kinds/updateKind): sürekli izleme kurallarının
+        // Cihaz sağlığı ▸ Yardım ▸ Denetim türleri (bkz. Api\AnomaliesApi::kinds/updateKind): sürekli izleme kurallarının
         // yönetici ayarları {tür: {every_s?, level?, scan?}} — verilmeyen alan varsayılandır. worker anomaly._due okur.
         'anomaly_kind_overrides' => [],
         // SSH denetiminin otomatik aralığı (gün); null = DIAGNOSE_INTERVAL_DAYS ortam değişkeni (vars. 7). worker

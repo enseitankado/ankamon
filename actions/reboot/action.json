@@ -1,6 +1,6 @@
 {
   "title": "Yeniden başlat",
-  "description": "Seçilen tahtaları yeniden başlatır. Açık oturumlar kapanır.",
+  "description": "Seçilen cihazları yeniden başlatır. Açık oturumlar kapanır.",
   "category": "Güç",
   "feature": "power",
   "confirm": true,

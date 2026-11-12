@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-# Sistem güncelleme (bkz. action.json). Asıl iş tahtada ayrı bir systemd birimi olarak çalışır: SSH
-# bağlantısı koparsa ya da görev zaman aşımına uğrarsa dpkg yarıda kesilmez (yarım kalan dpkg tahtayı
+# Sistem güncelleme (bkz. action.json). Asıl iş cihazda ayrı bir systemd birimi olarak çalışır: SSH
+# bağlantısı koparsa ya da görev zaman aşımına uğrarsa dpkg yarıda kesilmez (yarım kalan dpkg cihazı
 # açılmaz hâle getirebilir). Bu betik birimi başlatır ve çıktısını, birim bitene dek canlı izler.
 set -eu
 UNIT=ankamon-sistem-guncelle
@@ -13,7 +13,7 @@ REBOOT="${REBOOT:-hayir}"
 mkdir -p "$DIR"
 
 if systemctl is-active --quiet "$UNIT"; then
-    echo "Bu tahtada sistem güncellemesi zaten sürüyor — çıktısı izleniyor."
+    echo "Bu cihazda sistem güncellemesi zaten sürüyor — çıktısı izleniyor."
 else
     cat > "$DIR/sistem-guncelle.sh" <<'INNER'
 set -u
@@ -76,9 +76,9 @@ if [ -f /run/reboot-required ] || { [ -n "$newest" ] && [ "$newest" != "$(uname 
     echo "Yeniden başlatma gerekiyor (çalışan çekirdek $(uname -r), kurulu en yeni $newest)."
     if [ "${REBOOT:-hayir}" = evet ]; then
         shutdown -r +1 "Ankamon: sistem güncellemesi sonrası 1 dakika içinde yeniden başlatılıyor." \
-            && echo "Tahta 1 dakika içinde yeniden başlatılacak."
+            && echo "Cihaz 1 dakika içinde yeniden başlatılacak."
     else
-        echo "Yeniden başlatma seçilmedi — değişiklikler tahta yeniden açılınca tam etkinleşir."
+        echo "Yeniden başlatma seçilmedi — değişiklikler cihaz yeniden açılınca tam etkinleşir."
     fi
 else
     echo "Yeniden başlatma gerekmiyor."

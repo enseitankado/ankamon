@@ -5,7 +5,7 @@
 # kopyalanmıştır (bkz. worker/ankamon/executor/tools.py). Okunan parolalar iş çıktısına yazılır (işin amacı budur).
 set -u
 T=/opt/eta-112/eta-112.py
-[ -f "$T" ] || { echo "eta-112 tahtada bulunamadı ($T)." >&2; exit 1; }
+[ -f "$T" ] || { echo "eta-112 cihazda bulunamadı ($T)." >&2; exit 1; }
 echo "Araç: eta-112 $(cut -d' ' -f2 /opt/eta-112/VERSION 2>/dev/null | cut -c1-7)"
 
 echo "BIOS okunuyor (gerekirse flashrom/dmidecode kurulur; flash'a yazılmaz)…"

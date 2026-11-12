@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-# Web terminal (webssh): tarayıcıdan seçili tahtaya SSH. nginx /webshell/ ile vekillenir ve
+# Web terminal (webssh): tarayıcıdan seçili cihaza SSH. nginx /webshell/ ile vekillenir ve
 # oturum + "shell" yetkisiyle korunur. Yalnız 127.0.0.1 dinler; dışarı açılmaz.
 set -eu
 
@@ -10,7 +10,7 @@ set -eu
 . /opt/ankamon/services/wait-db.sh
 export PG_HOST=127.0.0.1 PG_PORT=5432 PG_DB=ankamon PG_USER=ankamon PG_PASSWORD="$POSTGRES_PASSWORD"
 
-# --policy=autoadd: imajdan çıkan tahtaların anahtarları değiştiği için bilinmeyen anahtar eklenir.
+# --policy=autoadd: imajdan çıkan cihazların anahtarları değiştiği için bilinmeyen anahtar eklenir.
 # --fbidhttp=False: parola HTTP üzerinden iletilebilir (okul iç ağı, TLS yok; nginx ardında).
 # --origin=same: WebSocket kökeni istekle aynı host olmalı (nginx Host ve Origin'i aynen iletir);
 # wildcard yalnız debug kipinde kabul edilir. Erişim ayrıca nginx auth_request ile kısıtlıdır.

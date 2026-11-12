@@ -27,7 +27,7 @@
 
 /**
  * vis-timeline (https://github.com/visjs/vis-timeline, Apache-2.0/MIT) sarmalayıcısı: satırlar
- * (tahta ya da kullanıcı) ve başlangıç/bitişli çubuklar (oturumlar); fare tekerleği/sürükleme ile
+ * (cihaz ya da kullanıcı) ve başlangıç/bitişli çubuklar (oturumlar); fare tekerleği/sürükleme ile
  * yakınlaştırma-kaydırma kütüphanenin kendisinden gelir.
  *
  * Kütüphane derlemede node_modules'tan resource/ankamon/vis/'e kopyalanır (bkz. Dockerfile) ve

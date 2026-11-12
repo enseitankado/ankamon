@@ -102,12 +102,12 @@ echo "Kartın desteklediği: ${supports:-bilinmiyor} · şu anki mod: ${current:
 journalctl -u tiha-wake-on-lan.service -n 1 --no-pager -o cat 2>/dev/null | sed 's/^/Servis günlüğü: /' || true
 case "$supports" in
     *g*) ;;
-    "") echo "UYARI: kart WoL desteği bildirmiyor — bu tahta ağdan uyandırılamayabilir."; exit 1 ;;
+    "") echo "UYARI: kart WoL desteği bildirmiyor — bu cihaz ağdan uyandırılamayabilir."; exit 1 ;;
     *) echo "UYARI: kart sihirli paketle (g) uyandırmayı desteklemiyor."; exit 1 ;;
 esac
 if [ "$current" = g ] || echo "$current" | grep -q g; then
-    echo "Tamam: tahta sihirli paketle uyandırmaya hazır."
-    echo "Not: BIOS'ta \"Wake on LAN\" açık, \"ErP\"/\"Deep Sleep\" kapalı olmalı; tahta düzgün kapatılmalıdır."
+    echo "Tamam: cihaz sihirli paketle uyandırmaya hazır."
+    echo "Not: BIOS'ta \"Wake on LAN\" açık, \"ErP\"/\"Deep Sleep\" kapalı olmalı; cihaz düzgün kapatılmalıdır."
 else
     echo "UYARI: Wake-on modu \"$current\" — sihirli paket (g) etkinleşmedi."
     exit 1

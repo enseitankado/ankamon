@@ -23,16 +23,16 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Sağ menü Ekran ▸ "Ekranı başka bilgisayara aktar": bir tahtanın ekranı seçili tahtalarda tam ekran görünür.
+"""Sağ menü Ekran ▸ "Ekranı başka bilgisayara aktar": bir cihazın ekranı seçili cihazlarda tam ekran görünür.
 
-Akış: kaynak tahtada ffmpeg (hazır gelir) etkin X ekranını yakalar, H.264 ile MediaMTX'e RTSP yayınlar (yol adı
-"r-<rastgele>", bkz. services/mediamtx.sh); hedef tahtalarda "Ekranımı yansıt"ın oynatıcısı (executor/cast.py: kaplama +
+Akış: kaynak cihazda ffmpeg (hazır gelir) etkin X ekranını yakalar, H.264 ile MediaMTX'e RTSP yayınlar (yol adı
+"r-<rastgele>", bkz. services/mediamtx.sh); hedef cihazlarda "Ekranımı yansıt"ın oynatıcısı (executor/cast.py: kaplama +
 mpv, kısa kesintilerde yeniden bağlanır, bitince ekranı eski hâline getirir) aynı yolu okur. Yeniden kodlama yok, sunucuda
-işlemci yükü çok düşük; yük kaynak tahtadadır (bir kodlayıcı, hedef sayısından bağımsız).
+işlemci yükü çok düşük; yük kaynak cihazdadır (bir kodlayıcı, hedef sayısından bağımsız).
 
 Kaynakta sarmalayıcı (/run/ankamon-relay/run.sh): etkin VT değişirse (oturum açma, kullanıcı değiştirme) yeni ekrana geçer.
 Durum `screen_relays` tablosunda (hedef başına bir satır); durdurma hedefi de kaynağı da kabul eder ve geride hedefi
-kalmayan kaynaktaki yayını da kapatır. /run tahta yeniden başlayınca silinir: kapanan tahtada yayın kendiliğinden biter.
+kalmayan kaynaktaki yayını da kapatır. /run cihaz yeniden başlayınca silinir: kapanan cihazda yayın kendiliğinden biter.
 Görüntü aktarılır, ses aktarılmaz.
 """
 
@@ -50,7 +50,7 @@ from .accounts import _ssh
 API_PORT = int(os.environ.get("CAST_API_PORT", "9997"))
 STREAM_RE = re.compile(r"^r-[A-Za-z0-9]{24,64}$")
 
-# Kaynak: yakalama ve kodlama. 1920 genişlik sınırı: tahta yazıları okunur kalsın; ultrafast + zerolatency: zayıf
+# Kaynak: yakalama ve kodlama. 1920 genişlik sınırı: cihaz yazıları okunur kalsın; ultrafast + zerolatency: zayıf
 # işlemcide de gecikme düşük; ana profil dışı özellik kullanmaz, mpv donanımsal çözebilir.
 _WRAPPER = r"""#!/bin/sh
 URL=__URL__
@@ -82,7 +82,7 @@ done
 """
 
 _START = r"""
-command -v ffmpeg >/dev/null 2>&1 || { echo "Kaynak tahtada ffmpeg yok." >&2; exit 3; }
+command -v ffmpeg >/dev/null 2>&1 || { echo "Kaynak cihazda ffmpeg yok." >&2; exit 3; }
 DIR=/run/ankamon-relay
 mkdir -p "$DIR"; chmod 700 "$DIR"
 [ -s "$DIR/pid" ] && pkill -TERM -g "$(cat "$DIR/pid")" 2>/dev/null && sleep 1
@@ -131,7 +131,7 @@ def start_source(board: dict, user: str, password: str, stream: str) -> dict:
         return result
     if not _published(stream):
         stop_source(board, user, password)
-        return {"status": "failed", "rc": None, "output": "Kaynak tahtadan yayın gelmedi (ffmpeg başlamadı ya da sunucuya ulaşamadı)."}
+        return {"status": "failed", "rc": None, "output": "Kaynak cihazdan yayın gelmedi (ffmpeg başlamadı ya da sunucuya ulaşamadı)."}
     return result
 
 
@@ -148,10 +148,10 @@ def _board(conn, board_id: int) -> dict | None:
 
 def start(conn, source_id: int, targets: list[dict], stream: str, started_by: str, user: str, password: str, on_target) -> None:
     """Kaynağı başlatır, sonra hedefleri on_target'a devreder: on_target(work) her hedef için `work(t) -> sonuç` çalıştırır
-    (runner paralel yürütür, sonuçları {tahta: sonuç} döner); başarılılar tabloya yazılır."""
+    (runner paralel yürütür, sonuçları {cihaz: sonuç} döner); başarılılar tabloya yazılır."""
     source = _board(conn, source_id)
     if source is None or not source["ip"]:
-        raise RuntimeError("Kaynak tahta bulunamadı.")
+        raise RuntimeError("Kaynak cihaz bulunamadı.")
     # Aynı kaynağın önceki yayını sürüyorsa hedefleri korunur: yeni yayın adına geçilir.
     previous = conn.execute("SELECT target_board_id FROM screen_relays WHERE source_board_id = %s", (source_id,)).fetchall()
     # Hedefler başka bir kaynaktan buraya geçebilir: o kaynakta hedef kalmazsa yayını sonda kapatılır.
@@ -182,12 +182,12 @@ def start(conn, source_id: int, targets: list[dict], stream: str, started_by: st
                 conn.execute("UPDATE screen_relays SET stream = %s WHERE target_board_id = %s", (stream, row["target_board_id"]))
     if not conn.execute("SELECT 1 FROM screen_relays WHERE source_board_id = %s LIMIT 1", (source_id,)).fetchone():
         stop_source(source, user, password)
-        raise RuntimeError("Hiçbir hedef tahtada görüntü açılamadı.")
+        raise RuntimeError("Hiçbir hedef cihazda görüntü açılamadı.")
     _release_orphans(conn, user, password, moved_from)
 
 
 def stop(conn, board: dict, user: str, password: str) -> dict:
-    """Bu tahtadaki aktarımı durdurur: kaynaksa bütün hedefleri, hedefse yalnız kendisini normale döndürür."""
+    """Bu cihazdaki aktarımı durdurur: kaynaksa bütün hedefleri, hedefse yalnız kendisini normale döndürür."""
     lines = []
     rows = conn.execute(
         "SELECT target_board_id, source_board_id FROM screen_relays WHERE source_board_id = %s OR target_board_id = %s",
@@ -205,14 +205,14 @@ def stop(conn, board: dict, user: str, password: str) -> dict:
         conn.execute("DELETE FROM screen_relays WHERE target_board_id = %s", (row["target_board_id"],))
     if not rows:
         res = stop_source(board, user, password)    # kayıt yok ama kalmış olabilir
-        return {"status": res["status"], "rc": res["rc"], "output": "Bu tahtada ekran aktarımı yoktu."}
+        return {"status": res["status"], "rc": res["rc"], "output": "Bu cihazda ekran aktarımı yoktu."}
     # Hedef durdurulduysa kaynağında başka hedef kalmamış olabilir; kaynaksa kendisi.
     lines.extend(_release_orphans(conn, user, password, sources))
     return {"status": "ok", "rc": 0, "output": "\n".join(lines)}
 
 
 def _release_orphans(conn, user: str, password: str, candidates: set[int]) -> list[str]:
-    """Verilen tahtalardan hedefi kalmayanlarda kaynak yayınını kapatır."""
+    """Verilen cihazlardan hedefi kalmayanlarda kaynak yayınını kapatır."""
     out = []
     for board_id in candidates:
         if conn.execute("SELECT 1 FROM screen_relays WHERE source_board_id = %s LIMIT 1", (board_id,)).fetchone():

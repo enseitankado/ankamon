@@ -23,20 +23,20 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Anomali: tahtanın saati NTP sunucusuyla eşitlenmiyor.
+"""Anomali: cihazın saati NTP sunucusuyla eşitlenmiyor.
 
-Sürekli izleme (detect) tahtanın node_exporter ölçümlerinden yapılır (telegraf, dakikada bir — bkz.
+Sürekli izleme (detect) cihazın node_exporter ölçümlerinden yapılır (telegraf, dakikada bir — bkz.
 docker/telegraf/reshape.star): bir ölçüm "eşitlenmemiş" sayılır, eğer
   - node_timex_sync_status = 0 (çekirdeğin saat eşitleme bayrağı; systemd-timesyncd/chrony eşitleyince 1), ya da
-  - tahtanın saati (node_time_seconds) ölçümün sunucudaki zamanından OFFSET_MAX'tan fazla sapıyorsa.
-Ardışık eşitlenmemiş ölçümler (aralarında GAP'ten uzun boşluk yok — tahta kapandıysa aralık biter) bir
+  - cihazın saati (node_time_seconds) ölçümün sunucudaki zamanından OFFSET_MAX'tan fazla sapıyorsa.
+Ardışık eşitlenmemiş ölçümler (aralarında GAP'ten uzun boşluk yok — cihaz kapandıysa aralık biter) bir
 aralıktır; THRESHOLD'dan uzun olanlar anomalidir (açılışta eşitleme birkaç saniye-dakika sürebilir).
 sync_status ölçümü eklenmeden önceki geçmişte yalnız saat sapması değerlendirilir.
 
 Sapma eşiği bilerek geniştir: ölçüm zamanı Ankamon sunucusunun saatidir; sunucunun kendi saati de birkaç
 saniye kayabilir. Asıl ölçüt çekirdeğin eşitleme bayrağıdır.
 
-Anlık tarama (PROBE/evaluate, bkz. anomaly.scan): tahtada timedatectl ile NTP açık mı, eşitlendi mi,
+Anlık tarama (PROBE/evaluate, bkz. anomaly.scan): cihazda timedatectl ile NTP açık mı, eşitlendi mi,
 hangi sunucu/servis, son eşitleme ve sunucuya göre saat farkı.
 """
 
@@ -44,7 +44,7 @@ import datetime
 
 KIND = "ntp_unsynced"
 THRESHOLD = datetime.timedelta(minutes=15)
-# Ölçümler arasında bundan uzun boşluk: tahta kapalıydı ya da ölçülemedi, aralık burada biter.
+# Ölçümler arasında bundan uzun boşluk: cihaz kapalıydı ya da ölçülemedi, aralık burada biter.
 GAP = datetime.timedelta(minutes=15)
 OFFSET_MAX = 30.0  # saniye
 # Her turda yeniden hesaplanan geriye dönük pencere (bkz. anomaly._since): ölçümler geç gelmez, birkaç
@@ -79,7 +79,7 @@ GROUP BY h.board_id, h.grp
 ORDER BY h.board_id, started_at
 """
 
-# Tahta başına ölçüm kapsamı (yeniden hesaplanan aralık) ve son ölçüm zamanı.
+# Cihaz başına ölçüm kapsamı (yeniden hesaplanan aralık) ve son ölçüm zamanı.
 _SCOPES = """
 SELECT t.board_id, min(m.time) AS first_at, max(m.time) AS last_at
 FROM metrics m JOIN metrics_tag t USING (tag_id)
@@ -123,7 +123,7 @@ def detect(conn, since):
     for r in scopes_rows:
         board = boards.get(int(r["board_id"])) if str(r["board_id"]).isdigit() else None
         if not board or not board["host"]:
-            continue  # tahta kaydı silinmiş: eski kayıtlara dokunma
+            continue  # cihaz kaydı silinmiş: eski kayıtlara dokunma
         last_sample[board["id"]] = r["last_at"]
         scopes.append((board["host"], r["first_at"], r["last_at"]))
 
@@ -189,7 +189,7 @@ def evaluate(values: dict, ctx: dict) -> dict:
     try:
         board_now = float(values.get("now", ""))
         t0, t1 = ctx["t0"], ctx["t1"]
-        # Tahtanın saati SSH süresince [t0, t1] aralığında olmalı; dışındaysa en yakın uca göre fark.
+        # Cihazın saati SSH süresince [t0, t1] aralığında olmalı; dışındaysa en yakın uca göre fark.
         offset = 0.0 if t0 - 1 <= board_now <= t1 + 1 else (board_now - t1 if board_now > t1 else board_now - t0)
         detail["offset_s"] = round(offset, 1)
     except (KeyError, ValueError):

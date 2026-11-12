@@ -23,22 +23,22 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Yedek dosyasından tahtada kullanıcı hesabını yeniden oluşturur: hesap, ev dizini, parola, PIN anahtarı.
+"""Yedek dosyasından cihazda kullanıcı hesabını yeniden oluşturur: hesap, ev dizini, parola, PIN anahtarı.
 
 Sağ menü "Yedekle/Geri al" ▸ Geri al (bkz. frontend ui/homebackup): dosya files servisine akışla yüklenir
-(new_upload/upload_summary), "restore_home" görevi runner'da tahtaları SIRAYLA işler (restore_home).
+(new_upload/upload_summary), "restore_home" görevi runner'da cihazları SIRAYLA işler (restore_home).
 
-Yüklenen dosyaya GÜVENİLMEZ: "boards.restore" yetkili biri elle hazırlanmış arşivle tahtada root yetkisi
+Yüklenen dosyaya GÜVENİLMEZ: "boards.restore" yetkili biri elle hazırlanmış arşivle cihazda root yetkisi
 kazanmaya çalışabilir. Bu yüzden hesap bilgisinin her alanı kalıba göre doğrulanır (_validate_meta — parola özeti
-chpasswd satırına, adlar komut argümanına gider) ve arşivin bütün üyeleri tahtaya gönderilmeden taranır
+chpasswd satırına, adlar komut argümanına gider) ve arşivin bütün üyeleri cihaza gönderilmeden taranır
 (_scan_members: ev dizini dışına yol, aygıt dosyası, setuid/setgid dosya reddedilir). tar'ın --xattrs'ı açarken yalnız
 user.* yazar (security.capability yazılmaz). Yönetici olmayan kullanıcı yetkili hesap (etapadmin, sudo grubu…)
 geri alamaz, yetkili bir grup ekleyemez; böyle bir hesabın üzerine de yazamaz (bkz. HOME_RESTORE_PRIVILEGED).
 
-Tek SSH oturumu: tahtada Python betiği çalışır, stdin'den önce tek satır JSON (hesap bilgisi — parola özeti ve PIN
+Tek SSH oturumu: cihazda Python betiği çalışır, stdin'den önce tek satır JSON (hesap bilgisi — parola özeti ve PIN
 komut satırında görünmesin diye argüman değil), ardından gzip'li arşiv gelir; arşivi tar doğrudan stdin'den açar.
 İlerleme gönderilen bayttan hesaplanır. Hesap varsa ya da ev dizini duruyorsa, "overwrite" verilmedikçe hiçbir şey
-değiştirilmez; açık süreci olan hesabın üzerine hiç yazılmaz. Kimlikler boşsa korunur, tahtada başka hesapta ise
+değiştirilmez; açık süreci olan hesabın üzerine hiç yazılmaz. Kimlikler boşsa korunur, cihazda başka hesapta ise
 yenisi alınır ve dosyaların sahipliği ona çevrilir.
 """
 
@@ -81,10 +81,10 @@ class HomeRestoreRefused(Exception):
 
 
 def merge_home_backup_results(parts: list[dict]) -> dict:
-    """Bir tahtadaki hesap başına yedek sonuçlarını tek tahta sonucuna indirger (bkz. runner "backup_home")."""
+    """Bir cihazdaki hesap başına yedek sonuçlarını tek cihaz sonucuna indirger (bkz. runner "backup_home")."""
     done = [p for p in parts if p["status"] != "skipped"]
     if not done:
-        return {"status": "failed", "rc": None, "output": "Seçilen hesaplar bu tahtada yok."}
+        return {"status": "failed", "rc": None, "output": "Seçilen hesaplar bu cihazda yok."}
     bad = next((p for p in done if p["status"] != "ok"), None)
     return {"status": bad["status"] if bad else "ok", "rc": (bad or done[-1])["rc"],
             "output": "\n".join(p["output"] for p in parts)}
@@ -226,7 +226,7 @@ def prepare_home_restore(token: str, owner: str, is_admin: bool) -> tuple[str, d
     return path, meta
 
 
-# Tahtada root olarak çalışır. Çıktı satırları: "I <bilgi>", "W <uyarı>", "E <hata>" (sonra çıkış 3).
+# Cihazda root olarak çalışır. Çıktı satırları: "I <bilgi>", "W <uyarı>", "E <hata>" (sonra çıkış 3).
 _REMOTE = r"""
 import grp, json, os, pwd, subprocess, sys, tempfile
 
@@ -270,7 +270,7 @@ name, home = m["username"], m["home"]
 ent = lookup(pwd.getpwnam, name)
 if ent:
     if not req["overwrite"]:
-        die(name + " hesabı bu tahtada zaten var; değiştirilmedi. Üzerine yazmak için seçeneği işaretleyin.")
+        die(name + " hesabı bu cihazda zaten var; değiştirilmedi. Üzerine yazmak için seçeneği işaretleyin.")
     if ent.pw_dir != home:
         die(name + " hesabının ev dizini farklı (" + ent.pw_dir + "); geri alınmadı.")
     if run("pgrep", "-u", str(ent.pw_uid))[0] == 0:
@@ -292,7 +292,7 @@ if not ent:
     shell = m["shell"] if os.path.exists(m["shell"]) else "/bin/bash"
     args = ["useradd", "-M", "-g", m["group"], "-d", home, "-s", shell, "-c", m["gecos"]]
     if lookup(pwd.getpwuid, m["uid"]):
-        say("W", "Kullanıcı kimliği " + str(m["uid"]) + " bu tahtada başka hesapta; yeni kimlik verildi.")
+        say("W", "Kullanıcı kimliği " + str(m["uid"]) + " bu cihazda başka hesapta; yeni kimlik verildi.")
     else:
         args += ["-u", str(m["uid"])]
     must(*args, name)
@@ -321,7 +321,7 @@ gone = [g for g in m["groups"] if g not in have]
 if have:
     must("usermod", "-a", "-G", ",".join(have), name)
 if gone:
-    say("W", "Bu tahtada olmayan gruplar atlandı: " + ", ".join(gone))
+    say("W", "Bu cihazda olmayan gruplar atlandı: " + ", ".join(gone))
 
 if m["shadow"]:
     must("chpasswd", "-e", data=(name + ":" + m["shadow"] + "\n").encode())
@@ -362,10 +362,10 @@ say("I", "Yeni hesap hazır." if created else "Var olan hesabın üzerine yazıl
 
 
 def restore_home(board: dict, user: str, password: str, archive: str, meta: dict, overwrite: bool, events) -> dict:
-    """Tek tahtaya geri alır; olaylar `events`'e. Döner: {"status", "rc", "output"} (job_targets için)."""
+    """Tek cihaza geri alır; olaylar `events`'e. Döner: {"status", "rc", "output"} (job_targets için)."""
     if not board.get("ip"):
-        events.add("fail", "Tahtanın IP adresi yok.")
-        return {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
+        events.add("fail", "Cihazın IP adresi yok.")
+        return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     name = meta["username"]
     target = f"{user}@{board['ip']}"
     events.add("info", f"Bağlanılıyor: {target} — {name} hesabı geri alınacak")
@@ -425,7 +425,7 @@ def restore_home(board: dict, user: str, password: str, archive: str, meta: dict
                     _progress(events, min(99, sent * 100 // max(total, 1)), sent, total, total)
         proc.stdin.close()
     except (BrokenPipeError, ValueError):
-        pass  # tahta erken vazgeçti (ör. hesap zaten var): neden çıktıda
+        pass  # cihaz erken vazgeçti (ör. hesap zaten var): neden çıktıda
     rc = proc.wait()
     timer.cancel()
     thread.join(timeout=10)

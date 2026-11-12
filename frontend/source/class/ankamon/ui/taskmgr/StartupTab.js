@@ -28,9 +28,9 @@
 /**
  * Başlangıç uygulamaları (Windows Görev Yöneticisi gibi): oturum açılınca kendiliğinden başlayan uygulamalar
  * (XDG autostart: /etc/xdg/autostart + ~/.config/autostart) — Ad, Yayımcı (paket), Durum, Başlangıç etkisi.
- * Etkinleştir / Devre dışı bırak, tahtada OTURUM AÇMIŞ kullanıcıya göre uygulanır (kullanıcının autostart
- * geçersiz kılması; sistem dosyası değişmez). Liste yalnız sekme görünürken 10 sn'de bir gelir. Çok tahtada
- * bütün tahtaların listeleri tek tabloda ("Bilgisayar" sütunu); değişiklik satırın tahtasına uygulanır.
+ * Etkinleştir / Devre dışı bırak, cihazda OTURUM AÇMIŞ kullanıcıya göre uygulanır (kullanıcının autostart
+ * geçersiz kılması; sistem dosyası değişmez). Liste yalnız sekme görünürken 10 sn'de bir gelir. Çok cihazda
+ * bütün cihazların listeleri tek tabloda ("Bilgisayar" sütunu); değişiklik satırın cihazına uygulanır.
  */
 qx.Class.define("ankamon.ui.taskmgr.StartupTab", {
   extend: ankamon.ui.taskmgr.Tab,
@@ -82,7 +82,7 @@ qx.Class.define("ankamon.ui.taskmgr.StartupTab", {
       return it ? { link: parsed.link, st, it } : null;
     },
 
-    /** Düğmeler: tahtada oturum açıksa etkin (çok tahtada seçili satırın tahtasına göre; seçim yoksa etkin). */
+    /** Düğmeler: cihazda oturum açıksa etkin (çok cihazda seçili satırın cihazına göre; seçim yoksa etkin). */
     __syncButtons() {
       const found = this.__item(this._selectedId(this.__table));
       let can;
@@ -103,7 +103,7 @@ qx.Class.define("ankamon.ui.taskmgr.StartupTab", {
       }
       const { link, st, it } = found;
       if (!st.user) {
-        ankamon.ui.Dialog.alert("Bu tahtada oturum açık değil: değişiklik oturum açılınca yapılabilir.");
+        ankamon.ui.Dialog.alert("Bu cihazda oturum açık değil: değişiklik oturum açılınca yapılabilir.");
         return;
       }
       try {
@@ -127,12 +127,12 @@ qx.Class.define("ankamon.ui.taskmgr.StartupTab", {
       if (!this._win.isMulti()) {
         const st = links[0].getModel().startup;
         this.__info.setValue(st.user
-          ? `Ayarlar tahtada oturum açmış <b>${F.esc(st.user)}</b> kullanıcısı için geçerlidir. ${st.items.filter(i => i.enabled).length} etkin / ${st.items.length}`
-          : "Tahtada oturum açık değil: liste görüntülenir, değişiklik oturum açılınca yapılabilir.");
+          ? `Ayarlar cihazda oturum açmış <b>${F.esc(st.user)}</b> kullanıcısı için geçerlidir. ${st.items.filter(i => i.enabled).length} etkin / ${st.items.length}`
+          : "Cihazda oturum açık değil: liste görüntülenir, değişiklik oturum açılınca yapılabilir.");
       } else {
         const withUser = links.filter(l => l.getModel().startup.user).length;
-        this.__info.setValue(`${links.length} tahta · ${withUser} tahtada oturum açık. Ayarlar her tahtada oturum açmış kullanıcı ` +
-          "için geçerlidir; oturumu kapalı tahtada değişiklik oturum açılınca yapılabilir.");
+        this.__info.setValue(`${links.length} cihaz · ${withUser} cihazda oturum açık. Ayarlar her cihazda oturum açmış kullanıcı ` +
+          "için geçerlidir; oturumu kapalı cihazda değişiklik oturum açılınca yapılabilir.");
       }
       const rows = [];
       links.forEach(link => {

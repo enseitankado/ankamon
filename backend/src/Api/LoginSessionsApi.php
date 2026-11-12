@@ -35,7 +35,7 @@ use Ankamon\Core\Db;
 use Ankamon\Core\Request;
 
 /**
- * Ankamon'un KENDİ kullanıcılarının oturum geçmişi (login_sessions, göç 019) — tahtalardaki kullanıcı
+ * Ankamon'un KENDİ kullanıcılarının oturum geçmişi (login_sessions, göç 019) — cihazlardaki kullanıcı
  * oturumları (board_sessions, "sessions.*" yetkileri) DEĞİL. Kullanıcılar ▸ Oturumlar sekmesi ve alt
  * çubuktaki "oturum açmış kullanıcılar" göstergesi kullanır. Ayrıntı 'logins' yetkisi ister; alt çubuk
  * sayısı her oturum sahibine açıktır (bkz. active()).
@@ -59,8 +59,8 @@ final class LoginSessionsApi
     private const SHORT_SECONDS = 20;
 
     /**
-     * Oturumun yapıldığı bilgisayar (kullanıcı isteği): IP → MAC (ağ envanteri net_devices, yoksa tahtalar) →
-     * takma ad (tahtanın takma adı, ağ envanterindeki etiket, bilinen takma adlar); takma ad yoksa MAC.
+     * Oturumun yapıldığı bilgisayar (kullanıcı isteği): IP → MAC (ağ envanteri net_devices, yoksa cihazlar) →
+     * takma ad (cihazın takma adı, ağ envanterindeki etiket, bilinen takma adlar); takma ad yoksa MAC.
      * Eşleme kayıt anındaki IP ile GÜNCEL envanter üzerinden yapılır (DHCP ile IP değişmiş olabilir).
      */
     private const COMPUTER_JOIN = "
@@ -181,7 +181,7 @@ final class LoginSessionsApi
      * penceresi odakta mı. `active` = gruptaki bir oturum odakta ve bildirimi FOCUS_STALE_SECONDS'tan taze
      * (sekme kapanınca/ağ gidince bildirim kesilir, kendiliğinden düşer) → ipucunda yeşil "Aktif".
      * `?view=` (göç 024): oturumun o an açık sayfası/sekmesi/penceresi → ipucunda "Aktif"in sağında. Satırdaki
-     * `computer`: IP'nin tahta/ağ envanterindeki takma adı (Oturum geçmişiyle aynı eşleme, COMPUTER_JOIN).
+     * `computer`: IP'nin cihaz/ağ envanterindeki takma adı (Oturum geçmişiyle aynı eşleme, COMPUTER_JOIN).
      */
     public function active(Request $request, array $user): array
     {

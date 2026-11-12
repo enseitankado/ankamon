@@ -43,7 +43,7 @@ use Ankamon\Core\Request;
  * yazılmadan önce maskelenir; parolalar zaten argv'de değildir (sshpass -e).
  *
  * Artımlı okuma: istemci dosyanın inode'unu ve bayt konumunu geri gönderir (ino/off); dosya ~3 MB'da .1'e döner,
- * inode değiştiyse önce .1'in kalanı okunur. Yalnız yönetici (komutlar tahtalara giden betiklerdir).
+ * inode değiştiyse önce .1'in kalanı okunur. Yalnız yönetici (komutlar cihazlara giden betiklerdir).
  */
 final class SshActivityApi
 {
@@ -235,7 +235,7 @@ final class SshActivityApi
         return [substr($text, 0, $last + 1), $start + $last + 1];
     }
 
-    /** Hedef IP → tahta takma adı / ağ envanteri adı (grid'de "Cihaz"). */
+    /** Hedef IP → cihaz takma adı / ağ envanteri adı (grid'de "Cihaz"). */
     private function names(array $events): array
     {
         $ips = [];
@@ -250,7 +250,7 @@ final class SshActivityApi
         return $this->ipNames(array_keys($ips));
     }
 
-    /** IP listesi → tahta takma adı / ağ envanteri adı. */
+    /** IP listesi → cihaz takma adı / ağ envanteri adı. */
     private function ipNames(array $ips): array
     {
         if (!$ips) {
@@ -269,7 +269,7 @@ final class SshActivityApi
         );
         $names = [];
         foreach ($rows as $row) {
-            $names[$row['ip']] = $row['name']; // öncelik: tahta (sonra yazılır)
+            $names[$row['ip']] = $row['name']; // öncelik: cihaz (sonra yazılır)
         }
         return $names;
     }

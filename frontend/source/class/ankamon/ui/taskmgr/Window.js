@@ -26,19 +26,19 @@
  */
 
 /**
- * Görev yöneticisi penceresi (Tahtalar/Ekranlar sağ menüsü ve araç çubuğu "Görev yöneticisi" — kullanıcı isteği:
+ * Görev yöneticisi penceresi (Cihazlar/Ekranlar sağ menüsü ve araç çubuğu "Görev yöneticisi" — kullanıcı isteği:
  * Windows Görev Yöneticisi'nin özellikleri ve görünümü). Sekmeler (Windows 11 gibi solda): İşlemler, Performans,
  * Uygulama geçmişi, Başlangıç uygulamaları, Kullanıcılar, Ayrıntılar, Hizmetler, Ayarlar. Üstte arama, Yeni görev
  * çalıştır, Görevi sonlandır, Verimlilik modu, Görünüm (güncelleme hızı, her zaman üstte).
  *
- * Çoklu tahta (kullanıcı isteği: seçili her tahta için ayrı pencere değil, tek pencerede süzme ile): pencere seçili
- * tahtaların HER BİRİ için bir canlı bağ (ui.taskmgr.TaskBoardLink: tahtaya tek SSH + ajan, kendi modeli) tutar.
- * Tablo sekmelerinde bütün tahtaların satırları tek tabloda, "Bilgisayar" sütunuyla ("takma ad [bilgisayar adı]");
- * satır kimlikleri tahtayla birleşiktir ("<tahta id>:<kimlik>") ve satır işlemleri satırın tahtasına gider.
+ * Çoklu cihaz (kullanıcı isteği: seçili her cihaz için ayrı pencere değil, tek pencerede süzme ile): pencere seçili
+ * cihazların HER BİRİ için bir canlı bağ (ui.taskmgr.TaskBoardLink: cihaza tek SSH + ajan, kendi modeli) tutar.
+ * Tablo sekmelerinde bütün cihazların satırları tek tabloda, "Bilgisayar" sütunuyla ("takma ad [bilgisayar adı]");
+ * satır kimlikleri cihazla birleşiktir ("<cihaz id>:<kimlik>") ve satır işlemleri satırın cihazına gider.
  * Üstteki "Bilgisayar" süzgeci (ui.taskmgr.TaskBoardPicker, çoklu seçim) ve arama kutusu (bilgisayar adını da
- * arar) birlikte süzer; Performans sekmesinde tahta seçici vardır. Tek tahtada görünüm eskisi gibidir (Bilgisayar
+ * arar) birlikte süzer; Performans sekmesinde cihaz seçici vardır. Tek cihazda görünüm eskisi gibidir (Bilgisayar
  * sütunu ve süzgeci yok). Pencere kapanınca ya da sayfa yenilenince BÜTÜN WebSocket'ler kapanır → SSH'ler ve
- * tahtalardaki ajanlar sonlanır. Çok tahtada tablo tazelemesi birleştirilir (güncelleme aralığında bir kez).
+ * cihazlardaki ajanlar sonlanır. Çok cihazda tablo tazelemesi birleştirilir (güncelleme aralığında bir kez).
  */
 qx.Class.define("ankamon.ui.taskmgr.Window", {
   extend: qx.ui.window.Window,
@@ -48,13 +48,13 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       ["startup", "Başlangıç uygulamaları"], ["users", "Kullanıcılar"], ["details", "Ayrıntılar"],
       ["services", "Hizmetler"], ["settings", "Ayarlar"]],
     PREF: "taskmgr.settings",
-    /** Çok tahtada bağlantılar arka arkaya bu aralıkla (ms) açılır — 30 SSH'nin aynı anda başlamaması için. */
+    /** Çok cihazda bağlantılar arka arkaya bu aralıkla (ms) açılır — 30 SSH'nin aynı anda başlamaması için. */
     CONNECT_STAGGER: 120,
 
     /**
-     * Sağ menüden / araç çubuğundan: verilen tahtaların (çevrim içi olanlar) hepsiyle TEK pencere. Aynı tahta
+     * Sağ menüden / araç çubuğundan: verilen cihazların (çevrim içi olanlar) hepsiyle TEK pencere. Aynı cihaz
      * kümesi için açık pencere varsa öne getirilir.
-     * @param boards {Array|Map} tahta(lar) {id, label, hostname, ip}
+     * @param boards {Array|Map} cihaz(lar) {id, label, hostname, ip}
      */
     open(boards, user) {
       const self = ankamon.ui.taskmgr.Window;
@@ -88,12 +88,12 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
     this.__settings = Object.assign({ interval: 1, startTab: "processes", onTop: false, memPct: false },
       (user.ui_prefs || {})[ankamon.ui.taskmgr.Window.PREF] || {});
     this.__chosen = new Set();
-    // Tahta başına bağ; sıra: "Bilgisayar" adına göre (doğal sıralama: A1-2 < A1-10).
+    // Cihaz başına bağ; sıra: "Bilgisayar" adına göre (doğal sıralama: A1-2 < A1-10).
     this.__links = list.map(b => new ankamon.ui.taskmgr.TaskBoardLink(b))
       .sort((a, b) => a.getDisplay().localeCompare(b.getDisplay(), "tr", { numeric: true }));
     this.__linkById = new Map(this.__links.map(l => [l.getId(), l]));
     this.__multi = this.__links.length > 1;
-    this.setCaption("Görev Yöneticisi — " + (this.__multi ? `${this.__links.length} tahta` : this.__links[0].getName()));
+    this.setCaption("Görev Yöneticisi — " + (this.__multi ? `${this.__links.length} cihaz` : this.__links[0].getName()));
     const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
     this.set({
       layout: new qx.ui.layout.VBox(6), contentPadding: 8, showMinimize: true, allowMaximize: true, showMaximize: true,
@@ -121,7 +121,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       bar.add(b);
       return b;
     };
-    btn("▸ Yeni görev çalıştır", () => this.runTask(), "Tahtada bir program/komut başlatır");
+    btn("▸ Yeni görev çalıştır", () => this.runTask(), "Cihazda bir program/komut başlatır");
     this.__endBtn = btn("✕ Görevi sonlandır", () => this.__endSelected(), "Seçili işlemi sonlandırır (Delete)");
     this.__ecoBtn = btn("🍃 Verimlilik modu", () => this.__ecoSelected(), "Seçili işlemin önceliğini ve disk önceliğini en düşüğe alır");
     const view = new qx.ui.menu.Menu();
@@ -167,10 +167,10 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
 
     // --- durum satırı ----------------------------------------------------------------------------------------
     const foot = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-    this.__status = new qx.ui.basic.Label(this.__multi ? "Tahtalara bağlanılıyor…" : "Tahtaya bağlanılıyor…").set({ rich: true, textColor: "app-muted" });
+    this.__status = new qx.ui.basic.Label(this.__multi ? "Cihazlara bağlanılıyor…" : "Cihaza bağlanılıyor…").set({ rich: true, textColor: "app-muted" });
     foot.add(this.__status, { flex: 1 });
     if (this.__multi) {
-      // Bağlanamayan tahtalar: tek tek ya da hepsi yeniden bağlanır (menü durum değiştikçe yeniden kurulur).
+      // Bağlanamayan cihazlar: tek tek ya da hepsi yeniden bağlanır (menü durum değiştikçe yeniden kurulur).
       this.__reconnect = new qx.ui.form.MenuButton("Bağlanamayanlar").set({ visibility: "excluded", padding: [2, 10] });
     } else {
       this.__reconnect = new qx.ui.form.Button("Yeniden bağlan").set({ visibility: "excluded", padding: [2, 10] });
@@ -239,18 +239,18 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       return this.__user;
     },
 
-    // ---- tahtalar ---------------------------------------------------------------------------------------------
-    /** Bütün tahta bağları (pencere sırasıyla). */
+    // ---- cihazlar ---------------------------------------------------------------------------------------------
+    /** Bütün cihaz bağları (pencere sırasıyla). */
     getLinks() {
       return this.__links;
     },
 
-    /** @param id {Number|String} tahta kimliği */
+    /** @param id {Number|String} cihaz kimliği */
     getLink(id) {
       return this.__linkById.get(Number(id)) || null;
     },
 
-    /** Pencere birden çok tahtayla mı açıldı ("Bilgisayar" sütunu ve süzgeci yalnız o zaman). */
+    /** Pencere birden çok cihazla mı açıldı ("Bilgisayar" sütunu ve süzgeci yalnız o zaman). */
     isMulti() {
       return this.__multi;
     },
@@ -268,7 +268,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       return this.__chosen.has(Number(id));
     },
 
-    /** "Bilgisayar" süzgeci: seçili tahta kimlikleri (boş → hepsi). */
+    /** "Bilgisayar" süzgeci: seçili cihaz kimlikleri (boş → hepsi). */
     setBoardFilter(ids) {
       this.__chosen = new Set((ids || []).map(Number).filter(id => this.__linkById.has(id)));
       if (this.__picker) {
@@ -278,7 +278,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       this.__refresh();
     },
 
-    /** Süzgeçte tek tahta varsa o (yeni görev, Performans varsayılanı), yoksa null. Tek tahtalı pencerede o tahta. */
+    /** Süzgeçte tek cihaz varsa o (yeni görev, Performans varsayılanı), yoksa null. Tek cihazlı pencerede o cihaz. */
     getSingleChosen() {
       if (!this.__multi) {
         return this.__links[0];
@@ -287,14 +287,14 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
     },
 
     /**
-     * Arama metni tahtanın "Bilgisayar" adıyla eşleşiyor mu (yalnız çok tahtada): eşleşirse o tahtanın bütün
+     * Arama metni cihazın "Bilgisayar" adıyla eşleşiyor mu (yalnız çok cihazda): eşleşirse o cihazın bütün
      * satırları gösterilir (satırın kendi alanları ayrıca aranmaz).
      */
     boardMatches(link, q) {
       return this.__multi && !!q && link.getDisplay().toLowerCase().includes(q);
     },
 
-    /** Uyumluluk (testler): verilen ya da ilk tahtanın modeli / bağlantısı. */
+    /** Uyumluluk (testler): verilen ya da ilk cihazın modeli / bağlantısı. */
     getModel(id) {
       const link = id === undefined ? this.__links[0] : this.getLink(id);
       return link ? link.getModel() : null;
@@ -369,7 +369,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       this.__updateReconnect();
       this.__updateStatus();
       if (link.getState() !== "open") {
-        // Kopan/yeniden bağlanan tahtanın satırları tablodan düşsün (model boşaldı).
+        // Kopan/yeniden bağlanan cihazın satırları tablodan düşsün (model boşaldı).
         this.__scheduleRefresh();
       }
     },
@@ -392,8 +392,8 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
     },
 
     /**
-     * Çerçeve geldi: görünen sekme tazelenir. Tek tahtada hemen (eskisi gibi); çok tahtada bütün tahtaların
-     * çerçeveleri birleştirilir — güncelleme aralığında (en az 0,5 sn) bir kez (30 tahtada saniyede 30 kez tabloyu
+     * Çerçeve geldi: görünen sekme tazelenir. Tek cihazda hemen (eskisi gibi); çok cihazda bütün cihazların
+     * çerçeveleri birleştirilir — güncelleme aralığında (en az 0,5 sn) bir kez (30 cihazda saniyede 30 kez tabloyu
      * yeniden kurmak tarayıcıyı boğardı).
      */
     __scheduleRefresh() {
@@ -436,7 +436,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
           return;
         }
         if (!m.snap) {
-          this.__status.setValue("Tahtaya bağlanılıyor…");
+          this.__status.setValue("Cihaza bağlanılıyor…");
           return;
         }
         this.__status.setValue(`🟢 ${F.esc(link.getName())} (${F.esc(m.static ? m.static.hostname : "")}) · ` +
@@ -451,15 +451,15 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       const connecting = all.length - open - failed;
       const shown = this.getVisibleLinks().filter(l => l.getModel().snap);
       const avg = f => (shown.length ? shown.reduce((a, l) => a + f(l.getModel()), 0) / shown.length : 0);
-      const parts = [`${open ? "🟢" : "⏳"} ${open}/${all.length} tahtaya bağlı`];
+      const parts = [`${open ? "🟢" : "⏳"} ${open}/${all.length} cihaza bağlı`];
       if (failed) {
-        parts.push(`<span style="color:#c42b1c">⚠ ${failed} tahtaya bağlanılamadı</span>`);
+        parts.push(`<span style="color:#c42b1c">⚠ ${failed} cihaza bağlanılamadı</span>`);
       }
       if (connecting) {
         parts.push(`${connecting} bağlanıyor…`);
       }
       if (shown.length) {
-        parts.push(`Gösterilen: ${shown.length} tahta`,
+        parts.push(`Gösterilen: ${shown.length} cihaz`,
           `İşlemler: ${shown.reduce((a, l) => a + l.getModel().procs.size, 0)}`,
           `Ort. CPU: ${F.pct(avg(m => m.totals.cpu), 0)}`,
           `Ort. bellek: ${F.pct(avg(m => (100 * m.totals.memUsed) / (m.memTotal || 1)), 0)}`);
@@ -467,7 +467,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       this.__status.setValue(parts.join(" · ") + paused);
     },
 
-    /** Yeniden bağlan düğmesi (tek tahta) / "Bağlanamayanlar" menüsü (çok tahta). */
+    /** Yeniden bağlan düğmesi (tek cihaz) / "Bağlanamayanlar" menüsü (çok cihaz). */
     __updateReconnect() {
       const failed = this.__links.filter(l => l.getState() === "closed");
       if (!this.__multi) {
@@ -509,7 +509,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       return tab ? tab.getUserData("key") : "";
     },
 
-    /** Ajandan istenen seyrek bölümler: yalnız görünen sekmenin gerektirdikleri (bütün tahtalara aynı). */
+    /** Ajandan istenen seyrek bölümler: yalnız görünen sekmenin gerektirdikleri (bütün cihazlara aynı). */
     __want() {
       const key = this.__currentKey();
       const want = [];
@@ -556,19 +556,19 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       return tab;
     },
 
-    /** Onay/ileti metinlerinde tahta (yalnız çok tahtada): " — <i>A1-5 [etap-…]</i>". */
+    /** Onay/ileti metinlerinde cihaz (yalnız çok cihazda): " — <i>A1-5 [etap-…]</i>". */
     whereHtml(link) {
       return this.__multi ? ` — <i>${ankamon.ui.taskmgr.Fmt.esc(link.getDisplay())}</i>` : "";
     },
 
-    // ---- işlemler (sekmeler çağırır; her biri satırın tahtasına gider) ------------------------------------------
+    // ---- işlemler (sekmeler çağırır; her biri satırın cihazına gider) ------------------------------------------
     async endTask(link, pid, tree, name) {
       const F = ankamon.ui.taskmgr.Fmt;
       const p = link.getModel().procs.get(pid);
       const system = p && p.uid < 1000;
       const text = (tree ? `<b>${F.esc(name)}</b> (${pid})${this.whereHtml(link)} işlem ağacı sonlandırılsın mı?<br><br>Bu işlem ve başlattığı tüm işlemler kapanır.`
         : `<b>${F.esc(name)}</b> (${pid})${this.whereHtml(link)} sonlandırılsın mı?`) +
-        (system ? "<br><br><b>Bu bir sistem işlemi.</b> Sonlandırmak tahtayı kararsız hale getirebilir ya da oturumu kapatabilir." : "") +
+        (system ? "<br><br><b>Bu bir sistem işlemi.</b> Sonlandırmak cihazı kararsız hale getirebilir ya da oturumu kapatabilir." : "") +
         "<br><br>Kaydedilmemiş veriler kaybolur.";
       if (!(await this.__confirm(text, tree ? "İşlem ağacını sonlandır" : "İşlemi sonlandır"))) {
         return;
@@ -599,7 +599,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
 
     async setPriority(link, pid, nice, name, label) {
       if (nice < -5 && !(await this.__confirm(`<b>${ankamon.ui.taskmgr.Fmt.esc(name)}</b>${this.whereHtml(link)} önceliği "${label}" yapılsın mı?<br><br>` +
-        "Çok yüksek öncelik tahtanın diğer işlerini (ses, ekran, giriş) yavaşlatabilir.", "Önceliği değiştir"))) {
+        "Çok yüksek öncelik cihazın diğer işlerini (ses, ekran, giriş) yavaşlatabilir.", "Önceliği değiştir"))) {
         return;
       }
       try {
@@ -626,7 +626,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
         ankamon.ui.Dialog.alert((this.__multi ? `<b>Bilgisayar:</b> ${F.esc(link.getDisplay())}<br>` : "") +
           `<b>Konum:</b> ${F.esc(res.props.exe || "(çekirdek iş parçacığı — dosyası yok)")}` +
           `<br><b>Çalışma dizini:</b> ${F.esc(res.props.cwd || "—")}<br><br>` +
-          `<span style="opacity:.7">Tahtanın dosyalarına sağ menü ▸ Dosyalar ▸ Dosya yöneticisi ile göz atabilirsiniz.</span>`, "Dosya konumu");
+          `<span style="opacity:.7">Cihazın dosyalarına sağ menü ▸ Dosyalar ▸ Dosya yöneticisi ile göz atabilirsiniz.</span>`, "Dosya konumu");
       } catch (e) {
         ankamon.ui.Dialog.error(e);
       }
@@ -646,7 +646,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       }
     },
 
-    /** Yeni görev çalıştır (çok tahtada tahta seçilerek — bkz. TaskDialogs.runTask). */
+    /** Yeni görev çalıştır (çok cihazda cihaz seçilerek — bkz. TaskDialogs.runTask). */
     runTask() {
       ankamon.ui.taskmgr.TaskDialogs.runTask(this);
     },

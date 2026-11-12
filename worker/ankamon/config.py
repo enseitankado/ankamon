@@ -16,7 +16,7 @@ PG_DSN = "host={} port={} dbname={} user={} password={}".format(
 # Telegraf'ın izlediği hedef dosyası (paylaşılan dizin).
 TELEGRAF_TARGETS = os.environ.get("TELEGRAF_TARGETS", "/targets/targets.conf")
 
-# Görev döngüsünün aralığı (saniye): tahta keşfi, MAC/kimlik, Telegraf hedefleri, kuyruktaki görevler.
+# Görev döngüsünün aralığı (saniye): cihaz keşfi, MAC/kimlik, Telegraf hedefleri, kuyruktaki görevler.
 TICK_SECONDS = int(os.environ.get("WORKER_TICK_SECONDS", "60"))
 
 # board_status (SSH/sensör portu yoklaması) bundan ayrı, daha sık çalışır: çevrimdışı tespiti

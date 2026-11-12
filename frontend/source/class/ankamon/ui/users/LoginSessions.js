@@ -28,7 +28,7 @@
 /**
  * Kullanıcılar ▸ Oturumlar: Ankamon'un KENDİ kullanıcılarının oturum geçmişi (kim, ne zaman, hangi IP'den
  * girdi; son etkinlik; ne zaman/nasıl çıktı; o oturumda hangi işlemleri yaptı) — bkz. backend
- * LoginSessionsApi, db/migrations/019_login_sessions.sql. Tahtalardaki kullanıcı oturumları (Tahtalar ▸
+ * LoginSessionsApi, db/migrations/019_login_sessions.sql. Cihazlardaki kullanıcı oturumları (Cihazlar ▸
  * Oturumlar, page.Sessions) ile KARIŞTIRILMASIN. Görmek 'logins' yetkisi ister.
  * Satıra çift tıklama / sağ menü: o oturumun işlem dökümü (audit_log).
  *
@@ -83,8 +83,8 @@ qx.Class.define("ankamon.ui.users.LoginSessions", {
       { id: "duration", label: "Süre", width: 100 },
       { id: "status", label: "Durum", width: 140 },
       { id: "ip", label: "IP adresi", width: 120 },
-      // IP → MAC → takma ad (tahtalar/ağ listesi); takma ad yoksa MAC (bkz. LoginSessionsApi::COMPUTER_JOIN).
-      { id: "computer", label: "Bilgisayar", hint: "Bilgisayar (IP → MAC → tahta/ağ listesindeki takma ad; yoksa MAC)", width: 170 },
+      // IP → MAC → takma ad (cihazlar/ağ listesi); takma ad yoksa MAC (bkz. LoginSessionsApi::COMPUTER_JOIN).
+      { id: "computer", label: "Bilgisayar", hint: "Bilgisayar (IP → MAC → cihaz/ağ listesindeki takma ad; yoksa MAC)", width: 170 },
       { id: "browser", label: "Tarayıcı", width: 160 },
       { id: "actions", label: "İşlem", hint: "İşlem sayısı (giriş/çıkış dahil)", width: 60 },
       { id: "action_names", label: "Kullandığı işlevler", width: 300 }

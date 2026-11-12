@@ -26,8 +26,8 @@
  */
 
 /**
- * Görev yöneticisinin canlı bağlantısı: /screen/ws/taskmgr/<tahta> WebSocket'i (nginx "taskmgr" yetkisi →
- * ekran köprüsü → tahtaya TEK SSH + ajan; bkz. worker/ankamon/screen/taskmgr.py). Ajanın çerçeveleri olay
+ * Görev yöneticisinin canlı bağlantısı: /screen/ws/taskmgr/<cihaz> WebSocket'i (nginx "taskmgr" yetkisi →
+ * ekran köprüsü → cihaza TEK SSH + ajan; bkz. worker/ankamon/screen/taskmgr.py). Ajanın çerçeveleri olay
  * olarak yayılır; komutlar send() ile gider, yanıt (aynı id'li "res") Promise ile döner. close() / sayfanın
  * kapanması WebSocket'i kapatır → sunucu SSH'yi sonlandırır.
  */
@@ -44,11 +44,11 @@ qx.Class.define("ankamon.ui.taskmgr.Connection", {
 
   statics: {
     CLOSE_TEXT: {
-      4001: "Tahta bulunamadı ya da IP adresi yok.",
-      4002: "Tahtaya SSH ile ulaşılamadı.",
-      4003: "Tahta SSH girişini reddetti (Ayarlar → SSH erişimi).",
-      4004: "Tahtada python3 yok — görev yöneticisi çalışamıyor.",
-      4005: "Tahtadaki görev yöneticisi ajanı beklenmedik biçimde kapandı.",
+      4001: "Cihaz bulunamadı ya da IP adresi yok.",
+      4002: "Cihaza SSH ile ulaşılamadı.",
+      4003: "Cihaz SSH girişini reddetti (Ayarlar → SSH erişimi).",
+      4004: "Cihazda python3 yok — görev yöneticisi çalışamıyor.",
+      4005: "Cihazdaki görev yöneticisi ajanı beklenmedik biçimde kapandı.",
       4029: "Aynı anda açık görev yöneticisi sınırına ulaşıldı.",
       1006: "Bağlantı koptu."
     }
@@ -116,13 +116,13 @@ qx.Class.define("ankamon.ui.taskmgr.Connection", {
     /** Komut gönderir; ajanın yanıtıyla çözülür (ok:false → hata). */
     send(op, args = {}) {
       if (!this.isOpen()) {
-        return Promise.reject(new Error("Tahtaya bağlı değil."));
+        return Promise.reject(new Error("Cihaza bağlı değil."));
       }
       const id = ++this.__seq;
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
           this.__pending.delete(id);
-          reject(new Error("Tahta yanıt vermedi (zaman aşımı)."));
+          reject(new Error("Cihaz yanıt vermedi (zaman aşımı)."));
         }, 90000);
         this.__pending.set(id, { resolve, reject, timer });
         this.__ws.send(JSON.stringify(Object.assign({ id, op }, args)));

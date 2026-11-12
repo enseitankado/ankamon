@@ -29,7 +29,7 @@
  * Sağlık ▸ Yardım sekmesi (bkz. page.Anomalies): bulguların iki yolu (sürekli izleme / SSH denetimi) ve sekmeler;
  * SSH denetim raporunun ne olduğu, nasıl okunduğu, denetimlerin ne zaman/nasıl yapıldığı ve sık karşılaşılan durumlar (kullanıcı isteği: "buranın ne işe yaradığı, nasıl çalıştığı
  * anlaşılmıyor"). Takvim değerleri sabit yazılmaz — /api/diagnose'un schedule alanından (sunucunun .env'i:
- * DIAGNOSE_INTERVAL_DAYS, DIAGNOSE_RETRY_HOURS) ve şu an denetlenemeyen tahtalardan okunur. Kodda karşılığı
+ * DIAGNOSE_INTERVAL_DAYS, DIAGNOSE_RETRY_HOURS) ve şu an denetlenemeyen cihazlardan okunur. Kodda karşılığı
  * olmayan iddia yazılmaz: kurallar worker/ankamon/tasks/diagnose_schedule.py ve executor/diagnose.py'dendir.
  */
 qx.Class.define("ankamon.page.MaintenanceHelp", {
@@ -75,11 +75,11 @@ qx.Class.define("ankamon.page.MaintenanceHelp", {
       const path = k => badge(P[k].color, P[k].text);
       let now = "";
       if (sc) {
-        now = `<div class="v note"><span class="t">Şu an</span>${sc.boards} kayıtlı tahta; ` +
-          (sc.never_scanned ? `${sc.never_scanned} tahta henüz hiç başarıyla denetlenmedi (açık olduklarında sırayla taranır). ` : "") +
+        now = `<div class="v note"><span class="t">Şu an</span>${sc.boards} kayıtlı cihaz; ` +
+          (sc.never_scanned ? `${sc.never_scanned} cihaz henüz hiç başarıyla denetlenmedi (açık olduklarında sırayla taranır). ` : "") +
           (sc.failing && sc.failing.length
             ? `son denemesi başarısız olan: <b>${esc(sc.failing.join(", "))}</b> — ${retry} saatte bir yeniden denenir.`
-            : "son denemesi başarısız olan tahta yok.") + "</div>";
+            : "son denemesi başarısız olan cihaz yok.") + "</div>";
       }
       return `<div class="mh">
 <style>
@@ -97,34 +97,34 @@ qx.Class.define("ankamon.page.MaintenanceHelp", {
 </style>
 
 <h3>Sağlık bölümü ne işe yarar?</h3>
-<p>Tahtalarda arızaya dönüşmeden önce fark edilmesi gereken donanım, yazılım ve ağ sorunlarını bulur. Bulgular
+<p>Cihazlarda arızaya dönüşmeden önce fark edilmesi gereken donanım, yazılım ve ağ sorunlarını bulur. Bulgular
 <b>iki yoldan</b> gelir; her bulgunun yanında hangisinden geldiği, kaynağı ve nasıl bakıldığı yazar.</p>
 <table>
   <tr><th></th><th>${path("watch")}</th><th>${path("ssh")}</th></tr>
-  <tr><th>Nasıl bakılır</th><td>Ankamon tahtaya <b>bağlanmaz</b>: tahtanın gönderdiği loglardan, tahtanın 9100 portundan
+  <tr><th>Nasıl bakılır</th><td>Ankamon cihaza <b>bağlanmaz</b>: cihazın gönderdiği loglardan, cihazın 9100 portundan
     okuduğu ölçümlerden ya da daha önce toplanmış bilgiden çıkarır.</td>
-    <td>Ankamon tahtaya root olarak <b>SSH ile girer</b>, yalnız okuma yapan komutlarla ölçer (tahtada hiçbir şey değişmez).</td></tr>
+    <td>Ankamon cihaza root olarak <b>SSH ile girer</b>, yalnız okuma yapan komutlarla ölçer (cihazda hiçbir şey değişmez).</td></tr>
   <tr><th>Ne zaman</th><td>Sürekli: kurala göre dakikada bir ya da 5 dakikada bir.</td>
-    <td>Her tahta haftada bir kendiliğinden (sunucu boştayken); istenince <b>Denetle</b> sekmesinden: seçili tahtalarda
-    ② <i>Tam SSH denetimi</i> ya da açık tüm tahtalarda <b>Şimdi tara</b>.</td></tr>
+    <td>Her cihaz haftada bir kendiliğinden (sunucu boştayken); istenince <b>Denetle</b> sekmesinden: seçili cihazlarda
+    ② <i>Tam SSH denetimi</i> ya da açık tüm cihazlarda <b>Şimdi tara</b>.</td></tr>
   <tr><th>Ne üretir</th><td>Zaman aralığı olan olay: ne zaman başladı, sürüyor mu, ne zaman bitti.</td>
     <td>Denetim anının fotoğrafı: o an diskin, servislerin, güncellemelerin durumu.</td></tr>
   <tr><th>Neyi iyi görür</th><td>Gelip geçen olaylar: ağ kopması, kaba kuvvet girişimi, sıcaklık yükselmesi, saat sapması,
-    oturumsuz açık kalma.</td><td>Ancak tahtaya girince görülenler: disk sağlığı (SMART), bekleyen güncellemeler, başarısız
+    oturumsuz açık kalma.</td><td>Ancak cihaza girince görülenler: disk sağlığı (SMART), bekleyen güncellemeler, başarısız
     servisler, boş alan.</td></tr>
-  <tr><th>Tahta kapalıyken</th><td>Kayıtlar kalır; bazı olaylar (ör. ağ kopması) bağlantı gelince geriye dönük yazılır.</td>
+  <tr><th>Cihaz kapalıyken</th><td>Kayıtlar kalır; bazı olaylar (ör. ağ kopması) bağlantı gelince geriye dönük yazılır.</td>
     <td>Denetlenemez; ilk açıldığı uygun anda denetlenir.</td></tr>
 </table>
 <p>Aynı soruya iki ayrı cevap verilmesin diye sürekli ölçülebilenler (BIOS pili, saat eşitlemesi) yalnız sürekli izlemede
 bakılır. Her denetimin listesi: bu sekmenin <b>Denetim türleri</b> bölümü.</p>
 <h3>Sekmeler</h3>
 <ul>
-  <li><b>Durum</b> — her tahtanın şu anki sağlığı: en kötü bulgusu, sürekli izlemede şu an sürenler, son denetim ya da
-      bulgunun zamanı (10 saatten yeniyse "2 saat 23 dk önce" gibi). Bir tahta seçince altta bulguları (seçim yokken alt tablo boş); her bulguda
+  <li><b>Durum</b> — her cihazın şu anki sağlığı: en kötü bulgusu, sürekli izlemede şu an sürenler, son denetim ya da
+      bulgunun zamanı (10 saatten yeniyse "2 saat 23 dk önce" gibi). Bir cihaz seçince altta bulguları (seçim yokken alt tablo boş); her bulguda
       <i>Yol, Kaynak, Nasıl bakıldı, Sıklık, Zaman</i>. "Aksiyon gereken ne?" sorusunun cevabı burası. Bulguya çift tık:
-      kaydına gider (sürekli izleme → Geçmiş; SSH denetimi → Denetle, o tahtaya süzülmüş). İki yolun kısa açıklaması
+      kaydına gider (sürekli izleme → Geçmiş; SSH denetimi → Denetle, o cihaza süzülmüş). İki yolun kısa açıklaması
       sekme adının ve en soldaki "ⓘ Bulgular nereden gelir?" yazısının ipucunda.</li>
-  <li><b>Denetle</b> — tahtaları ve denetimleri seçip o an taramak (tam SSH denetimi ve/veya sürekli izleme denetimlerinin
+  <li><b>Denetle</b> — cihazları ve denetimleri seçip o an taramak (tam SSH denetimi ve/veya sürekli izleme denetimlerinin
       anlık yoklaması); altta sonuçlar: <b>SSH denetim raporları</b> (aşağıda anlatılıyor) ve <b>Anlık yoklama</b>.</li>
   <li><b>Geçmiş / Özet</b> — sürekli izleme kayıtları, sekmenin üstündeki <b>Rapor dönemi</b>nde (ikisi aynı dönemi
       gösterir). Özet'te her sütun başlığının ve hücrenin üzerine gelince ne anlama geldiği yazar.</li>
@@ -133,56 +133,56 @@ bakılır. Her denetimin listesi: bu sekmenin <b>Denetim türleri</b> bölümü.
       bulgu düzeyi. Satıra çift tık: bütün ayrıntı; yönetici sıklığı, bulgu düzeyini ve anlık taranıp taranmayacağını
       oradan değiştirir (SSH denetiminde yalnız otomatik denetim aralığı, bütün başlıklar için ortak).</li>
 </ul>
-<p>Zaman içindeki değişimin grafikleri (sıcaklık, işlemci, bellek, disk, ağ) <b>Tahtalar ▸ Sensörler</b>'de.</p>
+<p>Zaman içindeki değişimin grafikleri (sıcaklık, işlemci, bellek, disk, ağ) <b>Cihazlar ▸ Sensörler</b>'de.</p>
 ${now}
 
 <h3>Denetle ▸ SSH denetim raporları nasıl okunur?</h3>
 <ol>
-  <li>Sayfa açılınca <b>"Son durum — tüm tahtalar"</b> görünür: denetlenmiş <b>her tahtanın en son denetimi</b>, hangi
+  <li>Sayfa açılınca <b>"Son durum — tüm cihazlar"</b> görünür: denetlenmiş <b>her cihazın en son denetimi</b>, hangi
       taramada yapılmış olursa olsun, tek tabloda. Her satırda denetim zamanı ve kimin başlattığı
       (<i>otomatik</i> ya da <i>elle: kullanıcı</i>) yazar.</li>
-  <li>Bir tahtayı seçince bulguları, önerileriyle birlikte alttaki bölmede görünür (seçim yokken
+  <li>Bir cihazı seçince bulguları, önerileriyle birlikte alttaki bölmede görünür (seçim yokken
       bölme boştur). İki bölmenin arasındaki çubuk sürüklenerek boyları ayarlanır.</li>
   <li>Sütun başlığına tıklamak sıralar; başlıktaki kutu süzer: elle yazın ya da ▾ ile hazır listeden seçin
-      (<b>Tahta, Genel durum, Acil, Dikkat, Bilgi</b>); düzeye göre süzmek için Genel durum sütunu (sunucuya gidilmez).</li>
+      (<b>Cihaz, Genel durum, Acil, Dikkat, Bilgi</b>); düzeye göre süzmek için Genel durum sütunu (sunucuya gidilmez).</li>
   <li><b>Rapor</b> seçicisinde, "Son durum"un altında tek tek taramalar listelenir (en yeni 30). Bir taramayı seçince
-      yalnız o taramada denetlenen tahtalar görünür.</li>
+      yalnız o taramada denetlenen cihazlar görünür.</li>
 </ol>
 <table>
   <tr><th>Düzey</th><th>Anlamı</th></tr>
-  <tr><td>${lv("bad")}</td><td>Hemen ilgilenilmeli: arıza yakın ya da tahta denetlenemedi (<i>bağlanılamadı</i>).</td></tr>
+  <tr><td>${lv("bad")}</td><td>Hemen ilgilenilmeli: arıza yakın ya da cihaz denetlenemedi (<i>bağlanılamadı</i>).</td></tr>
   <tr><td>${lv("warn")}</td><td>Henüz arıza yok ama kötüye gidiyor ya da performansı düşürüyor.</td></tr>
   <tr><td>${lv("info")}</td><td>Bilinmesi yararlı; işlem gerekmeyebilir (ör. yeniden başlatma bekliyor, sensör okunamadı).</td></tr>
   <tr><td>${lv("ok")}</td><td>Denetlenen hiçbir başlıkta sorun bulunmadı.</td></tr>
 </table>
-<p>Tahtanın genel durumu en kötü bulgusudur. <b>Acil / Dikkat / Bilgi</b> sütunları o düzeydeki bulgu sayısıdır.
-<i>Yarıda kaldı</i>: tarama o tahtada bitmeden kesildi (ör. Ankamon yeniden başlatıldı) — yeniden taranır.</p>
+<p>Cihazın genel durumu en kötü bulgusudur. <b>Acil / Dikkat / Bilgi</b> sütunları o düzeydeki bulgu sayısıdır.
+<i>Yarıda kaldı</i>: tarama o cihazda bitmeden kesildi (ör. Ankamon yeniden başlatıldı) — yeniden taranır.</p>
 
 <h3>SSH denetimi ne zaman yapılır?</h3>
 <table>
-  <tr><th>Elle</th><td><b>Denetle</b> sekmesinde ② <i>Tam SSH denetimi</i> seçili tahtaları, ③ SSH denetim raporlarının
-    üstündeki <b>Şimdi tara</b> düğmesi o an <b>açık olan tüm tahtaları</b> denetler (aynı anda kaç tahta: sunucunun
+  <tr><th>Elle</th><td><b>Denetle</b> sekmesinde ② <i>Tam SSH denetimi</i> seçili cihazları, ③ SSH denetim raporlarının
+    üstündeki <b>Şimdi tara</b> düğmesi o an <b>açık olan tüm cihazları</b> denetler (aynı anda kaç cihaz: sunucunun
     boş işlemci/belleğine göre). İlerleme düğmelerin yanında görünür.</td></tr>
-  <tr><th>Otomatik</th><td>Her tahta <b>en az ${esc(days)} günde bir</b> kendiliğinden denetlenir. Saat <b>tahta başına</b>
-    işler: bir tahtanın son başarılı denetiminden ~${esc(early)} gün geçince, sunucu boştayken (düşük işlemci yükü, yeterli
+  <tr><th>Otomatik</th><td>Her cihaz <b>en az ${esc(days)} günde bir</b> kendiliğinden denetlenir. Saat <b>cihaz başına</b>
+    işler: bir cihazın son başarılı denetiminden ~${esc(early)} gün geçince, sunucu boştayken (düşük işlemci yükü, yeterli
     boş bellek, az ağ trafiği) taranır; ${esc(days)} gün dolunca eşikler gevşer, bir gün daha geçerse sunucu meşgul olsa da
     taranır. Sunucuda başka bir görev sürerken otomatik tarama başlamaz.</td></tr>
-  <tr><th>Neden çoğu otomatik<br>tarama 1-2 tahtalık?</th><td>Çünkü otomatik tarama yalnız <b>zamanı gelen</b> tahtaları
-    kapsar ve tahtalar farklı günlerde açılıp denetlendiğinden zamanları farklıdır. Bu, tüm tahtaların taranmadığı
+  <tr><th>Neden çoğu otomatik<br>tarama 1-2 cihazlık?</th><td>Çünkü otomatik tarama yalnız <b>zamanı gelen</b> cihazları
+    kapsar ve cihazlar farklı günlerde açılıp denetlendiğinden zamanları farklıdır. Bu, tüm cihazların taranmadığı
     anlamına gelmez — "Son durum" görünümü hepsini birlikte gösterir.</td></tr>
-  <tr><th>Kapalı tahta</th><td>Taranamaz; ilk açıldığı uygun anda taranır.</td></tr>
-  <tr><th>Denetlenemeyen tahta</th><td>Bağlanılamayan tahta (ör. "SSH parolası reddedildi") <b>${esc(retry)} saatte bir</b>
+  <tr><th>Kapalı cihaz</th><td>Taranamaz; ilk açıldığı uygun anda taranır.</td></tr>
+  <tr><th>Denetlenemeyen cihaz</th><td>Bağlanılamayan cihaz (ör. "SSH parolası reddedildi") <b>${esc(retry)} saatte bir</b>
     yeniden denenir; neden düzelene kadar raporda ${lv("bad")} <i>bağlanılamadı</i> olarak kalır.</td></tr>
 </table>
 
 <h3>Nasıl çalışır?</h3>
 <ul>
-  <li>Sunucu her tahtaya <b>root</b> olarak <b>tek bir SSH bağlantısı</b> açar (tahta başına ~1-2 sn) ve yalnız okuma
+  <li>Sunucu her cihaza <b>root</b> olarak <b>tek bir SSH bağlantısı</b> açar (cihaz başına ~1-2 sn) ve yalnız okuma
       yapan komutlar çalıştırır: donanım bilgisi, disk SMART değerleri, son 7 günün çekirdek günlüğü, donanım
-      sensörleri, disk doluluğu, paket durumu. <b>Tahtada hiçbir şey değiştirilmez</b>; güncelleme listesi bile
-      yenilenmez (<code>apt update</code> çalıştırılmaz), tahtadaki mevcut liste okunur.</li>
-  <li>Toplanan donanım bilgisi tahtanın Bilgi kartını da tazeler.</li>
-  <li>Bazı denetimler tahtayı diğerleriyle kıyaslar (ör. RAM'i ve diski tahtaların ortalamasının belirgin altında mı)
+      sensörleri, disk doluluğu, paket durumu. <b>Cihazda hiçbir şey değiştirilmez</b>; güncelleme listesi bile
+      yenilenmez (<code>apt update</code> çalıştırılmaz), cihazdaki mevcut liste okunur.</li>
+  <li>Toplanan donanım bilgisi cihazın Bilgi kartını da tazeler.</li>
+  <li>Bazı denetimler cihazı diğerleriyle kıyaslar (ör. RAM'i ve diski cihazların ortalamasının belirgin altında mı)
       ve son 24 saatin işlemci sıcaklığı için toplanan sensör ölçümlerini kullanır.</li>
   <li>Raporlar sunucuda veritabanında saklanır ve kendiliğinden silinmez; eskileri
       <b>Sistem ▸ Disk kullanımı ▸ Bakım raporları</b> sekmesinden silinebilir.</li>
@@ -191,7 +191,7 @@ ${now}
 <h3>SSH denetiminde neler denetlenir?</h3>
 <table>
   <tr><th>Başlık</th><th>Denetimler</th></tr>
-  <tr><td>Donanım kapasitesi</td><td>RAM ve disk boyutu (tahtaların ortalamasıyla kıyas)</td></tr>
+  <tr><td>Donanım kapasitesi</td><td>RAM ve disk boyutu (cihazların ortalamasıyla kıyas)</td></tr>
   <tr><td>Disk sağlığı (SMART)</td><td>diskin kendi sağlık testi, okunamayan sektörler, yıpranma işaretleri, eşiği aşan öznitelikler (bu SMART hataları <b>Acil</b> sayılır), SSD kalan ömrü,
       disk sıcaklığı, son 7 günde çekirdeğin bildirdiği disk (G/Ç) hataları</td></tr>
   <tr><td>İşlemci sıcaklığı</td><td>son 24 saatin sıcaklık ölçümleri, ısı yüzünden işlemcinin yavaşlatılması</td></tr>
@@ -204,19 +204,19 @@ ${now}
 </table>
 
 <p>BIOS (CMOS) pili ve saat eşitlemesi sürekli izlemede bakılır: <i>BIOS pili zayıf</i>, <i>NTP eşitlenmemiş</i>,
-<i>Tahta saati yanlış</i> (Yardım ▸ Denetim türleri).</p>
+<i>Cihaz saati yanlış</i> (Yardım ▸ Denetim türleri).</p>
 
 <h3>Sık karşılaşılan durumlar</h3>
-<div class="q">Bir tahta hep ${lv("bad")} "bağlanılamadı — SSH parolası reddedildi" görünüyor.</div>
-<p>Sunucu tahtaya genel root parolasıyla (Ayarlar ▸ SSH erişimi) giremiyor: o tahtada root parolası değiştirilmiş.
-Tahtanın şu anki root parolasını biliyorsanız <b>Tahtalar ▸ sağ menü ▸ Kullanıcılar ▸ Parola ayarla… ▸ Yönetici hesapları</b>
-ile kaydedin; sunucu o tahtaya bundan sonra bu parolayla girer ve bir sonraki denemede (en geç ${esc(retry)} saat içinde ya da
+<div class="q">Bir cihaz hep ${lv("bad")} "bağlanılamadı — SSH parolası reddedildi" görünüyor.</div>
+<p>Sunucu cihaza genel root parolasıyla (Ayarlar ▸ SSH erişimi) giremiyor: o cihazda root parolası değiştirilmiş.
+Cihazın şu anki root parolasını biliyorsanız <b>Cihazlar ▸ sağ menü ▸ Kullanıcılar ▸ Parola ayarla… ▸ Yönetici hesapları</b>
+ile kaydedin; sunucu o cihaza bundan sonra bu parolayla girer ve bir sonraki denemede (en geç ${esc(retry)} saat içinde ya da
 hemen <b>Şimdi tara</b> ile) rapor düzelir.</p>
 <div class="q">"bağlanılamadı — SSH ile ulaşılamadı / zaman aşımı".</div>
-<p>Tahta tarama anında ağdan düşmüş ya da kapanıyor olabilir; bir sonraki denemede genellikle düzelir. Sürüyorsa tahtanın
+<p>Cihaz tarama anında ağdan düşmüş ya da kapanıyor olabilir; bir sonraki denemede genellikle düzelir. Sürüyorsa cihazın
 ağ bağlantısını ve SSH servisini denetleyin.</p>
-<div class="q">Bir tahta raporda hiç yok.</div>
-<p>O tahta henüz hiç denetlenmedi (ör. hep kapalıydı ya da yeni eklendi). Açıkken <b>Şimdi tara</b> ile hemen denetlenebilir.</p>
+<div class="q">Bir cihaz raporda hiç yok.</div>
+<p>O cihaz henüz hiç denetlenmedi (ör. hep kapalıydı ya da yeni eklendi). Açıkken <b>Şimdi tara</b> ile hemen denetlenebilir.</p>
 <div class="q">Bulguyu giderdim, rapor hâlâ eski.</div>
 <p>Rapor, denetim anının durumudur. <b>Şimdi tara</b> ile yeniden denetleyin; yeni sonuç "Son durum"a hemen yansır.</p>
 </div>`;

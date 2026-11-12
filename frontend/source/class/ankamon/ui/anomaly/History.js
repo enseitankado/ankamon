@@ -29,7 +29,7 @@
  * Sağlık ▸ Geçmiş'in alt bölmesi (bkz. ui.anomaly.Records): sürekli izlemenin seçili dönemle örtüşen tüm kayıtları
  * (sürenler dahil); Kaynak sütunu bulgunun nereden çıkarıldığını yazar (Log / Ölçüm / SSH verisi — bkz. backend
  * AnomaliesApi KINDS source). Excel tarzı sütun süzgeçli (bkz. page.Base _addColumnFilters). Üstteki özette satır
- * seçilince o tahtanın o bulgusuna süzülür (filterBoardKind). Satıra çift tıklama: kaydın bütün alanları (kırpılmadan)
+ * seçilince o cihazın o bulgusuna süzülür (filterBoardKind). Satıra çift tıklama: kaydın bütün alanları (kırpılmadan)
  * kipli pencerede — ui.anomaly.RowDetail (kullanıcı isteği 2026-11-12).
  */
 qx.Class.define("ankamon.ui.anomaly.History", {
@@ -40,7 +40,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
     super(new qx.ui.layout.VBox(4));
 
     this.__columns = [
-      { id: "board", label: "Tahta", width: 200 },
+      { id: "board", label: "Cihaz", width: 200 },
       { id: "kind", label: "Bulgu", width: 160 },
       { id: "source", label: "Kaynak", width: 90 },
       { id: "started", label: "Başlangıç", width: 150 },
@@ -96,7 +96,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
       const a = row.anomaly;
       const c = row.cells;
       ankamon.ui.anomaly.RowDetail.open(`${a.kindLabel} — ${a.board}`, [
-        ["Tahta", c[1]],
+        ["Cihaz", c[1]],
         ["Bulgu", c[2]],
         ["Kaynak", c[3]],
         ["Başlangıç", c[4]],
@@ -107,7 +107,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
       ]);
     },
 
-    /** Tahta ve Bulgu süzgeçlerini doldurur (özette satır seçimi; null: o süzgeç boş). */
+    /** Cihaz ve Bulgu süzgeçlerini doldurur (özette satır seçimi; null: o süzgeç boş). */
     filterBoardKind(board, kind) {
       this.__filterFields.board.setValue(board || "");
       this.__filterFields.kind.setValue(kind || "");

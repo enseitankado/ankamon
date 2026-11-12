@@ -30,8 +30,8 @@
  * her biri küçük grafik + özet), sağda seçili kaynağın 60 sn büyük grafiği ve ayrıntıları. CPU grafiği "Genel
  * kullanım" ya da "Mantıksal işlemciler" (çekirdek başına küçük grafikler) olarak değiştirilebilir.
  *
- * Çok tahta: üstte tahta seçici (Bilgisayar süzgecine uyan tahtalar); grafikler seçilen tahtanın. Süzgeçte tek
- * tahta seçilince seçici ona geçer.
+ * Çok cihaz: üstte cihaz seçici (Bilgisayar süzgecine uyan cihazlar); grafikler seçilen cihazın. Süzgeçte tek
+ * cihaz seçilince seçici ona geçer.
  */
 qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
   extend: ankamon.ui.taskmgr.Tab,
@@ -41,7 +41,7 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
     this.__tiles = new Map();
     this.__selected = "cpu";
 
-    // Tahta seçici (yalnız çok tahtada).
+    // Cihaz seçici (yalnız çok cihazda).
     const boardBar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
     boardBar.add(new qx.ui.basic.Label("Bilgisayar:"));
     this.__boardBox = new qx.ui.form.SelectBox().set({ width: 340 });
@@ -182,7 +182,7 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
       return t;
     },
 
-    // overridden: süzgeçte tek tahta seçilince seçici ona geçer.
+    // overridden: süzgeçte tek cihaz seçilince seçici ona geçer.
     onBoardFilter() {
       const single = this._win.getSingleChosen();
       if (single) {
@@ -191,8 +191,8 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
     },
 
     /**
-     * Çok tahtada seçicideki tahtalar (süzgece uyanlar) — liste yalnız değişince yeniden kurulur; seçili tahta
-     * süzgeçten çıktıysa ilk bağlı tahtaya geçilir. @return {ankamon.ui.taskmgr.TaskBoardLink?} grafikleri gösterilecek tahta
+     * Çok cihazda seçicideki cihazlar (süzgece uyanlar) — liste yalnız değişince yeniden kurulur; seçili cihaz
+     * süzgeçten çıktıysa ilk bağlı cihaza geçilir. @return {ankamon.ui.taskmgr.TaskBoardLink?} grafikleri gösterilecek cihaz
      */
     __currentLink() {
       const win = this._win;
@@ -221,7 +221,7 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
       } finally {
         this.__syncing = false;
       }
-      this.__boardNote.setValue(links.length > 1 ? `${links.length} tahtadan biri — grafikler seçilen tahtanın` : "");
+      this.__boardNote.setValue(links.length > 1 ? `${links.length} cihazdan biri — grafikler seçilen cihazın` : "");
       return link;
     },
 
@@ -357,7 +357,7 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
     __drawCores(m) {
       const n = m.hist.cores.length;
       const cols = Math.ceil(Math.sqrt(n));
-      // Çekirdek sayısı farklı tahtaya geçildi (çok tahta): ızgara baştan kurulur.
+      // Çekirdek sayısı farklı cihaza geçildi (çok cihaz): ızgara baştan kurulur.
       if (this.__coreGraphs.length && this.__coreGraphs.length !== n) {
         this.__coreGraphs.forEach(g => g.destroy());
         this.__coreGraphs = [];

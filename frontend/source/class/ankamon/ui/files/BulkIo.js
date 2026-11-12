@@ -200,14 +200,14 @@ qx.Class.define("ankamon.ui.files.BulkIo", {
     },
 
     /**
-     * Toplananları seçilen klasörün içinde "<arşiv adı>/<tahta>/<kullanıcı>/…" yapısıyla tek tek yazar
-     * (4 dosya paralel; arşiv adı sunucudan: "<tahta>_<ana dizin/dosya>_<alma zamanı>").
+     * Toplananları seçilen klasörün içinde "<arşiv adı>/<cihaz>/<kullanıcı>/…" yapısıyla tek tek yazar
+     * (4 dosya paralel; arşiv adı sunucudan: "<cihaz>_<ana dizin/dosya>_<alma zamanı>").
      * @param onProgress {Function} (yazılan bayt, toplam bayt, dosya sayısı, toplam dosya)
      * @return {Promise<Array>} yazılamayan dosyalar [{path, error}]
      */
     async saveToFolder(jobId, picked, onProgress) {
       const { files, name } = await ankamon.ui.files.Api.request("GET", `/bulk/${jobId}/manifest`);
-      // Dosyalar seçilen klasörün içinde, arşiv adıyla aynı alt klasöre ("<tahta>_<ana ad>_<zaman>") yazılır.
+      // Dosyalar seçilen klasörün içinde, arşiv adıyla aynı alt klasöre ("<cihaz>_<ana ad>_<zaman>") yazılır.
       const dirHandle = name ? await picked.getDirectoryHandle(name, { create: true }) : picked;
       const total = files.reduce((sum, f) => sum + f.size, 0);
       let bytes = 0;

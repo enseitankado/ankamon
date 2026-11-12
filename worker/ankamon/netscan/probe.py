@@ -28,7 +28,7 @@
 Varlık için ARP kullanılır (ICMP değil): aynı L2 ağdaki her IPv4 cihazı, güvenlik duvarı ping'i
 engellese bile ARP'ye yanıt vermek zorundadır — "cihaz orada mı" sorusunun en güvenilir cevabı.
 Çekirdeğin komşu tablosu (/proc/net/arp) da bedava bir ek kaynaktır: sunucunun o an konuştuğu
-cihazlar (ör. log gönderen tahtalar) tarama arasında da "görüldü" sayılır.
+cihazlar (ör. log gönderen cihazlar) tarama arasında da "görüldü" sayılır.
 
 İki araç da `nice -n 19` + `ionice -c3` ile en düşük öncelikte çalışır (bkz. load.py).
 """

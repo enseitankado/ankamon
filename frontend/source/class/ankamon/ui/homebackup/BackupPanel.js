@@ -26,28 +26,28 @@
  */
 
 /**
- * Yedekle sekmesi: tahtalar × hesaplar. Hesap listesi seçili tahtaların birleşimidir (önbellekli, bkz.
- * BoardOps.accountsOf); bir hesap bazı tahtalarda yoksa o tahtalarda atlanır. Görev: "backup_home" (bkz. worker
+ * Yedekle sekmesi: cihazlar × hesaplar. Hesap listesi seçili cihazların birleşimidir (önbellekli, bkz.
+ * BoardOps.accountsOf); bir hesap bazı cihazlarda yoksa o cihazlarda atlanır. Görev: "backup_home" (bkz. worker
  * executor/backup.py); canlı rapor, ilerleme ve sırayla indirme görev penceresinde (bkz. ui.Jobs).
  */
 qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
   extend: qx.ui.container.Composite,
 
   /**
-   * @param boards {Array} [{id, name}] çevrim içi tahtalar
-   * @param selected {Array} başta işaretli tahta kimlikleri
+   * @param boards {Array} [{id, name}] çevrim içi cihazlar
+   * @param selected {Array} başta işaretli cihaz kimlikleri
    */
   construct(boards, selected) {
     super(new qx.ui.layout.VBox(10));
     this.__boards = boards;
     const body = new qx.ui.container.Composite(new qx.ui.layout.HBox(10));
 
-    const step1 = ankamon.ui.StepBox.create(1, "Tahtaları seç");
+    const step1 = ankamon.ui.StepBox.create(1, "Cihazları seç");
     this.__boardList = new ankamon.ui.homebackup.CheckColumn();
     step1.add(this.__boardList, { flex: 1 });
     body.add(step1, { flex: 1 });
 
-    const step2 = ankamon.ui.StepBox.create(2, "Hesapları seç", "seçili tahtalardaki hesaplar");
+    const step2 = ankamon.ui.StepBox.create(2, "Hesapları seç", "seçili cihazlardaki hesaplar");
     this.__accountList = new ankamon.ui.homebackup.CheckColumn();
     step2.add(this.__accountList, { flex: 1 });
     this.__note = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true, wrap: true, allowGrowX: true });
@@ -68,7 +68,7 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
 
     this.__boardList.addListener("changeChecked", () => this.__loadAccounts());
     this.__accountList.addListener("changeChecked", () => this.__update());
-    this.__boardList.setItems(boards.map(b => ({ value: b.id, label: b.name, checked: selected.includes(b.id) })), "Çevrim içi tahta yok.");
+    this.__boardList.setItems(boards.map(b => ({ value: b.id, label: b.name, checked: selected.includes(b.id) })), "Çevrim içi cihaz yok.");
   },
 
   members: {
@@ -90,13 +90,13 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
       this.__update();
       if (!boards.length) {
         this.__note.setValue("");
-        this.__accountList.setItems([], "Önce tahta seçin.");
+        this.__accountList.setItems([], "Önce cihaz seçin.");
         return;
       }
       this.__note.setValue("Hesaplar yükleniyor…");
       const results = await Promise.allSettled(boards.map(b => ankamon.ui.BoardOps.accountsOf(b)));
       if (seq !== this.__loadSeq || this.isDisposed()) {
-        return; // bu arada tahta seçimi değişti: yeni yükleme sonucu geçerli
+        return; // bu arada cihaz seçimi değişti: yeni yükleme sonucu geçerli
       }
       const union = new Map();
       const failed = [];
@@ -120,16 +120,16 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
             const label = acc.full_name && acc.full_name !== acc.name ? `${acc.full_name} (${acc.name})` : acc.name;
             const mb = sizes && sizes[acc.name];
             return {
-              value: acc.name, label: label + (reached > 1 && count < reached ? ` — ${count}/${reached} tahtada` : ""),
+              value: acc.name, label: label + (reached > 1 && count < reached ? ` — ${count}/${reached} cihazda` : ""),
               side: sizes ? (mb === undefined ? "—" : `${mb} MB`) : "…"
             };
           });
-        this.__accountList.setItems(items, "Seçili tahtalarda kullanıcı hesabı yok.");
+        this.__accountList.setItems(items, "Seçili cihazlarda kullanıcı hesabı yok.");
       };
       show(null);
-      this.__note.setValue((failed.length ? "Hesapları alınamayan tahtalar: " + qx.bom.String.escape(failed.join(", ")) + ". " : "") +
+      this.__note.setValue((failed.length ? "Hesapları alınamayan cihazlar: " + qx.bom.String.escape(failed.join(", ")) + ". " : "") +
         (union.size ? ankamon.ui.JobSpinner.label("Boyutlar ölçülüyor…") : ""));
-      const failNote = failed.length ? "Hesapları alınamayan tahtalar: " + qx.bom.String.escape(failed.join(", ")) : "";
+      const failNote = failed.length ? "Hesapları alınamayan cihazlar: " + qx.bom.String.escape(failed.join(", ")) : "";
       let sizes = null;
       try {
         sizes = union.size ? await this.__homeSizes(boards.filter(b => !failed.includes(b.name))) : {};
@@ -146,8 +146,8 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
     },
 
     /**
-     * Ev dizini boyutları (MB): "home_sizes" görevi tahtalarda du çalıştırır (bkz. worker executor/homesize.py).
-     * Birden çok tahtada hesap başına toplam: yedeğin kaplayacağı alan.
+     * Ev dizini boyutları (MB): "home_sizes" görevi cihazlarda du çalıştırır (bkz. worker executor/homesize.py).
+     * Birden çok cihazda hesap başına toplam: yedeğin kaplayacağı alan.
      * @return {Map} {hesap: MB}
      */
     async __homeSizes(boards) {
@@ -171,7 +171,7 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
       const boards = this.__boardList.getChecked().length;
       const accounts = this.__accountList.getChecked().length;
       this.__start.setEnabled(boards > 0 && accounts > 0);
-      this.__start.setLabel(boards && accounts ? `Yedekle (${boards} tahta, ${accounts} hesap)` : "Yedekle");
+      this.__start.setLabel(boards && accounts ? `Yedekle (${boards} cihaz, ${accounts} hesap)` : "Yedekle");
     },
 
     __run() {
@@ -179,7 +179,7 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
       const usernames = this.__accountList.getChecked();
       ankamon.ui.Jobs.show(
         ankamon.io.Api.post("/jobs", { type: "backup_home", usernames, board_ids: boards }).then(res => res.id),
-        `Yedekle — ${usernames.length === 1 ? usernames[0] : usernames.length + " hesap"}` + (boards.length > 1 ? ` (${boards.length} tahta)` : ""),
+        `Yedekle — ${usernames.length === 1 ? usernames[0] : usernames.length + " hesap"}` + (boards.length > 1 ? ` (${boards.length} cihaz)` : ""),
         { progress: true, downloads: (jobId, name) => `/api/home-backups/${jobId}?file=${encodeURIComponent(name)}` });
     }
   }

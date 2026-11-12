@@ -1,14 +1,14 @@
 # SPDX-FileCopyrightText: 2026 Özgür Koca <ozgurkoca@gmail.com>
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-"""Sağ menü Ekran ▸ "Uyandır" / "Uyut": tahtanın ekranını güç tasarrufundan çıkarır ya da ona sokar.
+"""Sağ menü Ekran ▸ "Uyandır" / "Uyut": cihazın ekranını güç tasarrufundan çıkarır ya da ona sokar.
 
 ETAP oturumlarında Cinnamon'un kendi ekran karartması kapalıdır (sleep-display-* 0); ekranı X
 sunucusunun yerleşik ekran koruyucusu (prefer blanking — çerçeve tamponu siyaha boyanır, önizleme de
 siyah görünür) ve DPMS kapatır — giriş ekranında X'in varsayılan süreleri işler. Uyandırma etkin VT'deki
 X sunucusunda (bkz. screen/remote.py ile aynı seçim) `xset s reset` + `xset dpms force on`: kullanıcı
 dokunmuş gibi davranır; kilitli oturumun kilidini AÇMAZ (ETAP kilidi dm-tool lock — ayrı VT'deki
-giriş ekranı; uyanan ekran o olur). Uyutma `xset dpms force off`: tahtaya dokunulunca ekran kendiliğinden
+giriş ekranı; uyanan ekran o olur). Uyutma `xset dpms force off`: cihaza dokunulunca ekran kendiliğinden
 açılır; oturuma ve otomatik kapanmanın boşta kalma sayacına dokunmaz (DPMS sayacı sıfırlamaz).
 
 `xset s reset` X'in boşta kalma süresini de sıfırlar (XScreenSaver idle — TiHA'nın otomatik kapanması
@@ -36,7 +36,7 @@ export DISPLAY="$1"
 # TiHA'nın açık geri sayım penceresini (tiha-shutdown-countdown.py, başlık "Otomatik Kapatma Uyarısı")
 # "10 dakika ertele" anlamında kapatır: pencereye WM_DELETE_WINDOW gönderilir — pencerenin kendi sağ üst X
 # davranışı (xset s reset + çıkış kodu 1 = servis 10 dk erteler). Süreci öldürmek YANLIŞ olurdu: servis
-# 1 dışındaki her çıkış kodunu "süre doldu" sayıp tahtayı kapatır. DISPLAY/XAUTHORITY ayarlı olmalı;
+# 1 dışındaki her çıkış kodunu "süre doldu" sayıp cihazı kapatır. DISPLAY/XAUTHORITY ayarlı olmalı;
 # python3-xlib yoksa sessizce geçilir (pencere açık kalır, müdahale eden kişi düğmeye basabilir).
 COUNTDOWN_POSTPONE = r"""
 if pgrep -f 'tiha-shutdown-countdown[.]py' >/dev/null 2>&1; then
@@ -84,7 +84,7 @@ _SLEEP_SCRIPT = _ACTIVE_X + r"""
 xset dpms force off || { echo "Ekran uyutulamadı (xset)."; exit 4; }
 sleep 2
 case "$(xset q 2>/dev/null | awk '/Monitor is/ { print $3 }')" in
-  On) echo "Ekran hemen yeniden açıldı: tahtada ekranı açık tutan bir şey var (ekran yansıtma, müdahale oturumu ya da kullanım)."; exit 5 ;;
+  On) echo "Ekran hemen yeniden açıldı: cihazda ekranı açık tutan bir şey var (ekran yansıtma, müdahale oturumu ya da kullanım)."; exit 5 ;;
   *) echo "Ekran uyutuldu (dokunulunca açılır)." ;;
 esac
 """

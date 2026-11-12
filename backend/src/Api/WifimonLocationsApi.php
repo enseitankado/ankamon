@@ -122,7 +122,7 @@ final class WifimonLocationsApi
                 [$boardId]
             );
             if (!$board) {
-                throw ApiError::badRequest('Sensör (tahta) bulunamadı.');
+                throw ApiError::badRequest('Sensör (cihaz) bulunamadı.');
             }
             $changed = Db::transaction(static function () use ($addrs, $board, $note, $user): int {
                 $count = 0;

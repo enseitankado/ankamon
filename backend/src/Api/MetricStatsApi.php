@@ -37,7 +37,7 @@ use Ankamon\Core\Request;
 use Ankamon\Core\Storage;
 
 /**
- * Tahta başına sensör verisi alanı (Disk kullanımı penceresinin "Sensör verileri" sekmesi) ve
+ * Cihaz başına sensör verisi alanı (Disk kullanımı penceresinin "Sensör verileri" sekmesi) ve
  * kalıcı silme.
  *
  * Sensör verisi üç katmanda durur (bkz. 001_core.sql): ham ölçümler (metrics, ~METRICS_RAW_DAYS) ve
@@ -108,7 +108,7 @@ final class MetricStatsApi
     }
 
     /**
-     * Kalıcı silme: board (tahta id'si, "unmatched" — tahtaya bağlanamayan seriler — ya da boş:
+     * Kalıcı silme: board (cihaz id'si, "unmatched" — cihaza bağlanamayan seriler — ya da boş:
      * TÜM sensör verisi). Ham ölçümler + 5 dk/1 sa özetleri birlikte silinir. Geri alınamaz;
      * audit_log'a yazılır.
      */
@@ -123,7 +123,7 @@ final class MetricStatsApi
                      OR NOT EXISTS (SELECT 1 FROM boards b WHERE b.id::text = t.board_id)"
                 : 'SELECT tag_id FROM metrics_tag WHERE board_id = ?';
             if ($board !== 'unmatched' && !Db::value('SELECT 1 FROM boards WHERE id = ?', [(int) $board])) {
-                throw ApiError::notFound('Tahta bulunamadı.');
+                throw ApiError::notFound('Cihaz bulunamadı.');
             }
             $tags = array_column(Db::all($tagSql, $board === 'unmatched' ? [] : [(string) (int) $board]), 'tag_id');
             if (!$tags) {

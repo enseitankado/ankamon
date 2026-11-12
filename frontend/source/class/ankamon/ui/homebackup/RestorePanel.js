@@ -27,7 +27,7 @@
 
 /**
  * Geri al sekmesi: yedek dosyası sunucuya yüklenir (/home-restore-api/, bkz. worker files HomeRestoreUploadHandler),
- * hesap özeti gösterilir, seçilen tahtalarda hesap + ev dizini + parola + PIN anahtarı yeniden oluşturulur
+ * hesap özeti gösterilir, seçilen cihazlarda hesap + ev dizini + parola + PIN anahtarı yeniden oluşturulur
  * ("restore_home" görevi, bkz. worker executor/home_restore.py). Yüklenen dosya görevle birlikte sunucudan silinir;
  * yeniden geri almak için dosya yeniden seçilir.
  */
@@ -35,8 +35,8 @@ qx.Class.define("ankamon.ui.homebackup.RestorePanel", {
   extend: qx.ui.container.Composite,
 
   /**
-   * @param boards {Array} [{id, name}] çevrim içi tahtalar
-   * @param selected {Array} başta işaretli tahta kimlikleri
+   * @param boards {Array} [{id, name}] çevrim içi cihazlar
+   * @param selected {Array} başta işaretli cihaz kimlikleri
    */
   construct(boards, selected) {
     super(new qx.ui.layout.VBox(10));
@@ -54,7 +54,7 @@ qx.Class.define("ankamon.ui.homebackup.RestorePanel", {
     step1.add(pick);
     this.add(step1);
 
-    const step2 = ankamon.ui.StepBox.create(2, "Tahtaları seç", "hesap bu tahtalarda yeniden oluşturulur");
+    const step2 = ankamon.ui.StepBox.create(2, "Cihazları seç", "hesap bu cihazlarda yeniden oluşturulur");
     this.__boardList = new ankamon.ui.homebackup.CheckColumn();
     step2.add(this.__boardList, { flex: 1 });
     this.add(step2, { flex: 1 });
@@ -74,7 +74,7 @@ qx.Class.define("ankamon.ui.homebackup.RestorePanel", {
     this.add(step3);
 
     this.__boardList.addListener("changeChecked", () => this.__update());
-    this.__boardList.setItems(boards.map(b => ({ value: b.id, label: b.name, checked: selected.includes(b.id) })), "Çevrim içi tahta yok.");
+    this.__boardList.setItems(boards.map(b => ({ value: b.id, label: b.name, checked: selected.includes(b.id) })), "Çevrim içi cihaz yok.");
   },
 
   members: {
@@ -91,7 +91,7 @@ qx.Class.define("ankamon.ui.homebackup.RestorePanel", {
     __update() {
       const n = this.__boardList.getChecked().length;
       this.__start.setEnabled(!!this.__summary && n > 0);
-      this.__start.setLabel(this.__summary && n ? `Geri al (${n} tahta)` : "Geri al");
+      this.__start.setLabel(this.__summary && n ? `Geri al (${n} cihaz)` : "Geri al");
     },
 
     async __pick() {
@@ -159,7 +159,7 @@ qx.Class.define("ankamon.ui.homebackup.RestorePanel", {
       const names = this.__boards.filter(b => ids.includes(b.id)).map(b => b.name);
       const esc = qx.bom.String.escape;
       const ok = await ankamon.ui.Dialog.confirm(
-        `<b>${esc(s.username)}</b> hesabı <b>${esc(names.join(", "))}</b> tahtasında yedekten yeniden oluşturulsun mu?` +
+        `<b>${esc(s.username)}</b> hesabı <b>${esc(names.join(", "))}</b> cihazında yedekten yeniden oluşturulsun mu?` +
         (overwrite ? "<br><br>Hesap varsa <b>üzerine yazılır</b>: dosyaları, parolası ve PIN anahtarı yedektekiyle değişir." : ""),
         "Geri al");
       if (!ok || this.__summary !== s) {
@@ -171,7 +171,7 @@ qx.Class.define("ankamon.ui.homebackup.RestorePanel", {
       ankamon.ui.BoardOps.forgetAccounts(ids.map(id => ({ id })));
       ankamon.ui.Jobs.show(
         ankamon.io.Api.post("/jobs", { type: "restore_home", token: s.token, username: s.username, overwrite, board_ids: ids }).then(res => res.id),
-        `Geri al — ${s.username}` + (ids.length > 1 ? ` (${ids.length} tahta)` : ""),
+        `Geri al — ${s.username}` + (ids.length > 1 ? ` (${ids.length} cihaz)` : ""),
         { progress: true });
     }
   },

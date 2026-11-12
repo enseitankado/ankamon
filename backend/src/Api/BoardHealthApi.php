@@ -36,14 +36,14 @@ use Ankamon\Core\Db;
 use Ankamon\Core\Request;
 
 /**
- * Tahta sağlığı ▸ Durum: iki yoldan gelen bulgular tek biçimde (bkz. frontend ui.health.Status; GET /api/board-health).
+ * Cihaz sağlığı ▸ Durum: iki yoldan gelen bulgular tek biçimde (bkz. frontend ui.health.Status; GET /api/board-health).
  * (Konteynerin kendi sağlık denetimi /api/health ayrıdır: HealthApi.)
  *
- *   path "watch" — Sürekli izleme: worker'ın anomali kuralları; tahtaya bağlanmadan, tahtanın gönderdiği loglardan,
+ *   path "watch" — Sürekli izleme: worker'ın anomali kuralları; cihaza bağlanmadan, cihazın gönderdiği loglardan,
  *                  Ankamon'un okuduğu ölçümlerden ve daha önce toplanmış verilerden birkaç dakikada bir çıkarılır
  *                  (anomalies tablosu, yalnız SÜRENLER).
- *   path "ssh"   — SSH denetimi: Ankamon tahtaya SSH ile girip ölçer (sorun tespiti, "diagnose" görevi); haftalık
- *                  otomatik ya da elle. Her tahtanın EN SON denetiminin dikkat/acil bulguları (DiagnoseApi::latest).
+ *   path "ssh"   — SSH denetimi: Ankamon cihaza SSH ile girip ölçer (sorun tespiti, "diagnose" görevi); haftalık
+ *                  otomatik ya da elle. Her cihazın EN SON denetiminin dikkat/acil bulguları (DiagnoseApi::latest).
  *
  * Bulgu: {board_id, board, path, source, how, check, level (bad|warn|info), text, advice, since, run_id}.
  * Yetki: Sürekli izleme bulguları 'anomalies', SSH denetimi bulguları 'diagnose' ister; kullanıcı yalnız yetkili
@@ -100,7 +100,7 @@ final class BoardHealthApi
                     'run_id' => (int) $t['run_id'], 'origin' => null];
                 if ($t['status'] !== 'ok') {
                     $findings[] = $base + ['how' => $how, 'check' => 'Denetlenemedi', 'level' => 'info',
-                        'text' => trim((string) $t['output']) ?: 'Tahtaya SSH ile bağlanılamadı.', 'advice' => null];
+                        'text' => trim((string) $t['output']) ?: 'Cihaza SSH ile bağlanılamadı.', 'advice' => null];
                     continue;
                 }
                 $report = json_decode((string) $t['output'], true) ?: [];

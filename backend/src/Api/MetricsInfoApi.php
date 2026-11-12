@@ -137,7 +137,7 @@ final class MetricsInfoApi
         ];
     }
 
-    /** Tahta başına: durum, seri sayısı ve son 10 dakikada gerçekten yazılan satır (ölçülen). */
+    /** Cihaz başına: durum, seri sayısı ve son 10 dakikada gerçekten yazılan satır (ölçülen). */
     private static function boards(): array
     {
         $recent = [];

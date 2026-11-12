@@ -23,16 +23,16 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Tahtada SSH ile çalıştırılan başlatma betiği: ekrandaki X sunucusunu bulur, x11vnc'yi başlatır, portunu bildirir.
+"""Cihazda SSH ile çalıştırılan başlatma betiği: ekrandaki X sunucusunu bulur, x11vnc'yi başlatır, portunu bildirir.
 
 Akış iki adımdır (bkz. __main__.py):
-  1) `ssh tahta <betik>` — x11vnc yalnız tahtanın 127.0.0.1'inde, tek bağlantılık (-once) ve 15 sn
+  1) `ssh cihaz <betik>` — x11vnc yalnız cihazın 127.0.0.1'inde, tek bağlantılık (-once) ve 15 sn
      içinde bağlanılmazsa kendiliğinden çıkacak şekilde (-timeout) arka planda başlar; betik seçilen
      portu "PORT=<n>" diye yazıp biter.
-  2) `ssh -W 127.0.0.1:<n> tahta` — standart SSH tüneli: SSH'nin stdin/stdout'u doğrudan x11vnc'nin
+  2) `ssh -W 127.0.0.1:<n> cihaz` — standart SSH tüneli: SSH'nin stdin/stdout'u doğrudan x11vnc'nin
      TCP bağlantısıdır. Köprü bu baytları WebSocket'e geçirir. Tünel kapanınca x11vnc (-once) biter.
 
-Müdahale (control) kipinde tahta "kullanılıyor" sayılır: başlarken ekran uyandırılır, X'in boşta kalma
+Müdahale (control) kipinde cihaz "kullanılıyor" sayılır: başlarken ekran uyandırılır, X'in boşta kalma
 sayacı sıfırlanır (otomatik kapanma onu okur) ve açık TiHA geri sayım penceresi ertelenir (bkz.
 executor/display.py); oturum sürdükçe (x11vnc yaşadıkça) sayaç 30 sn'de bir sıfırlanır — TiHA'nın en kısa
 boşta eşiği 60 sn olduğundan müdahale sırasında yeni kapatma penceresi açılmaz. Salt izleme sayaca dokunmaz.
@@ -45,10 +45,10 @@ import shlex
 
 from ..executor import display
 
-# Görüntü profilleri. max_width: tahta ekranı bundan genişse x11vnc tahtada küçültür (ağ ve
+# Görüntü profilleri. max_width: cihaz ekranı bundan genişse x11vnc cihazda küçültür (ağ ve
 # tarayıcı yükü azalır). wait: x11vnc'nin ekran yoklama/güncelleme aralığı (ms) — kare hızını belirler.
 PROFILES = {
-    "view": {"max_width": 1920, "wait": 20},    # tek tahta, büyük pencere
+    "view": {"max_width": 1920, "wait": 20},    # tek cihaz, büyük pencere
     "thumb": {"max_width": 480, "wait": 250},   # çoklu önizleme kutucukları (~4 kare/sn)
     "chat": {"max_width": 1920, "wait": 100},   # sohbet açıkken: yazı okunsun, ~10 kare/sn yeter (bkz. screen/index.html)
 }
@@ -124,6 +124,6 @@ def parse_port(output: str) -> int | None:
 
 
 def parse_dim(output: str) -> str | None:
-    """Tahta ekranının gerçek çözünürlüğü ("1920x1080") — paylaşılan yayının masaüstü adı için."""
+    """Cihaz ekranının gerçek çözünürlüğü ("1920x1080") — paylaşılan yayının masaüstü adı için."""
     m = _DIM.search(output)
     return m.group(1) if m else None

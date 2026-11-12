@@ -37,94 +37,94 @@ use Ankamon\Core\Request;
 use Ankamon\Core\Settings;
 
 /**
- * Anomaliler (Tahtalar ▸ Anomaliler): worker'ın kurallarla ön hesapladığı sıra dışı durum aralıkları
+ * Anomaliler (Cihazlar ▸ Anomaliler): worker'ın kurallarla ön hesapladığı sıra dışı durum aralıkları
  * (bkz. db/migrations/033_anomalies.sql, worker/ankamon/anomaly). İstek başına hesap yapılmaz.
  *
  * Yanıt: {"kinds": {tür: {label, description, scan, source, source_detail, every}}, "anomalies": [{id, kind, board_id, board, host,
  * started_at, ended_at|null, detail}], "computed_at", "last_scan_job"} — sürenlerin TÜMÜ + [from, to] aralığıyla
- * örtüşen bitmişler (epoch saniye). board: tahtanın güncel adı; tahta silindiyse kayıttaki ad.
+ * örtüşen bitmişler (epoch saniye). board: cihazın güncel adı; cihaz silindiyse kayıttaki ad.
  */
 final class AnomaliesApi
 {
     /**
-     * level: bulgunun düzeyi (bad = Acil, warn = Dikkat — Bakım raporuyla aynı adlar; Tahta sağlığı ▸ Durum en kötüsünü gösterir).
+     * level: bulgunun düzeyi (bad = Acil, warn = Dikkat — Bakım raporuyla aynı adlar; Cihaz sağlığı ▸ Durum en kötüsünü gösterir).
      * Tür adları ve açıklamaları — arayüz metni tek yerde (worker yalnız kind yazar). scan: Anomaliler ▸
-     * Tarama'da seçilen tahtalarda anlık taranabilir (kuralın PROBE'u var — bkz. worker anomaly/scan.py).
-     * source/source_detail/every: otomatik tespitin veri kaynağı ve sıklığı (Anlık sekmesi). Otomatik tespit tahtaya
+     * Tarama'da seçilen cihazlarda anlık taranabilir (kuralın PROBE'u var — bkz. worker anomaly/scan.py).
+     * source/source_detail/every: otomatik tespitin veri kaynağı ve sıklığı (Anlık sekmesi). Otomatik tespit cihaza
      * bağlanıp komut çalıştırmaz: worker 60 sn'lik turda kuralları Ankamon'daki veriden hesaplar, log tarayan
      * kurallar en çok 5 dk'da bir (EVERY). Kural ya da kaynağı değişirse burası da güncellenir.
      */
     private const KINDS = [
         'no_login' => [
             'label' => 'Oturumsuz açık',
-            'description' => 'Tahta en az 15 dakikadır açık ve kimse oturum açmamış (açılıştan beri ya da son oturum kapandıktan sonra).',
+            'description' => 'Cihaz en az 15 dakikadır açık ve kimse oturum açmamış (açılıştan beri ya da son oturum kapandıktan sonra).',
             'level' => 'warn',
             'scan' => true,
             'source' => 'Log',
-            'source_detail' => 'Tahtanın gönderdiği loglardan çıkarılan açık kalma ve oturum aralıkları (Ankamon bağlanmaz).',
+            'source_detail' => 'Cihazın gönderdiği loglardan çıkarılan açık kalma ve oturum aralıkları (Ankamon bağlanmaz).',
             'every' => '60 sn',
         ],
         'ntp_unsynced' => [
             'label' => 'NTP eşitlenmemiş',
-            'description' => 'Tahtanın saati en az 15 dakikadır NTP sunucusuyla eşitlenmiyor (eşitleme kapalı, sunucuya ulaşılamıyor) ya da saati Ankamon sunucusundan 30 sn\'den fazla sapıyor.',
+            'description' => 'Cihazın saati en az 15 dakikadır NTP sunucusuyla eşitlenmiyor (eşitleme kapalı, sunucuya ulaşılamıyor) ya da saati Ankamon sunucusundan 30 sn\'den fazla sapıyor.',
             'level' => 'warn',
             'scan' => true,
             'source' => 'Ölçüm',
-            'source_detail' => 'Ankamon\'un tahtanın 9100 portundan 60 sn\'de bir okuduğu saat ölçümleri (komut çalışmaz).',
+            'source_detail' => 'Ankamon\'un cihazın 9100 portundan 60 sn\'de bir okuduğu saat ölçümleri (komut çalışmaz).',
             'every' => '60 sn',
         ],
         'cpu_temp_high' => [
             'label' => 'İşlemci sıcaklığı yüksek',
-            'description' => 'İşlemci sıcaklığı en az 15 dakikadır tahtanın kendi ortalamasının %30 üzerinde (ortalama: son 30 günün saatlik ortalamaları; en az 24 saatlik geçmiş gerekir).',
+            'description' => 'İşlemci sıcaklığı en az 15 dakikadır cihazın kendi ortalamasının %30 üzerinde (ortalama: son 30 günün saatlik ortalamaları; en az 24 saatlik geçmiş gerekir).',
             'level' => 'warn',
             'scan' => true,
             'source' => 'Ölçüm',
-            'source_detail' => 'Ankamon\'un tahtanın 9100 portundan 60 sn\'de bir okuduğu sıcaklık ölçümleri (komut çalışmaz).',
+            'source_detail' => 'Ankamon\'un cihazın 9100 portundan 60 sn\'de bir okuduğu sıcaklık ölçümleri (komut çalışmaz).',
             'every' => '60 sn',
         ],
         'disk_temp_high' => [
             'label' => 'Disk sıcaklığı yüksek',
-            'description' => 'Disk sıcaklığı en az 15 dakikadır tahtanın kendi ortalamasının %30 üzerinde (ortalama: son 30 günün saatlik ortalamaları; en az 24 saatlik geçmiş gerekir).',
+            'description' => 'Disk sıcaklığı en az 15 dakikadır cihazın kendi ortalamasının %30 üzerinde (ortalama: son 30 günün saatlik ortalamaları; en az 24 saatlik geçmiş gerekir).',
             'level' => 'warn',
             'scan' => true,
             'source' => 'Ölçüm',
-            'source_detail' => 'Ankamon\'un tahtanın 9100 portundan 60 sn\'de bir okuduğu disk sıcaklığı ölçümleri (komut çalışmaz).',
+            'source_detail' => 'Ankamon\'un cihazın 9100 portundan 60 sn\'de bir okuduğu disk sıcaklığı ölçümleri (komut çalışmaz).',
             'every' => '60 sn',
         ],
         'net_link_lost' => [
             'label' => 'Ağ bağlantısı koptu',
-            'description' => 'Tahta açıkken ağa ulaşamadı: ağ kablosu çıkarıldı ya da ağ anahtarı/port kesildi. Bağlantı gelince tahtanın kuyrukta bekletip geç gönderdiği loglardan geriye dönük saptanır (o sürede sensör verisi de alınamamış, başka tahtalar ise ulaşıyor olmalı). Tahta kabloyu kaybettiğini logla bildirdiyse "Ağ kablosu çıkarıldı" yazar. Tarama: kablonun şu anki durumu ve son 7 gündeki kopmalar.',
+            'description' => 'Cihaz açıkken ağa ulaşamadı: ağ kablosu çıkarıldı ya da ağ anahtarı/port kesildi. Bağlantı gelince cihazın kuyrukta bekletip geç gönderdiği loglardan geriye dönük saptanır (o sürede sensör verisi de alınamamış, başka cihazlar ise ulaşıyor olmalı). Cihaz kabloyu kaybettiğini logla bildirdiyse "Ağ kablosu çıkarıldı" yazar. Tarama: kablonun şu anki durumu ve son 7 gündeki kopmalar.',
             'level' => 'bad',
             'scan' => true,
             'source' => 'Log',
-            'source_detail' => 'Tahtanın loglarının geç ve toplu gelmesi (Ankamon bağlanmaz).',
+            'source_detail' => 'Cihazın loglarının geç ve toplu gelmesi (Ankamon bağlanmaz).',
             'every' => '5 dk',
         ],
         'log_delayed' => [
             'label' => 'Log iletimi gecikti',
-            'description' => 'Tahtaya ulaşılabildiği halde (sensör verisi geliyordu) logları en az 10 dakika geç geldi: sorun log iletim yolunda — tahta log sunucusunun adını (istiklal.local) çözemedi, sunucunun log portu ya da tahtanın rsyslog\'u. Ağ bağlantısı kopukluğu ayrı türdür.',
+            'description' => 'Cihaza ulaşılabildiği halde (sensör verisi geliyordu) logları en az 10 dakika geç geldi: sorun log iletim yolunda — cihaz log sunucusunun adını (istiklal.local) çözemedi, sunucunun log portu ya da cihazın rsyslog\'u. Ağ bağlantısı kopukluğu ayrı türdür.',
             'level' => 'warn',
             'scan' => false,
             'source' => 'Log',
-            'source_detail' => 'Tahtanın loglarının geç gelmesi (Ankamon bağlanmaz).',
+            'source_detail' => 'Cihazın loglarının geç gelmesi (Ankamon bağlanmaz).',
             'every' => '5 dk',
         ],
         'ssh_bruteforce' => [
             'label' => 'SSH kaba kuvvet',
-            'description' => 'Aynı kaynaktan en az 10 başarısız SSH girişi (aralarında 10 dakikadan uzun ara yok). Kaynak adres ve denenen hesaplar ayrıntıda; kaynak Ankamon\'un kendisi de olabilir (ayarlardaki parola tahtanınkinden farklıysa).',
+            'description' => 'Aynı kaynaktan en az 10 başarısız SSH girişi (aralarında 10 dakikadan uzun ara yok). Kaynak adres ve denenen hesaplar ayrıntıda; kaynak Ankamon\'un kendisi de olabilir (ayarlardaki parola cihazınkinden farklıysa).',
             'level' => 'bad',
             'scan' => false,
             'source' => 'Log',
-            'source_detail' => 'Tahtanın sshd logları: başarısız giriş satırları (Ankamon bağlanmaz).',
+            'source_detail' => 'Cihazın sshd logları: başarısız giriş satırları (Ankamon bağlanmaz).',
             'every' => '5 dk',
         ],
         'dhcp_issue' => [
             'label' => 'DHCP adres alamadı',
-            'description' => 'Tahta bir ağ arabiriminde (kablolu ya da Wi-Fi) DHCP ile adres alamadı (15 dakika içinde en az 3 kez). Yalnız NetworkManager satırlarını gönderen tahtalarda görülür.',
+            'description' => 'Cihaz bir ağ arabiriminde (kablolu ya da Wi-Fi) DHCP ile adres alamadı (15 dakika içinde en az 3 kez). Yalnız NetworkManager satırlarını gönderen cihazlarda görülür.',
             'level' => 'warn',
             'scan' => false,
             'source' => 'Log',
-            'source_detail' => 'Tahtanın NetworkManager logları: DHCP hataları (Ankamon bağlanmaz).',
+            'source_detail' => 'Cihazın NetworkManager logları: DHCP hataları (Ankamon bağlanmaz).',
             'every' => '5 dk',
         ],
         'nic_error' => [
@@ -133,12 +133,12 @@ final class AnomaliesApi
             'level' => 'bad',
             'scan' => false,
             'source' => 'Log',
-            'source_detail' => 'Tahtanın çekirdek logları: ağ kartı hataları (Ankamon bağlanmaz).',
+            'source_detail' => 'Cihazın çekirdek logları: ağ kartı hataları (Ankamon bağlanmaz).',
             'every' => '5 dk',
         ],
         'identity_conflict' => [
             'label' => 'Ad / IP çakışması',
-            'description' => 'Aynı bilgisayar adı aynı anda birden çok IP\'den log gönderdi (aynı kalıptan kurulmuş tahtalar adı değiştirilmeden) ya da iki tahta kaydı aynı IP\'yi taşıyor. Aynı IP durumu düzelene dek açık kalır.',
+            'description' => 'Aynı bilgisayar adı aynı anda birden çok IP\'den log gönderdi (aynı kalıptan kurulmuş cihazlar adı değiştirilmeden) ya da iki cihaz kaydı aynı IP\'yi taşıyor. Aynı IP durumu düzelene dek açık kalır.',
             'level' => 'warn',
             'scan' => false,
             'source' => 'Log',
@@ -146,8 +146,8 @@ final class AnomaliesApi
             'every' => '5 dk',
         ],
         'subnet_changed' => [
-            'label' => 'Tahta başka ağda',
-            'description' => 'Tahtanın logları başka bir IP ağından gelmeye başladı: tahta taşındı, başka VLAN\'a bağlandı ya da Wi-Fi\'ye geçti.',
+            'label' => 'Cihaz başka ağda',
+            'description' => 'Cihazın logları başka bir IP ağından gelmeye başladı: cihaz taşındı, başka VLAN\'a bağlandı ya da Wi-Fi\'ye geçti.',
             'level' => 'warn',
             'scan' => false,
             'source' => 'Log',
@@ -155,21 +155,21 @@ final class AnomaliesApi
             'every' => '5 dk',
         ],
         'clock_skew' => [
-            'label' => 'Tahta saati yanlış',
-            'description' => 'Tahtanın saati sunucununkinden en az 10 dakika sapıyor (logların tahta zamanına göre). NTP eşitlenmemiş kuralı sensör verisi olan tahtaları görür, bu kural log gönderen her tahtayı.',
+            'label' => 'Cihaz saati yanlış',
+            'description' => 'Cihazın saati sunucununkinden en az 10 dakika sapıyor (logların cihaz zamanına göre). NTP eşitlenmemiş kuralı sensör verisi olan cihazları görür, bu kural log gönderen her cihazı.',
             'level' => 'warn',
             'scan' => false,
             'source' => 'Log',
-            'source_detail' => 'Log satırının tahtadaki zamanı ile Ankamon\'a varış zamanı farkı (Ankamon bağlanmaz).',
+            'source_detail' => 'Log satırının cihazdaki zamanı ile Ankamon\'a varış zamanı farkı (Ankamon bağlanmaz).',
             'every' => '5 dk',
         ],
         'cmos_battery_low' => [
             'label' => 'BIOS pili zayıf',
-            'description' => 'BIOS (CMOS) pilinin gerilimi 2,4 V\'un altında. Sağlam bir okuma gelene (pil değişene) dek sürer. Yalnız pil sensörü etkinleştirilmiş tahtalarda ölçülür.',
+            'description' => 'BIOS (CMOS) pilinin gerilimi 2,4 V\'un altında. Sağlam bir okuma gelene (pil değişene) dek sürer. Yalnız pil sensörü etkinleştirilmiş cihazlarda ölçülür.',
             'level' => 'warn',
             'scan' => true,
             'source' => 'Ölçüm',
-            'source_detail' => 'Ankamon\'un tahtanın 9100 portundan 60 sn\'de bir okuduğu pil gerilimi ölçümü (komut çalışmaz).',
+            'source_detail' => 'Ankamon\'un cihazın 9100 portundan 60 sn\'de bir okuduğu pil gerilimi ölçümü (komut çalışmaz).',
             'every' => '60 sn',
         ],
         'uefi_nvram_high' => [
@@ -296,7 +296,7 @@ final class AnomaliesApi
             $dir = defined('EXT_DIR') ? EXT_DIR : '/opt/ankamon/ext';
             foreach (glob($dir . '/*/anomaly_kinds.json') ?: [] as $file) {
                 $extra = json_decode((string) file_get_contents($file), true);
-                // origin: kaydı üreten eklenti (Tahta sağlığı ▸ Denetimler, Durum) — extension.json başlığı, yoksa dizin adı.
+                // origin: kaydı üreten eklenti (Cihaz sağlığı ▸ Denetimler, Durum) — extension.json başlığı, yoksa dizin adı.
                 $meta = json_decode((string) @file_get_contents(dirname($file) . '/extension.json'), true);
                 $origin = is_array($meta) && !empty($meta['title']) ? (string) $meta['title'] : basename(dirname($file));
                 foreach (is_array($extra) ? $extra : [] as $kind => $def) {

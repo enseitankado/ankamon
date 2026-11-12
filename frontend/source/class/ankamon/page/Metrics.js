@@ -29,24 +29,24 @@
  * Sensörler (Bakım sayfasının sekmesi — bkz. page.Maintenance): Grafana panosu gömülü açılır
  * (oturum Ankamon'dan devralınır).
  *
- * Varsayılan: "Çevrim içi tahtalar" panosu (docker/grafana/dashboards/cevrimici-tahtalar.json) — şu an
- * çevrim içi TÜM tahtalar, her grafikte tahta başına bir çizgi; lejant tablosunda son/en yüksek değerler.
- * Düğme satırındaki seçim kutusundan tek bir tahta seçilince o tahtanın ayrıntılı panosu (tahta-genel-bakis,
+ * Varsayılan: "Çevrim içi cihazlar" panosu (docker/grafana/dashboards/cevrimici-cihazlar.json) — şu an
+ * çevrim içi TÜM cihazlar, her grafikte cihaz başına bir çizgi; lejant tablosunda son/en yüksek değerler.
+ * Düğme satırındaki seçim kutusundan tek bir cihaz seçilince o cihazın ayrıntılı panosu (cihaz-genel-bakis,
  * var-board) açılır. Seçim yalnız bu sayfa açıkken hatırlanır.
  */
 qx.Class.define("ankamon.page.Metrics", {
   extend: ankamon.page.Base,
 
   statics: {
-    ALL_URL: "/grafana/d/ankamon-cevrimici/cevrim-ici-tahtalar?kiosk",
-    BOARD_URL: "/grafana/d/ankamon-genel/tahta-genel-bakis?kiosk&var-board="
+    ALL_URL: "/grafana/d/ankamon-cevrimici/cevrim-ici-cihazlar?kiosk",
+    BOARD_URL: "/grafana/d/ankamon-genel/cihaz-genel-bakis?kiosk&var-board="
   },
 
   construct(user) {
     // Başlık yok: Bakım sayfasının "Sensörler" sekmesinde durur, sekme adı yeterli (bkz. page.Maintenance).
     super(user, null);
-    this.__select = new qx.ui.form.SelectBox().set({ width: 280, toolTipText: "Gösterilecek tahtalar" });
-    this.__select.add(new qx.ui.form.ListItem("Tüm çevrim içi tahtalar", null, null));
+    this.__select = new qx.ui.form.SelectBox().set({ width: 280, toolTipText: "Gösterilecek cihazlar" });
+    this.__select.add(new qx.ui.form.ListItem("Tüm çevrim içi cihazlar", null, null));
     this.__select.addListener("changeSelection", () => {
       if (!this.__filling) {
         this.__show();
@@ -59,7 +59,7 @@ qx.Class.define("ankamon.page.Metrics", {
     // Grafana düğmesinin yanında, adıyla).
     this._addButton("Veri Toplama şeması", () => ankamon.ui.MetricsHelp.open())
       .setToolTipText("Sensör verisi nasıl toplanıyor, saklanıyor ve sunuluyor? (canlı bilgiler)");
-    // Sensör verisi eksik tahtalar için kurulum yönergesi (bkz. __updateNotice): yeni satır kaplamasın diye düğme
+    // Sensör verisi eksik cihazlar için kurulum yönergesi (bkz. __updateNotice): yeni satır kaplamasın diye düğme
     // satırında katlı tek satırlık sarı şerit; tıklayınca ayrıntı (bağlantılar dahil) şeridin altında açılır.
     this.__noticeChip = new qx.ui.basic.Atom("").set({ rich: true, visibility: "excluded", cursor: "pointer",
       padding: [4, 10], backgroundColor: "#fff4ce", textColor: "#3b2f00", alignY: "middle",
@@ -101,7 +101,7 @@ qx.Class.define("ankamon.page.Metrics", {
     __filling: false,
     __shown: null,
 
-    /** Seçili tahta kimliği; null = tüm çevrim içi tahtalar. */
+    /** Seçili cihaz kimliği; null = tüm çevrim içi cihazlar. */
     __boardId() {
       const sel = this.__select.getSelection()[0];
       return sel ? sel.getModel() : null;
@@ -113,14 +113,14 @@ qx.Class.define("ankamon.page.Metrics", {
     },
 
     /**
-     * Sensör verisi eksik tahtalar için bilgilendirme: tüm tahtalar görünümünde o tahtaların listesi, tek
-     * tahtada yalnız o tahta. Eksiklik iki türlüdür ama kurulum TEK hazır komuttur — "Metrik izlemeyi kur"
+     * Sensör verisi eksik cihazlar için bilgilendirme: tüm cihazlar görünümünde o cihazların listesi, tek
+     * cihazda yalnız o cihaz. Eksiklik iki türlüdür ama kurulum TEK hazır komuttur — "Metrik izlemeyi kur"
      * (actions/node-exporter; fan/pil/anakart sensörlerini de etkinleştirir):
-     *   • son 7 günde hiç veri gelmeyen tahtalar (has_data);
-     *   • fan/anakart sensörü olmayan ve anakart sensörü adımı henüz denenmemiş tahtalar (has_board_sensors,
+     *   • son 7 günde hiç veri gelmeyen cihazlar (has_data);
+     *   • fan/anakart sensörü olmayan ve anakart sensörü adımı henüz denenmemiş cihazlar (has_board_sensors,
      *     superio_done — yonga desteklenmiyorsa komut yeniden önerilmez).
-     * Komutun yolu tıklanır: Komut çalıştır penceresi bu tahtalar için o hazır komut seçili açılır
-     * (bkz. ui.BoardOps.run). Listede kapalı tahta varsa sonuna "WoL ile aç" bağlantısı eklenir.
+     * Komutun yolu tıklanır: Komut çalıştır penceresi bu cihazlar için o hazır komut seçili açılır
+     * (bkz. ui.BoardOps.run). Listede kapalı cihaz varsa sonuna "WoL ile aç" bağlantısı eklenir.
      */
     __updateNotice() {
       const esc = qx.bom.String.escape;
@@ -138,27 +138,27 @@ qx.Class.define("ankamon.page.Metrics", {
       const canRun = this._can("actions");
       const link = (attr, text) => `<span ${attr} style="color:#0b57d0;text-decoration:underline;cursor:pointer">${text}</span>`;
       const names = arr => arr.slice(0, 12).map(b => esc(b.name) + (b.online ? "" : " (kapalı)")).join(", ") +
-        (arr.length > 12 ? ` ve ${arr.length - 12} tahta daha` : "");
+        (arr.length > 12 ? ` ve ${arr.length - 12} cihaz daha` : "");
       const wol = arr => {
         const off = arr.filter(b => !b.online);
         if (!off.length || !this._can("power")) {
           return "";
         }
-        const text = id !== null ? "tahtayı WoL ile aç" : `${off.length} kapalı tahtayı WoL ile aç`;
+        const text = id !== null ? "cihazı WoL ile aç" : `${off.length} kapalı cihazı WoL ile aç`;
         return " — " + link(`data-sensor-wol="${off.map(b => b.id).join(",")}"`, text);
       };
 
       const lines = [];
       if (missing.length) {
         lines.push(id === null
-          ? `<b>${missing.length} tahtada hiç sensör verisi yok:</b> ${names(missing)}${wol(missing)}.`
-          : "<b>Bu tahtada hiç sensör verisi yok:</b> sensör istemcisi (metrik izleme) kurulu değil ya da çalışmıyor" +
-            (missing[0].online ? "" : " (tahta kapalı" + wol(missing) + ")") + ".");
+          ? `<b>${missing.length} cihazda hiç sensör verisi yok:</b> ${names(missing)}${wol(missing)}.`
+          : "<b>Bu cihazda hiç sensör verisi yok:</b> sensör istemcisi (metrik izleme) kurulu değil ya da çalışmıyor" +
+            (missing[0].online ? "" : " (cihaz kapalı" + wol(missing) + ")") + ".");
       }
       if (noBoard.length) {
         lines.push(id === null
-          ? `<b>${noBoard.length} tahtada fan / anakart sensörü verisi yok:</b> ${names(noBoard)}${wol(noBoard)}.`
-          : "<b>Bu tahtada fan / anakart sensörü verisi yok.</b>" + (noBoard[0].online ? "" : " Tahta kapalı" + wol(noBoard) + "."));
+          ? `<b>${noBoard.length} cihazda fan / anakart sensörü verisi yok:</b> ${names(noBoard)}${wol(noBoard)}.`
+          : "<b>Bu cihazda fan / anakart sensörü verisi yok.</b>" + (noBoard[0].online ? "" : " Cihaz kapalı" + wol(noBoard) + "."));
       }
       this.__noticeTargets = {};
       if (steps.length) {
@@ -172,21 +172,21 @@ qx.Class.define("ankamon.page.Metrics", {
             return "";
           }
           const off = st.boards.filter(b => !b.online).length;
-          return ` — ${st.boards.length} tahta` + (off ? ` (${off} kapalı: önce açılmalı)` : "");
+          return ` — ${st.boards.length} cihaz` + (off ? ` (${off} kapalı: önce açılmalı)` : "");
         };
-        lines.push((steps.length > 1 ? "Kurmak için Tahtalar'da tahtaları işaretleyip sırasıyla şu hazır komutları çalıştırın" :
-          "Kurmak için Tahtalar'da tahtaları işaretleyip şu hazır komutu çalıştırın") +
-          (canRun ? " (bağlantı pencereyi bu tahtalar için açar):" : ":"));
+        lines.push((steps.length > 1 ? "Kurmak için Cihazlar'da cihazları işaretleyip sırasıyla şu hazır komutları çalıştırın" :
+          "Kurmak için Cihazlar'da cihazları işaretleyip şu hazır komutu çalıştırın") +
+          (canRun ? " (bağlantı pencereyi bu cihazlar için açar):" : ":"));
         steps.forEach((st, i) => lines.push(`${steps.length > 1 ? i + 1 + ". " : "• "}${path(st)} (${st.what})${count(st)}`));
         lines.push("Veri birkaç dakika içinde grafiklere gelmeye başlar.");
       }
       const html = lines.join("<br>");
       this.__notice.setValue(html);
-      // Katlı şerit: kaç tahtada eksik olduğu (ayrıntı açılır pencerede).
+      // Katlı şerit: kaç cihazda eksik olduğu (ayrıntı açılır pencerede).
       const n = new Set(missing.concat(noBoard).map(b => b.id)).size;
       this.__noticeSummary = !html ? ""
-        : id !== null ? "⚠ Bu tahtada sensör verisi eksik"
-        : `⚠ ${n} tahtada sensör verisi eksik`;
+        : id !== null ? "⚠ Bu cihazda sensör verisi eksik"
+        : `⚠ ${n} cihazda sensör verisi eksik`;
       this.__noticeChip.setVisibility(html ? "visible" : "excluded");
       if (!html) {
         this.__noticePopup.hide();
@@ -215,8 +215,8 @@ qx.Class.define("ankamon.page.Metrics", {
       const ids = hit.getAttribute("data-sensor-wol").split(",").map(Number);
       ankamon.io.Api.post("/jobs", { type: "wol", board_ids: ids })
         .then(() => ankamon.ui.Dialog.alert(
-          `${ids.length} tahtaya uyandırma (Wake-on-LAN) paketi gönderildi. WoL kurulumu yapılmışsa birkaç dakika ` +
-          "sonra tahtalar açılacaktır.", "Uyandırma (WoL)"))
+          `${ids.length} cihaza uyandırma (Wake-on-LAN) paketi gönderildi. WoL kurulumu yapılmışsa birkaç dakika ` +
+          "sonra cihazlar açılacaktır.", "Uyandırma (WoL)"))
         .catch(err => ankamon.ui.Dialog.error(err));
     },
 
@@ -230,7 +230,7 @@ qx.Class.define("ankamon.page.Metrics", {
       }
     },
 
-    /** Belirli bir tahtanın ayrıntılı grafiklerini göster. */
+    /** Belirli bir cihazın ayrıntılı grafiklerini göster. */
     async showBoard(boardId) {
       await this._refresh();
       const item = this.__select.getChildren().find(i => i.getModel() === boardId);
@@ -240,12 +240,12 @@ qx.Class.define("ankamon.page.Metrics", {
     },
 
     async _refresh() {
-      // Tahta listesi her açılışta tazelenir (yeni eklenen / çevrim içi-dışı değişen tahtalar); seçim korunur.
+      // Cihaz listesi her açılışta tazelenir (yeni eklenen / çevrim içi-dışı değişen cihazlar); seçim korunur.
       let boards = [];
       try {
         boards = (await ankamon.io.Api.get("/boards")).boards;
       } catch (e) {
-        // "boards" yetkisi yoksa yalnız "Tüm çevrim içi tahtalar" kalır.
+        // "boards" yetkisi yoksa yalnız "Tüm çevrim içi cihazlar" kalır.
       }
       try {
         this.__coverage = (await ankamon.io.Api.get("/metrics/coverage")).boards;

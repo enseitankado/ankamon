@@ -26,7 +26,7 @@
  */
 
 /**
- * Ayarlar: herkese açık "Görünüm" (tema) sekmesi + yalnız yöneticiye görünen "Tahta erişimi"
+ * Ayarlar: herkese açık "Görünüm" (tema) sekmesi + yalnız yöneticiye görünen "Cihaz erişimi"
  * (SSH + Samba + ekran istemcisinin otomatik kurulumu), "Ağ arabirimleri" (sunucunun kartları — yalnız liste) ve
  * "Ders saatleri" (ui.LessonTimesEditor, /api/lesson-times)
  * sekmeleri. Sayfa herkese açıktır (bkz. ui.Shell.PAGES); admin
@@ -71,44 +71,44 @@ qx.Class.define("ankamon.page.Settings", {
         "Okul ya da kurumun adı ve kodu (ör. MEB kurum kodu). Bildirim başlıklarında görünür; Sağlık ▸ Bildirimler'deki ntfy konu önerisi bunlardan türetilir.", org);
       tabs.add(orgPage);
 
-      const access = this.__page("Tahta erişimi");
+      const access = this.__page("Cihaz erişimi");
       const ssh = new ankamon.ui.Form();
       ssh.text("user", "Kullanıcı adı", settings.ssh_access.user);
       ssh.password("password", "Parola", settings.ssh_access.password_set ? "kayıtlı — değiştirmek için yazın" : "henüz girilmedi");
       this.__section(access, "SSH erişimi",
-        "Uzaktan işlemler, toplu komut ve web terminal tahtalara bu hesapla bağlanır. " +
+        "Uzaktan işlemler, toplu komut ve web terminal cihazlara bu hesapla bağlanır. " +
         "TiHA yalnız root ve etapadmin hesaplarına SSH izni verir.", ssh);
       const samba = new ankamon.ui.Form();
       samba.text("user", "Kullanıcı adı", settings.samba_access.user);
       samba.password("password", "Parola", settings.samba_access.password_set ? "kayıtlı — değiştirmek için yazın" : "henüz girilmedi");
       this.__section(access, "Samba erişimi",
         "TiHA'nın \"Dosya sunucusu\" adımıyla açtığı paylaşımın hesabı. SSH'tan bağımsız olarak saklanır.", samba);
-      // Ekranlar: tahtada x11vnc yoksa "Ekran istemcisini kur" arka planda kendiliğinden çalışsın mı
+      // Ekranlar: cihazda x11vnc yoksa "Ekran istemcisini kur" arka planda kendiliğinden çalışsın mı
       // (bkz. worker/ankamon/screen/__main__.py; kutucukta "İstemci yükleniyor…" görünür).
       const vncAuto = new qx.ui.form.CheckBox("Ekran istemcisini otomatik kur").set({
         value: settings.screen_vnc_autoinstall !== false
       });
       this.__section(access, "Ekran izleme",
-        "Tahtalar sayfasındaki ekran önizlemesi ve fare/klavye ile müdahale için tahtada x11vnc gerekir. Bu seçenek " +
-        "açıkken, ağda olan ama x11vnc'si kurulu olmayan tahtaya hazır işlemlerdeki \"Ekran istemcisini (x11vnc) " +
+        "Cihazlar sayfasındaki ekran önizlemesi ve fare/klavye ile müdahale için cihazda x11vnc gerekir. Bu seçenek " +
+        "açıkken, ağda olan ama x11vnc'si kurulu olmayan cihaza hazır işlemlerdeki \"Ekran istemcisini (x11vnc) " +
         "kur\" arka planda kendiliğinden uygulanır; kurulum sürerken önizlemede \"İstemci yükleniyor…\" yazar.", vncAuto);
       access.add(new qx.ui.basic.Label(
-        `Tahtalar loglarını bu sunucunun <b>${settings.syslog_port}</b> numaralı portuna (TCP ya da UDP) gönderir. ` +
-        `Sensör verisi tahtalardan <b>${settings.scrape_interval}</b> aralıkla okunur.`
+        `Cihazlar loglarını bu sunucunun <b>${settings.syslog_port}</b> numaralı portuna (TCP ya da UDP) gönderir. ` +
+        `Sensör verisi cihazlardan <b>${settings.scrape_interval}</b> aralıkla okunur.`
       ).set({ rich: true, wrap: true, textColor: "app-muted" }));
       tabs.add(access);
 
-      // Ağ arabirimleri (kullanıcı isteği 2026-11-10): tahta ağı / idari ağ ayrımı YOK — sunucunun bütün kartları listelenir
+      // Ağ arabirimleri (kullanıcı isteği 2026-11-10): cihaz ağı / idari ağ ayrımı YOK — sunucunun bütün kartları listelenir
       // ve Ankamon bütün hizmetlerini hepsi üzerinden yürütür (bkz. worker/ankamon/netroles.py, SettingsApi::interfaces).
       const netPage = this.__page("Ağ arabirimleri");
       this.__section(netPage, "Ağ arabirimleri",
         "Sunucunun işletim sisteminde bulunan ağ kartları; \"Etkin\" kutusuyla bir kart kablo çıkarmadan devre dışı bırakılır ya da " +
         "yeniden devreye alınır (sunucu yeniden başlasa da korunur). Ankamon'un bütün giriş/çıkış hizmetleri etkin kartların " +
-        "<b>hepsi</b> üzerinden çalışır; ağlar arasında rol ayrımı (tahta ağı / idari ağ) yoktur: panel ve web terminal, " +
-        `log alımı (port ${settings.syslog_port}), sensör okuma, SSH/Samba ile tahta yönetimi, ağ taraması ve görülen akış ` +
-        "gözlemi, servis/paylaşım/etkinlik taramaları, loglardan tahta kaydı, Wake-on-LAN (tahtanın bulunduğu ağa), ekran " +
-        "yansıtma ve yerel ad duyurusu (Avahi). Bir cihazın tahta olup olmadığına hangi ağda görüldüğü değil MAC adresi karar " +
-        "verir (ETAP tahta önekleri; uymayan tahtanın Bilgisayar ayrıntıları'nda varlık türü \"Akıllı tahta\" seçilir). Yeni bir " +
+        "<b>hepsi</b> üzerinden çalışır; ağlar arasında rol ayrımı (cihaz ağı / idari ağ) yoktur: panel ve web terminal, " +
+        `log alımı (port ${settings.syslog_port}), sensör okuma, SSH/Samba ile cihaz yönetimi, ağ taraması ve görülen akış ` +
+        "gözlemi, servis/paylaşım/etkinlik taramaları, loglardan cihaz kaydı, Wake-on-LAN (cihazın bulunduğu ağa), ekran " +
+        "yansıtma ve yerel ad duyurusu (Avahi). Bir cihazın cihaz olup olmadığına hangi ağda görüldüğü değil MAC adresi karar " +
+        "verir (ETAP cihaz önekleri; uymayan cihazın Bilgisayar ayrıntıları'nda varlık türü \"Akıllı tahta\" seçilir). Yeni bir " +
         "kart takılınca ya da adresi değişince bir sonraki ağ taramasında kendiliğinden kullanılmaya başlar; ağ başına taramayı " +
         "durdurmak için Ağ ▸ Varlıklar ▸ <i>Ağlar</i> düğmesi. Kartlar arasında IP yönlendirmesi yapılmaz (ağlar birbirine " +
         "açılmaz).", this.__ifaceTable(settings.interfaces), 900);
@@ -179,7 +179,7 @@ qx.Class.define("ankamon.page.Settings", {
         // Sayfa yeniden yüklenir (anında, DOM'da canlı uygulamak yerine): qx.ui.table.Table satırları
         // tema değişince kendiliğinden yeniden boyar ama sütun BAŞLIĞI (qx.ui.table.pane.Header
         // widget'ları) canlı tema değişiminde boyanmıyor — eski temanın renginde TAKILI kalıyor
-        // (çerçevenin kendi bir eksiği/hatası; ölçüldü: iki ayrı tahta/loglar gibi tüm grid'lerde aynı).
+        // (çerçevenin kendi bir eksiği/hatası; ölçüldü: iki ayrı cihaz/loglar gibi tüm grid'lerde aynı).
         // Açılışta (Application.js tema sayfa oluşturulmadan ÖNCE uygulanıyor) sorun yok — bu yüzden
         // en güvenilir düzeltme, canlı DOM güncellemesi yerine sayfayı yeniden yüklemek. Yüklenince
         // Genel bakış'a değil yine Ayarlar'a dönülür (kullanıcı isteği; bkz. Shell.REOPEN_KEY).
@@ -243,7 +243,7 @@ qx.Class.define("ankamon.page.Settings", {
               : "";
             const last = !others ? "Bu, sunucunun etkin son fiziksel kartı: kapatılınca hiçbir ağa erişilemez.<br><br>" : "";
             const sure = await ankamon.ui.Dialog.confirm(`${warn}${last}<b>${qx.bom.String.escape(i.name)}</b> kartı pasif ` +
-              "yapılsın mı? Bu karttaki ağlarda tarama, log alımı, tahta yönetimi ve panel erişimi durur; ayar sunucu yeniden " +
+              "yapılsın mı? Bu karttaki ağlarda tarama, log alımı, cihaz yönetimi ve panel erişimi durur; ayar sunucu yeniden " +
               "başlasa da korunur.", "Pasif yap");
             if (!sure) {
               revert();

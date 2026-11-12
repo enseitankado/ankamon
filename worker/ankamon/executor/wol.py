@@ -26,8 +26,8 @@
 """Wake-on-LAN sihirli paketi (uzaktan uyandırma).
 
 Sihirli paket yerel ağ yayınıyla (broadcast) gider; konteyner host ağını kullandığından fiziksel ağa ulaşır
-(bkz. docker-compose.yml network_mode). Sunucu birden çok ağa bağlı olabilir (tahta + idari ağ): paket,
-tahtanın bilinen IP'sinin düştüğü yerel ağın arabirimine BAĞLANARAK (SO_BINDTODEVICE) o ağın kendi yayın
+(bkz. docker-compose.yml network_mode). Sunucu birden çok ağa bağlı olabilir (cihaz + idari ağ): paket,
+cihazın bilinen IP'sinin düştüğü yerel ağın arabirimine BAĞLANARAK (SO_BINDTODEVICE) o ağın kendi yayın
 adresine (maske arabirimden) ve 255.255.255.255'e gönderilir — varsayılan rotanın arabirimine değil.
 IP bilinmiyorsa ya da hiçbir yerel ağa düşmüyorsa bağlı her ağa ayrı ayrı gönderilir.
 """
@@ -49,7 +49,7 @@ def _magic(mac: str) -> bytes:
 
 
 def _targets(ip: str | None) -> list[tuple[str | None, str]]:
-    """[(arabirim, yayın adresi)] — tahtanın ağı bulunursa yalnız o, yoksa bağlı her ağ."""
+    """[(arabirim, yayın adresi)] — cihazın ağı bulunursa yalnız o, yoksa bağlı her ağ."""
     nets = [(n["iface"], ipaddress.ip_network(n["cidr"])) for n in ifaces.networks()]
     if ip:
         try:
@@ -66,9 +66,9 @@ def wake(mac: str, ip: str | None) -> tuple[bool, str]:
     """Verilen MAC'e sihirli paket gönderir. (başarı, ileti) döner.
 
     mac her zaman KABLOLU kartın MAC'idir (boards.mac); kablosuz MAC (boards.wifi_mac, göç 043) kullanılmaz:
-    kapalı tahtada Wi-Fi kartı ağa bağlı değildir, Wi-Fi WoL tahtalarda genelde desteklenmez."""
+    kapalı cihazda Wi-Fi kartı ağa bağlı değildir, Wi-Fi WoL cihazlarda genelde desteklenmez."""
     if not mac:
-        return False, "Bu tahtanın kablolu MAC adresi kayıtlı değil; uyandırma gönderilemez."
+        return False, "Bu cihazın kablolu MAC adresi kayıtlı değil; uyandırma gönderilemez."
     try:
         packet = _magic(mac)
     except ValueError:

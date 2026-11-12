@@ -61,7 +61,7 @@ export \
     GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false \
     GF_NEWS_NEWS_FEED_ENABLED=false \
     GF_PLUGINS_PREINSTALL_DISABLED=true \
-    GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/ankamon/grafana/dashboards/tahta-genel-bakis.json \
+    GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/ankamon/grafana/dashboards/cihaz-genel-bakis.json \
     ANKAMON_RO_PASSWORD="$PG_READONLY_PASSWORD"
 
 # Eski ad artığı (tihamon -> ankamon): eski panolar sahipsiz provisioning temizliğiyle silinince "Tiha-Mon"

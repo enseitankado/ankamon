@@ -26,7 +26,7 @@
  */
 
 /**
- * Tahtalar ▸ Sensörler / Ahenk (sol menüde Tahtalar altında, eski "Bakım"): sekmeler — "Sensörler" (Grafana panosu, page.Metrics) ve eklenti sekmeleri (ör. "Ahenk"). Sorun
+ * Cihazlar ▸ Sensörler / Ahenk (sol menüde Cihazlar altında, eski "Bakım"): sekmeler — "Sensörler" (Grafana panosu, page.Metrics) ve eklenti sekmeleri (ör. "Ahenk"). Sorun
  * tespiti raporu (page.Diagnose) ve yardımı (page.MaintenanceHelp) "Sağlık"a taşındı (bkz. page.Anomalies);
  * eski {tab: "diagnose"|"help"} istekleri oraya yönlenir. Her sekme yalnız kendi yetkisiyle görünür (bkz. ui.Shell PAGES).
  *

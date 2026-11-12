@@ -8,7 +8,7 @@ if ! command -v nmcli >/dev/null 2>&1; then
     exit 1
 fi
 if ! nmcli -t -f TYPE dev | grep -qx wifi; then
-    echo "Bu tahtada kablosuz ağ kartı yok — yapılacak bir şey yok."
+    echo "Bu cihazda kablosuz ağ kartı yok — yapılacak bir şey yok."
     exit 0
 fi
 
@@ -64,7 +64,7 @@ kural_kur
 nmcli radio wifi off
 sleep 1
 if [ "$(nmcli radio wifi)" = "disabled" ]; then
-    echo "Wi-Fi kapatıldı: kablosuz kart artık ağ taramıyor ve tahta yeniden başlasa da kapalı kalır."
+    echo "Wi-Fi kapatıldı: kablosuz kart artık ağ taramıyor ve cihaz yeniden başlasa da kapalı kalır."
     echo "Kablolu bağlantı (ve Ankamon erişimi) etkilenmedi. Geri açmak için \"Wi-Fi'yi aç\"."
 else
     echo "Wi-Fi kapatılamadı: radyo hâlâ açık görünüyor." >&2

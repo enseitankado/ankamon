@@ -31,7 +31,7 @@ declare(strict_types=1);
 namespace Ankamon\Core;
 
 /**
- * Uzaktan işlem kataloğu: actions/<kimlik>/action.json (+ tahtada çalışacak run.sh).
+ * Uzaktan işlem kataloğu: actions/<kimlik>/action.json (+ cihazda çalışacak run.sh).
  * Aynı dizini worker da okur; yeni işlem eklemek için yeni bir alt dizin yeterlidir.
  */
 final class Actions
@@ -88,7 +88,7 @@ final class Actions
             if ($value !== '' && $type === 'select' && !in_array($value, array_column($param['options'], 'value'), true)) {
                 throw ApiError::badRequest($param['label'] . ' için geçersiz seçim.');
             }
-            // İsteğe bağlı biçim denetimi (action.json "pattern"/"pattern_error"): tahtaya gitmeden reddet.
+            // İsteğe bağlı biçim denetimi (action.json "pattern"/"pattern_error"): cihaza gitmeden reddet.
             if ($value !== '' && isset($param['pattern'])
                 && !preg_match('~' . str_replace('~', '\\~', (string) $param['pattern']) . '~u', $value)) {
                 throw ApiError::badRequest($param['label'] . ': ' . ($param['pattern_error'] ?? 'geçersiz biçim.'));

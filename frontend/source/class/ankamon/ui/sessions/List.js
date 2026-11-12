@@ -29,14 +29,14 @@
  * Oturumlar sayfasının "Oturumlar" sekmesi: tüm oturum kayıtlarının grid'i (bkz. page.Sessions —
  * veriyi sayfa çeker, setData ile verir).
  *
- * Tahtalar grid'iyle aynı desen: sütun bazlı Excel tarzı süzgeç + yerleşik tıkla-sırala
+ * Cihazlar grid'iyle aynı desen: sütun bazlı Excel tarzı süzgeç + yerleşik tıkla-sırala
  * (qx.ui.table.model.Simple varsayılan olarak sıralanabilir) + sütun genişliği/görünürlüğü
  * localStorage'da kalıcı (bkz. page.Base _createTable storageKey).
  *
  * Satır sağ menüsü: her satırda "Oturum geçmişi" (o kullanıcının zaman çizelgesi — Kullanıcılar
- * sekmesine geçer, bkz. page.Sessions.showUserHistory). Devam eden bir tahta oturumunda ayrıca
+ * sekmesine geçer, bkz. page.Sessions.showUserHistory). Devam eden bir cihaz oturumunda ayrıca
  * "Oturumu kapat" / "Oturumu kilitle" (yetki "boards.login" — bkz. ui.BoardOps.sessionAction).
- * Hedef o satırın KULLANICISIDIR (tahtadaki etkin oturum değil): kullanıcı değiştirilmiş tahtada
+ * Hedef o satırın KULLANICISIDIR (cihazdaki etkin oturum değil): kullanıcı değiştirilmiş cihazda
  * arka plandaki oturum da kapatılabilir.
  */
 qx.Class.define("ankamon.ui.sessions.List", {
@@ -66,7 +66,7 @@ qx.Class.define("ankamon.ui.sessions.List", {
     this.__columns = [
       { id: "kind", label: "Tür", width: 110 },
       { id: "username", label: "Kullanıcı adı", width: 160 },
-      { id: "board", label: "Tahta", width: 180 },
+      { id: "board", label: "Cihaz", width: 180 },
       { id: "started", label: "Oturum açma", width: 150 },
       { id: "ended", label: "Oturum kapama", width: 150 },
       { id: "duration", label: "Süre", width: 100 },
@@ -108,13 +108,13 @@ qx.Class.define("ankamon.ui.sessions.List", {
           session: s,
           cells: [
             (s.kind === "webshell" ? "w:" : "b:") + s.id,
-            s.kind === "webshell" ? "Web terminal" : "Tahta oturumu",
+            s.kind === "webshell" ? "Web terminal" : "Cihaz oturumu",
             s.username,
             s.board || s.host,
             F.dateTime(s.started_at * 1000),
             s.ended_at ? F.dateTime(s.ended_at * 1000) : "—",
             F.duration(durationSeconds) + (s.ended_at ? "" : " (devam ediyor)"),
-            // Kilitli = tahtadaki oturum açık ama ekran kilidinde (Tahtalar grid'indeki "(kilitli)" ile aynı kaynak).
+            // Kilitli = cihazdaki oturum açık ama ekran kilidinde (Cihazlar grid'indeki "(kilitli)" ile aynı kaynak).
             s.locked ? "Açık (kilitli)" : (s.end_detail || F.sessionEndReason(s.end_reason))
           ]
         };
@@ -144,7 +144,7 @@ qx.Class.define("ankamon.ui.sessions.List", {
     },
 
     /**
-     * Her satırda "Oturum geçmişi"; yalnız sürmekte olan tahta (greeter) oturumlarında ve
+     * Her satırda "Oturum geçmişi"; yalnız sürmekte olan cihaz (greeter) oturumlarında ve
      * "boards.login" yetkisiyle ayrıca oturumu kapat/kilitle.
      */
     __rowMenu(s) {

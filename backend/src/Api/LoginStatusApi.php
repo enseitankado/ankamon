@@ -34,11 +34,11 @@ use Ankamon\Core\Db;
 
 /**
  * Giriş ekranının durum satırı (frontend ui/Login.js): oturum açmadan görülür, bu yüzden YALNIZ
- * sayılar döner — tahta adı/IP'si, sorun ayrıntısı yok.
+ * sayılar döner — cihaz adı/IP'si, sorun ayrıntısı yok.
  *
- * Acil sorun: her tahtanın EN SON başarılı otomatik sorun tespiti taramasının genel düzeyi "bad"
- * olan tahta sayısı (bkz. worker executor/diagnose.py, tasks/diagnose_schedule.py). Elle yapılan
- * taramalar sayılmaz; tahta başına yalnız son otomatik sonuç önemlidir (düzelen sorun kalkar).
+ * Acil sorun: her cihazın EN SON başarılı otomatik sorun tespiti taramasının genel düzeyi "bad"
+ * olan cihaz sayısı (bkz. worker executor/diagnose.py, tasks/diagnose_schedule.py). Elle yapılan
+ * taramalar sayılmaz; cihaz başına yalnız son otomatik sonuç önemlidir (düzelen sorun kalkar).
  */
 final class LoginStatusApi
 {

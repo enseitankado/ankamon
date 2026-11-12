@@ -43,7 +43,7 @@ use Ankamon\Core\Storage;
  * indirilen de odur. Biçimler:
  *  - veritabanı satırları (loglar, sensör ölçümleri, sohbet, oturum hareketleri, ntfy): gzip'li CSV — sunucu tarafı
  *    imleçle parça parça okunup akıtılır (milyonlarca satırda da bellek sabit);
- *  - görevler ve bakım raporları: gzip'li NDJSON (satır başına bir görev: tahta sonuçları ve çıktı akışıyla);
+ *  - görevler ve bakım raporları: gzip'li NDJSON (satır başına bir görev: cihaz sonuçları ve çıktı akışıyla);
  *  - ekran görüntüleri: tar (JPEG'ler zaten sıkıştırılmış);
  *  - yedekler ve log kuyruğu: dosyalar root'a ait — storage-ops servisi indirme dosyasını hazırlar, nginx verir
  *    (X-Accel-Redirect /_exports/; bkz. docker/rootfs/services/storage-ops.sh export_files).
@@ -87,7 +87,7 @@ final class StorageExportApi
         $board = $request->query('board');
         $where = [];
         $params = [];
-        $scope = 'tum-tahtalar';
+        $scope = 'tum-cihazlar';
         if ($type === 'command') {
             if ($board === 'unmatched') {
                 $where[] = 'board_id IS NULL';
@@ -99,14 +99,14 @@ final class StorageExportApi
             }
             $sql = 'SELECT time, board_name, username, source, command, exit_code, status FROM command_log'
                 . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY time';
-            $header = ['zaman', 'tahta', 'kullanici', 'kaynak', 'komut', 'cikis_kodu', 'durum'];
+            $header = ['zaman', 'cihaz', 'kullanici', 'kaynak', 'komut', 'cikis_kodu', 'durum'];
         } else {
             if ($board === 'unmatched') {
                 $where[] = 'NOT EXISTS (SELECT 1 FROM boards b WHERE lower(b.hostname) = lower(logs.host) OR host(b.ip) = logs.from_ip)';
                 $scope = 'eslesmeyen';
             } elseif ($board !== null) {
                 $b = Db::one('SELECT hostname, host(ip) AS ip FROM boards WHERE id = ?', [(int) $board])
-                    ?? throw ApiError::notFound('Tahta bulunamadı.');
+                    ?? throw ApiError::notFound('Cihaz bulunamadı.');
                 $where[] = '(lower(host) = lower(?) OR from_ip = ?)';
                 array_push($params, (string) $b['hostname'], (string) $b['ip']);
                 $scope = self::boardSlug((int) $board);
@@ -124,7 +124,7 @@ final class StorageExportApi
         $board = $request->query('board');
         $where = '';
         $params = [];
-        $scope = 'tum-tahtalar';
+        $scope = 'tum-cihazlar';
         if ($board === 'unmatched') {
             $where = " WHERE NULLIF(t.board_id, '') IS NULL OR NOT EXISTS (SELECT 1 FROM boards b WHERE b.id::text = t.board_id)";
             $scope = 'eslesmeyen';
@@ -134,7 +134,7 @@ final class StorageExportApi
             $scope = self::boardSlug((int) $board);
         }
         $this->csv('sensor-verileri-' . $scope,
-            ['zaman', 'tahta_id', 'olcum', 'cpu', 'mode', 'device', 'mountpoint', 'fstype', 'chip', 'sensor', 'type', 'zone', 'deger'],
+            ['zaman', 'cihaz_id', 'olcum', 'cpu', 'mode', 'device', 'mountpoint', 'fstype', 'chip', 'sensor', 'type', 'zone', 'deger'],
             "SELECT m.time, t.board_id, t.name, t.cpu, t.mode, t.device, t.mountpoint, t.fstype, t.chip, t.sensor, t.type, t.zone, m.value
              FROM metrics m JOIN metrics_tag t USING (tag_id)$where ORDER BY m.time",
             $params);
@@ -193,7 +193,7 @@ final class StorageExportApi
         self::finish($gz);
     }
 
-    /** Ekran görüntüleri: all=1 ya da name=<tahta adı> — tar, içinde kayıtlı göreli yollarıyla. */
+    /** Ekran görüntüleri: all=1 ya da name=<cihaz adı> — tar, içinde kayıtlı göreli yollarıyla. */
     private function screenshots(Request $request): void
     {
         if ($request->query('all') === '1') {
@@ -355,7 +355,7 @@ final class StorageExportApi
     private static function boardSlug(int $id): string
     {
         $b = Db::one("SELECT COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name FROM boards WHERE id = ?", [$id]);
-        return self::slug($b['name'] ?? "tahta-$id");
+        return self::slug($b['name'] ?? "cihaz-$id");
     }
 
     /** Dosya adına uygun ASCII kısaltma (Türkçe harfler sadeleşir). */

@@ -23,13 +23,13 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Ekran penceresindeki hoparlör düğmesi: tahtanın çıkış sesi tarayıcıya (ws /screen/ws/audio/<tahta id>).
+"""Ekran penceresindeki hoparlör düğmesi: cihazın çıkış sesi tarayıcıya (ws /screen/ws/audio/<cihaz id>).
 
-Tahtada `parec`, oturum kullanıcısının pipewire-pulse soketinden varsayılan çıkışın izleme (monitor) kaynağını okur: ham
-PCM SSH üstünden WebSocket'e akar, tarayıcı çalar (bkz. screen/index.html Tile.setAudio). Kurulum gerekmez, tahtanın
-ses düzeyine dokunulmaz, tahtada ses kesilmez. Yalnız düğme açıkken akar (~770 kbit/sn); pencere kapanınca SSH ölür, parec biter.
+Cihazda `parec`, oturum kullanıcısının pipewire-pulse soketinden varsayılan çıkışın izleme (monitor) kaynağını okur: ham
+PCM SSH üstünden WebSocket'e akar, tarayıcı çalar (bkz. screen/index.html Tile.setAudio). Kurulum gerekmez, cihazın
+ses düzeyine dokunulmaz, cihazda ses kesilmez. Yalnız düğme açıkken akar (~770 kbit/sn); pencere kapanınca SSH ölür, parec biter.
 Yetki: /screen/ws/ ile aynı ("screen", nginx). Biçim tarayıcıyla sabit: 24 kHz, stereo, s16le.
-Kapanış kodları: 4001 tahta yok · 4002 SSH · 4003 SSH girişi reddedildi · 4008 tahtada ses sunucusu yok.
+Kapanış kodları: 4001 cihaz yok · 4002 SSH · 4003 SSH girişi reddedildi · 4008 cihazda ses sunucusu yok.
 """
 
 from __future__ import annotations

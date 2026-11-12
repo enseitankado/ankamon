@@ -38,7 +38,7 @@ use Ankamon\Core\Storage;
 
 /**
  * Görev kuyruğu kayıtlarının alanı (Disk kullanımı penceresinin "Görev kuyruğu" sekmesi) ve kalıcı
- * silme. Bir görev üç tabloda iz bırakır: jobs, job_targets (tahta başına sonuç/çıktı) ve
+ * silme. Bir görev üç tabloda iz bırakır: jobs, job_targets (cihaz başına sonuç/çıktı) ve
  * job_events (canlı çıktı zaman çizelgesi — en büyüğü); son ikisi ON DELETE CASCADE ile görevle
  * birlikte silinir. Görev başına boyut, üç tablonun gerçek toplam boyutunun satırların
  * pg_column_size ağırlığına orantılı paylaştırılmasıyla tahmin edilir (~).
@@ -73,8 +73,8 @@ final class JobStatsApi
     }
 
     /**
-     * Tarama raporlarının silinmesi. Not: otomatik tarama zamanlayıcısı tahtanın son başarılı
-     * taramasını bu kayıtlardan okur — silinen tahtalar bir sonraki uygun anda yeniden taranır.
+     * Tarama raporlarının silinmesi. Not: otomatik tarama zamanlayıcısı cihazın son başarılı
+     * taramasını bu kayıtlardan okur — silinen cihazlar bir sonraki uygun anda yeniden taranır.
      */
     public function diagnoseDelete(Request $request, array $user): array
     {
