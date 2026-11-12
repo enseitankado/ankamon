@@ -106,6 +106,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       ssh: "Uzak bağlantı (SSH ile cihazdan okundu)",
       quick: "Uzak bağlantı (SSH, anlık yoklama)",
       metric: "Uzak bağlantı (Ankamon'un topladığı sensör ölçümleri)",
+      facts: "Uzak bağlantı (SSH ile toplanan donanım bilgisi)",
       log: "Cihazın gönderdiği loglar"
     }
   },
@@ -615,7 +616,8 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       });
       // 3) Süren sürekli izleme bulguları.
       (this.__active || []).forEach(a => {
-        const source = a.source === "Log" ? SRC.log : (a.source === "Ölçüm" ? SRC.metric : (a.source || ""));
+        // Kural verisinin kaynağı (AnomaliesApi KINDS source): Log / Ölçüm / SSH verisi (daha önce SSH ile toplanan donanım bilgisi).
+        const source = { "Log": SRC.log, "Ölçüm": SRC.metric, "SSH verisi": SRC.facts }[a.source] || a.source || "";
         add(`watch:${a.id}`, 1, { board: a.board, check: a.kindLabel || a.kind, result: "Sürüyor",
           detail: a.text || "", advice: a.kindDesc || "", source, at: F.dateTime(a.started_at * 1000) },
         S.html("Sürüyor", red), esc(a.text || ""));

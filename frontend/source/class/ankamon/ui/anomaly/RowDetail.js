@@ -26,7 +26,7 @@ qx.Class.define("ankamon.ui.anomaly.RowDetail", {
       const win = ankamon.ui.Dialog.window(caption, 680, { maximizable: true });
       // Kipli kalsın (WindowDock pencereleri kipsizleştirir; bu işaretle istisna — bkz. ui.WindowDock).
       win.setUserData("ankamon.keepModal", true);
-      win.set({ modal: true, resizable: true, maxHeight: 640 });
+      win.set({ modal: true, resizable: true, height: 520 });
       const view = new qx.ui.basic.Label(html).set({ rich: true, wrap: true, selectable: true, allowGrowX: true });
       win.add(new qx.ui.container.Scroll(view).set({ minHeight: 120 }), { flex: 1 });
       const copy = new qx.ui.form.Button("Kopyala");
