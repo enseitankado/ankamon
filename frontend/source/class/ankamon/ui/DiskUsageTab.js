@@ -39,6 +39,7 @@
  *                       all?, group?, groupAll?, cells}] (cells: columns ile aynı sırada), info: durum satırı metni
  *   remove   {Function} async row => silinen kayıt sayısı
  *   onDeleted{Function?} silme bittikten sonra (ör. arkadaki log grid'ini tazelemek için)
+ *   download {Function?} row => indirme adresi (eklenti sekmeleri; çekirdek sekmeler EXPORT_MODES ile /api/storage/export)
  */
 qx.Class.define("ankamon.ui.DiskUsageTab", {
   extend: qx.ui.tabview.Page,
@@ -65,8 +66,9 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
     refresh.addListener("execute", () => this.load());
     bar.add(refresh);
     // İndir (kullanıcı isteği 2026-11-12): seçili kapsamların verisi dosya olarak — silmeyle aynı kapsam (bkz. backend
-    // StorageExportApi). Sekme tanımında mode yoksa (eklenti sekmesi vb.) düğme konmaz.
-    if (spec.mode && spec.download !== false) {
+    // StorageExportApi; EXPORT_MODES). Eklenti sekmesi kendi indirme adresini spec.download(row) → url ile verir; ikisi de
+    // yoksa düğme konmaz.
+    if (typeof spec.download === "function" || ankamon.ui.DiskUsageTab.EXPORT_MODES.includes(spec.mode)) {
       this.__downloadBtn = new qx.ui.form.Button(`${ankamon.ui.Shell.ICON.backup} Seçilenleri indir`).set({
         enabled: false, toolTipText: "Seçili satırların verisini bilgisayarınıza indirir (loglar/ölçümler gzip'li CSV, görevler NDJSON, " +
           "ekran görüntüleri tar, yedekler kendi dosyası)"
@@ -108,6 +110,9 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
   },
 
   statics: {
+    /** Çekirdek indirme uç noktasının (GET /api/storage/export?mode=…) bildiği sekmeler. */
+    EXPORT_MODES: ["system", "command", "queue", "metrics", "jobs", "diagnose", "backups", "screenshots", "chat", "movements", "ntfy"],
+
     /**
      * url'yi gizli bir iframe'de açar: sunucu dosyayı ek (attachment) olarak verirse tarayıcı indirir, sayfa değişmez.
      * Hata yanıtı (JSON) iframe'e yüklenir — okunup kullanıcıya gösterilir. iframe bir süre sonra kaldırılır.
@@ -245,7 +250,7 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
      * o grubun tek tek satırları ayrıca indirilmez (silmeyle aynı kural — bkz. __deleteMany).
      */
     __downloadable(selected) {
-      const candidates = selected.filter(r => r.scope && r.n > 0);
+      const candidates = selected.filter(r => (r.scope || typeof this.__spec.download === "function") && r.n > 0);
       const all = candidates.find(r => r.all);
       const groups = new Set(candidates.filter(r => r.groupAll).map(r => r.groupAll));
       return all ? [all] : candidates.filter(r => r.groupAll || !groups.has(r.group));
@@ -255,7 +260,8 @@ qx.Class.define("ankamon.ui.DiskUsageTab", {
     __downloadMany(selected) {
       const rows = this.__downloadable(selected);
       rows.forEach((row, i) => {
-        const url = "/api/storage/export?" + new URLSearchParams(Object.assign({ mode: this.__spec.mode }, row.scope)).toString();
+        const url = typeof this.__spec.download === "function" ? this.__spec.download(row)
+          : "/api/storage/export?" + new URLSearchParams(Object.assign({ mode: this.__spec.mode }, row.scope)).toString();
         // Tarayıcılar art arda tetiklenen indirmeleri engelleyebilir: aralıklı.
         qx.event.Timer.once(() => ankamon.ui.DiskUsageTab.download(url, row.name), this, i * 800);
       });
