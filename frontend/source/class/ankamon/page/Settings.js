@@ -125,7 +125,7 @@ qx.Class.define("ankamon.page.Settings", {
       // Eklentiler (ext/<ad>): yüklü eklentiler ve ayar şemalarını bildirenlerin formu (bkz.
       // ui.ExtensionsSettings, Core\Extensions). Kendi "Kaydet"i vardır; aşağıdaki global Kaydet'e girmez.
       const extPage = this.__page("Eklentiler");
-      extPage.add(new ankamon.ui.ExtensionsSettings(), { flex: 1 });
+      extPage.add(new ankamon.ui.ExtensionsSettings(this._user), { flex: 1 });
       tabs.add(extPage);
 
       this._rememberTab(tabs, "settings"); // sekmeler her yüklemede yeniden kurulur; son seçili geri gelir

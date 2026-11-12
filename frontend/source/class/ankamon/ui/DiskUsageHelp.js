@@ -56,7 +56,7 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
       win.open();
       ankamon.io.Api.get("/storage/policy").then(p => {
         if (!win.isDisposed()) {
-          html.setHtml(this.__render(spec.mode, p, rows || []));
+          html.setHtml(this.__render(spec, p, rows || []));
         }
       }, e => {
         if (!win.isDisposed()) {
@@ -86,7 +86,8 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
       .dh ul{margin:4px 0;padding-left:20px}
     </style>`,
 
-    __render(mode, p, rows) {
+    __render(spec, p, rows) {
+      const mode = spec.mode;
       const F = ankamon.util.Format;
       const esc = qx.bom.String.escape;
       const env = (key, def) => (p.env && p.env[key]) || def;
@@ -109,10 +110,12 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
         ? `/data diski: toplam ${F.bytes(p.disk.total)}, <b>boş ${F.bytes(p.disk.free)}</b>` : "";
       const now = all && all.bytes != null
         ? `Şu an (${esc(String(all.name).replace(/^—\s*|\s*—$/g, ""))}): <b>${F.bytes(all.bytes)}</b>` +
-          `${all.n != null ? ` (${Number(all.n).toLocaleString("tr-TR")} ${this.UNIT[mode] || "kayıt"})` : ""}` +
+          `${all.n != null ? ` (${Number(all.n).toLocaleString("tr-TR")} ${spec.unit || this.UNIT[mode] || "kayıt"})` : ""}` +
           `${all.first ? `, en eski kayıt ${F.dateTime(all.first)}` : ""}.` : "";
 
-      const T = this.__topics(mode, { env, pol, run, drop, compress, F, esc, p });
+      const ctx = { env, pol, run, drop, compress, F, esc, p };
+      // Eklenti sekmesi kendi yardımını verir (spec.help(ctx) → aynı biçim; bkz. ankamon.ext.Extensions.addDiskUsageTab).
+      const T = spec.help ? spec.help(ctx) : this.__topics(mode, ctx);
       if (!T) {
         return "<div class='dh'>Bu sekme için yardım yok.</div>";
       }
@@ -135,7 +138,9 @@ qx.Class.define("ankamon.ui.DiskUsageHelp", {
       if (T.todo) {
         h += `<h3>Yer açmak / büyümeyi sınırlamak için</h3><ul>${T.todo.map(t => `<li>${t}</li>`).join("")}</ul>`;
       }
-      h += "<p class='muted'>Süreler sunucudaki <code>.env</code> dosyasından gelir; değiştirmek için <code>.env</code> düzenlenip " +
+      // T.footer: sekmenin kendi alt notu (eklenti sekmeleri; süreleri .env'den gelmeyen veri).
+      h += T.footer !== undefined ? (T.footer ? `<p class='muted'>${T.footer}</p>` : "")
+        : "<p class='muted'>Süreler sunucudaki <code>.env</code> dosyasından gelir; değiştirmek için <code>.env</code> düzenlenip " +
         "konteyner yeniden başlatılır (arayüzden ayarlanmaz). Elle silme bu sekmedeki satırlardan yapılır ve geri alınamaz.</p>";
       return h + "</div>";
     },

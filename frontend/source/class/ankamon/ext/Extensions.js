@@ -44,7 +44,8 @@
  *    Varsayılan gizli; işlendi ise (true) görünür.
  * Kanca dışındaki eklenti noktaları: addMaintenanceTab (Bakım sekmesi), addBoardMenu (Tahtalar sağ menüsü
  * maddesi ve isteğe bağlı araç çubuğu düğmesi), addPage (sol menüde eklentinin kendi sayfası), addWifiTrustedAction
- * (Wi-Fi Monitör güvenilir listesinde işaretli kayıtlara düğme).
+ * (Wi-Fi Monitör güvenilir listesinde işaretli kayıtlara düğme), addDiskUsageTab (Sistem ▸ Disk kullanımı'nda eklentinin
+ * verisi için sekme), addSettingsTab (Ayarlar ▸ Eklentiler'de eklentinin bölümüne ayar formunun yanında ek sekme).
  *
  * Bir eklentinin durumu değişip kanca yanıtları farklılaşınca changed() çağrılır (CHANGED mesajı): kancayı
  * sürekli gösterilen bir öğe için soran çekirdek bileşenleri (ör. alt çubuk) yanıtı yeniden değerlendirir.
@@ -63,6 +64,8 @@ qx.Class.define("ankamon.ext.Extensions", {
     __pages: [],            // eklentilerin sol menü sayfaları (bkz. addPage)
     __wifiTrustedActions: [], // eklentilerin Wi-Fi Monitör güvenilir listesi düğmeleri (bkz. addWifiTrustedAction)
     __boardMenus: [],       // eklentilerin Tahtalar sağ menüsü maddeleri (bkz. addBoardMenu)
+    __diskUsageTabs: [],    // eklentilerin Disk kullanımı sekme tanımı üreticileri (bkz. addDiskUsageTab)
+    __settingsTabs: {},     // {eklenti-adı: [{key, label, create}]} Ayarlar ▸ Eklentiler ek sekmeleri (bkz. addSettingsTab)
 
     /**
      * Oturum açıldığında BİR KEZ, Shell oluşturulmadan ÖNCE (bkz. ankamon.Application): önce eklentilerin
@@ -170,6 +173,44 @@ qx.Class.define("ankamon.ext.Extensions", {
     /** @return {Array} eklentilerin güvenilir listesi düğmeleri (bkz. addWifiTrustedAction). */
     wifiTrustedActions() {
       return this.__wifiTrustedActions;
+    },
+
+    /**
+     * Bir eklenti Sistem ▸ Disk kullanımı sayfasına kendi verisi için sekme ekler (Özet dilimi ve sol ağaç alt seçeneği
+     * de kendiliğinden gelir). make() her çağrıda YENİ bir sekme tanımı döndürür — ui.DiskUsage.specs() biçiminde:
+     * {mode, label, noun, columns, size(), load(), remove(row), lastDisk(), help?(ctx), unit?} (ayrıntı: ui.DiskUsageTab,
+     * ui.DiskUsageHelp). mode çekirdek sekmelerle çakışmamalı (ör. "ext-<ad>"). init() içinde yalnız eklenti etkin ve
+     * kullanıcı yetkiliyse çağrılmalı.
+     */
+    addDiskUsageTab(make) {
+      this.__diskUsageTabs.push(make);
+    },
+
+    /** @return {Array} eklentilerin Disk kullanımı sekme tanımları (hata veren eklenti atlanır). */
+    diskUsageSpecs() {
+      return this.__diskUsageTabs.map(make => {
+        try {
+          return make() || null;
+        } catch (e) {
+          qx.log.Logger.error(this, `Eklenti disk kullanımı sekmesi kurulamadı: ${e}`);
+          return null;
+        }
+      }).filter(Boolean);
+    },
+
+    /**
+     * Ayarlar ▸ Eklentiler'de eklentinin bölümüne ek sekme: {key, label, create()} — create bir qx widget'ı döndürür
+     * (bölüm her açılışta yeniden kurulur). Ek sekmesi olan eklentinin bölümünde ilk sekme "Ayarlar" (şema formu) olur.
+     * Eklenti devre dışıyken de görünmesi istenen sekme (ör. veri yönetimi) etkinlik denetimi olmadan kaydedilebilir.
+     * @param name {String} eklentinin adı (ext/<ad>)
+     */
+    addSettingsTab(name, spec) {
+      (this.__settingsTabs[name] = this.__settingsTabs[name] || []).push(spec);
+    },
+
+    /** @return {Array} eklentinin Ayarlar ▸ Eklentiler ek sekmeleri. */
+    settingsTabs(name) {
+      return this.__settingsTabs[name] || [];
     },
 
     /** @return {Array} eklentilerin kayıtlı sayfa tanımları (bkz. addPage). */

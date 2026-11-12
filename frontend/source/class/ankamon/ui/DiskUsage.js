@@ -58,7 +58,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
         this.__chatSpec(),
         this.__scopedSpec("movements", "Oturum hareketleri", "oturum hareketi", "/storage/session-activity", "Olay sayısı"),
         this.__scopedSpec("ntfy", "ntfy bildirimleri", "bildirim kaydı", "/storage/ntfy", "Bildirim sayısı", "Kural")
-      ];
+      ].concat(ankamon.ext.Extensions.diskUsageSpecs()); // eklentilerin verisi (bkz. Extensions.addDiskUsageTab)
     },
 
     /** size(): uç noktanın "total.bytes" alanı + /data disk bilgisi (yükleme yapılmadan, Özet için). */

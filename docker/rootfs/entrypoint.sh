@@ -36,6 +36,9 @@ done
 mkdir -p /data/postgres /data/grafana /data/rsyslog /data/telegraf /data/backups /data/files /run/ankamon
 # Ekran görüntüleri: PHP (nobody) siler, nginx verir (bkz. worker executor/screenshot.py, ScreenshotsApi).
 mkdir -p /data/screenshots && chown nobody:nginx /data/screenshots && chmod 0750 /data/screenshots
+# Eklentilerin kalıcı dosyaları (ör. veri paketi yedekleri): /data/ext/<ad>/ — PHP (nobody) yazar/siler, worker (root)
+# de yazabilir (dosyayı nobody'ye devreder). Çekirdek eklentiyi adıyla bilmez; alt dizini eklenti açar.
+mkdir -p /data/ext && chown nobody:nobody /data/ext && chmod 0750 /data/ext
 # Yeniden başlatmada eski hazır bayrağı kalmasın; göçler yeniden denetlensin.
 rm -f /run/ankamon/db-ready
 
