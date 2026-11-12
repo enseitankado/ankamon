@@ -435,7 +435,7 @@ def identities(conn, device_ids: list[int]) -> dict[int, dict]:
     for r in rows:
         etap = r["etap"] or {}
         model = ""
-        if etap.get("cihaz"):
+        if etap.get("tahta"):
             # util.Format.etap ile aynı ad: model (yoksa marka) ve FATİH fazı.
             model = " · ".join(x for x in (etap.get("ad") or etap.get("marka") or "",
                                             f"Faz {etap['faz']}" if etap.get("faz") else "") if x)

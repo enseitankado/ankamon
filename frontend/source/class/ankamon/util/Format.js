@@ -86,7 +86,7 @@ qx.Class.define("ankamon.util.Format", {
       if (!info) {
         return "";
       }
-      if (!info.cihaz) {
+      if (!info.tahta) {
         return "ETAP cihazı";
       }
       const faz = info.faz ? `Faz ${info.faz}` : "Faz ?";

@@ -27,7 +27,7 @@
 cihazlar sunucunun BÜTÜN ağ bağdaştırıcılarından algılanır; cihaz olup olmadığına MAC karar verir).
 
 Cihaz MAC'i:
-  - ETAP faz veritabanında bir akıllı tahta modeline düşen önek (bkz. etap_phase — "cihaz" alanı), ya da
+  - ETAP faz veritabanında bir akıllı tahta modeline düşen önek (bkz. etap_phase — "tahta" alanı: akıllı tahta modeli mi), ya da
   - MEB cihazlarına AYRILMIŞ bir OUI'deki MAC (ulusal ETAP envanterinin üretici özeti — etap_vendors.json "ayrik",
     scripts/build-etap-vendors.py: Vestel 00:09:DF, Decenta / Shiyuan(MAINBRD) / Cultraview OPS blokları …; kullanıcı
     isteği 2026-11-10). Genel PC üreticisi OUI'lerinde (GIGABYTE OPS vb.) yalnız önek bloğu karar verir.
@@ -48,7 +48,7 @@ def is_device_mac(mac: str | None) -> bool:
     if not mac or mac == _ZERO:
         return False
     info = etap_phase.lookup(mac)
-    if info and info.get("cihaz"):
+    if info and info.get("tahta"):
         return True
     return etap_phase.dedicated_oui(mac)
 

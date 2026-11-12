@@ -337,14 +337,14 @@ def fill_device_ips(conn) -> int:
 def _etap_device(mac: str) -> bool:
     """MAC, ETAP faz veritabanında bilinen bir akıllı tahta modeline mi düşüyor (bkz. etap_phase)."""
     info = etap_phase.lookup(mac)
-    return bool(info and info["cihaz"])
+    return bool(info and info["tahta"])
 
 
 def _etap_value(info: dict | None) -> dict | None:
     """etap sütununa yazılan kararlı alt küme (önek ayrıntısı yazılmaz — her turda gereksiz değişmesin)."""
     if not info:
         return None
-    return {k: info[k] for k in ("model", "ad", "faz", "marka", "guven", "cihaz", "kaynak")}
+    return {k: info[k] for k in ("model", "ad", "faz", "marka", "guven", "tahta", "kaynak")}
 
 
 def update_etap(conn) -> int:
@@ -372,7 +372,7 @@ def update_etap(conn) -> int:
         if value != dev["etap"]:
             sets.append("etap = %s")
             args.append(Jsonb(value) if value else None)
-        if value and value["cihaz"]:
+        if value and value["tahta"]:
             if dev["type_auto"] != classify.DEVICE:
                 sets.append("type_auto = %s")
                 args.append(classify.DEVICE)
