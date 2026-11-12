@@ -77,7 +77,7 @@ final class JobsApi
         }
         unset($job['created_by_id']);
         $job['targets'] = Db::all(
-            "SELECT t.device_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS device, host(b.ip) AS ip,
+            "SELECT t.device_id, t.device_id AS board_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS device, host(b.ip) AS ip,
                     t.status, t.exit_code, t.output
              FROM job_targets t JOIN devices b ON b.id = t.device_id
              WHERE t.job_id = ? ORDER BY device",
@@ -104,12 +104,12 @@ final class JobsApi
         unset($job['created_by']);
         $after = max(0, (int) $request->query('after', '0'));
         $events = Db::all(
-            'SELECT id, device_id, kind, text, (extract(epoch FROM time) * 1000)::bigint AS t
+            'SELECT id, device_id, device_id AS board_id, kind, text, (extract(epoch FROM time) * 1000)::bigint AS t
              FROM job_events WHERE job_id = ? AND id > ? ORDER BY id LIMIT 2000',
             [$job['id'], $after]
         );
         $targets = Db::all(
-            "SELECT t.device_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS device, host(b.ip) AS ip,
+            "SELECT t.device_id, t.device_id AS board_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS device, host(b.ip) AS ip,
                     t.status, t.exit_code
              FROM job_targets t JOIN devices b ON b.id = t.device_id
              WHERE t.job_id = ? ORDER BY device",
@@ -221,7 +221,9 @@ final class JobsApi
             throw ApiError::forbidden($params['account'] . ' parolasını ayarlama yetkiniz yok.');
         }
 
-        $deviceIds = array_values(array_unique(array_map('intval', (array) $request->input('device_ids', []))));
+        // board_ids: eski ad (terim geçişi 2026-11-12) — eklentiler ve eski sekmeler.
+        $deviceIds = array_values(array_unique(array_map('intval',
+            (array) $request->input('device_ids', $request->input('board_ids', [])))));
         // Sorun tespiti sayfasının "Şimdi tara"sı cihaz seçmez: o an çevrimiçi TÜM cihazlar.
         if ($type === 'diagnose' && !$deviceIds && $request->input('all_online')) {
             $deviceIds = array_map('intval', array_column(
