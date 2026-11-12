@@ -292,13 +292,40 @@ final class JobsApi
         return [$action['feature'], $action['title'], ['action' => $action['id'], 'values' => $values], true];
     }
 
+    /**
+     * Serbest komut. İşletim sistemine göre (kullanıcı isteği 2026-11-12; platforms/README.md): "commands" aile → komut
+     * (linux/macos: bash, windows: PowerShell) — her cihaza kendi ailesinin komutu gider, komutu yazılmamış ailedeki cihaz
+     * atlanır. Eski tek "command" yalnız bash kabuklu ailelere (Linux/macOS) gider.
+     */
     private function commandJob(Request $request): array
     {
-        $command = trim((string) $request->input('command', ''));
-        if ($command === '' || strlen($command) > 4000) {
-            throw ApiError::badRequest('Komut boş ya da çok uzun.');
+        $commands = [];
+        foreach ((array) $request->input('commands', []) as $family => $text) {
+            $text = trim((string) $text);
+            if ($text === '') {
+                continue;
+            }
+            if (!in_array($family, ['linux', 'windows', 'macos'], true)) {
+                throw ApiError::badRequest('Geçersiz işletim sistemi ailesi: ' . $family);
+            }
+            if (strlen($text) > 4000) {
+                throw ApiError::badRequest('Komut çok uzun.');
+            }
+            $commands[$family] = $text;
         }
-        return ['shell', mb_strimwidth($command, 0, 80, '…'), ['command' => $command], true];
+        $command = trim((string) $request->input('command', ''));
+        if ($command === '' && !$commands) {
+            throw ApiError::badRequest('Komut boş.');
+        }
+        if (strlen($command) > 4000) {
+            throw ApiError::badRequest('Komut çok uzun.');
+        }
+        $params = $command !== '' ? ['command' => $command] : [];
+        if ($commands) {
+            $params['commands'] = $commands;
+        }
+        $title = $command !== '' ? $command : (string) reset($commands);
+        return ['shell', mb_strimwidth($title, 0, 80, '…'), $params, true];
     }
 
     /** Kullanıcı adı tahtada betiğe gömülür: worker'daki accounts.USERNAME_RE ile AYNI kural. */

@@ -103,6 +103,14 @@ qx.Class.define("ankamon.ui.BoardOps", {
         "Wi-Fi kartının kalıcı (fabrika) MAC adresi — isteğe bağlı. Tahta açıkken Ankamon karttan okuyup kendiliğinden " +
         "doldurur. Tahta Wi-Fi ile bağlıyken ağ taramasında tanınmasını sağlar; uzaktan uyandırma kablolu MAC ile yapılır.");
       form.text("exporter_port", "Sensör portu", String(board.exporter_port ?? 9100));
+      // İşletim sistemi (kullanıcı isteği 2026-11-12): sağ menü / araç çubuğu / Komut çalıştır işlevleri buna göre seçilir
+      // (platforms/README.md). Boş = kendiliğinden (SSH bilgisi, yoksa ağ taraması tahmini).
+      const P = ankamon.ui.boards.Platforms;
+      const detected = board.id ? ` — şu an: ${P.describe(Object.assign({}, board, board.os_source === "manual" ? { os_source: null } : {}))}` : "";
+      form.select("os_family", "İşletim sistemi", [{ value: "", label: "Kendiliğinden" + (board.os_source !== "manual" ? detected : "") }]
+        .concat((P.catalog().family_order || ["linux"]).map(f => ({ value: f, label: P.label(f) }))), board.os_family_manual || "")
+        .setToolTipText("Cihazın işletim sistemi ailesi: işlevler (ekran, kilit, komut, kapat…) bu sisteme göre uygulanır; " +
+          "sistemde uygulaması olmayan işlev bu cihazda devre dışı olur. Kendiliğinden: SSH ile toplanan bilgi, yoksa ağ taraması tahmini.");
       // Kayıtlı tahtada IP ve MAC'ler SALT OKUNUR (kullanıcı isteği 2026-11-11): ağ taramasından / tahtanın kendisinden
       // öğrenilir; Kaydet bunları göndermez (pencere açıkken tarayıcının güncellediği değer eskisiyle ezilmesin).
       const locked = adding ? [] : ["ip", "mac", "wifi_mac"];
@@ -954,7 +962,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
       }
       if (board.online && (can("boards") || can("screen"))) {
         const count = boards.length > 1 ? ` (${boards.length} tahta)` : "";
-        items.push(this.menuButton(ICON.info, "Bilgi kartı" + count, () => this.infoCard(boards)));
+        items.push(this.menuButton(ICON.info, "Bilgi kartı" + count, () => this.infoCard(ankamon.ui.boards.Platforms.only("Bilgi kartı", boards))));
       }
       return items;
     },
@@ -964,6 +972,12 @@ qx.Class.define("ankamon.ui.BoardOps", {
 
     menu(board, user, boards = [board], sessionOps = null) {
       const can = feature => user.is_admin || user.features.includes(feature);
+      // İşletim sistemine göre (kullanıcı isteği 2026-11-12; platforms/README.md): pencere açan maddeler yalnız işlevin
+      // uygulaması olan cihazlarla açılır (os); işi worker yapan maddelerde desteklemeyen hedefi worker "Atlandı" yazar.
+      // Maddelerin devre dışı/ipucu hâli: ui.boards.Platforms.decorate (page.Boards __rowMenu sonunda).
+      const P = ankamon.ui.boards.Platforms;
+      P.load().catch(() => {});
+      const os = (key, list) => P.only(key, list);
       const menu = new qx.ui.menu.Menu();
       // Menü simgeleri resim değil, metne eklenen Unicode karakterdir — bkz. ankamon.ui.Shell.ICON
       // başındaki not (background-image tabanlı simgeler bu derlenmiş build'de güvenilmez).
@@ -1034,7 +1048,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         const screens = sub();
         const display = sub();
         if (can("screen")) {
-          subAdd(screens, ICON.screen, "Ekranı göster" + count, () => this.screen(boards, user));
+          subAdd(screens, ICON.screen, "Ekranı göster" + count, () => this.screen(os("Ekranı göster", boards), user));
         }
         if (can("screen") && can("screen.control")) {
           // Fare/klavye ile müdahale tek tahtada anlamlı: çoklu seçimde de yalnız sağ tıklanan tahta.
@@ -1067,7 +1081,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
             : this.__job({ type: "screen_unlock", board_ids: list.map(b => b.id) }, "Ekran kilidini aç")));
         }
         if (can("cast")) {
-          display.add(this.menuButton(ICON.cast, "Ekranımı yansıt" + count, null, this.__castMenu(online)));
+          display.add(this.menuButton(ICON.cast, "Ekranımı yansıt" + count, null, this.__castMenu(os("Ekranımı yansıt", online))));
         }
         // Ekran görüntüsü: Oturumlar ▸ Zaman çizelgesi'nde işaret olarak görünür (bkz. worker executor/screenshot.py).
         if (can("screen.screenshot")) {
@@ -1076,7 +1090,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
         // Ekran aktarımı: sağ tıklanan tahtanın ekranı başka tahtalarda (bkz. ui.boards.RelayDialog, executor/relay.py).
         if (can("screen.relay")) {
-          subAdd(display, ICON.relay, "Ekranı başka bilgisayara aktar…", () => ankamon.ui.boards.RelayDialog.open(board, online, user));
+          subAdd(display, ICON.relay, "Ekranı başka bilgisayara aktar…", () => ankamon.ui.boards.RelayDialog.open(board, os("Ekranı başka bilgisayara aktar…", online), user));
           stateAdd(display, ICON.relayStop, "Ekran aktarımını durdur", online.filter(b => b.relay_source || b.relay_is_source || b.relay_source === undefined),
             list => this.__powerJob({ type: "relay_stop", board_ids: list.map(b => b.id) }, "Ekran aktarımını durdur", "relay_stop", "durdurma", user));
         }
@@ -1104,6 +1118,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         // araç çubuğunda da Yönet ▸ Web filtresi alt menüsü olarak görünür (ActionBar mirror).
         if (can("boards.webfilter")) {
           const webFilter = ankamon.ui.boards.EtaKisitWebFilter;
+          const online = os("Web filtresi", boards.filter(b => b.online));
           const filter = sub();
           subAdd(filter, ICON.webFilter, "Listedeki siteleri engelle (kara liste)…" + count, () => webFilter.open(online, boards, "denylist"));
           subAdd(filter, ICON.webFilter, "Yalnız listedeki sitelere izin ver (beyaz liste)…" + count, () => webFilter.open(online, boards, "allowlist"));
@@ -1124,7 +1139,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         const sessions = sub();
         if (can("boards.login")) {
           sessions.add(this.menuButton(ICON.sessions, "Oturum aç" + count, null,
-            this.__accountMenu(online, "açılır", (acc, label) => this.__login(online, acc, label, sessionOps))));
+            this.__accountMenu(os("Oturum aç", online), "açılır", (acc, label) => this.__login(os("Oturum aç", online), acc, label, sessionOps))));
           subAdd(sessions, ICON.logout, "Oturumu kapat" + count, () => this.sessionAction("logout", online, sessionOps));
           // Yalnız açık (ve kilitli olmayan) oturumu olan tahtalar (kullanıcı isteği 2026-11-11: oturumsuz tahtada hiçbir
           // şey yapılmasın, "bir şey yapılmadı" iletisi de çıkmasın). Oturum bilgisi gelmeyen çağıranda tahta uygun sayılır.
@@ -1148,7 +1163,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
         // Parola ayarla…: bir ya da birçok hesaba ortak parola; etapadmin/root ayrı bölümde, kendi
         // parolasıyla ve ayrı yetkiyle (bkz. setPasswords; işi hazır işlem "user-password" yapar).
         if (can("boards.passwords")) {
-          subAdd(sessions, ICON.password, "Parola ayarla…" + count, () => this.setPasswords(online, user));
+          subAdd(sessions, ICON.password, "Parola ayarla…" + count, () => this.setPasswords(os("Parola ayarla…", online), user));
         }
         // Kullanıcı sil…: hesap(lar) seçilir, dosyaları silme varsayılan açık (bkz. deleteUsers; işi
         // hazır işlem "user-delete" yapar — Komut çalıştır listesinde de var).
@@ -1157,7 +1172,7 @@ qx.Class.define("ankamon.ui.BoardOps", {
           if (can("actions")) {
             subAdd(sessions, "＋", "Kullanıcı ekle…" + count, () => this.run(online, user, "user-add"));
           }
-          subAdd(sessions, ICON.delete, "Kullanıcı sil…" + count, () => this.deleteUsers(online));
+          subAdd(sessions, ICON.delete, "Kullanıcı sil…" + count, () => this.deleteUsers(os("Kullanıcı sil…", online)));
         }
         group(ICON.sessions, "Oturumlar", sessions);
 
@@ -1171,28 +1186,28 @@ qx.Class.define("ankamon.ui.BoardOps", {
           subAdd(files, ICON.copy, "Bilgisayarlar arasında kopyala", () => ankamon.ui.files.CopyWindow.open(board, user));
           // Toplu: bu bilgisayardan seçili tahtalardaki kullanıcıların bir konumuna (varsayılan Masaüstü) ve
           // tersi; tek pencerede "Dağıt" ve "Topla" sekmeleri (bkz. ui.files.BulkWindow). Tahta seçimi değiştirilebilir.
-          subAdd(files, ICON.bulk, "Dosyaları dağıt/topla" + count, () => ankamon.ui.files.BulkWindow.open(online, user));
+          subAdd(files, ICON.bulk, "Dosyaları dağıt/topla" + count, () => ankamon.ui.files.BulkWindow.open(os("Dosyaları dağıt/topla", online), user));
         }
         if (can("boards.backup") || can("boards.restore")) {
-          files.add(this.menuButton(ICON.backup, "Yedekle/Geri al" + count, () => ankamon.ui.homebackup.Window.open(online, user)));
+          files.add(this.menuButton(ICON.backup, "Yedekle/Geri al" + count, () => ankamon.ui.homebackup.Window.open(os("Yedekle/Geri al", online), user)));
         }
         group(ICON.filemanager, "Dosyalar", files);
         // Görev yöneticisi (Windows'taki gibi; canlı SSH, pencere kapanınca biter — bkz. ui.taskmgr.Window):
         // "Dosyalar"ın hemen altında (kullanıcı isteği). Çoklu seçimde seçili çevrim içi tahtaların HEPSİ tek pencerede
         // (tahta başına ayrı pencere değil; Bilgisayar sütunu/süzgeciyle — bkz. ui.taskmgr.Window).
         if (can("taskmgr")) {
-          add(ICON.taskmgr, "Görev yöneticisi" + count, () => ankamon.ui.taskmgr.Window.open(online, user));
+          add(ICON.taskmgr, "Görev yöneticisi" + count, () => ankamon.ui.taskmgr.Window.open(os("Görev yöneticisi", online), user));
         }
         // Web sitesi aç: seçili tahtalardan oturumu açık olanlarda varsayılan tarayıcıyla, tam ekran (bkz. worker executor/open_url.py).
         if (can("screen.web")) {
-          const withSession = online.filter(b => b.session_username);
+          const withSession = os("Web sitesi aç…", online).filter(b => b.session_username);
           const webCount = withSession.length > 1 ? ` (${withSession.length} tahta)` : "";
           add(ICON.web, "Web sitesi aç…" + webCount, () => this.openWebsite(withSession));
           menu.getChildren()[menu.getChildren().length - 1].setEnabled(withSession.length > 0);
         }
         // Wi-Fi Monitör: seçili çevrim içi tahtalar tek pencerede (sınıfta telefon arama; sabit/yabancı verici) — bkz. ui.boards.WifiMonitor.
         if (can("screen")) {
-          add(ICON.wifi, "Wi-Fi Monitör" + count, () => ankamon.ui.boards.WifiMonitor.open(online, user));
+          add(ICON.wifi, "Wi-Fi Monitör" + count, () => ankamon.ui.boards.WifiMonitor.open(os("Wi-Fi Monitör", online), user));
         }
         // Sohbet: her bilgisayar için ayrı pencere; çoklu seçimde sağ tıklanan tahta (bkz. ui.chat.Window).
         if (can("boards.chat")) {
@@ -1567,12 +1582,29 @@ qx.Class.define("ankamon.ui.BoardOps", {
         }
       }
 
-      const win = ankamon.ui.Dialog.window(`Komut çalıştır — ${ids.length} tahta`, 560);
+      // İşletim sistemine göre (kullanıcı isteği 2026-11-12; platforms/README.md): üstte hedeflerin aile dağılımı; hazır
+      // işlemler desteklediği aileleri gösterir, seçili cihazların hiçbirinde betiği olmayan işlem seçilemez; serbest
+      // komutta seçimde bulunan her aile için ayrı kutu (Linux/macOS bash, Windows PowerShell) — her cihaza kendi
+      // ailesinin komutu gider (worker runner _command_for).
+      const P = ankamon.ui.boards.Platforms;
+      await P.load().catch(() => {});
+      const present = P.counts(boards).map(([f]) => f);
+      const win = ankamon.ui.Dialog.window(`Komut çalıştır — ${ids.length} tahta`, 620);
+      win.add(new qx.ui.basic.Label(`<b>Hedefler:</b> ${qx.bom.String.escape(P.summary(boards))}`)
+        .set({ rich: true, toolTipText: "Cihazların işletim sistemi ailesi: komutlar ve hazır işlemler her cihaza kendi sistemine göre gönderilir." }));
       const select = new qx.ui.form.SelectBox();
       if (canCommand) {
         select.add(new qx.ui.form.ListItem("— Serbest komut —", null, null));
       }
-      actions.forEach(a => select.add(new qx.ui.form.ListItem(`${a.category} — ${a.title}`, null, a)));
+      const famText = a => (a.platforms || ["linux"]).map(f => P.label(f)).join(", ");
+      actions.forEach(a => {
+        const usable = present.filter(f => (a.platforms || ["linux"]).includes(f));
+        const item = new qx.ui.form.ListItem(`${a.category} — ${a.title}  [${famText(a)}]`, null, a);
+        if (!usable.length) {
+          item.set({ enabled: false, toolTipText: `Seçili cihazların sisteminde (${present.map(f => P.label(f)).join(", ")}) bu işlemin uygulaması yok.` });
+        }
+        select.add(item);
+      });
       if (!select.getChildren().length) {
         ankamon.ui.Dialog.alert("Çalıştırabileceğiniz hazır işlem ya da komut izniniz yok.");
         win.close();
@@ -1593,13 +1625,28 @@ qx.Class.define("ankamon.ui.BoardOps", {
         form = null;
         commandArea = null;
         if (action === null) {
-          desc.setValue("İşaretli tahtalarda çalıştırılacak bash komutu.");
-          commandArea = new qx.ui.form.TextArea("").set({
-            font: "app-mono", height: 140, placeholder: "ör. systemctl restart prometheus-node-exporter"
+          // Aile başına komut kutusu (yalnız seçimde bulunan ve serbest komutu destekleyen aileler).
+          const shells = present.filter(f => P.supports("Hazır / Serbest komut çalıştır", f));
+          const other = present.filter(f => !shells.includes(f));
+          desc.setValue("İşaretli cihazlarda çalıştırılacak komut — her cihaza kendi işletim sisteminin kutusundaki komut gider; " +
+            "boş bırakılan sistemdeki cihazlar atlanır." + (other.length ? ` ${other.map(f => P.label(f)).join(", ")} cihazlarda serbest komut tanımlı değil.` : ""));
+          commandArea = {};
+          const hint = { linux: "ör. systemctl restart prometheus-node-exporter", windows: "ör. Get-Service | Where-Object Status -eq 'Running'",
+            macos: "ör. softwareupdate -l" };
+          shells.forEach(f => {
+            const fam = P.catalog().families[f] || {};
+            const n = P.counts(boards).find(([x]) => x === f)[1];
+            body.add(new qx.ui.basic.Label(`<b>${qx.bom.String.escape(P.label(f))}</b> — ${n} cihaz · ${fam.shell === "powershell" ? "PowerShell" : "bash"}`)
+              .set({ rich: true, marginTop: 4 }));
+            commandArea[f] = new qx.ui.form.TextArea("").set({ font: "app-mono", height: shells.length > 1 ? 90 : 140, placeholder: hint[f] || "" });
+            body.add(commandArea[f]);
           });
-          body.add(commandArea);
         } else {
-          desc.setValue(qx.bom.String.escape(action.description));
+          const usable = present.filter(f => (action.platforms || ["linux"]).includes(f));
+          const skipped = boards.filter(b => !usable.includes(P.familyOf(b)));
+          desc.setValue(qx.bom.String.escape(action.description) +
+            `<br><span style="opacity:.8">Tanımlı olduğu sistemler: ${qx.bom.String.escape(famText(action))}` +
+            (skipped.length ? ` — <b>${skipped.length} cihaz (${qx.bom.String.escape(P.summary(skipped))}) atlanır</b>` : "") + "</span>");
           if (action.params.length) {
             form = new ankamon.ui.Form();
             action.params.forEach(p => {
@@ -1639,12 +1686,18 @@ qx.Class.define("ankamon.ui.BoardOps", {
         const sel = select.getSelection()[0];
         const action = sel ? sel.getModel() : null;
         if (action === null) {
-          const command = (commandArea.getValue() || "").trim();
-          if (!command) {
+          const commands = {};
+          Object.entries(commandArea || {}).forEach(([f, area]) => {
+            const text = (area.getValue() || "").trim();
+            if (text) {
+              commands[f] = text;
+            }
+          });
+          if (!Object.keys(commands).length) {
             return;
           }
           win.close();
-          this.__job({ type: "command", command, board_ids: ids }, "Komut çıktısı");
+          this.__job({ type: "command", commands, board_ids: ids }, "Komut çıktısı");
           return;
         }
         win.close();

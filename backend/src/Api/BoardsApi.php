@@ -46,6 +46,11 @@ final class BoardsApi
     // kalıcı MAC'i (göç 043; worker oturum yoklaması/donanım bilgisi yazar, elle de girilebilir).
     private const COLUMNS = "b.id, b.hostname, b.mac::text AS mac, b.wifi_mac::text AS wifi_mac, host(b.ip) AS ip, b.label, b.location, b.notes,
         b.source, b.monitor_enabled, b.smart_board, b.exporter_port, b.online,
+        -- İşletim sistemi ailesi (göç 052 — elle > SSH bilgisi > ağ taraması; NULL = bilinmiyor) ve OS adı: sağ menü /
+        -- araç çubuğu / Komut çalıştır işlevleri buna göre seçilir (bkz. platforms/README.md).
+        device_os_family(b.id) AS os_family, device_os_source(b.id) AS os_source, b.os_family AS os_family_manual,
+        COALESCE(NULLIF(b.facts->>'os_name', ''), (SELECT d.os_guess FROM net_devices d WHERE d.mac IN (b.mac, b.wifi_mac)
+            AND COALESCE(d.os_guess, '') <> '' ORDER BY d.last_seen_at DESC NULLS LAST LIMIT 1)) AS os_name,
         b.ssh_ok, b.exporter_ok, b.facts - '{disk_layout,firmware_boot,uefi_vars}'::text[] AS facts, b.etap,
         b.session_username, b.session_locked, extract(epoch FROM b.session_checked_at)::bigint AS session_checked_at,
         -- Ekran kutucuğunda 'Oturumu açık kullanıcı yok (23 dk)': tahta açık ve taze yoklama (5 dk, no_login
@@ -320,6 +325,14 @@ final class BoardsApi
         // "Bu bir akıllı tahtadır": MAC'i tahta MAC'i olmasa da tahta sayılır (bkz. migration 046, worker boards_from_logs).
         if ($request->has('smart_board')) {
             $fields['smart_board'] = (bool) $request->input('smart_board');
+        }
+        // İşletim sistemi ailesi (elle; boş = kendiliğinden — bkz. göç 052, platforms/README.md).
+        if ($request->has('os_family')) {
+            $family = trim((string) $request->input('os_family'));
+            if ($family !== '' && !in_array($family, ['linux', 'windows', 'macos', 'other'], true)) {
+                throw ApiError::badRequest('Geçersiz işletim sistemi ailesi.');
+            }
+            $fields['os_family'] = $family === '' ? null : $family;
         }
         if ($request->has('exporter_port')) {
             $port = (int) $request->input('exporter_port');

@@ -10,6 +10,7 @@ namespace Ankamon\Api;
 
 use Ankamon\Core\Actions;
 use Ankamon\Core\Auth;
+use Ankamon\Core\Platforms;
 use Ankamon\Core\Request;
 
 final class ActionsApi
@@ -24,5 +25,11 @@ final class ActionsApi
         $allowed = array_filter(Actions::all(),
             static fn($action) => empty($action['hidden']) && Auth::can($user, $action['feature']));
         return ['actions' => array_values($allowed)];
+    }
+
+    /** İşletim sistemine göre işlev tanımı (platforms/catalog.json; bkz. ui.boards.Platforms). */
+    public function platforms(Request $request, array $user): array
+    {
+        return Platforms::catalog();
     }
 }

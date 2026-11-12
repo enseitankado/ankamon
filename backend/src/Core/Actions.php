@@ -57,6 +57,9 @@ final class Actions
                 'id' => $id, 'description' => '', 'category' => 'Diğer',
                 'feature' => 'actions', 'confirm' => false, 'params' => [],
             ];
+            // Betiği bulunan OS aileleri (run.sh / run.ps1 / run.macos.sh — bkz. platforms/README.md): Komut çalıştır'da
+            // işlemin hangi cihazlarda çalışacağı gösterilir; worker betiği hedefin ailesine göre seçer.
+            $actions[$id]['platforms'] = Platforms::actionFamilies(dirname($file));
         }
         uasort($actions, static fn($a, $b) => [$a['category'], $a['title']] <=> [$b['category'], $b['title']]);
         return $actions;

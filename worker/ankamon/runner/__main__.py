@@ -42,6 +42,7 @@ from ..executor import (accounts, backup, board_password, cast, diagnose, displa
                         tools, whoami, wol)
 from ..anomaly import scan as anomaly_scan_mod
 from ..executor.jobs import _action_dir, _board_access, _claim, _targets, _write_one, _write_results
+from .. import platforms
 from . import board_media_jobs, stream
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -105,17 +106,51 @@ def _board_conn_close(conn) -> None:
 POLL_SECONDS = 3
 
 
-def _job_text(job) -> tuple[str, dict | None, int]:
-    """Görev türüne göre tahtada çalışacak betik, ortam değişkenleri ve zaman aşımı."""
+def _command_for(params: dict, family: str) -> str | None:
+    """Serbest komutun bu aile için metni: aile başına "commands" (Komut çalıştır'da her aileye ayrı kutu), yoksa eski
+    tek "command" — yalnız bash kabuklu ailelerde (Linux/macOS); Windows'a bash komutu gönderilmez."""
+    per = params.get("commands") or {}
+    text = (per.get(family) or "").strip()
+    if text:
+        return text
+    legacy = (params.get("command") or "").strip()
+    return legacy if legacy and platforms.shell(family) == "bash" else None
+
+
+def _job_text(job, family: str = "linux") -> tuple[str, dict | None, int]:
+    """Görev türüne ve hedefin işletim sistemi ailesine göre tahtada çalışacak betik, ortam değişkenleri ve zaman aşımı
+    (kullanıcı isteği 2026-11-12: işlev adı aynı, uygulaması aileye göre — run.sh | run.ps1 | run.macos.sh)."""
     params = job["params"] or {}
     if job["type"] == "command":
-        return params["command"], None, 120
+        return _command_for(params, family) or "", None, 120
     action_dir = _action_dir(params["action"])  # çekirdek ya da eklenti (ext/<ad>/actions)
     with open(os.path.join(action_dir, "action.json"), encoding="utf-8") as f:
         timeout = int(json.load(f).get("timeout", 120))
-    with open(os.path.join(action_dir, "run.sh"), encoding="utf-8") as f:
+    path = platforms.action_script(action_dir, family)
+    if path is None:
+        raise ValueError(f"işlemin {platforms.label(family)} betiği yok")
+    with open(path, encoding="utf-8") as f:
         script = f.read()
     return script, {k: str(v) for k, v in (params.get("values") or {}).items()}, timeout
+
+
+def _platform_skip(job, family: str) -> str | None:
+    """Hedef bu ailede bu görevi çalıştıramıyorsa "Atlandı: …" metni; çalıştırabiliyorsa None."""
+    params = job["params"] or {}
+    if job["type"] == "command":
+        if not platforms.job_supported("command", family):
+            return platforms.unsupported_text("Serbest komut", family)
+        if _command_for(params, family) is None:
+            return (f"Atlandı: {platforms.label(family)} cihazları için komut yazılmadı "
+                    f"(Komut çalıştır penceresinde {platforms.label(family)} kutusu).")
+        return None
+    if job["type"] == "action":
+        try:
+            path = platforms.action_script(_action_dir(params.get("action", "")), family)
+        except OSError:
+            path = None
+        return None if path else platforms.unsupported_text(job["title"], family)
+    return None if platforms.job_supported(job["type"], family) else platforms.unsupported_text(job["title"], family)
 
 
 def _action_def(job) -> dict:
@@ -155,12 +190,35 @@ def _run_job(job) -> None:
         targets = _targets(conn, job["id"])
         names = {t["board_id"]: t["name"] for t in targets}
         general.add("info", f"Görev başladı: {job['title']} — {len(targets)} tahta")
+        # İşletim sistemine göre (kullanıcı isteği 2026-11-12; platforms/README.md): işlevin hedefin ailesinde uygulaması
+        # yoksa o hedef çalıştırılmaz, "Atlandı" yazılır; kalanlar aşağıdaki dallarda kendi ailelerine göre çalışır.
+        families = platforms.families(conn, [t["board_id"] for t in targets])
+        skipped_results: dict[int, dict] = {}
+        runnable = []
+        for t in targets:
+            text = _platform_skip(job, families[t["board_id"]])
+            if text is None:
+                runnable.append(t)
+                continue
+            ev = stream.Events(conn, job["id"], t["board_id"])
+            ev.add("info", text)
+            ev.close()
+            skipped_results[t["board_id"]] = {"status": "skipped", "rc": None, "output": text}
+            _write_one(conn, job, t["board_id"], skipped_results[t["board_id"]], names.get(t["board_id"], ""))
+        if skipped_results:
+            by_family: dict[str, int] = {}
+            for bid in skipped_results:
+                by_family[families[bid]] = by_family.get(families[bid], 0) + 1
+            general.add("info", "İşletim sistemine göre atlanan: " + ", ".join(
+                f"{n} {platforms.label(f)}" for f, n in by_family.items()) + " cihaz (bu işlevin o sistemde uygulaması yok)")
+        targets = runnable
         general.flush()
         # Komut/hazır işlemde tahtalar grup grup çalışır: sıra gelene kadar "queued" kalır, her tahta
         # kendi işi başlarken "running" olur (canlı pencerede çalışan/sırada/biten ayrımı — bkz. ui/Jobs.js).
         if job["type"] not in ("command", "action"):
-            conn.execute("UPDATE job_targets SET status = 'running', started_at = now() WHERE job_id = %s", (job["id"],))
-        results: dict[int, dict] = {}
+            conn.execute("UPDATE job_targets SET status = 'running', started_at = now() WHERE job_id = %s AND board_id = ANY(%s)",
+                         (job["id"], [t["board_id"] for t in targets]))
+        results: dict[int, dict] = dict(skipped_results)
 
         if job["type"] == "wol":
             for t in targets:
@@ -175,7 +233,9 @@ def _run_job(job) -> None:
             user, password = _board_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
-            body, env, timeout = _job_text(job)
+            # Betik/komut hedefin ailesine göre (Linux: bash run.sh, Windows: PowerShell run.ps1, macOS: bash run.macos.sh).
+            texts = {f: _job_text(job, f) for f in {families[t["board_id"]] for t in targets}}
+            env = next(iter(texts.values()))[1] if texts else None
             # SSH etkinlik kaydında (alt çubuk ▸ SSH) "password" türü parametrelerin değerleri görünmesin: komut satırında
             # export AD='değer' olarak gider; sshpass sarmalayıcısı bunları kayda yazmadan önce *** yapar.
             try:
@@ -186,7 +246,9 @@ def _run_job(job) -> None:
             # Tahtaya taşınacak dış araçlar (action.json "tools", ör. eta-112): sunucu kopyası bir kez
             # hazırlanır (günün ilk kullanımında sürüm denetimi), her tahtaya gerekirse SFTP ile gider.
             try:
-                prepared = {name: tools.ensure(name, general) for name in _action_def(job).get("tools", [])}
+                # Dış araçlar Linux ikilileridir (ör. eta-112): yalnız Linux hedef varsa hazırlanır ve yalnız onlara gider.
+                need_tools = any(families[t["board_id"]] == "linux" for t in targets)
+                prepared = {name: tools.ensure(name, general) for name in _action_def(job).get("tools", [])} if need_tools else {}
             except tools.ToolError as e:
                 raise RuntimeError(str(e)) from e
 
@@ -210,7 +272,9 @@ def _run_job(job) -> None:
                             result = {"status": "unreachable", "rc": None, "output": "Tahtanın IP adresi yok."}
                         else:
                             result = None
-                            for name, local in prepared.items():
+                            family = families[t["board_id"]]
+                            body, env, timeout = texts[family]
+                            for name, local in (prepared.items() if family == "linux" else ()):
                                 try:
                                     tools.upload(t, user, password, name, local, ev)
                                 except (tools.ToolError, OSError, subprocess.TimeoutExpired) as e:
@@ -219,7 +283,7 @@ def _run_job(job) -> None:
                                     break
                             if result is None:
                                 result = stream.run(t, user, password, body=body, env=env, timeout=timeout, events=ev,
-                                                    secrets=secrets)
+                                                    secrets=secrets, shell=platforms.shell(family) or "bash")
                                 # İşlem bitiş kancaları (eklenti-farkında): bir eklenti worker'ı bir action id
                                 # için callback kaydettiyse 'ok' bitişte çalıştırılır (ör. rapor okuyup tabloya
                                 # yazma). Çekirdek hiçbir eklentiyi adıyla bilmez (bkz. _JOB_DONE_HOOKS).

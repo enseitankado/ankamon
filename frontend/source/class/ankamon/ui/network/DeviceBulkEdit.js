@@ -98,6 +98,15 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
       const out = {};
       keys.forEach(key => {
         const field = form.getField(key);
+        if (field instanceof qx.ui.form.SelectBox) {
+          // Seçim kutusu (ör. işletim sistemi): model null = "değiştirme".
+          const item = field.getSelection()[0];
+          const model = item ? item.getModel() : null;
+          if (model !== null && model !== field.getUserData("bulkInitial")) {
+            out[key] = model;
+          }
+          return;
+        }
         const value = field instanceof qx.ui.form.CheckBox ? field.getValue() : String(field.getValue() ?? "").trim();
         if (field instanceof qx.ui.form.CheckBox ? value !== null && value !== field.getUserData("bulkInitial")
           : value !== field.getUserData("bulkInitial")) {
@@ -150,6 +159,21 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
         this.__fixed(boardForm, "mac", "Kablolu MAC", boards, b => b.mac);
         this.__fixed(boardForm, "wifi_mac", "Kablosuz MAC", boards, b => b.wifi_mac);
         this.__editable(boardForm, "exporter_port", "Sensör portu", boards, b => b.exporter_port);
+        // İşletim sistemi (kullanıcı isteği 2026-11-12; platforms/README.md): toplu seçim — ör. birkaç cihazı Windows yapmak.
+        const P = ankamon.ui.boards.Platforms;
+        const commonOs = this.__common(boards, b => b.os_family_manual || "");
+        const osBox = new qx.ui.form.SelectBox().set({ toolTipText: "İşlevler (ekran, kilit, komut, kapat…) cihazın işletim sistemine göre uygulanır" });
+        const osItems = (commonOs === undefined ? [[null, "— farklı; değiştirme —"]] : [])
+          .concat([["", "Kendiliğinden (SSH bilgisi / ağ taraması)"]], (P.catalog().family_order || ["linux"]).map(f => [f, P.label(f)]));
+        osItems.forEach(([value, label]) => {
+          const item = new qx.ui.form.ListItem(label, null, value);
+          osBox.add(item);
+          if (value === (commonOs === undefined ? null : commonOs)) {
+            osBox.setSelection([item]);
+          }
+        });
+        osBox.setUserData("bulkInitial", commonOs === undefined ? null : commonOs);
+        boardForm.addField("os_family", "İşletim sistemi", osBox);
         const monitor = this.__common(boards, b => b.monitor_enabled !== false);
         const check = new qx.ui.form.CheckBox().set({ triState: monitor === undefined, value: monitor === undefined ? null : monitor === "true" });
         check.setUserData("bulkInitial", monitor === undefined ? null : monitor === "true");
@@ -174,7 +198,7 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
         const save = new qx.ui.form.Button(`Kaydet (${count} bilgisayar)`);
         save.addListener("execute", async () => {
           const deviceChanges = deviceForm ? this.__changed(deviceForm, ["device_type", "model", "notes"]) : {};
-          const boardChanges = boardForm ? this.__changed(boardForm, ["location", "exporter_port", "monitor_enabled", "notes"]) : {};
+          const boardChanges = boardForm ? this.__changed(boardForm, ["location", "exporter_port", "os_family", "monitor_enabled", "notes"]) : {};
           if ("exporter_port" in boardChanges) {
             const port = parseInt(boardChanges.exporter_port, 10);
             if (!(port > 0 && port < 65536)) {

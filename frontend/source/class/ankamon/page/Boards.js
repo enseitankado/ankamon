@@ -75,6 +75,8 @@ qx.Class.define("ankamon.page.Boards", {
       { id: "wifi_mac", label: "Kablosuz MAC", hint: "Wi-Fi kartının kalıcı (fabrika) MAC adresi", width: 140 },
       // FATİH fazı (bkz. util.Format.etap — anakart modelinden, yoksa maskelenmiş MAC önekinden).
       { id: "faz", label: "Faz", hint: "FATİH fazı ve tahta markası", width: 130 },
+      // İşletim sistemi ailesi + adı (göç 052; kullanıcı isteği 2026-11-12): işlevler buna göre seçilir (platforms/README.md).
+      { id: "os", label: "İşletim sistemi", hint: "Cihazın işletim sistemi — sağ menü ve araç çubuğu işlevleri buna göre uygulanır (Düzenle ▸ İşletim sistemi ile değiştirilebilir)", width: 170 },
       // Anlık oturum (bkz. worker executor/session_probe.py — 30 sn'de bir SSH ile yoklanır; Oturum aç/
       // kapat/sorgula sonuçları da hemen yazar): kullanıcı adı, "(kilitli)" ya da "Oturum kapalı".
       { id: "session", label: "Oturum", width: 140 },
@@ -453,7 +455,7 @@ qx.Class.define("ankamon.page.Boards", {
             ankamon.page.Boards.statusText(board),
             ankamon.page.Boards.manageableText(board),
             board.label || board.hostname || board.ip,
-            board.hostname, board.ip, board.mac, board.wifi_mac || "", F.etap(board.etap, board.facts.cpu_model),
+            board.hostname, board.ip, board.mac, board.wifi_mac || "", F.etap(board.etap, board.facts.cpu_model), ankamon.ui.boards.Platforms.label(ankamon.ui.boards.Platforms.familyOf(board)) + (board.os_name ? " — " + board.os_name : ""),
             ankamon.page.Boards.sessionText(board),
             ankamon.page.Boards.wifiText(board),
             ankamon.page.Boards.cableText(board),
@@ -1524,7 +1526,9 @@ qx.Class.define("ankamon.page.Boards", {
         menu.add(new qx.ui.menu.Separator());
         add(ICON.add || "＋", "Tahta ekle…", () => this.__edit(null));
       }
-      return menu;
+      // İşletim sistemine göre (kullanıcı isteği 2026-11-12): seçili cihazların hiçbirinde uygulaması olmayan madde devre
+      // dışı + ipucu (araç çubuğu aynı maddeleri kullanır) — bkz. ui.boards.Platforms, platforms/README.md.
+      return ankamon.ui.boards.Platforms.decorate(menu, boards);
     },
 
     /**

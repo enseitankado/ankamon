@@ -80,7 +80,7 @@ _DIYEZ, _NOKTALI_VIRGUL, _CIFT_TIRE = "#", ";", "--"
 _C_BLOK = ("/*", " *", " */")
 _HTML_BLOK = ("<!--", "", "-->")
 _NOKTALI_VIRGUL_DOSYALAR = {"php.ini", "php-fpm.conf", "supervisord.conf"}
-_DIYEZ_UZANTILAR = {".py", ".sh", ".yml", ".yaml", ".conf", ".star", ".tsv", ".txt", ".toml", ".ini"}
+_DIYEZ_UZANTILAR = {".py", ".sh", ".yml", ".yaml", ".conf", ".star", ".tsv", ".txt", ".toml", ".ini", ".ps1"}
 _DIYEZ_ADLAR = {"Dockerfile", ".gitignore", ".dockerignore", ".gitattributes", ".env.example", "pre-push",
                 "pre-commit"}
 _TAM_BASLIK_UZANTILAR = {".py", ".php", ".js", ".sh"}

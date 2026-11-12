@@ -45,9 +45,10 @@ qx.Class.define("ankamon.ui.Jobs", {
   statics: {
     POLL_MS: 700,
 
-    STATUS_ICON: { queued: "⏳", running: "▶", ok: "✓", failed: "✕", unreachable: "⚠" },
+    // skipped: işlevin hedefin işletim sisteminde uygulaması yok (bkz. platforms/README.md) — hata değil, atlandı.
+    STATUS_ICON: { queued: "⏳", running: "▶", ok: "✓", failed: "✕", unreachable: "⚠", skipped: "⤼" },
     // Listede durum rengi ve grup sırası (çalışan → sırada → biten).
-    STATUS_COLOR: { queued: "#888", running: "#1a73e8", ok: "#2e7d32", failed: "#c5221f", unreachable: "#e37400" },
+    STATUS_COLOR: { queued: "#888", running: "#1a73e8", ok: "#2e7d32", failed: "#c5221f", unreachable: "#e37400", skipped: "#7a6f9b" },
     STATUS_RANK: { running: 0, queued: 1 },
 
     // İndirme kuyruğunda iki otomatik indirme arası en az bu kadar beklenir: tarayıcılar art arda hızlı
@@ -333,7 +334,8 @@ qx.Class.define("ankamon.ui.Jobs", {
           ? ` — <span style="color:${C.running}">${ankamon.ui.JobSpinner.html()} ${count("running")} çalışıyor</span> · ` +
             `<span style="color:${C.queued}">⏳ ${count("queued")} sırada</span> · ` +
             `<span style="color:${C.ok}">✓ ${count("ok")} başarılı</span>` +
-            (failed ? ` · <span style="color:${C.failed}">✕ ${failed} başarısız</span>` : "")
+            (failed ? ` · <span style="color:${C.failed}">✕ ${failed} başarısız</span>` : "") +
+            (count("skipped") ? ` · <span style="color:${C.skipped}" title="Bu işlevin o cihazların işletim sisteminde uygulaması yok">⤼ ${count("skipped")} atlandı (işletim sistemi)</span>` : "")
           : "";
         status.setValue(running
           ? `<b>${title}</b> — ${F.jobStatus(res.job.status)}: ${done}/${res.targets.length} tahta bitti${counts}`

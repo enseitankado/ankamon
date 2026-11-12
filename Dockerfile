@@ -157,6 +157,8 @@ COPY docker/rootfs/services /opt/ankamon/services
 COPY docker/rootfs/certs /opt/ankamon/certs
 COPY backend /opt/ankamon/app
 COPY actions /opt/ankamon/app/actions
+# İşletim sistemine göre işlev tanımı (PHP Core\Platforms ve worker ankamon/platforms.py okur — bkz. platforms/README.md).
+COPY platforms /opt/ankamon/app/platforms
 COPY worker /opt/ankamon/worker
 # Eklentilerin sunucu/worker kısımları (backend/, worker/); yoksa yalnız ext/README.md gelir.
 COPY ext /opt/ankamon/ext

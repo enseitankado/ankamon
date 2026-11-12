@@ -87,6 +87,33 @@ def _wrapper(body: str, env: dict | None) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _wrapper_powershell(body: str, env: dict | None) -> str:
+    """Windows (PowerShell) karşılığı: hazır işareti, $env: atamaları (tek tırnak kaçışıyla), betik ve çıkış kodu."""
+    lines = [f"Write-Output '{_READY}'", "$ErrorActionPreference = 'Continue'",
+             "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8"]
+    for key, value in (env or {}).items():
+        lines.append(f"$env:{key} = '" + str(value).replace("'", "''") + "'")
+    lines.append(body)
+    # Betik kendisi exit etmediyse: son yerel komutun kodu, yoksa son komutun başarısı.
+    lines.append("if ($LASTEXITCODE) { exit $LASTEXITCODE } elseif ($?) { exit 0 } else { exit 1 }")
+    return "\n".join(lines) + "\n"
+
+
+# Windows komut satırı (cmd.exe) sınırı 8191 karakter; -EncodedCommand base64(UTF-16) betiği ~2.7 katına çıkarır.
+_MAX_POWERSHELL_CMDLINE = 8000
+
+
+def remote_command(body: str, env: dict | None, shell: str = "bash") -> str:
+    """Hedefin kabuğuna göre SSH ile gönderilecek komut satırı (bkz. ankamon/platforms.py, platforms/README.md)."""
+    if shell == "powershell":
+        from .. import platforms
+        cmd = platforms.powershell_command(_wrapper_powershell(body, env))
+        if len(cmd) > _MAX_POWERSHELL_CMDLINE:
+            raise ValueError(f"PowerShell betiği Windows komut satırı için çok uzun ({len(cmd)} > {_MAX_POWERSHELL_CMDLINE} karakter).")
+        return cmd
+    return "bash -c " + shlex.quote(_wrapper(body, env))
+
+
 def _reader(pipe, kind: str, out: queue.Queue) -> None:
     for raw in iter(pipe.readline, b""):
         line = raw.decode("utf-8", errors="replace").rstrip("\n")
@@ -98,12 +125,18 @@ def _reader(pipe, kind: str, out: queue.Queue) -> None:
 
 
 def run(board: dict, user: str, password: str, *, body: str, env: dict | None, timeout: int,
-        events: Events, secrets: list | tuple = ()) -> dict:
-    """Betiği çalıştırır; olayları `events`'e yazar. Döner: {"status", "rc", "output"} (job_targets için)."""
+        events: Events, secrets: list | tuple = (), shell: str = "bash") -> dict:
+    """Betiği çalıştırır; olayları `events`'e yazar. Döner: {"status", "rc", "output"} (job_targets için).
+    shell: hedefin kabuğu — "bash" (Linux/macOS) ya da "powershell" (Windows; bkz. remote_command)."""
     target = f"{user}@{board['ip']}"
-    events.add("info", f"Bağlanılıyor: {target} …")
+    events.add("info", f"Bağlanılıyor: {target} …" + (" (PowerShell)" if shell == "powershell" else ""))
     started = time.monotonic()
-    cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, target, "bash -c " + shlex.quote(_wrapper(body, env))]
+    try:
+        remote = remote_command(body, env, shell)
+    except ValueError as e:
+        events.add("fail", str(e))
+        return {"status": "failed", "rc": None, "output": str(e)}
+    cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, target, remote]
     penv = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     if secrets:
         # SSH etkinlik kaydı bu değerleri (düz ve kabuk tırnaklı yazımlarıyla) *** yapar (bkz. ankamon-sshpass.sh).

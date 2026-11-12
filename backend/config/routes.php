@@ -173,6 +173,7 @@ return [
     ['GET',    '/api/metrics/coverage',  [Api\MetricsApi::class, 'coverage'], 'metrics'],
 
     ['GET',    '/api/actions',           [Api\ActionsApi::class, 'index'],     'user'],
+    ['GET',    '/api/platforms',         [Api\ActionsApi::class, 'platforms'], 'user'],
     ['GET',    '/api/diagnose',          [Api\DiagnoseApi::class, 'runs'],    'diagnose'],
     ['GET',    '/api/diagnose/latest',   [Api\DiagnoseApi::class, 'latest'],  'diagnose'],
     ['GET',    '/api/diagnose/{id}',     [Api\DiagnoseApi::class, 'show'],    'diagnose'],

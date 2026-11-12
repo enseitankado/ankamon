@@ -172,7 +172,12 @@ def _write_one(conn, job, board_id: int, result: dict, name: str) -> None:
            WHERE job_id = %s AND board_id = %s""",
         (result["status"], result["rc"], result["output"], job["id"], board_id))
     if job["type"] in _LOGGED_TYPES:
-        command_text = (job["params"] or {}).get("command") if job["type"] == "command" else job["title"]
+        params = job["params"] or {}
+        command_text = job["title"]
+        if job["type"] == "command":
+            # Aile başına komut (Komut çalıştır — bkz. platforms/README.md) ya da eski tek komut.
+            command_text = params.get("command") or " | ".join(
+                f"[{fam}] {text}" for fam, text in (params.get("commands") or {}).items() if text)
         conn.execute(
             """INSERT INTO command_log (board_id, board_name, username, source, command, exit_code, status)
                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
@@ -184,8 +189,13 @@ def _write_results(conn, job, results: dict[int, dict], targets: list[dict]) -> 
     genel iş özetini kapatır."""
     total = len(results)
     ok = sum(1 for r in results.values() if r["status"] == "ok")
-    status = "done" if ok == total else "failed"
-    summary = f"{ok}/{total} tahtada başarılı" if total else "Hedef tahta yok."
+    # İşletim sistemine göre atlananlar (işlevin o ailede uygulaması yok — bkz. platforms/README.md) başarısızlık sayılmaz.
+    skipped = sum(1 for r in results.values() if r["status"] == "skipped")
+    ran = total - skipped
+    status = "done" if (ran and ok == ran) or not total else "failed"
+    summary = f"{ok}/{ran} tahtada başarılı" if ran else ("Hiçbir hedefte uygulanamadı" if total else "Hedef tahta yok.")
+    if skipped:
+        summary += f" · {skipped} atlandı (işletim sistemi)"
     if job["type"] == "ntfy_test" and not total:
         summary = "Deneme bildirimi gönderildi (ntfy sunucusu kabul etti)."   # tahtasız görev: hata olsaydı failed olurdu
     conn.execute(
