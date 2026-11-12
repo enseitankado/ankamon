@@ -161,7 +161,7 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
             return [1, 2, 3, 4, 5, 6].map(() => cell("", na)).join("");
           }
           if (!loc) {
-            return `<td style="${td};opacity:.6" colspan="6">yükleniyor…</td>`;
+            return cell("yükleniyor…", "Sensörlerin sinyal ölçümleri sunucudan okunuyor; birkaç saniye içinde bu hücrelerde fiziksel cihaz, sinyal, öneri ve konum görünecek.", "opacity:.6").replace("<td ", "<td colspan=\"6\" ");
           }
           const rows = Loc.groupStats(f.kind, f.value, loc.stats);
           const addrs = Array.from(new Set([f.value.toUpperCase()].concat(rows.map(r => r.addr)))).sort();
