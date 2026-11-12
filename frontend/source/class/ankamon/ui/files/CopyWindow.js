@@ -40,25 +40,25 @@ qx.Class.define("ankamon.ui.files.CopyWindow", {
 
   statics: {
     /**
-     * @param board {Map} sağ tıklanan cihaz {id, label|hostname|ip}
+     * @param device {Map} sağ tıklanan cihaz {id, label|hostname|ip}
      * @param user {Map?} oturum sahibi (tablo sütun sırası/gizleme tercihleri için)
      */
-    async open(board, user) {
+    async open(device, user) {
       const name = b => b.label || b.hostname || b.ip || "#" + b.id;
-      let boards = [{ id: board.id, name: name(board), online: true }];
+      let devices = [{ id: device.id, name: name(device), online: true }];
       try {
-        const res = await ankamon.io.Api.get("/boards");
-        boards = res.boards.filter(b => b.online || b.id === board.id).map(b => ({ id: b.id, name: name(b) }));
+        const res = await ankamon.io.Api.get("/devices");
+        devices = res.devices.filter(b => b.online || b.id === device.id).map(b => ({ id: b.id, name: name(b) }));
       } catch (e) {
-        // Cihaz listesi okunamadı (ör. "boards" yetkisi yok): yalnız bu cihaz arasında kopyalanır.
+        // Cihaz listesi okunamadı (ör. "devices" yetkisi yok): yalnız bu cihaz arasında kopyalanır.
       }
-      const win = new ankamon.ui.files.CopyWindow(boards, board.id, user);
+      const win = new ankamon.ui.files.CopyWindow(devices, device.id, user);
       qx.core.Init.getApplication().getRoot().add(win);
       win.open();
     }
   },
 
-  construct(boards, sourceId, user) {
+  construct(devices, sourceId, user) {
     super("Bilgisayarlar arasında kopyala");
     const root = qx.core.Init.getApplication().getRoot();
     const bounds = root.getBounds() || { width: 1280, height: 760 };
@@ -69,9 +69,9 @@ qx.Class.define("ankamon.ui.files.CopyWindow", {
       height: Math.min(820, bounds.height - 30)
     });
     // Hedef: kaynaktan farklı ilk cihaz (yoksa aynı cihaz — cihaz içinde dizinler arası kopyalama).
-    const other = boards.find(b => b.id !== sourceId) || boards[0];
-    this.__left = new ankamon.ui.files.Pane("Kaynak", boards, sourceId, "/home", user);
-    this.__right = new ankamon.ui.files.Pane("Hedef", boards, other.id, "/home", user);
+    const other = devices.find(b => b.id !== sourceId) || devices[0];
+    this.__left = new ankamon.ui.files.Pane("Kaynak", devices, sourceId, "/home", user);
+    this.__right = new ankamon.ui.files.Pane("Hedef", devices, other.id, "/home", user);
 
     const middle = new qx.ui.container.Composite(new qx.ui.layout.VBox(8).set({ alignY: "middle" }));
     this.__toRight = new qx.ui.form.Button("Kopyala →").set({ toolTipText: "Soldaki seçili öğeleri sağdaki dizine kopyalar" });
@@ -156,8 +156,8 @@ qx.Class.define("ankamon.ui.files.CopyWindow", {
       }
       try {
         const res = await ankamon.ui.files.Api.post("/copy", {
-          src_board: from.getBoardId(), src_dir: from.getPath(), names,
-          dst_board: to.getBoardId(), dst_dir: to.getPath()
+          src_device: from.getDeviceId(), src_dir: from.getPath(), names,
+          dst_device: to.getDeviceId(), dst_dir: to.getPath()
         });
         this.__jobId = res.id;
         this.__target = to;
@@ -169,7 +169,7 @@ qx.Class.define("ankamon.ui.files.CopyWindow", {
       this.__cancel.setEnabled(true);
       this.__bar.setValue(0);
       this.__progressText.setValue(
-        `${esc(from.getBoardName())}:${esc(from.getPath())} → ${esc(to.getBoardName())}:${esc(to.getPath())} — başlıyor…`);
+        `${esc(from.getDeviceName())}:${esc(from.getPath())} → ${esc(to.getDeviceName())}:${esc(to.getPath())} — başlıyor…`);
       this.__updateButtons();
       this.__timer = new qx.event.Timer(500);
       this.__timer.addListener("interval", this.__poll, this);

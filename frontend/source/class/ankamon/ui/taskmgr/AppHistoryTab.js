@@ -101,10 +101,10 @@ qx.Class.define("ankamon.ui.taskmgr.AppHistoryTab", {
             add(p.name, [p.pid], p.user);
           }
         });
-        const whole = this._win.boardMatches(link, q);
-        const board = link.getDisplay();
+        const whole = this._win.deviceMatches(link, q);
+        const device = link.getDisplay();
         [...groups.entries()].filter(([name]) => whole || !q || name.toLowerCase().includes(q))
-          .forEach(([name, g]) => rows.push([this._rowId(link, name), name, F.cpuTime(g.ticks / hz), g.net, g.procs, g.user || "", board, g.ticks]));
+          .forEach(([name, g]) => rows.push([this._rowId(link, name), name, F.cpuTime(g.ticks / hz), g.net, g.procs, g.user || "", device, g.ticks]));
       });
       // CPU süresine göre azalan (cihazlar arası da); sıralama anahtarı satırın sonundaki gizli tik sayısı, tabloya girmez.
       rows.sort((a, b) => b[b.length - 1] - a[a.length - 1]);

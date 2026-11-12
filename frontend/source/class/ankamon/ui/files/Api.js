@@ -78,8 +78,8 @@ qx.Class.define("ankamon.ui.files.Api", {
       return `${text} (HTTP ${status})`;
     },
 
-    list(board, path) {
-      return this.request("GET", "/list?" + new URLSearchParams({ board, path }).toString());
+    list(device, path) {
+      return this.request("GET", "/list?" + new URLSearchParams({ device, path }).toString());
     },
 
     post(path, body) {

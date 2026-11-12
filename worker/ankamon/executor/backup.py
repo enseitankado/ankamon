@@ -177,7 +177,7 @@ def _safe(text: str) -> str:
     return re.sub(r"[^A-Za-z0-9._]+", "-", text or "").strip("-")[:60] or "cihaz"
 
 
-def backup(board: dict, user: str, password: str, username: str, job_id: int, events, part: tuple = (0, 1)) -> dict:
+def backup(device: dict, user: str, password: str, username: str, job_id: int, events, part: tuple = (0, 1)) -> dict:
     """Yedekler; olayları `events`'e yazar ("info"/"err"/"ok"/"fail" satırları + ilerleme çubuğu için
     "progress" ve indirilecek dosya için "file" — ikisi de JSON metinli, bkz. frontend ui/Jobs.js).
     part: (sıra, toplam) — cihazda birden çok hesap yedeklenirken çubuk cihazın toplamını göstersin.
@@ -188,17 +188,17 @@ def backup(board: dict, user: str, password: str, username: str, job_id: int, ev
     if not USERNAME_RE.match(username or ""):
         events.add("fail", f"Geçersiz kullanıcı adı: {username}")
         return {"status": "failed", "rc": None, "output": "Geçersiz kullanıcı adı."}
-    if not board.get("ip"):
+    if not device.get("ip"):
         events.add("fail", "Cihazın IP adresi yok.")
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
 
     out_dir = job_dir(job_id)
     os.makedirs(out_dir, mode=0o755, exist_ok=True)
     os.chmod(BASE_DIR, 0o755)
-    name = f"{_safe(board.get('name') or board.get('hostname') or '')}_{username}_{time.strftime('%Y%m%d-%H%M')}.tar.gz"
+    name = f"{_safe(device.get('name') or device.get('hostname') or '')}_{username}_{time.strftime('%Y%m%d-%H%M')}.tar.gz"
     path = os.path.join(out_dir, name)
 
-    target = f"{user}@{board['ip']}"
+    target = f"{user}@{device['ip']}"
     events.add("info", f"Bağlanılıyor: {target} — {username} hesabının ev dizini yedeklenecek")
     script = _SCRIPT.format(user=username, checkpoint=CHECKPOINT, meta=HOME_BACKUP_META, meta_py=_META_PY)
     started = time.monotonic()

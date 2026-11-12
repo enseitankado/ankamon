@@ -53,36 +53,36 @@ final class MetricStatsApi
     public function stats(Request $request): array
     {
         $layers = $this->layers();
-        $boards = [];
-        foreach (Db::all("SELECT id::text AS id, COALESCE(NULLIF(label,''), hostname, host(ip)) AS name FROM boards") as $b) {
-            $boards[$b['id']] = $b['name'];
+        $devices = [];
+        foreach (Db::all("SELECT id::text AS id, COALESCE(NULLIF(label,''), hostname, host(ip)) AS name FROM devices") as $b) {
+            $devices[$b['id']] = $b['name'];
         }
 
         $rows = [];
         $unmatched = self::emptyRow(null, '');
         $total = self::emptyRow(null, '');
-        $add = function (?string $boardId, string $field, array $g) use (&$rows, &$unmatched, &$total, $boards) {
-            if ($boardId !== null && $boardId !== '' && isset($boards[$boardId])) {
-                $rows[$boardId] ??= self::emptyRow((int) $boardId, (string) $boards[$boardId]);
-                self::foldMetricBoardBucket($rows[$boardId], $field, $g);
+        $add = function (?string $deviceId, string $field, array $g) use (&$rows, &$unmatched, &$total, $devices) {
+            if ($deviceId !== null && $deviceId !== '' && isset($devices[$deviceId])) {
+                $rows[$deviceId] ??= self::emptyRow((int) $deviceId, (string) $devices[$deviceId]);
+                self::foldMetricDeviceBucket($rows[$deviceId], $field, $g);
             } else {
-                self::foldMetricBoardBucket($unmatched, $field, $g);
+                self::foldMetricDeviceBucket($unmatched, $field, $g);
             }
-            self::foldMetricBoardBucket($total, $field, $g);
+            self::foldMetricDeviceBucket($total, $field, $g);
         };
 
-        foreach (Db::all('SELECT board_id, count(*) AS n FROM metrics_tag GROUP BY board_id') as $g) {
-            $add($g['board_id'], 'series', $g);
+        foreach (Db::all('SELECT device_id, count(*) AS n FROM metrics_tag GROUP BY device_id') as $g) {
+            $add($g['device_id'], 'series', $g);
         }
         foreach ($layers as $field => $table) {
             $groups = Db::all(
-                "SELECT t.board_id, count(*) AS n,
+                "SELECT t.device_id, count(*) AS n,
                         (extract(epoch FROM min(m.time)) * 1000)::bigint AS first,
                         (extract(epoch FROM max(m.time)) * 1000)::bigint AS last
-                 FROM $table m JOIN metrics_tag t USING (tag_id) GROUP BY t.board_id"
+                 FROM $table m JOIN metrics_tag t USING (tag_id) GROUP BY t.device_id"
             );
             foreach ($groups as $g) {
-                $add($g['board_id'], $field, $g);
+                $add($g['device_id'], $field, $g);
             }
         }
 
@@ -100,7 +100,7 @@ final class MetricStatsApi
         usort($rows, fn($a, $b) => strcasecmp($a['name'], $b['name']));
         $hasUnmatched = $unmatched['series'] + $unmatched['raw'] + $unmatched['m5'] + $unmatched['h1'] > 0;
         return [
-            'boards' => array_map($estimate, $rows),
+            'devices' => array_map($estimate, $rows),
             'unmatched' => $hasUnmatched ? $estimate($unmatched) : null,
             'total' => self::metricStatsRowShape($total) + ['bytes' => array_sum($bytes)],
             'disk' => Storage::diskSpace(),
@@ -108,24 +108,24 @@ final class MetricStatsApi
     }
 
     /**
-     * Kalıcı silme: board (cihaz id'si, "unmatched" — cihaza bağlanamayan seriler — ya da boş:
+     * Kalıcı silme: device (cihaz id'si, "unmatched" — cihaza bağlanamayan seriler — ya da boş:
      * TÜM sensör verisi). Ham ölçümler + 5 dk/1 sa özetleri birlikte silinir. Geri alınamaz;
      * audit_log'a yazılır.
      */
     public function delete(Request $request, array $user): array
     {
-        $board = $request->query('board');
+        $device = $request->query('device');
         $where = '';
         $params = [];
-        if ($board !== null) {
-            $tagSql = $board === 'unmatched'
-                ? "SELECT tag_id FROM metrics_tag t WHERE NULLIF(t.board_id, '') IS NULL
-                     OR NOT EXISTS (SELECT 1 FROM boards b WHERE b.id::text = t.board_id)"
-                : 'SELECT tag_id FROM metrics_tag WHERE board_id = ?';
-            if ($board !== 'unmatched' && !Db::value('SELECT 1 FROM boards WHERE id = ?', [(int) $board])) {
+        if ($device !== null) {
+            $tagSql = $device === 'unmatched'
+                ? "SELECT tag_id FROM metrics_tag t WHERE NULLIF(t.device_id, '') IS NULL
+                     OR NOT EXISTS (SELECT 1 FROM devices b WHERE b.id::text = t.device_id)"
+                : 'SELECT tag_id FROM metrics_tag WHERE device_id = ?';
+            if ($device !== 'unmatched' && !Db::value('SELECT 1 FROM devices WHERE id = ?', [(int) $device])) {
                 throw ApiError::notFound('Cihaz bulunamadı.');
             }
-            $tags = array_column(Db::all($tagSql, $board === 'unmatched' ? [] : [(string) (int) $board]), 'tag_id');
+            $tags = array_column(Db::all($tagSql, $device === 'unmatched' ? [] : [(string) (int) $device]), 'tag_id');
             if (!$tags) {
                 return ['ok' => true, 'deleted' => 0];
             }
@@ -140,7 +140,7 @@ final class MetricStatsApi
             array_values($this->layers())
         ));
         $deleted = array_sum($counts);
-        Audit::log($user, $request, 'metrics.delete', (string) ($board ?? 'all'), [
+        Audit::log($user, $request, 'metrics.delete', (string) ($device ?? 'all'), [
             'raw' => $counts[0], 'aggregates' => $deleted - $counts[0],
         ]);
         return ['ok' => true, 'deleted' => $deleted];
@@ -164,10 +164,10 @@ final class MetricStatsApi
 
     private static function emptyRow(?int $id, string $name): array
     {
-        return ['board_id' => $id, 'name' => $name, 'series' => 0, 'raw' => 0, 'm5' => 0, 'h1' => 0, 'first' => null, 'last' => null];
+        return ['device_id' => $id, 'name' => $name, 'series' => 0, 'raw' => 0, 'm5' => 0, 'h1' => 0, 'first' => null, 'last' => null];
     }
 
-    private static function foldMetricBoardBucket(array &$acc, string $field, array $g): void
+    private static function foldMetricDeviceBucket(array &$acc, string $field, array $g): void
     {
         $acc[$field] += (int) $g['n'];
         if (isset($g['first']) && ($acc['first'] === null || $g['first'] < $acc['first'])) {
@@ -182,7 +182,7 @@ final class MetricStatsApi
     private static function metricStatsRowShape(array $row): array
     {
         return [
-            'board_id' => $row['board_id'], 'name' => $row['name'], 'series' => $row['series'],
+            'device_id' => $row['device_id'], 'name' => $row['name'], 'series' => $row['series'],
             'n' => $row['raw'], 'agg' => $row['m5'] + $row['h1'],
             'first' => $row['first'] !== null ? (int) $row['first'] : null,
             'last' => $row['last'] !== null ? (int) $row['last'] : null,

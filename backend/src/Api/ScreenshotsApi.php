@@ -47,7 +47,7 @@ final class ScreenshotsApi
     public function index(Request $request): array
     {
         return ['screenshots' => Db::all(
-            "SELECT id, board_id, board_name, session_username, taken_by, bytes,
+            "SELECT id, device_id, device_name, session_username, taken_by, bytes,
                     extract(epoch FROM taken_at)::bigint AS taken_at
              FROM screenshots ORDER BY taken_at DESC LIMIT 5000"
         )];
@@ -68,29 +68,29 @@ final class ScreenshotsApi
     public function deleteOne(Request $request, array $user): array
     {
         $id = $request->arg('id');
-        $row = Db::one('SELECT board_name, file FROM screenshots WHERE id = ?', [$id]) ?? throw ApiError::notFound();
+        $row = Db::one('SELECT device_name, file FROM screenshots WHERE id = ?', [$id]) ?? throw ApiError::notFound();
         @unlink(self::BASE_DIR . '/' . $row['file']);
         Db::exec('DELETE FROM screenshots WHERE id = ?', [$id]);
-        Audit::log($user, $request, 'screenshots.delete', $row['board_name'], ['id' => $id]);
+        Audit::log($user, $request, 'screenshots.delete', $row['device_name'], ['id' => $id]);
         return ['ok' => true, 'deleted' => 1];
     }
 
     /** Disk kullanımı: cihaz (ad) başına adet, ilk/son ve gerçek dosya boyutu. */
     public function stats(Request $request): array
     {
-        $boards = Db::all(
-            "SELECT board_id, board_name AS name, count(*) AS n, coalesce(sum(bytes), 0) AS bytes,
+        $devices = Db::all(
+            "SELECT device_id, device_name AS name, count(*) AS n, coalesce(sum(bytes), 0) AS bytes,
                     (extract(epoch FROM min(taken_at)) * 1000)::bigint AS first,
                     (extract(epoch FROM max(taken_at)) * 1000)::bigint AS last
-             FROM screenshots GROUP BY board_id, board_name ORDER BY bytes DESC"
+             FROM screenshots GROUP BY device_id, device_name ORDER BY bytes DESC"
         );
         return [
-            'boards' => $boards,
+            'devices' => $devices,
             'total' => [
-                'n' => array_sum(array_column($boards, 'n')),
-                'bytes' => array_sum(array_column($boards, 'bytes')),
-                'first' => $boards ? min(array_column($boards, 'first')) : null,
-                'last' => $boards ? max(array_column($boards, 'last')) : null,
+                'n' => array_sum(array_column($devices, 'n')),
+                'bytes' => array_sum(array_column($devices, 'bytes')),
+                'first' => $devices ? min(array_column($devices, 'first')) : null,
+                'last' => $devices ? max(array_column($devices, 'last')) : null,
             ],
             'dir' => self::BASE_DIR,
             'disk' => Storage::diskSpace(),
@@ -108,7 +108,7 @@ final class ScreenshotsApi
             if ($scope === '') {
                 throw ApiError::badRequest('Silinecek kapsam seçilmedi.');
             }
-            $rows = Db::all('SELECT id, file FROM screenshots WHERE board_name = ?', [$scope]);
+            $rows = Db::all('SELECT id, file FROM screenshots WHERE device_name = ?', [$scope]);
         }
         foreach ($rows as $row) {
             @unlink(self::BASE_DIR . '/' . $row['file']);

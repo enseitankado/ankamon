@@ -38,12 +38,12 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .. import activity, db
-from ..executor import (accounts, backup, board_password, cast, diagnose, display, home_restore, hwfacts, screenlock, session_probe,
+from ..executor import (accounts, backup, device_password, cast, diagnose, display, home_restore, hwfacts, screenlock, session_probe,
                         tools, whoami, wol)
 from ..anomaly import scan as anomaly_scan_mod
-from ..executor.jobs import _action_dir, _board_access, _claim, _targets, _write_one, _write_results
+from ..executor.jobs import _action_dir, _device_access, _claim, _targets, _write_one, _write_results
 from .. import platforms
-from . import board_media_jobs, stream
+from . import device_media_jobs, stream
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("ankamon.runner")
@@ -51,8 +51,8 @@ log = logging.getLogger("ankamon.runner")
 
 def _load_job_done_hooks() -> tuple[dict, dict]:
     """Eklentilerin iş-bitiş kancaları: ext/<ad>/worker/job_hooks.py içindeki
-    JOB_DONE = {action_id: fn}: fn(conn, board, user, password, job_id, events) — ilgili işlem 'ok' bitince;
-    JOB_FINISHED = {action_id: fn}: fn(conn, board, user, password, job_id, events, result) — betik cihazda
+    JOB_DONE = {action_id: fn}: fn(conn, device, user, password, job_id, events) — ilgili işlem 'ok' bitince;
+    JOB_FINISHED = {action_id: fn}: fn(conn, device, user, password, job_id, events, result) — betik cihazda
     çalışıp bittiğinde ('ok' ya da 'failed'; bağlanılamayan cihazda çağrılmaz). Cihazdaki aracın kendi çıkış
     kodunu taşıyan işlemler başarısızlıkta da sonuç dosyasını okuyabilsin diye. Çekirdek hiçbir eklentiyi
     adıyla bilmez; bir action id için kayıtlı callback varsa çalıştırır (ör. rapor okuyup yazma).
@@ -80,29 +80,34 @@ def _load_job_done_hooks() -> tuple[dict, dict]:
 
 _JOB_DONE_HOOKS, _JOB_FINISHED_HOOKS = _load_job_done_hooks()
 
+
+def _legacy_target(t: dict) -> dict:
+    """Eklenti kancalarına giden hedef: eski anahtar adları da (board_id/board_name — terim geçişi 2026-11-12)."""
+    return {**t, "board_id": t.get("device_id"), "board_name": t.get("device_name", t.get("name"))}
+
 JOB_THREADS = int(os.environ.get("RUNNER_JOB_THREADS", "8"))  # aynı anda çalışan görev
 # Cihaz iş parçacıklarının (her biri kendi bağlantısı, SSH süresince tutar) TÜM görevler toplamında aynı anda
 # tutabileceği veritabanı bağlantısı. Paralellik görev başına yüke göre 20'ye çıkar, görevler de 8'e kadar eşzamanlı:
 # kotasız, açık cihazlarla 5 toplu işte tepe 89/100 ölçüldü (2026-11-05). Kota dolunca sıradaki cihaz bekler.
 # Bütçe: 40 + görevlerin kendi bağlantıları (~16) + diğer servisler (~14) + PHP-FPM (12) < max_connections 100.
-BOARD_DB_SLOTS = int(os.environ.get("RUNNER_BOARD_DB_SLOTS", "40"))
-_board_db_slots = threading.BoundedSemaphore(BOARD_DB_SLOTS)
+DEVICE_DB_SLOTS = int(os.environ.get("RUNNER_DEVICE_DB_SLOTS", "40"))
+_device_db_slots = threading.BoundedSemaphore(DEVICE_DB_SLOTS)
 
 
-def _board_conn():
-    _board_db_slots.acquire()
+def _device_conn():
+    _device_db_slots.acquire()
     try:
         return db.connect()
     except BaseException:
-        _board_db_slots.release()
+        _device_db_slots.release()
         raise
 
 
-def _board_conn_close(conn) -> None:
+def _device_conn_close(conn) -> None:
     try:
         conn.close()
     finally:
-        _board_db_slots.release()
+        _device_db_slots.release()
 POLL_SECONDS = 3
 
 
@@ -175,10 +180,10 @@ def _scrub_secrets(conn, job) -> None:
             (key, job["id"], key))
 
 
-def _board_event(conn, job_id: int, board_id: int, kind: str, text: str) -> None:
+def _device_event(conn, job_id: int, device_id: int, kind: str, text: str) -> None:
     """Paralel çalışan dallarda (whoami/login/logout) canlı pencereye cihaz başına satır yazar —
     yoksa bu görevlerin penceresi boş kalıyordu (kullanıcı bildirdi). Ana iş parçacığında çağrılır."""
-    ev = stream.Events(conn, job_id, board_id)
+    ev = stream.Events(conn, job_id, device_id)
     ev.add(kind, text)
     ev.close()
 
@@ -188,23 +193,23 @@ def _run_job(job) -> None:
     general = stream.Events(conn, job["id"], None)
     try:
         targets = _targets(conn, job["id"])
-        names = {t["board_id"]: t["name"] for t in targets}
+        names = {t["device_id"]: t["name"] for t in targets}
         general.add("info", f"Görev başladı: {job['title']} — {len(targets)} cihaz")
         # İşletim sistemine göre (kullanıcı isteği 2026-11-12; platforms/README.md): işlevin hedefin ailesinde uygulaması
         # yoksa o hedef çalıştırılmaz, "Atlandı" yazılır; kalanlar aşağıdaki dallarda kendi ailelerine göre çalışır.
-        families = platforms.families(conn, [t["board_id"] for t in targets])
+        families = platforms.families(conn, [t["device_id"] for t in targets])
         skipped_results: dict[int, dict] = {}
         runnable = []
         for t in targets:
-            text = _platform_skip(job, families[t["board_id"]])
+            text = _platform_skip(job, families[t["device_id"]])
             if text is None:
                 runnable.append(t)
                 continue
-            ev = stream.Events(conn, job["id"], t["board_id"])
+            ev = stream.Events(conn, job["id"], t["device_id"])
             ev.add("info", text)
             ev.close()
-            skipped_results[t["board_id"]] = {"status": "skipped", "rc": None, "output": text}
-            _write_one(conn, job, t["board_id"], skipped_results[t["board_id"]], names.get(t["board_id"], ""))
+            skipped_results[t["device_id"]] = {"status": "skipped", "rc": None, "output": text}
+            _write_one(conn, job, t["device_id"], skipped_results[t["device_id"]], names.get(t["device_id"], ""))
         if skipped_results:
             by_family: dict[str, int] = {}
             for bid in skipped_results:
@@ -216,25 +221,25 @@ def _run_job(job) -> None:
         # Komut/hazır işlemde cihazlar grup grup çalışır: sıra gelene kadar "queued" kalır, her cihaz
         # kendi işi başlarken "running" olur (canlı pencerede çalışan/sırada/biten ayrımı — bkz. ui/Jobs.js).
         if job["type"] not in ("command", "action"):
-            conn.execute("UPDATE job_targets SET status = 'running', started_at = now() WHERE job_id = %s AND board_id = ANY(%s)",
-                         (job["id"], [t["board_id"] for t in targets]))
+            conn.execute("UPDATE job_targets SET status = 'running', started_at = now() WHERE job_id = %s AND device_id = ANY(%s)",
+                         (job["id"], [t["device_id"] for t in targets]))
         results: dict[int, dict] = dict(skipped_results)
 
         if job["type"] == "wol":
             for t in targets:
-                ev = stream.Events(conn, job["id"], t["board_id"])
+                ev = stream.Events(conn, job["id"], t["device_id"])
                 ev.add("info", f"Uyandırma paketi gönderiliyor: MAC {t['mac'] or '—'}")
                 ok, msg = wol.wake(t["mac"], t["ip"])
                 ev.add("ok" if ok else "fail", msg)
                 ev.close()
-                results[t["board_id"]] = {"status": "ok" if ok else "failed", "rc": 0 if ok else None, "output": msg}
-                _write_one(conn, job, t["board_id"], results[t["board_id"]], names.get(t["board_id"], ""))
+                results[t["device_id"]] = {"status": "ok" if ok else "failed", "rc": 0 if ok else None, "output": msg}
+                _write_one(conn, job, t["device_id"], results[t["device_id"]], names.get(t["device_id"], ""))
         elif job["type"] in ("command", "action"):
-            user, password = _board_access(conn)
+            user, password = _device_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
             # Betik/komut hedefin ailesine göre (Linux: bash run.sh, Windows: PowerShell run.ps1, macOS: bash run.macos.sh).
-            texts = {f: _job_text(job, f) for f in {families[t["board_id"]] for t in targets}}
+            texts = {f: _job_text(job, f) for f in {families[t["device_id"]] for t in targets}}
             env = next(iter(texts.values()))[1] if texts else None
             # SSH etkinlik kaydında (alt çubuk ▸ SSH) "password" türü parametrelerin değerleri görünmesin: komut satırında
             # export AD='değer' olarak gider; sshpass sarmalayıcısı bunları kayda yazmadan önce *** yapar.
@@ -247,7 +252,7 @@ def _run_job(job) -> None:
             # hazırlanır (günün ilk kullanımında sürüm denetimi), her cihaza gerekirse SFTP ile gider.
             try:
                 # Dış araçlar Linux ikilileridir (ör. eta-112): yalnız Linux hedef varsa hazırlanır ve yalnız onlara gider.
-                need_tools = any(families[t["board_id"]] == "linux" for t in targets)
+                need_tools = any(families[t["device_id"]] == "linux" for t in targets)
                 prepared = {name: tools.ensure(name, general) for name in _action_def(job).get("tools", [])} if need_tools else {}
             except tools.ToolError as e:
                 raise RuntimeError(str(e)) from e
@@ -257,22 +262,22 @@ def _run_job(job) -> None:
             # biten cihazın yerine sıradaki başlar. Her iş parçacığı KENDİ veritabanı bağlantısını açar:
             # tek bağlantının iş parçacıkları arasında paylaşılması güvenli değildi (eskiden bu yüzden
             # sıralıydı — birden fazla cihazda yalnız biri tamamlanıyordu). Çıktı cihaz başına ayrı tutulur
-            # (job_events.board_id), pencerede cihaz seçilerek okunur.
+            # (job_events.device_id), pencerede cihaz seçilerek okunur.
             action = (job["params"] or {}).get("action") if job["type"] == "action" else None
 
             def work(t):
-                wconn = _board_conn()
+                wconn = _device_conn()
                 try:
-                    wconn.execute("UPDATE job_targets SET status = 'running', started_at = now() WHERE job_id = %s AND board_id = %s",
-                                  (job["id"], t["board_id"]))
-                    ev = stream.Events(wconn, job["id"], t["board_id"])
+                    wconn.execute("UPDATE job_targets SET status = 'running', started_at = now() WHERE job_id = %s AND device_id = %s",
+                                  (job["id"], t["device_id"]))
+                    ev = stream.Events(wconn, job["id"], t["device_id"])
                     try:
                         if not t["ip"]:
                             ev.add("fail", "Cihazın IP adresi yok.")
                             result = {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
                         else:
                             result = None
-                            family = families[t["board_id"]]
+                            family = families[t["device_id"]]
                             body, env, timeout = texts[family]
                             for name, local in (prepared.items() if family == "linux" else ()):
                                 try:
@@ -288,41 +293,41 @@ def _run_job(job) -> None:
                                 # için callback kaydettiyse 'ok' bitişte çalıştırılır (ör. rapor okuyup tabloya
                                 # yazma). Çekirdek hiçbir eklentiyi adıyla bilmez (bkz. _JOB_DONE_HOOKS).
                                 # Kapatma cihazda başarıyla bitti: SSH'e ulaşılamayınca cihaz beklemeden çevrim dışı
-                                # sayılsın (bkz. tasks/board_status SHUTDOWN_GRACE, BoardsApi alive; göç 051).
+                                # sayılsın (bkz. tasks/device_status SHUTDOWN_GRACE, DevicesApi alive; göç 051).
                                 if result["status"] == "ok" and action == "shutdown":
-                                    wconn.execute("UPDATE boards SET shutdown_at = now() WHERE id = %s", (t["board_id"],))
+                                    wconn.execute("UPDATE devices SET shutdown_at = now() WHERE id = %s", (t["device_id"],))
                                 if result["status"] == "ok" and action in _JOB_DONE_HOOKS:
                                     try:
-                                        _JOB_DONE_HOOKS[action](wconn, t, user, password, job["id"], ev)
+                                        _JOB_DONE_HOOKS[action](wconn, _legacy_target(t), user, password, job["id"], ev)
                                     except Exception:
                                         log.exception("işlem bitiş kancası hatası: %s", action)
                                 if result["status"] in ("ok", "failed") and action in _JOB_FINISHED_HOOKS:
                                     try:
-                                        _JOB_FINISHED_HOOKS[action](wconn, t, user, password, job["id"], ev, result)
+                                        _JOB_FINISHED_HOOKS[action](wconn, _legacy_target(t), user, password, job["id"], ev, result)
                                     except Exception:
                                         log.exception("işlem bitiş kancası hatası: %s", action)
                     except Exception as e:  # tek cihazın beklenmedik hatası diğerlerini durdurmasın
-                        log.exception("görev #%s cihaz %s", job["id"], t["board_id"])
+                        log.exception("görev #%s cihaz %s", job["id"], t["device_id"])
                         ev.add("fail", f"Beklenmeyen hata: {e}")
                         result = {"status": "failed", "rc": None, "output": f"Beklenmeyen hata: {e}"}
                     finally:
                         ev.close()
-                    _write_one(wconn, job, t["board_id"], result, names.get(t["board_id"], ""))
+                    _write_one(wconn, job, t["device_id"], result, names.get(t["device_id"], ""))
                     # Wi-Fi aç/kapat: grid'in "Wi-Fi" sütunu ve Bilgi kartı yeni durumu hemen göstersin.
                     if action in hwfacts.WIFI_ACTIONS and result["status"] == "ok":
-                        hwfacts.mark_wifi_radio(wconn, t["board_id"], hwfacts.WIFI_ACTIONS[action])
+                        hwfacts.mark_wifi_radio(wconn, t["device_id"], hwfacts.WIFI_ACTIONS[action])
                     # Kullanıcı ekle/sil: "Oturum aç"/"Yedekle"/"Kullanıcı sil" listeleri güncel hesapları
                     # göstersin (kısmi başarıda da — bazı hesaplar silinmiş olabilir).
                     if action in ("user-add", "user-delete"):
-                        accounts.invalidate(wconn, t["board_id"])
+                        accounts.invalidate(wconn, t["device_id"])
                     # Parola ayarla ile root değişti: Ankamon'un bağlantısı kopmasın, cihaza özel kaydedilir.
                     if action == "user-password" and result["status"] == "ok" and user == "root":
                         values = (job["params"] or {}).get("values") or {}
                         if "root" in str(values.get("KULLANICILAR", "")).split():
-                            board_password.remember_root(wconn, t, str(values.get("PAROLA", "")), password)
+                            device_password.remember_root(wconn, t, str(values.get("PAROLA", "")), password)
                     return result
                 finally:
-                    _board_conn_close(wconn)
+                    _device_conn_close(wconn)
 
             n = max(1, min(whoami.dynamic_concurrency(), len(targets)))
             if len(targets) > 1:
@@ -332,9 +337,9 @@ def _run_job(job) -> None:
             with ThreadPoolExecutor(max_workers=n) as pool:
                 futures = {pool.submit(work, t): t for t in targets}
                 for future in as_completed(futures):
-                    results[futures[future]["board_id"]] = future.result()
+                    results[futures[future]["device_id"]] = future.result()
         elif job["type"] == "whoami":
-            user, password = _board_access(conn)
+            user, password = _device_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
             # Burada (command/action'ın aksine) cihazlar PARALEL sorgulanır: her cihaz bağımsız,
@@ -346,43 +351,43 @@ def _run_job(job) -> None:
             # SIRAYLA yapılır — tek bağlantının iş parçacıkları arasında eşzamanlı paylaşılması
             # command/action'da (bkz. yukarıdaki not) güvenli değildi, burada da aynı kısıtlama geçerli.
             for t in targets:
-                _board_event(conn, job["id"], t["board_id"], "info", f"Oturumlar sorgulanıyor: root@{t['ip'] or '—'} …")
+                _device_event(conn, job["id"], t["device_id"], "info", f"Oturumlar sorgulanıyor: root@{t['ip'] or '—'} …")
             n = whoami.dynamic_concurrency()
             with ThreadPoolExecutor(max_workers=max(1, min(n, len(targets)))) as pool:
                 futures = {pool.submit(whoami.query, t, user, password): t for t in targets}
                 for future in as_completed(futures):
                     t = futures[future]
                     result = future.result()
-                    _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
-                    results[t["board_id"]] = result
+                    _write_one(conn, job, t["device_id"], result, names.get(t["device_id"], ""))
+                    results[t["device_id"]] = result
                     if result["status"] != "ok":
-                        _board_event(conn, job["id"], t["board_id"], "fail", f"Sorgulanamadı: {result['output']}")
+                        _device_event(conn, job["id"], t["device_id"], "fail", f"Sorgulanamadı: {result['output']}")
                     elif result["output"]:
-                        _board_event(conn, job["id"], t["board_id"], "ok", f"Açık oturum: {result['output']}")
+                        _device_event(conn, job["id"], t["device_id"], "ok", f"Açık oturum: {result['output']}")
                     else:
-                        _board_event(conn, job["id"], t["board_id"], "ok", "Açık kullanıcı oturumu yok (cihaz giriş ekranında).")
+                        _device_event(conn, job["id"], t["device_id"], "ok", "Açık kullanıcı oturumu yok (cihaz giriş ekranında).")
                     if result["status"] == "ok":   # grid'in "Oturum" sütunu (kilidi `who` bilmez: None)
-                        session_probe.store(conn, t["board_id"], result["output"], None)
+                        session_probe.store(conn, t["device_id"], result["output"], None)
         elif job["type"] == "anomaly_scan":
             # Anomaliler ▸ Tarama (bkz. anomaly/scan.py): seçilen kurallar seçilen cihazlarda anlık yoklanır.
             # whoami/facts deseni: cihazlar PARALEL (dinamik eşzamanlılık); her iş parçacığı evaluate'in
             # okumaları için kendi bağlantısını açar, job_targets'a yazmak ana iş parçacığında sırayla.
-            user, password = _board_access(conn)
+            user, password = _device_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
             kinds = list((job["params"] or {}).get("kinds") or [])
             hostnames = {r["id"]: r["hostname"] for r in conn.execute(
-                "SELECT id, hostname FROM boards WHERE id = ANY(%s)", ([t["board_id"] for t in targets],)).fetchall()}
+                "SELECT id, hostname FROM devices WHERE id = ANY(%s)", ([t["device_id"] for t in targets],)).fetchall()}
 
             def anomaly_scan(t):
-                wconn = _board_conn()
+                wconn = _device_conn()
                 try:
-                    return anomaly_scan_mod.run(wconn, dict(t, hostname=hostnames.get(t["board_id"])), kinds, user, password)
+                    return anomaly_scan_mod.run(wconn, dict(t, hostname=hostnames.get(t["device_id"])), kinds, user, password)
                 except Exception as e:  # noqa: BLE001 — bir cihazın hatası diğerlerini düşürmesin
-                    log.exception("anomali taraması: cihaz %s", t["board_id"])
+                    log.exception("anomali taraması: cihaz %s", t["device_id"])
                     return {"status": "failed", "rc": None, "output": f"Hata: {e}"}
                 finally:
-                    _board_conn_close(wconn)
+                    _device_conn_close(wconn)
 
             n = whoami.dynamic_concurrency()
             with ThreadPoolExecutor(max_workers=max(1, min(n, len(targets)))) as pool:
@@ -390,8 +395,8 @@ def _run_job(job) -> None:
                 for future in as_completed(futures):
                     t = futures[future]
                     result = future.result()
-                    _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
-                    results[t["board_id"]] = result
+                    _write_one(conn, job, t["device_id"], result, names.get(t["device_id"], ""))
+                    results[t["device_id"]] = result
         elif job["type"] == "facts":
             # "Bilgi kartı": cihaz başına 60dk önbellek (bkz. hwfacts.CACHE_SECONDS) — önbellekte
             # taze bir değer varsa SSH'a hiç gidilmez, hemen o değer yazılır. Geri kalanlar whoami ile
@@ -400,15 +405,15 @@ def _run_job(job) -> None:
             cutoff = now_ts - hwfacts.CACHE_SECONDS
             pending = []
             for t in targets:
-                cached = hwfacts.cached(conn, t["board_id"], cutoff)
+                cached = hwfacts.cached(conn, t["device_id"], cutoff)
                 if cached is None:
                     pending.append(t)
                     continue
                 result = {"status": "ok", "rc": 0, "output": json.dumps(cached, ensure_ascii=False)}
-                _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
-                results[t["board_id"]] = result
+                _write_one(conn, job, t["device_id"], result, names.get(t["device_id"], ""))
+                results[t["device_id"]] = result
             if pending:
-                user, password = _board_access(conn)
+                user, password = _device_access(conn)
                 if not password:
                     raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
                 n = whoami.dynamic_concurrency()
@@ -418,31 +423,31 @@ def _run_job(job) -> None:
                         t = futures[future]
                         result = future.result()
                         if result["status"] == "ok":
-                            hwfacts.store(conn, t["board_id"], json.loads(result["output"]), now_ts)
-                        _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
-                        results[t["board_id"]] = result
+                            hwfacts.store(conn, t["device_id"], json.loads(result["output"]), now_ts)
+                        _write_one(conn, job, t["device_id"], result, names.get(t["device_id"], ""))
+                        results[t["device_id"]] = result
         elif job["type"] == "accounts":
             # "Oturum aç" alt menüsünün hesap listesi (bkz. executor/accounts.py): 24 saat önbellek.
             now_ts = int(time.time())
             for t in targets:
-                listed = accounts.cached(conn, t["board_id"], now_ts - accounts.CACHE_SECONDS)
+                listed = accounts.cached(conn, t["device_id"], now_ts - accounts.CACHE_SECONDS)
                 if listed is not None:
                     result = {"status": "ok", "rc": 0, "output": json.dumps(listed, ensure_ascii=False)}
                 else:
-                    user, password = _board_access(conn)
+                    user, password = _device_access(conn)
                     if not password:
                         raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
                     result = accounts.list_accounts(t, user, password)
                     if result["status"] == "ok":
-                        accounts.store(conn, t["board_id"], json.loads(result["output"]), now_ts)
-                _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
-                results[t["board_id"]] = result
+                        accounts.store(conn, t["device_id"], json.loads(result["output"]), now_ts)
+                _write_one(conn, job, t["device_id"], result, names.get(t["device_id"], ""))
+                results[t["device_id"]] = result
         elif job["type"] in ("login", "logout", "lock", "wake", "sleep", "screen_lock", "screen_unlock"):
             # Seçilen hesapla oturum açma / açık oturumu kapatma ya da kilitleme — cihazlar bağımsız,
             # PARALEL (whoami deseni). logout/lock'ta username isteğe bağlı (Oturumlar grid'i belirli
             # kullanıcıyı hedefler; boşsa cihazdaki etkin oturum).
             username = (job["params"] or {}).get("username", "")
-            user, password = _board_access(conn)
+            user, password = _device_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
             if job["type"] == "login":
@@ -457,10 +462,10 @@ def _run_job(job) -> None:
             elif job["type"] == "screen_lock":
                 # Ekran ▸ Kilitle: "Kilidi aç"a dek tam ekran "Kilitli", giriş yakalanır (bkz. executor/screenlock.py).
                 # Kilit ekranı cihazın kimliğini de yazar (takma ad, bilgisayar adı, ETAP, MAC, IP).
-                identities = screenlock.identities(conn, [t["board_id"] for t in targets])
+                identities = screenlock.identities(conn, [t["device_id"] for t in targets])
 
                 def work(t):
-                    return screenlock.lock(t, user, password, identities.get(t["board_id"]))
+                    return screenlock.lock(t, user, password, identities.get(t["device_id"]))
             elif job["type"] == "screen_unlock":
                 def work(t):
                     return screenlock.unlock(t, user, password)
@@ -478,16 +483,16 @@ def _run_job(job) -> None:
                      "wake": "Ekran uyandırılıyor…", "sleep": "Ekran uyutuluyor…",
                      "screen_lock": "Ekran kilitleniyor…", "screen_unlock": "Ekran kilidi açılıyor…"}[job["type"]]
             for t in targets:
-                _board_event(conn, job["id"], t["board_id"], "info", f"Bağlanılıyor: root@{t['ip'] or '—'} — {start}")
+                _device_event(conn, job["id"], t["device_id"], "info", f"Bağlanılıyor: root@{t['ip'] or '—'} — {start}")
             n = whoami.dynamic_concurrency()
             with ThreadPoolExecutor(max_workers=max(1, min(n, len(targets)))) as pool:
                 futures = {pool.submit(work, t): t for t in targets}
                 for future in as_completed(futures):
                     t = futures[future]
                     result = future.result()
-                    _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
-                    results[t["board_id"]] = result
-                    ev = stream.Events(conn, job["id"], t["board_id"])
+                    _write_one(conn, job, t["device_id"], result, names.get(t["device_id"], ""))
+                    results[t["device_id"]] = result
+                    ev = stream.Events(conn, job["id"], t["device_id"])
                     for line in (result["output"] or "").splitlines():
                         if line.strip():
                             ev.add("out", line)
@@ -497,28 +502,28 @@ def _run_job(job) -> None:
                     # Cihazlar grid'inin "Oturum" sütunu hemen güncellensin (bkz. executor/session_probe.py).
                     if result["status"] == "ok" and job["type"] in ("wake", "sleep"):
                         # Ekranlar'daki "güç tasarrufu" yazısı bir sonraki yoklamayı beklemeden kalksın / çıksın.
-                        session_probe.store_display(conn, t["board_id"], "On" if job["type"] == "wake" else "Off")
+                        session_probe.store_display(conn, t["device_id"], "On" if job["type"] == "wake" else "Off")
                     elif result["status"] == "ok" and job["type"] in ("screen_lock", "screen_unlock"):
                         # "Oturum" hücresindeki "/ Kilitli" bir sonraki yoklamayı beklemeden.
-                        session_probe.store_screen_lock(conn, t["board_id"], job["type"] == "screen_lock")
+                        session_probe.store_screen_lock(conn, t["device_id"], job["type"] == "screen_lock")
                         if job["type"] == "screen_lock":
-                            session_probe.store_display(conn, t["board_id"], "On")  # kilitleme ekranı uyandırır
+                            session_probe.store_display(conn, t["device_id"], "On")  # kilitleme ekranı uyandırır
                     elif result["status"] == "ok":
                         if job["type"] == "login":
-                            session_probe.store(conn, t["board_id"], username, False)
+                            session_probe.store(conn, t["device_id"], username, False)
                         else:
                             # Kapatılan/kilitlenen oturum etkin olan olmayabilir (arka planda başka
                             # oturumlar kalabilir): tahmin etmek yerine gerçek durumu yeniden yokla.
                             st = session_probe.probe(t, user, password)
                             if st["ok"]:
-                                session_probe.store(conn, t["board_id"], st["user"], st["locked"])
-                                session_probe.store_display(conn, t["board_id"], st["display"])
+                                session_probe.store(conn, t["device_id"], st["user"], st["locked"])
+                                session_probe.store_display(conn, t["device_id"], st["display"])
         elif job["type"] == "backup_home":
             # "Yedekle/Geri al" ▸ Yedekle: cihazlar SIRAYLA (command/action gibi) — her cihazın canlı raporu ve ilerlemesi
             # okunaklı aksın, aynı anda onlarca cihazın ağ/disk yükü birikmesin; `conn` da yalnız bu
             # iş parçacığında kullanılır (bkz. yukarıdaki not). Eski yedekler önce temizlenir.
             usernames = (job["params"] or {}).get("usernames") or []
-            user, password = _board_access(conn)
+            user, password = _device_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
             keep = backup.keep_hours(conn)
@@ -526,19 +531,19 @@ def _run_job(job) -> None:
             if removed:
                 general.add("info", f"{removed} eski yedek dizini silindi ({keep} saatten eski).")
             for t in targets:
-                ev = stream.Events(conn, job["id"], t["board_id"])
+                ev = stream.Events(conn, job["id"], t["device_id"])
                 try:
                     parts = [backup.backup(t, user, password, name, job["id"], ev, (i, len(usernames)))
                              for i, name in enumerate(usernames)]
                 finally:
                     ev.close()
                 result = home_restore.merge_home_backup_results(parts)
-                _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
-                results[t["board_id"]] = result
+                _write_one(conn, job, t["device_id"], result, names.get(t["device_id"], ""))
+                results[t["device_id"]] = result
         elif job["type"] == "restore_home":
             # "Yedekle/Geri al" ▸ Geri al: yüklenen yedekten hesap + ev dizini + PIN anahtarı, cihazlar SIRAYLA.
             params = job["params"] or {}
-            user, password = _board_access(conn)
+            user, password = _device_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
             backup.cleanup(keep_job=backup.keep_hours(conn))
@@ -547,14 +552,14 @@ def _run_job(job) -> None:
                 archive, meta = home_restore.prepare_home_restore(
                     params.get("token", ""), job["username"], bool(row and row["is_admin"]))
                 for t in targets:
-                    ev = stream.Events(conn, job["id"], t["board_id"])
+                    ev = stream.Events(conn, job["id"], t["device_id"])
                     try:
                         result = home_restore.restore_home(t, user, password, archive, meta, bool(params.get("overwrite")), ev)
                     finally:
                         ev.close()
-                    accounts.invalidate(conn, t["board_id"])
-                    _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
-                    results[t["board_id"]] = result
+                    accounts.invalidate(conn, t["device_id"])
+                    _write_one(conn, job, t["device_id"], result, names.get(t["device_id"], ""))
+                    results[t["device_id"]] = result
             except home_restore.HomeRestoreRefused as exc:
                 raise RuntimeError(str(exc))
             finally:
@@ -563,7 +568,7 @@ def _run_job(job) -> None:
             # "Ekranımı yansıt" (bkz. executor/cast.py): cihazlar bağımsız, PARALEL (login deseni) —
             # yayın bütün sınıflarda aynı anda başlasın. conn yalnız bu iş parçacığında kullanılır.
             params = job["params"] or {}
-            user, password = _board_access(conn)
+            user, password = _device_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
             if job["type"] == "cast_start":
@@ -582,41 +587,41 @@ def _run_job(job) -> None:
                 for future in as_completed(futures):
                     t = futures[future]
                     result = future.result()
-                    ev = stream.Events(conn, job["id"], t["board_id"])
+                    ev = stream.Events(conn, job["id"], t["device_id"])
                     for line in (result.get("output") or "").splitlines():
                         ev.add("out", line)
                     ev.add("ok" if result["status"] == "ok" else "fail",
                            "Tamam." if result["status"] == "ok" else "Başarısız.")
                     ev.close()
-                    _write_one(conn, job, t["board_id"], result, names.get(t["board_id"], ""))
-                    results[t["board_id"]] = result
-        elif job["type"] in board_media_jobs.TYPES:
-            board_media_jobs.run(conn, job, targets, names, results)
+                    _write_one(conn, job, t["device_id"], result, names.get(t["device_id"], ""))
+                    results[t["device_id"]] = result
+        elif job["type"] in device_media_jobs.TYPES:
+            device_media_jobs.run(conn, job, targets, names, results)
         elif job["type"] == "diagnose":
             # "Bakım" taraması (bkz. executor/diagnose.py; elle "Şimdi tara" ya da haftalık otomatik): cihazlar
             # PARALEL, aynı anda en çok `n` cihaz — n konteynerin o anki CPU/RAM boşluğuna göre
             # (whoami.dynamic_concurrency, kullanıcı isteği); biten cihazın yerine sıradaki başlar. Her
             # cihaz bitince sonucu hemen yazılır (arayüzdeki ilerleme çubuğu job_targets durumlarından
             # ilerler). Her iş parçacığı KENDİ veritabanı bağlantısını açar (command/action'daki not).
-            user, password = _board_access(conn)
+            user, password = _device_access(conn)
             if not password:
                 raise RuntimeError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
             # Görev başında hepsi "running" işaretlendi; sırası gelmeyenler "Sırada" görünsün.
             conn.execute("UPDATE job_targets SET status = 'queued' WHERE job_id = %s", (job["id"],))
 
             def scan(t):
-                wconn = _board_conn()
+                wconn = _device_conn()
                 try:
-                    wconn.execute("UPDATE job_targets SET status = 'running' WHERE job_id = %s AND board_id = %s",
-                                  (job["id"], t["board_id"]))
-                    ev = stream.Events(wconn, job["id"], t["board_id"])
+                    wconn.execute("UPDATE job_targets SET status = 'running' WHERE job_id = %s AND device_id = %s",
+                                  (job["id"], t["device_id"]))
+                    ev = stream.Events(wconn, job["id"], t["device_id"])
                     try:
                         ev.add("info", "Denetleniyor…")
                         ev.flush()
                         try:
                             result = diagnose.run(wconn, t, user, password)
                         except Exception as e:  # bir cihazın hatası diğerlerinin taramasını düşürmesin
-                            log.exception("bakım taraması: cihaz %s", t["board_id"])
+                            log.exception("bakım taraması: cihaz %s", t["device_id"])
                             result = {"status": "failed", "rc": None, "output": f"Denetim hatası: {e}"}
                         if result["status"] == "ok":
                             report = json.loads(result["output"])
@@ -627,10 +632,10 @@ def _run_job(job) -> None:
                             ev.add("fail", result["output"])
                     finally:
                         ev.close()
-                    _write_one(wconn, job, t["board_id"], result, names.get(t["board_id"], ""))
+                    _write_one(wconn, job, t["device_id"], result, names.get(t["device_id"], ""))
                     return result
                 finally:
-                    _board_conn_close(wconn)
+                    _device_conn_close(wconn)
 
             n = max(1, min(whoami.dynamic_concurrency(), len(targets)))
             if len(targets) > 1:
@@ -640,7 +645,7 @@ def _run_job(job) -> None:
             with ThreadPoolExecutor(max_workers=n) as pool:
                 futures = {pool.submit(scan, t): t for t in targets}
                 for future in as_completed(futures):
-                    results[futures[future]["board_id"]] = future.result()
+                    results[futures[future]["device_id"]] = future.result()
         else:
             raise RuntimeError(f"Bilinmeyen görev türü: {job['type']}")
 
@@ -657,7 +662,7 @@ def _run_job(job) -> None:
         activity.record(conn, f"Görev hatası: {job['title']} — {exc}"[:200], "error", "runner", traceback.format_exc())
     finally:
         _scrub_secrets(conn, job)
-        board_media_jobs.scrub(conn, job)
+        device_media_jobs.scrub(conn, job)
         general.close()
         conn.close()
 

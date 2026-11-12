@@ -66,8 +66,8 @@ final class BreakLeagueApi
         $today = new DateTimeImmutable((string) Db::value('SELECT current_date::text'));
         $lessons = Settings::get('lesson_times');
         $withOut = $request->query('with_excluded') === '1';
-        $by = $request->query('by') === 'users' ? 'users' : 'boards';
-        $leagueOut = LeagueExclusionsApi::leagueExcludedValues('break', $by === 'users' ? 'user' : 'board');
+        $by = $request->query('by') === 'users' ? 'users' : 'devices';
+        $leagueOut = LeagueExclusionsApi::leagueExcludedValues('break', $by === 'users' ? 'user' : 'device');
         $periods = [];
         foreach (SessionLeagueApi::leaguePeriods($today, Settings::get('school_calendar')) as $period) {
             $period['title'] = str_replace('şampiyonu', 'teneffüs şampiyonu', $period['title']);
@@ -80,7 +80,7 @@ final class BreakLeagueApi
             'by' => $by,
             'sort' => isset(self::BREAK_LEAGUE_SORTS[$sort]) ? $sort : 'total',
             'breaks' => self::breakWindows($lessons),
-            'boards' => (int) Db::value('SELECT count(*) FROM boards'),
+            'devices' => (int) Db::value('SELECT count(*) FROM devices'),
             'with_excluded' => $withOut,
             'excluded' => $leagueOut,
             'periods' => $periods,
@@ -112,7 +112,7 @@ final class BreakLeagueApi
         $shown = $withOut ? 'true' : 'false';
         $rows = Db::all(
             "WITH days AS (
-                 SELECT host, max(board_id) AS board_id, sum(on_seconds)::bigint AS on_seconds,
+                 SELECT host, max(device_id) AS device_id, sum(on_seconds)::bigint AS on_seconds,
                         sum(session_seconds)::bigint AS session_seconds,
                         sum(on_seconds - session_seconds)::bigint AS idle_seconds,
                         sum(break_seconds)::bigint AS break_seconds, count(*) AS days
@@ -121,13 +121,13 @@ final class BreakLeagueApi
              ), ranked AS (
                  SELECT * FROM days WHERE $column > 0 ORDER BY $column DESC, on_seconds DESC, host LIMIT ?
              )
-             SELECT r.*, COALESCE(NULLIF(b.label, ''), r.host) AS board, r.host = ANY(?::text[]) AS excluded
-             FROM ranked r LEFT JOIN boards b ON b.id = r.board_id
+             SELECT r.*, COALESCE(NULLIF(b.label, ''), r.host) AS device, r.host = ANY(?::text[]) AS excluded
+             FROM ranked r LEFT JOIN devices b ON b.id = r.device_id
              ORDER BY r.$column DESC, r.on_seconds DESC, r.host",
             [$from, $to, $shown, $out, $limit, $out]
         );
         $all = Db::one(
-            'SELECT count(DISTINCT host) AS boards, COALESCE(sum(on_seconds), 0)::bigint AS on_seconds,
+            'SELECT count(DISTINCT host) AS devices, COALESCE(sum(on_seconds), 0)::bigint AS on_seconds,
                     COALESCE(sum(session_seconds), 0)::bigint AS session_seconds
              FROM break_league_days WHERE day >= ?::date AND day < ?::date AND on_seconds > 0
                AND (?::boolean OR host <> ALL(?::text[]))',
@@ -139,13 +139,13 @@ final class BreakLeagueApi
             [$from, $to, $out]
         ) : 0;
         return [
-            'participants' => (int) ($all['boards'] ?? 0),
+            'participants' => (int) ($all['devices'] ?? 0),
             'total_seconds' => (int) ($all['on_seconds'] ?? 0),
             'total_session_seconds' => (int) ($all['session_seconds'] ?? 0),
             'excluded_count' => $hidden,
             'leaders' => array_map(fn(array $r) => [
                 'host' => $r['host'],
-                'board' => $r['board'],
+                'device' => $r['device'],
                 'seconds' => (int) $r['on_seconds'],
                 'session_seconds' => (int) $r['session_seconds'],
                 'idle_seconds' => (int) $r['idle_seconds'],
@@ -174,17 +174,17 @@ final class BreakLeagueApi
              totals AS (
                  SELECT username, sum(session_seconds + idle_seconds)::bigint AS on_seconds,
                         sum(session_seconds)::bigint AS session_seconds, sum(idle_seconds)::bigint AS idle_seconds,
-                        count(DISTINCT day) AS days, count(DISTINCT host) AS boards
+                        count(DISTINCT day) AS days, count(DISTINCT host) AS devices
                  FROM parts GROUP BY username HAVING sum(session_seconds + idle_seconds) > 0
              ), ranked AS (
                  SELECT * FROM totals WHERE $column > 0 ORDER BY $column DESC, on_seconds DESC, username LIMIT ?
              ), top AS (
                  SELECT DISTINCT ON (p.username) p.username AS k, COALESCE(NULLIF(b.label, ''), p.host) AS top
-                 FROM parts p LEFT JOIN boards b ON b.id = p.board_id
+                 FROM parts p LEFT JOIN devices b ON b.id = p.device_id
                  WHERE p.username IN (SELECT username FROM ranked)
                  GROUP BY p.username, p.host, b.label ORDER BY p.username, sum(p.session_seconds + p.idle_seconds) DESC
              )
-             SELECT r.*, n.full_name, t.top AS board, lower(r.username) = ANY(?::text[]) AS excluded
+             SELECT r.*, n.full_name, t.top AS device, lower(r.username) = ANY(?::text[]) AS excluded
              FROM ranked r LEFT JOIN session_league_names n ON n.username = r.username LEFT JOIN top t ON t.k = r.username
              ORDER BY r.$column DESC, r.on_seconds DESC, r.username",
             [$from, $to, $system, $shown, $out, $limit, $out]
@@ -218,12 +218,12 @@ final class BreakLeagueApi
             'leaders' => array_map(fn(array $r) => [
                 'username' => $r['username'],
                 'full_name' => $r['full_name'],
-                'board' => $r['board'],
+                'device' => $r['device'],
                 'seconds' => (int) $r['on_seconds'],
                 'session_seconds' => (int) $r['session_seconds'],
                 'idle_seconds' => (int) $r['idle_seconds'],
                 'days' => (int) $r['days'],
-                'boards' => (int) $r['boards'],
+                'devices' => (int) $r['devices'],
                 'excluded' => (bool) $r['excluded'],
             ], $rows),
         ];

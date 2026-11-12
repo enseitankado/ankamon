@@ -215,13 +215,13 @@ def _write_version(name: str, state: dict) -> None:
         f.write(f"{tool['repo']} {state['commit']} {state.get('updated_at') or ''}\n")
 
 
-def upload(board: dict, user: str, password: str, name: str, local: dict, events, timeout: int = 60) -> None:
+def upload(device: dict, user: str, password: str, name: str, local: dict, events, timeout: int = 60) -> None:
     """Aracı cihaza kopyalar (yalnız gerekiyorsa). Hata olursa ToolError."""
     tool = TOOLS[name]
     if tool.get("kind") == "archive":
-        return _upload_archive(board, user, password, name, local, events, timeout)
+        return _upload_archive(device, user, password, name, local, events, timeout)
     dst = remote_path(name)
-    target = f"{user}@{board['ip']}"
+    target = f"{user}@{device['ip']}"
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     probe = subprocess.run(
         ["sshpass", "-e", "ssh", "-T", *_SSH_OPTS, target, f"sha256sum {dst} 2>/dev/null | cut -d' ' -f1"],
@@ -379,11 +379,11 @@ def _ensure_archive(name: str, events) -> dict:
     return result()
 
 
-def _upload_archive(board: dict, user: str, password: str, name: str, local: dict, events, timeout: int) -> None:
+def _upload_archive(device: dict, user: str, password: str, name: str, local: dict, events, timeout: int) -> None:
     """Arşivi cihaza kopyalayıp remote_dir'i atomik olarak değiştirir (yalnız arşiv özeti farklıysa)."""
     tool = TOOLS[name]
     dst = tool["remote_dir"].rstrip("/")
-    target = f"{user}@{board['ip']}"
+    target = f"{user}@{device['ip']}"
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
 
     def ssh(command: str) -> subprocess.CompletedProcess:

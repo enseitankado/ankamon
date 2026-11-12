@@ -7,35 +7,35 @@
 declare(strict_types=1);
 
 // Özellikler arası bağımlılık (alt özellik => üst özellik): alt özellik yalnız üstüyle birlikte
-// kullanılabilir — ör. "shell" Cihazlar sayfasının sağ menüsünden açılır, sayfa ise "boards" ister.
+// kullanılabilir — ör. "shell" Cihazlar sayfasının sağ menüsünden açılır, sayfa ise "devices" ister.
 // UsersApi kaydederken üst özelliği kendiliğinden ekler; Kullanıcılar penceresi alt özellikleri
 // üstünün altında girintili gösterir ve üstü kapalıyken devre dışı bırakır.
 $ozellikBagimliliklari = [
-    'boards.manage' => 'boards',
-    'actions' => 'boards',
-    'power' => 'boards',
-    'shell' => 'boards',
-    'screen' => 'boards',
+    'devices.manage' => 'devices',
+    'actions' => 'devices',
+    'power' => 'devices',
+    'shell' => 'devices',
+    'screen' => 'devices',
     'screen.control' => 'screen',
     'screen.lock' => 'screen',
     'screen.screenshot' => 'screen',
     'screen.input' => 'screen',
     'screen.relay' => 'screen',
-    'boards.chat' => 'boards',
-    'cast' => 'boards',
-    'filemanager' => 'boards',
-    'taskmgr' => 'boards',
-    'boards.backup' => 'boards',
-    'boards.restore' => 'boards',
-    'boards.login' => 'boards',
-    'boards.users' => 'boards',
-    'anomalies' => 'boards',
+    'devices.chat' => 'devices',
+    'cast' => 'devices',
+    'filemanager' => 'devices',
+    'taskmgr' => 'devices',
+    'devices.backup' => 'devices',
+    'devices.restore' => 'devices',
+    'devices.login' => 'devices',
+    'devices.users' => 'devices',
+    'anomalies' => 'devices',
     'anomalies.notify' => 'anomalies',
     'screen.web' => 'screen',
-    'boards.webfilter' => 'boards',
-    'boards.passwords' => 'boards',
-    'boards.passwords.etapadmin' => 'boards.passwords',
-    'boards.passwords.root' => 'boards.passwords',
+    'devices.webfilter' => 'devices',
+    'devices.passwords' => 'devices',
+    'devices.passwords.etapadmin' => 'devices.passwords',
+    'devices.passwords.root' => 'devices.passwords',
     'logs.manage' => 'logs',
     'logs.exclude' => 'logs',
     'sessions.manage' => 'logs',
@@ -47,6 +47,9 @@ $ozellikBagimliliklari = [
 // Eklentilerin kendi yetkileri: ext/<ad>/feature_deps.php aynı biçimde dizi döndürür (çekirdek hiçbir eklentiyi adıyla
 // bilmez). Çekirdek anahtarı ezilemez; etkin olmayan eklentinin yetkisi de listelenir (yönetici önceden verebilsin).
 foreach (glob(\Ankamon\Core\Extensions::dir() . '/*/feature_deps.php') ?: [] as $eklentiDosyasi) {
-    $ozellikBagimliliklari += (array) require $eklentiDosyasi;
+    // Eski yetki adları (boards… → devices…, bkz. Auth::feature) yeni adla eşlenir.
+    foreach ((array) require $eklentiDosyasi as $alt => $ust) {
+        $ozellikBagimliliklari += [\Ankamon\Core\Auth::feature((string) $alt) => \Ankamon\Core\Auth::feature((string) $ust)];
+    }
 }
 return $ozellikBagimliliklari;

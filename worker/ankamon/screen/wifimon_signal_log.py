@@ -121,7 +121,7 @@ def _loggable(row: dict) -> bool:
     return row.get("kind") == "wifi" or (row.get("kind") in ("client", "probe") and not row.get("random"))
 
 
-def record(board_id: int, rows: list[dict]) -> None:
+def record(device_id: int, rows: list[dict]) -> None:
     """Satırların sinyalini sensörün günlük toplamına ekler (aynı taramada aynı adres×bant bir kez — en güçlüsü)."""
     global _last_prune
     best: dict[tuple[str, str], dict] = {}
@@ -138,16 +138,16 @@ def record(board_id: int, rows: list[dict]) -> None:
     try:
         with db.connect() as conn:
             conn.execute(
-                """INSERT INTO wifimon_signal_stats AS s (addr, board_id, band, kind, n, n_est, sum_dbm, sum_sq_dbm,
+                """INSERT INTO wifimon_signal_stats AS s (addr, device_id, band, kind, n, n_est, sum_dbm, sum_sq_dbm,
                                                           min_dbm, max_dbm, last_dbm, last_chan)
                    SELECT a, %s, b, k, 1, CASE WHEN e THEN 1 ELSE 0 END, d, d * d, d, d, d, c
                    FROM unnest(%s::text[], %s::text[], %s::text[], %s::float8[], %s::bool[], %s::text[]) AS u(a, b, k, d, e, c)
-                   ON CONFLICT (addr, board_id, band, day) DO UPDATE SET
+                   ON CONFLICT (addr, device_id, band, day) DO UPDATE SET
                      n = s.n + 1, n_est = s.n_est + EXCLUDED.n_est,
                      sum_dbm = s.sum_dbm + EXCLUDED.sum_dbm, sum_sq_dbm = s.sum_sq_dbm + EXCLUDED.sum_sq_dbm,
                      min_dbm = least(s.min_dbm, EXCLUDED.min_dbm), max_dbm = greatest(s.max_dbm, EXCLUDED.max_dbm),
                      last_dbm = EXCLUDED.last_dbm, last_chan = EXCLUDED.last_chan, kind = EXCLUDED.kind, last_at = now()""",
-                (board_id, [r["addr"].upper() for r in items], [r["band"] for r in items], [r["kind"] for r in items],
+                (device_id, [r["addr"].upper() for r in items], [r["band"] for r in items], [r["kind"] for r in items],
                  [float(r["rssi"]) for r in items], [bool(r.get("rssi_est")) for r in items],
                  [str(r.get("chan") or "") for r in items]))
             if time.time() - _last_prune > 3600:

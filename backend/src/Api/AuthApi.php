@@ -161,7 +161,7 @@ final class AuthApi
 
     /**
      * "Ekranlar" sekmesindeki önizleme kutucuklarının sürükle-bırakla değiştirilen sırası (cihaz
-     * id'leri; bkz. frontend page/Boards.js __previewList + docker/rootfs/screen/index.html).
+     * id'leri; bkz. frontend page/Devices.js __previewList + docker/rootfs/screen/index.html).
      * nav_order ile aynı mantık: kullanıcı başına, oturum bağımsız kalıcı.
      */
     public function screenOrder(Request $request, array $user): array
@@ -266,14 +266,14 @@ final class AuthApi
         return ['ok' => true];
     }
 
-    /** nginx auth_request ucu: /screen/ws/chat/ (Sohbet — bkz. worker screen/chat.py) için oturum + "boards.chat". */
+    /** nginx auth_request ucu: /screen/ws/chat/ (Sohbet — bkz. worker screen/chat.py) için oturum + "devices.chat". */
     public function chat(): array
     {
         $user = Auth::user();
         if ($user === null) {
             throw new ApiError(401, 'Oturum açmanız gerekiyor.');
         }
-        if (!Auth::can($user, 'boards.chat')) {
+        if (!Auth::can($user, 'devices.chat')) {
             throw ApiError::forbidden();
         }
         header('X-Auth-User: ' . $user['username']);
@@ -327,7 +327,7 @@ final class AuthApi
         if ($user === null) {
             throw new ApiError(401, 'Oturum açmanız gerekiyor.');
         }
-        if (!Auth::can($user, 'boards.restore')) {
+        if (!Auth::can($user, 'devices.restore')) {
             throw ApiError::forbidden();
         }
         header('X-Auth-User: ' . $user['username']);

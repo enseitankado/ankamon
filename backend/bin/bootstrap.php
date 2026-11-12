@@ -53,24 +53,24 @@ if (!Db::value('SELECT 1 FROM users WHERE username = ?', [Auth::ADMIN_USERNAME])
     echo "etapadmin hesabı oluşturuldu.\n";
 }
 
-// Eski tek-anahtarlı kurulumlardan geçiş: 'board_access' varsa ve 'ssh_access' yoksa taşı.
-$legacy = Db::value("SELECT value FROM settings WHERE key = 'board_access'");
+// Eski tek-anahtarlı kurulumlardan geçiş: 'device_access' varsa ve 'ssh_access' yoksa taşı.
+$legacy = Db::value("SELECT value FROM settings WHERE key = 'device_access'");
 if ($legacy !== null && Db::value("SELECT 1 FROM settings WHERE key = 'ssh_access'") === null) {
     Settings::set('ssh_access', json_decode((string) $legacy, true));
-    echo "Eski 'board_access' ayarı 'ssh_access' olarak taşındı.\n";
+    echo "Eski 'device_access' ayarı 'ssh_access' olarak taşındı.\n";
 }
 
 if (Db::value("SELECT 1 FROM settings WHERE key = 'ssh_access'") === null) {
     Settings::set('ssh_access', [
-        'user' => getenv('BOARD_SSH_USER') ?: 'root',
-        'password' => getenv('BOARD_SSH_PASSWORD') ?: '',
+        'user' => getenv('DEVICE_SSH_USER') ?: 'root',
+        'password' => getenv('DEVICE_SSH_PASSWORD') ?: '',
     ]);
     echo "SSH erişim bilgileri ayarlara yazıldı.\n";
 }
 if (Db::value("SELECT 1 FROM settings WHERE key = 'samba_access'") === null) {
     Settings::set('samba_access', [
-        'user' => getenv('BOARD_SMB_USER') ?: 'root',
-        'password' => getenv('BOARD_SMB_PASSWORD') ?: '',
+        'user' => getenv('DEVICE_SMB_USER') ?: 'root',
+        'password' => getenv('DEVICE_SMB_PASSWORD') ?: '',
     ]);
     echo "Samba erişim bilgileri ayarlara yazıldı.\n";
 }

@@ -37,8 +37,8 @@ use Ankamon\Core\Request;
 
 /**
  * Wi-Fi Monitör "sabit" vericileri (wifimon_fixed_emitters — bkz. göç 040). Sınıfta telefon ararken okulun/sınıfın olağan
- * ağları ve cihazları bu listeye alınır; arayüz (ui.boards.WifiMonitor) gerisini "yabancı" olarak öne çıkarır.
- * kind: ssid (ağ adı, bütün erişim noktaları) | bssid | bt | probe; board_id NULL = bütün cihazlar.
+ * ağları ve cihazları bu listeye alınır; arayüz (ui.devices.WifiMonitor) gerisini "yabancı" olarak öne çıkarır.
+ * kind: ssid (ağ adı, bütün erişim noktaları) | bssid | bt | probe; device_id NULL = bütün cihazlar.
  * Okuma ve değiştirme "screen" yetkisi ister (Wi-Fi Monitör'ü açabilen herkes; bkz. routes.php).
  */
 final class WifimonFixedEmittersApi
@@ -49,20 +49,20 @@ final class WifimonFixedEmittersApi
     public function index(Request $request): array
     {
         $rows = Db::all(
-            "SELECT f.id, f.kind, f.value, f.board_id, f.label, f.created_by,
+            "SELECT f.id, f.kind, f.value, f.device_id, f.label, f.created_by,
                     (extract(epoch FROM f.created_at) * 1000)::bigint AS created_ts,
-                    coalesce(nullif(b.label, ''), b.hostname, host(b.ip)) AS board_name
-             FROM wifimon_fixed_emitters f LEFT JOIN boards b ON b.id = f.board_id
-             ORDER BY f.board_id NULLS FIRST, f.kind, f.value"
+                    coalesce(nullif(b.label, ''), b.hostname, host(b.ip)) AS device_name
+             FROM wifimon_fixed_emitters f LEFT JOIN devices b ON b.id = f.device_id
+             ORDER BY f.device_id NULLS FIRST, f.kind, f.value"
         );
         foreach ($rows as &$row) {
             $row['id'] = (int) $row['id'];
-            $row['board_id'] = $row['board_id'] === null ? null : (int) $row['board_id'];
+            $row['device_id'] = $row['device_id'] === null ? null : (int) $row['device_id'];
         }
         return ['fixed' => $rows];
     }
 
-    /** Toplu ekleme: items [{kind, value, board_id?, label?}]; zaten olanlar atlanır. */
+    /** Toplu ekleme: items [{kind, value, device_id?, label?}]; zaten olanlar atlanır. */
     public function create(Request $request, array $user): array
     {
         $items = $request->input('items', []);
@@ -75,11 +75,11 @@ final class WifimonFixedEmittersApi
         $clean = array_map([self::class, 'validatedFixedEmitter'], $items);
         $added = Db::transaction(static function () use ($clean, $user): int {
             $count = 0;
-            foreach ($clean as [$kind, $value, $boardId, $label]) {
+            foreach ($clean as [$kind, $value, $deviceId, $label]) {
                 $count += Db::exec(
-                    'INSERT INTO wifimon_fixed_emitters (kind, value, board_id, label, created_by) VALUES (?, ?, ?, ?, ?)
-                     ON CONFLICT (kind, value, coalesce(board_id, 0)) DO NOTHING',
-                    [$kind, $value, $boardId, $label, (string) ($user['username'] ?? '—')]
+                    'INSERT INTO wifimon_fixed_emitters (kind, value, device_id, label, created_by) VALUES (?, ?, ?, ?, ?)
+                     ON CONFLICT (kind, value, coalesce(device_id, 0)) DO NOTHING',
+                    [$kind, $value, $deviceId, $label, (string) ($user['username'] ?? '—')]
                 );
             }
             return $count;
@@ -95,13 +95,13 @@ final class WifimonFixedEmittersApi
             throw ApiError::badRequest('Sabit listesinden çıkarılacak kayıt seçilmedi.');
         }
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $removed = Db::all("DELETE FROM wifimon_fixed_emitters WHERE id IN ($placeholders) RETURNING kind, value, board_id", $ids);
+        $removed = Db::all("DELETE FROM wifimon_fixed_emitters WHERE id IN ($placeholders) RETURNING kind, value, device_id", $ids);
         Audit::log($user, $request, 'wifimon.fixed.delete', '', ['count' => count($removed), 'removed' => array_slice($removed, 0, 50)]);
         return ['ok' => true, 'deleted' => count($removed)];
     }
 
     /**
-     * Toplu kapsam değişikliği (kullanıcı isteği 2026-11-10): ids [..], board_id null = okul geneli, sayı = o cihazın sınıfı.
+     * Toplu kapsam değişikliği (kullanıcı isteği 2026-11-10): ids [..], device_id null = okul geneli, sayı = o cihazın sınıfı.
      * Hedef kapsamda aynı verici zaten kayıtlıysa taşınan kayıt fazlalıktır, silinir (UNIQUE kind+value+kapsam).
      */
     public function rescope(Request $request, array $user): array
@@ -113,20 +113,20 @@ final class WifimonFixedEmittersApi
         if (count($ids) > self::MAX_ITEMS) {
             throw ApiError::badRequest('Tek seferde en fazla ' . self::MAX_ITEMS . ' kayıt değiştirilebilir.');
         }
-        $raw = $request->input('board_id');
-        $boardId = $raw === null || $raw === '' ? null : (int) $raw;
-        if ($boardId !== null && !Db::value('SELECT 1 FROM boards WHERE id = ?', [$boardId])) {
+        $raw = $request->input('device_id');
+        $deviceId = $raw === null || $raw === '' ? null : (int) $raw;
+        if ($deviceId !== null && !Db::value('SELECT 1 FROM devices WHERE id = ?', [$deviceId])) {
             throw ApiError::badRequest('Cihaz bulunamadı.');
         }
-        [$moved, $merged] = Db::transaction(static function () use ($ids, $boardId): array {
+        [$moved, $merged] = Db::transaction(static function () use ($ids, $deviceId): array {
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
             // Hedefte zaten olanlar (ya da seçilenlerin kendi aralarında aynı vericinin birden çok kaydı): biri kalır.
             $merged = Db::exec(
                 "DELETE FROM wifimon_fixed_emitters f WHERE f.id IN ($placeholders)
-                   AND coalesce(f.board_id, 0) <> coalesce(?::int, 0)
+                   AND coalesce(f.device_id, 0) <> coalesce(?::int, 0)
                    AND EXISTS (SELECT 1 FROM wifimon_fixed_emitters g
-                               WHERE g.kind = f.kind AND g.value = f.value AND coalesce(g.board_id, 0) = coalesce(?::int, 0))",
-                [...$ids, $boardId, $boardId]
+                               WHERE g.kind = f.kind AND g.value = f.value AND coalesce(g.device_id, 0) = coalesce(?::int, 0))",
+                [...$ids, $deviceId, $deviceId]
             );
             $merged += Db::exec(
                 "DELETE FROM wifimon_fixed_emitters f WHERE f.id IN ($placeholders)
@@ -135,13 +135,13 @@ final class WifimonFixedEmittersApi
                 [...$ids, ...$ids]
             );
             $moved = Db::exec(
-                "UPDATE wifimon_fixed_emitters SET board_id = ?
-                 WHERE id IN ($placeholders) AND coalesce(board_id, 0) <> coalesce(?::int, 0)",
-                [$boardId, ...$ids, $boardId]
+                "UPDATE wifimon_fixed_emitters SET device_id = ?
+                 WHERE id IN ($placeholders) AND coalesce(device_id, 0) <> coalesce(?::int, 0)",
+                [$deviceId, ...$ids, $deviceId]
             );
             return [$moved, $merged];
         });
-        Audit::log($user, $request, 'wifimon.fixed.rescope', '', ['count' => count($ids), 'board_id' => $boardId,
+        Audit::log($user, $request, 'wifimon.fixed.rescope', '', ['count' => count($ids), 'device_id' => $deviceId,
             'moved' => $moved, 'merged' => $merged, 'ids' => array_slice($ids, 0, 50)]);
         return ['ok' => true, 'moved' => $moved, 'merged' => $merged];
     }
@@ -165,11 +165,11 @@ final class WifimonFixedEmittersApi
                 throw ApiError::badRequest('Geçersiz adres: ' . $value);
             }
         }
-        $boardId = isset($item['board_id']) && $item['board_id'] !== null && $item['board_id'] !== '' ? (int) $item['board_id'] : null;
-        if ($boardId !== null && !Db::value('SELECT 1 FROM boards WHERE id = ?', [$boardId])) {
+        $deviceId = isset($item['device_id']) && $item['device_id'] !== null && $item['device_id'] !== '' ? (int) $item['device_id'] : null;
+        if ($deviceId !== null && !Db::value('SELECT 1 FROM devices WHERE id = ?', [$deviceId])) {
             throw ApiError::badRequest('Cihaz bulunamadı.');
         }
         $label = mb_substr(trim((string) ($item['label'] ?? '')), 0, 120);
-        return [$kind, $value, $boardId, $label];
+        return [$kind, $value, $deviceId, $label];
     }
 }

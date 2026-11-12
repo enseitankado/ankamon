@@ -119,7 +119,7 @@ qx.Class.define("ankamon.page.Network", {
       { id: "activity", label: "Ağ etkinliği", hint: "Göreli ağ yoğunluğu 0–100 (anlık en yüksek görülen akış = 100; pasif gözlem). Ham değer: 'Ağ akışı' sütunu.", width: 120 },
       { id: "activity_detail", label: "Ağ akışı", hint: "Görülen akış ayrıntısı: kbit/sn + baskın protokol; görünür akış yoksa Windows IP-ID gönderim hızı (sakin/boş).", width: 170 },
       // Sensörler: bağlı cihaz kaydına son 24 saatte sensör verisi geldi mi — Var/Yok (kullanıcı isteği 2026-11-12;
-      // backend Core\BoardSensors::lastSeenAll). Sona eklendi: servis/paylaşım alt satırları sabit sütun sırası kullanır.
+      // backend Core\DeviceSensors::lastSeenAll). Sona eklendi: servis/paylaşım alt satırları sabit sütun sırası kullanır.
       { id: "sensors", label: "Sensörler", hint: "Sensör verisi geliyor mu (son 24 saat)", width: 90, choices: true }
       // Ayrı "Takma ad" (MAC kaydı) sütunu yok (kullanıcı isteği, 2026-10-19: "Takma ad / Ad" ile yineleniyordu);
       // MAC ↔ takma ad kaydı "Takma ad / Ad"ın kendisini besler — bkz. ui.network.Ops.deviceName (known_alias).
@@ -617,7 +617,7 @@ qx.Class.define("ankamon.page.Network", {
         this.__showDetails(devices[0]);
         return;
       }
-      ankamon.ui.network.DeviceBulkEdit.open({ devices, user: this._user, onSaved: () => this.refresh() });
+      ankamon.ui.network.DeviceBulkEdit.open({ assets: devices, user: this._user, onSaved: () => this.refresh() });
     },
 
     async __remove(devices) {
@@ -729,7 +729,7 @@ qx.Class.define("ankamon.page.Network", {
      */
     __showDetails(device) {
       if (device) {
-        ankamon.ui.network.DeviceWindow.open({ device, user: this._user, onSaved: () => this.refresh() });
+        ankamon.ui.network.DeviceWindow.open({ asset: device, user: this._user, onSaved: () => this.refresh() });
       }
     },
 
@@ -759,7 +759,7 @@ qx.Class.define("ankamon.page.Network", {
     __rowMenu(device, devices) {
       const menu = new qx.ui.menu.Menu();
       const ICON = ankamon.ui.Shell.ICON;
-      const add = (icon, label, handler) => menu.add(ankamon.ui.BoardOps.menuButton(icon, label, handler));
+      const add = (icon, label, handler) => menu.add(ankamon.ui.DeviceOps.menuButton(icon, label, handler));
       const count = devices.length > 1 ? ` (${devices.length} cihaz)` : "";
       add(ICON.info, "Bilgisayar ayrıntıları", () => this.__showDetails(device));
       menu.add(new qx.ui.menu.Separator());

@@ -43,7 +43,7 @@ log = logging.getLogger(__name__)
 
 _BATCH = 5000
 _MAX_BATCHES = 20
-_LAG = datetime.timedelta(seconds=20)         # oturum kaydı önce yazılsın (board_sessions hızlı döngüde)
+_LAG = datetime.timedelta(seconds=20)         # oturum kaydı önce yazılsın (device_sessions hızlı döngüde)
 _SENSOR_LAG = datetime.timedelta(minutes=15)  # 5 dk özetleri gecikmeli tazelenir
 _EPOCH = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 
@@ -85,14 +85,14 @@ class _Sessions:
 
     def __init__(self, conn, start, end):
         rows = conn.execute(
-            """SELECT id, host, board_id, username, started_at, ended_at FROM board_sessions
+            """SELECT id, host, device_id, username, started_at, ended_at FROM device_sessions
                WHERE started_at <= %s AND (ended_at IS NULL OR ended_at >= %s)""", (end, start)).fetchall()
         self.by_host: dict[str, list] = {}
-        self.by_board: dict[int, list] = {}
+        self.by_device: dict[int, list] = {}
         for r in rows:
             self.by_host.setdefault(r["host"].lower(), []).append(r)
-            if r["board_id"]:
-                self.by_board.setdefault(r["board_id"], []).append(r)
+            if r["device_id"]:
+                self.by_device.setdefault(r["device_id"], []).append(r)
 
     @staticmethod
     def _at(rows, when):
@@ -102,22 +102,22 @@ class _Sessions:
     def host(self, host, when):
         return self._at(self.by_host.get(host), when)
 
-    def board(self, board_id, when):
-        return self._at(self.by_board.get(board_id), when)
+    def device(self, device_id, when):
+        return self._at(self.by_device.get(device_id), when)
 
 
 def _insert(conn, rows: list[tuple]) -> None:
     if rows:
         with conn.cursor() as cur:
             cur.executemany(
-                """INSERT INTO session_activity (at, board_id, board_name, session_id, username, kind, summary, detail, source)
+                """INSERT INTO session_activity (at, device_id, device_name, session_id, username, kind, summary, detail, source)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""", rows)
 
 
-def _boards(conn):
+def _devices(conn):
     rows = conn.execute(
         """SELECT id, lower(hostname) AS host, COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name,
-                  COALESCE((facts->>'cpu_cores')::int, 4) AS cores FROM boards""").fetchall()
+                  COALESCE((facts->>'cpu_cores')::int, 4) AS cores FROM devices""").fetchall()
     return {r["host"]: r for r in rows if r["host"]}, {r["id"]: r for r in rows}
 
 
@@ -163,9 +163,9 @@ def _from_logs(conn, by_host) -> None:
                 previous = _polkit_failed.get((host, hit[2]))
                 if previous and r["received_at"] - previous <= _POLKIT_PAIR:
                     continue
-            board = by_host.get(host)
+            device = by_host.get(host)
             username = hit[2] if hit[2] and hit[0] in _ACTOR_KINDS else (session["username"] if session else hit[2])
-            row = (r["received_at"], board["id"] if board else None, board["name"] if board else r["host"],
+            row = (r["received_at"], device["id"] if device else None, device["name"] if device else r["host"],
                    session["id"] if session else None, username,
                    hit[0], hit[1], rules.mask_secrets(message)[:1000], r["program"])
             if rules.is_group_add(hit[1]):
@@ -194,22 +194,22 @@ def _from_ankamon(conn, by_id) -> None:
     _from_logs'ta ham log satırıyla (detail) ve ret bilgisiyle "yetki" türünde üretilir, ikisi birden çift satır olurdu."""
     since = _cursor(conn, "session_activity.ankamon")
     rows = conn.execute(
-        """SELECT at, board_id, board_name, kind, text, source FROM (
-             SELECT time AS at, board_id, board_name, 'komut' AS kind, username || ': ' || left(command, 240) AS text, source
-               FROM command_log WHERE time > %(s)s AND board_id IS NOT NULL AND source IS DISTINCT FROM 'local'
-             UNION ALL SELECT taken_at, board_id, board_name, 'goruntu', taken_by || ': ekran görüntüsü aldı', 'screenshot'
-               FROM screenshots WHERE taken_at > %(s)s AND board_id IS NOT NULL
-             UNION ALL SELECT sent_at, board_id, board_name, 'sohbet', author || ': sohbet iletisi', 'chat'
-               FROM chat_messages WHERE sent_at > %(s)s AND board_id IS NOT NULL
+        """SELECT at, device_id, device_name, kind, text, source FROM (
+             SELECT time AS at, device_id, device_name, 'komut' AS kind, username || ': ' || left(command, 240) AS text, source
+               FROM command_log WHERE time > %(s)s AND device_id IS NOT NULL AND source IS DISTINCT FROM 'local'
+             UNION ALL SELECT taken_at, device_id, device_name, 'goruntu', taken_by || ': ekran görüntüsü aldı', 'screenshot'
+               FROM screenshots WHERE taken_at > %(s)s AND device_id IS NOT NULL
+             UNION ALL SELECT sent_at, device_id, device_name, 'sohbet', author || ': sohbet iletisi', 'chat'
+               FROM chat_messages WHERE sent_at > %(s)s AND device_id IS NOT NULL
            ) x WHERE at < now() ORDER BY at LIMIT %(n)s""", {"s": since, "n": _BATCH}).fetchall()
     if not rows:
         return
     sessions = _Sessions(conn, rows[0]["at"], rows[-1]["at"])
     out = []
     for r in rows:
-        session = sessions.board(r["board_id"], r["at"])
+        session = sessions.device(r["device_id"], r["at"])
         username = session["username"] if session else None
-        out.append((r["at"], r["board_id"], r["board_name"], session["id"] if session else None,
+        out.append((r["at"], r["device_id"], r["device_name"], session["id"] if session else None,
                     username, "ankamon", "Ankamon — " + r["text"], None, r["source"]))
     with conn.transaction():
         _insert(conn, out)
@@ -223,10 +223,10 @@ def _from_sensors(conn, by_id) -> None:
         since = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)
     until = datetime.datetime.now(datetime.timezone.utc) - _SENSOR_LAG
     rows = conn.execute(
-        r"""SELECT t.board_id::int AS board_id, m.time, t.name,
+        r"""SELECT t.device_id::int AS device_id, m.time, t.name,
                    CASE WHEN t.name = 'node_load1' THEN max(m.max) ELSE sum(m.max - m.min) END AS v
             FROM metrics_5m m JOIN metrics_tag t USING (tag_id)
-            WHERE m.time > %s AND m.time <= %s AND t.board_id ~ '^\d+$'
+            WHERE m.time > %s AND m.time <= %s AND t.device_id ~ '^\d+$'
               AND (t.name = 'node_load1' OR (t.name IN ('node_network_receive_bytes_total', 'node_network_transmit_bytes_total')
                    AND t.device <> 'lo' AND t.device !~ '^(docker|veth|br-)'))
             GROUP BY 1, 2, 3 ORDER BY 2 LIMIT 50000""", (since, until)).fetchall()
@@ -235,25 +235,25 @@ def _from_sensors(conn, by_id) -> None:
     sessions = _Sessions(conn, rows[0]["time"], rows[-1]["time"])
     out, last = [], {}
     for r in rows:
-        board = by_id.get(r["board_id"])
-        if not board or r["v"] is None:
+        device = by_id.get(r["device_id"])
+        if not device or r["v"] is None:
             continue
         if r["name"] == "node_load1":
-            if r["v"] < board["cores"]:
+            if r["v"] < device["cores"]:
                 continue
-            source, text = "sensor:cpu", f"Yüksek işlemci yükü (yük {r['v']:.1f}, {board['cores']} çekirdek)"
+            source, text = "sensor:cpu", f"Yüksek işlemci yükü (yük {r['v']:.1f}, {device['cores']} çekirdek)"
         else:
             mb = r["v"] / 1048576
             if mb < NET_MB:
                 continue
             down = "receive" in r["name"]
             source, text = "sensor:rx" if down else "sensor:tx", f"Yoğun ağ {'indirme' if down else 'yükleme'} (5 dakikada {mb:.0f} MB)"
-        key = (r["board_id"], source)
+        key = (r["device_id"], source)
         if key in last and r["time"] - last[key] <= _REPEAT:
             continue
         last[key] = r["time"]
-        session = sessions.board(r["board_id"], r["time"])
-        out.append((r["time"], r["board_id"], board["name"], session["id"] if session else None,
+        session = sessions.device(r["device_id"], r["time"])
+        out.append((r["time"], r["device_id"], device["name"], session["id"] if session else None,
                     session["username"] if session else None, "sensor", text, None, source))
     with conn.transaction():
         _insert(conn, out)
@@ -261,7 +261,7 @@ def _from_sensors(conn, by_id) -> None:
 
 
 def run(conn) -> None:
-    by_host, by_id = _boards(conn)
+    by_host, by_id = _devices(conn)
     _from_logs(conn, by_host)
     _from_ankamon(conn, by_id)
     _from_sensors(conn, by_id)

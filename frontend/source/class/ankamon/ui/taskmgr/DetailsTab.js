@@ -155,8 +155,8 @@ qx.Class.define("ankamon.ui.taskmgr.DetailsTab", {
       const rows = [];
       this._links().forEach(link => {
         const m = link.getModel();
-        const whole = this._win.boardMatches(link, q);
-        const board = link.getDisplay();
+        const whole = this._win.deviceMatches(link, q);
+        const device = link.getDisplay();
         m.procs.forEach(p => {
           if ((p.kthread && !all) || (q && !whole && !p.name.toLowerCase().includes(q) && String(p.pid) !== q &&
             !(p.cmd || "").toLowerCase().includes(q) && !p.user.toLowerCase().includes(q))) {
@@ -164,7 +164,7 @@ qx.Class.define("ankamon.ui.taskmgr.DetailsTab", {
           }
           rows.push([this._rowId(link, p.pid), p.name, p.pid, F.state(p.state, p.eco), p.user, Math.round(p.cpu), p.mem, p.cmd || `[${p.name}]`,
             F.priority(p.nice) + ` (nice ${p.nice})`, p.threads, p.disk, p.net, p.ppid,
-            F.cpuTime(p.ticks / (m.hz || 100)), p.exe || "", board]);
+            F.cpuTime(p.ticks / (m.hz || 100)), p.exe || "", device]);
         });
       });
       // Kullanıcı sütun başlığından sıralama seçmediyse ada göre (Windows varsayılanı; çok cihazda aynı ad cihaza

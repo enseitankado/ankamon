@@ -140,13 +140,13 @@ qx.Class.define("ankamon.ui.taskmgr.ServicesTab", {
       let running = 0;
       links.forEach(link => {
         const items = link.getModel().services;
-        const whole = this._win.boardMatches(link, q);
-        const board = link.getDisplay();
+        const whole = this._win.deviceMatches(link, q);
+        const device = link.getDisplay();
         total += items.length;
         running += items.filter(s => s.active === "active").length;
         items.filter(s => whole || !q || s.name.toLowerCase().includes(q) || (s.desc || "").toLowerCase().includes(q) || String(s.pid) === q)
           .forEach(s => rows.push([this._rowId(link, s.name), s.name.replace(/\.service$/, ""), s.pid || "", s.desc || "",
-            S.STATE[s.active] || s.active, S.START[s.file_state] ?? s.file_state, s.sub || "", board]));
+            S.STATE[s.active] || s.active, S.START[s.file_state] ?? s.file_state, s.sub || "", device]));
       });
       // İşlem iletisi (__act) 6 sn görünür, sonra özet.
       if (!this.__msgAt || Date.now() - this.__msgAt > 6000) {

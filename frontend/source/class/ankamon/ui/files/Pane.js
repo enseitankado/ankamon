@@ -41,12 +41,12 @@ qx.Class.define("ankamon.ui.files.Pane", {
 
   /**
    * @param caption {String} panel başlığı ("Kaynak", "Hedef")
-   * @param boards {Array} seçilebilecek cihazlar [{id, name}]
-   * @param boardId {Number} başlangıç cihazı
+   * @param devices {Array} seçilebilecek cihazlar [{id, name}]
+   * @param deviceId {Number} başlangıç cihazı
    * @param path {String} başlangıç dizini
    * @param user {Map?} oturum sahibi: verilirse sütun sırası/gizleme kullanıcı başına sunucuda saklanır
    */
-  construct(caption, boards, boardId, path, user) {
+  construct(caption, devices, deviceId, path, user) {
     super(new qx.ui.layout.VBox(6));
     this.__path = path || "/home";
     this.__user = user || null;
@@ -54,16 +54,16 @@ qx.Class.define("ankamon.ui.files.Pane", {
 
     const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(6).set({ alignY: "middle" }));
     head.add(new qx.ui.basic.Label(caption).set({ font: "bold" }));
-    this.__boardBox = new qx.ui.form.SelectBox().set({ minWidth: 180 });
-    boards.forEach(b => {
+    this.__deviceBox = new qx.ui.form.SelectBox().set({ minWidth: 180 });
+    devices.forEach(b => {
       const item = new qx.ui.form.ListItem(b.name, null, b.id);
-      this.__boardBox.add(item);
-      if (b.id === boardId) {
-        this.__boardBox.setSelection([item]);
+      this.__deviceBox.add(item);
+      if (b.id === deviceId) {
+        this.__deviceBox.setSelection([item]);
       }
     });
-    this.__boardBox.addListener("changeSelection", () => this.load("/home"));
-    head.add(this.__boardBox, { flex: 1 });
+    this.__deviceBox.addListener("changeSelection", () => this.load("/home"));
+    head.add(this.__deviceBox, { flex: 1 });
     this.add(head);
 
     const nav = new qx.ui.container.Composite(new qx.ui.layout.HBox(4).set({ alignY: "middle" }));
@@ -110,7 +110,7 @@ qx.Class.define("ankamon.ui.files.Pane", {
     __user: null,
     __items: null,
     __info: null,
-    __boardBox: null,
+    __deviceBox: null,
     __pathField: null,
     __table: null,
     __status: null,
@@ -118,13 +118,13 @@ qx.Class.define("ankamon.ui.files.Pane", {
     __deleteButton: null,
     __loading: 0,
 
-    getBoardId() {
-      const sel = this.__boardBox.getSelection()[0];
+    getDeviceId() {
+      const sel = this.__deviceBox.getSelection()[0];
       return sel ? sel.getModel() : null;
     },
 
-    getBoardName() {
-      const sel = this.__boardBox.getSelection()[0];
+    getDeviceName() {
+      const sel = this.__deviceBox.getSelection()[0];
       return sel ? sel.getLabel() : "";
     },
 
@@ -150,14 +150,14 @@ qx.Class.define("ankamon.ui.files.Pane", {
     },
 
     async load(path) {
-      const board = this.getBoardId();
-      if (board === null) {
+      const device = this.getDeviceId();
+      if (device === null) {
         return;
       }
       const token = ++this.__loading;
       this.__status.setValue("Yükleniyor…");
       try {
-        const res = await ankamon.ui.files.Api.list(board, path);
+        const res = await ankamon.ui.files.Api.list(device, path);
         if (token !== this.__loading) {
           return; // bu arada başka bir dizin istendi
         }
@@ -287,7 +287,7 @@ qx.Class.define("ankamon.ui.files.Pane", {
         return;
       }
       try {
-        await ankamon.ui.files.Api.post("/mkdir", { board: this.getBoardId(), path: this.__path, name });
+        await ankamon.ui.files.Api.post("/mkdir", { device: this.getDeviceId(), path: this.__path, name });
         await this.reload();
       } catch (e) {
         ankamon.ui.Dialog.error(e);
@@ -306,7 +306,7 @@ qx.Class.define("ankamon.ui.files.Pane", {
       }
       try {
         await ankamon.ui.files.Api.post("/rename",
-          { board: this.getBoardId(), path: this.__join(this.__path, names[0]), name });
+          { device: this.getDeviceId(), path: this.__join(this.__path, names[0]), name });
         await this.reload();
       } catch (e) {
         ankamon.ui.Dialog.error(e);
@@ -322,7 +322,7 @@ qx.Class.define("ankamon.ui.files.Pane", {
       const shown = names.slice(0, 8).map(n => "• " + esc(n)).join("<br>") +
         (names.length > 8 ? `<br>… ve ${names.length - 8} öğe daha` : "");
       const ok = await ankamon.ui.Dialog.confirm(
-        `<b>${esc(this.getBoardName())}</b> cihazında <b>${esc(this.__path)}</b> içinden ` +
+        `<b>${esc(this.getDeviceName())}</b> cihazında <b>${esc(this.__path)}</b> içinden ` +
         `${names.length} öğe <b>kalıcı olarak</b> silinsin mi? Klasörler içerikleriyle birlikte silinir.<br><br>${shown}`,
         "Sil");
       if (!ok) {
@@ -330,7 +330,7 @@ qx.Class.define("ankamon.ui.files.Pane", {
       }
       try {
         await ankamon.ui.files.Api.post("/delete",
-          { board: this.getBoardId(), paths: names.map(n => this.__join(this.__path, n)) });
+          { device: this.getDeviceId(), paths: names.map(n => this.__join(this.__path, n)) });
         await this.reload();
       } catch (e) {
         ankamon.ui.Dialog.error(e);

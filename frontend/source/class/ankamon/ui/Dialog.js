@@ -62,7 +62,7 @@ qx.Class.define("ankamon.ui.Dialog", {
      * (tema appearance'ından bağımsız) bütün temalarda tutarlı çalışır.
      *
      * Uygulama açılışında bir kez çağrılır (bkz. Application.main): qx.ui.window.Window'ın alt öğe kurucusu
-     * yamalanır, böylece Ankamon'da açılan HER pencere — Dialog.window, Jobs, BoardOps, Window'dan türeyen
+     * yamalanır, böylece Ankamon'da açılan HER pencere — Dialog.window, Jobs, DeviceOps, Window'dan türeyen
      * sınıflar (Görev yöneticisi, dosya kopyalama/toplu işlem) ve eklentilerinkiler — açan kod bir şey
      * çağırmadan ince başlıkla doğar (önceden pencere başına çağrılıyordu, bazı pencereler kalın kalmıştı).
      */

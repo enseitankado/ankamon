@@ -41,11 +41,11 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
 
   /**
    * @param page {ankamon.page.Leagues} yetki denetimi (_can) için
-   * @param by {String} "users" | "boards" — sıralanan (sekme başına sabit; etiket/kimlik page.Leagues TABS'tan)
+   * @param by {String} "users" | "devices" — sıralanan (sekme başına sabit; etiket/kimlik page.Leagues TABS'tan)
    */
   construct(page, by) {
     super("Kullanım sıralaması"); // eski adı "Şampiyonlar Ligi" (Ligler sayfası — bkz. page.Leagues)
-    this.__byFixed = by === "boards" ? "boards" : "users";
+    this.__byFixed = by === "devices" ? "devices" : "users";
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
 
@@ -54,7 +54,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
     refresh.addListener("execute", () => this.load());
     bar.add(refresh);
     this.__out = ankamon.ui.sessions.LeagueExclusions.toolbar(bar, {
-      league: "session", page, kind: () => this.__byKey() === "boards" ? "board" : "user", onChange: () => this.load()
+      league: "session", page, kind: () => this.__byKey() === "devices" ? "device" : "user", onChange: () => this.load()
     });
     this.__status = new qx.ui.basic.Label("").set({ textColor: "app-muted", alignY: "middle" });
     bar.add(this.__status, { flex: 1 });
@@ -137,7 +137,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
         const by = this.__byKey();
         const data = await ankamon.io.Api.get(`/session-league?by=${by}` + (this.__out.withExcluded() ? "&with_excluded=1" : ""));
         this.__out.setInfo(data.excluded);
-        this.__renderLeague(data.periods || [], by === "boards");
+        this.__renderLeague(data.periods || [], by === "devices");
         this.__status.setValue("Cihazlarda açık kalınan toplam oturum süresine göre · etapadmin ve root sayılmaz · " +
           "güncelleme: " + new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
       } catch (e) {
@@ -169,17 +169,17 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
         ? this.__leagueDate(p.from) : `${this.__leagueDate(p.from)} – ${this.__leagueDate(lastYmd)}`;
     },
 
-    __leaderTip(r, rank, boards) {
+    __leaderTip(r, rank, devices) {
       const F = ankamon.util.Format;
       const out = r.excluded ? "\n(sıralama dışı)" : "";
-      if (boards) {
-        return `${rank}. ${r.board}` + (r.board !== r.host ? ` (${r.host})` : "") +
+      if (devices) {
+        return `${rank}. ${r.device}` + (r.device !== r.host ? ` (${r.host})` : "") +
           `\nToplam: ${F.duration(r.seconds)}\n${r.days} gün · ${r.sessions} oturum · ${r.users} kullanıcı` +
           (r.top_user ? `\nEn çok kullanan: ${r.top_user}` : "") + out;
       }
       return `${rank}. ${r.full_name || r.username}` + (r.full_name ? ` (${r.username})` : "") +
-        `\nToplam: ${F.duration(r.seconds)}\n${r.days} gün · ${r.sessions} oturum · ${r.boards} cihaz` +
-        (r.board ? `\nEn çok kullandığı cihaz: ${r.board}` : "") + out;
+        `\nToplam: ${F.duration(r.seconds)}\n${r.days} gün · ${r.sessions} oturum · ${r.devices} cihaz` +
+        (r.device ? `\nEn çok kullandığı cihaz: ${r.device}` : "") + out;
     },
 
     /** Kart altı: dönemde süresi olan lig dışı sayısı (gizliyse "sayılmadı", gösteriliyorsa "dahil"). */
@@ -187,17 +187,17 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
       return p.excluded_count ? ` · ${p.excluded_count} sıralama dışı ${shown ? "dahil" : "sayılmadı"}` : "";
     },
 
-    __renderLeague(periods, boards) {
+    __renderLeague(periods, devices) {
       const F = ankamon.util.Format;
       const esc = qx.bom.String.escape;
       const medals = ankamon.ui.sessions.ChampionsLeague.LEAGUE_MEDALS;
       const outTag = r => r.excluded ? `<span class="lg-outtag">sıralama dışı</span>` : "";
-      const name = r => esc(boards ? r.board : (r.full_name || r.username));
-      const sub = r => boards ? r.top_user : r.board;
+      const name = r => esc(devices ? r.device : (r.full_name || r.username));
+      const sub = r => devices ? r.top_user : r.device;
       const shown = this.__out.withExcluded();
       // Sağ tık menüsünün kimliği: kullanıcı adı ya da cihaz host adı (league_exclusions.value).
-      const menuAttrs = r => ankamon.ui.sessions.LeagueExclusions.rowAttrs(boards ? "board" : "user",
-        boards ? r.host : r.username, boards ? r.board : (r.full_name || r.username), r.excluded);
+      const menuAttrs = r => ankamon.ui.sessions.LeagueExclusions.rowAttrs(devices ? "device" : "user",
+        devices ? r.host : r.username, devices ? r.device : (r.full_name || r.username), r.excluded);
 
       const card = p => {
         const rows = p.leaders || [];
@@ -211,18 +211,18 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
         // Kürsü: 2. solda, 1. ortada (en yüksek), 3. sağda.
         const podium = [1, 0, 2].filter(i => rows[i]).map(i => {
           const r = rows[i];
-          return `<div class="lg-step lg-step${i + 1}${r.excluded ? " lg-out" : ""}"${menuAttrs(r)} title="${esc(this.__leaderTip(r, i + 1, boards))}">` +
+          return `<div class="lg-step lg-step${i + 1}${r.excluded ? " lg-out" : ""}"${menuAttrs(r)} title="${esc(this.__leaderTip(r, i + 1, devices))}">` +
             (i === 0 ? `<div class="lg-crown">🏆</div>` : "") +
             `<div class="lg-pname">${name(r)}</div><div class="lg-ptime">${esc(F.duration(r.seconds))}</div>` +
             `<div class="lg-block" style="background:${medals[i]}">${i + 1}</div></div>`;
         }).join("");
         const bars = rows.map((r, i) =>
-          `<div class="lg-row${i === 0 ? " lg-lead" : ""}${r.excluded ? " lg-out" : ""}"${menuAttrs(r)} title="${esc(this.__leaderTip(r, i + 1, boards))}">` +
+          `<div class="lg-row${i === 0 ? " lg-lead" : ""}${r.excluded ? " lg-out" : ""}"${menuAttrs(r)} title="${esc(this.__leaderTip(r, i + 1, devices))}">` +
           `<span class="lg-rank" ${i < 3 ? `style="background:${medals[i]};color:#fff"` : ""}>${i + 1}</span>` +
           `<span class="lg-name">${name(r)}${sub(r) || r.excluded ? `<small>${outTag(r)}${esc(sub(r) || "")}</small>` : ""}</span>` +
           `<span class="lg-track"><span class="lg-bar" style="width:${Math.max(2, r.seconds / top * 100).toFixed(1)}%"></span></span>` +
           `<span class="lg-time">${esc(F.duration(r.seconds))}</span></div>`).join("");
-        const foot = `<div class="lg-foot">${p.participants} ${boards ? "cihaz" : "kullanıcı"} · toplam ${esc(F.duration(p.total_seconds))}` +
+        const foot = `<div class="lg-foot">${p.participants} ${devices ? "cihaz" : "kullanıcı"} · toplam ${esc(F.duration(p.total_seconds))}` +
           (p.participants > rows.length ? ` · ilk ${rows.length} gösteriliyor` : "") + this.leagueOutNote(p, shown) + `</div>`;
         return `<div class="lg-card">${head}<div class="lg-podium">${podium}</div><div class="lg-bars">${bars}</div>${foot}</div>`;
       };

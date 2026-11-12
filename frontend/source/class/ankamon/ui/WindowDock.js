@@ -35,7 +35,7 @@
  * pencere yine büyütülmüş).
  *
  * Yeni pencereler kökün "changeActiveWindow" olayından yakalanır (Window.open() pencereyi etkinleştirir) —
- * pencereleri açan kodlara (Dialog.window, BoardOps, Jobs…) tek tek dokunmak gerekmez.
+ * pencereleri açan kodlara (Dialog.window, DeviceOps, Jobs…) tek tek dokunmak gerekmez.
  *
  * İçinde iframe olan pencereler (terminal, dosya yöneticisi, ekran): iframe'e tıklama olayı qooxdoo'ya
  * ulaşmaz, pencere öne gelmezdi; kipsiz pencereler üst üste binebildiğinden iframe'e tıklanınca da

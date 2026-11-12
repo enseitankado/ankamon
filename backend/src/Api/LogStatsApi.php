@@ -44,7 +44,7 @@ use Ankamon\Core\Storage;
  * GERÇEK disk boyutu ayrıştırılamaz. Boyut, tablonun toplam fiziksel boyutunun (Storage::relationBytes
  * — hypertable'da hypertable_size) satır sayısına ORANTILI PAYLAŞTIRILMASIYLA tahmin edilir — arayüzde
  * "~" ile işaretlenmeli.
- * "command_log" sıkıştırılmaz ve board_id sütunu olduğundan eşleme gerekmez, ama aynı tahmin
+ * "command_log" sıkıştırılmaz ve device_id sütunu olduğundan eşleme gerekmez, ama aynı tahmin
  * yöntemi (tutarlılık için) burada da kullanılır.
  */
 final class LogStatsApi
@@ -55,7 +55,7 @@ final class LogStatsApi
     }
 
     /**
-     * Kalıcı silme. Kapsam: type (system|command, zorunlu) + board (cihaz id'si, "unmatched"
+     * Kalıcı silme. Kapsam: type (system|command, zorunlu) + device (cihaz id'si, "unmatched"
      * — cihazsız/eşleşmeyen kayıtlar — ya da boş bırakılırsa TÜM kayıtlar) + isteğe bağlı from/to
      * (ISO 8601; verilmezse tarih sınırı yok — o kapsamdaki HER ŞEY silinir). Geri alınamaz;
      * ne silindiği etkinlik denetim kaydına (audit_log) yazılır.
@@ -63,7 +63,7 @@ final class LogStatsApi
     public function delete(Request $request, array $user): array
     {
         $type = $this->type($request);
-        $board = $request->query('board'); // id (sayısal), "unmatched" ya da null (tüm cihazlar)
+        $device = $request->query('device'); // id (sayısal), "unmatched" ya da null (tüm cihazlar)
         $from = $request->query('from');
         $to = $request->query('to');
 
@@ -79,18 +79,18 @@ final class LogStatsApi
         }
 
         if ($type === 'command') {
-            if ($board === 'unmatched') {
-                $where[] = 'board_id IS NULL';
-            } elseif ($board !== null) {
-                $where[] = 'board_id = ?';
-                $params[] = (int) $board;
+            if ($device === 'unmatched') {
+                $where[] = 'device_id IS NULL';
+            } elseif ($device !== null) {
+                $where[] = 'device_id = ?';
+                $params[] = (int) $device;
             }
             $sql = 'DELETE FROM command_log' . ($where ? ' WHERE ' . implode(' AND ', $where) : '');
         } else {
-            if ($board === 'unmatched') {
-                $where[] = 'NOT EXISTS (SELECT 1 FROM boards b WHERE lower(b.hostname) = lower(logs.host) OR host(b.ip) = logs.from_ip)';
-            } elseif ($board !== null) {
-                $b = Db::one('SELECT hostname, host(ip) AS ip FROM boards WHERE id = ?', [(int) $board])
+            if ($device === 'unmatched') {
+                $where[] = 'NOT EXISTS (SELECT 1 FROM devices b WHERE lower(b.hostname) = lower(logs.host) OR host(b.ip) = logs.from_ip)';
+            } elseif ($device !== null) {
+                $b = Db::one('SELECT hostname, host(ip) AS ip FROM devices WHERE id = ?', [(int) $device])
                     ?? throw ApiError::notFound('Cihaz bulunamadı.');
                 $where[] = '(lower(host) = lower(?) OR from_ip = ?)';
                 array_push($params, (string) $b['hostname'], (string) $b['ip']);
@@ -100,7 +100,7 @@ final class LogStatsApi
 
         [$deleted] = Storage::delete([[$sql, $params]]);
         Audit::log($user, $request, 'logs.delete', $type, [
-            'board' => $board, 'from' => $from, 'to' => $to, 'deleted' => $deleted,
+            'device' => $device, 'from' => $from, 'to' => $to, 'deleted' => $deleted,
         ]);
         return ['ok' => true, 'deleted' => $deleted];
     }
@@ -118,18 +118,18 @@ final class LogStatsApi
                     (extract(epoch FROM max(received_at)) * 1000)::bigint AS last
              FROM logs GROUP BY host, from_ip"
         );
-        $boards = Db::all(
-            "SELECT id, hostname, host(ip) AS ip, COALESCE(NULLIF(label,''), hostname, host(ip)) AS name FROM boards"
+        $devices = Db::all(
+            "SELECT id, hostname, host(ip) AS ip, COALESCE(NULLIF(label,''), hostname, host(ip)) AS name FROM devices"
         );
         $bytesTotal = Storage::relationBytes('logs');
 
-        $byBoard = [];
+        $byDevice = [];
         $unmatched = ['n' => 0, 'first' => null, 'last' => null];
         $grandN = 0;
         foreach ($groups as $g) {
             $grandN += (int) $g['n'];
             $match = null;
-            foreach ($boards as $b) {
+            foreach ($devices as $b) {
                 $hostMatch = $b['hostname'] !== null && $b['hostname'] !== '' && strcasecmp((string) $g['host'], (string) $b['hostname']) === 0;
                 $ipMatch = $g['from_ip'] !== null && $g['from_ip'] === $b['ip'];
                 if ($hostMatch || $ipMatch) {
@@ -138,44 +138,44 @@ final class LogStatsApi
                 }
             }
             if ($match === null) {
-                self::foldLogBoardBucket($unmatched, $g);
+                self::foldLogDeviceBucket($unmatched, $g);
                 continue;
             }
-            $byBoard[$match['id']] ??= ['board_id' => $match['id'], 'name' => $match['name'], 'n' => 0, 'first' => null, 'last' => null];
-            self::foldLogBoardBucket($byBoard[$match['id']], $g);
+            $byDevice[$match['id']] ??= ['device_id' => $match['id'], 'name' => $match['name'], 'n' => 0, 'first' => null, 'last' => null];
+            self::foldLogDeviceBucket($byDevice[$match['id']], $g);
         }
 
-        return $this->logStatsResponseShape(array_values($byBoard), $unmatched, $grandN, $bytesTotal);
+        return $this->logStatsResponseShape(array_values($byDevice), $unmatched, $grandN, $bytesTotal);
     }
 
     private function commandStats(): array
     {
         $groups = Db::all(
-            "SELECT c.board_id, COALESCE(NULLIF(b.label,''), b.hostname, host(b.ip)) AS name, count(*) AS n,
+            "SELECT c.device_id, COALESCE(NULLIF(b.label,''), b.hostname, host(b.ip)) AS name, count(*) AS n,
                     (extract(epoch FROM min(c.time)) * 1000)::bigint AS first,
                     (extract(epoch FROM max(c.time)) * 1000)::bigint AS last
-             FROM command_log c LEFT JOIN boards b ON b.id = c.board_id
-             GROUP BY c.board_id, name"
+             FROM command_log c LEFT JOIN devices b ON b.id = c.device_id
+             GROUP BY c.device_id, name"
         );
         $bytesTotal = Storage::relationBytes('command_log');
 
-        $byBoard = [];
+        $byDevice = [];
         $unmatched = ['n' => 0, 'first' => null, 'last' => null];
         $grandN = 0;
         foreach ($groups as $g) {
             $grandN += (int) $g['n'];
-            if ($g['board_id'] === null) {
-                self::foldLogBoardBucket($unmatched, $g);
+            if ($g['device_id'] === null) {
+                self::foldLogDeviceBucket($unmatched, $g);
                 continue;
             }
-            $byBoard[] = ['board_id' => (int) $g['board_id'], 'name' => $g['name'], 'n' => (int) $g['n'], 'first' => $g['first'], 'last' => $g['last']];
+            $byDevice[] = ['device_id' => (int) $g['device_id'], 'name' => $g['name'], 'n' => (int) $g['n'], 'first' => $g['first'], 'last' => $g['last']];
         }
 
-        return $this->logStatsResponseShape($byBoard, $unmatched, $grandN, $bytesTotal);
+        return $this->logStatsResponseShape($byDevice, $unmatched, $grandN, $bytesTotal);
     }
 
     /** @param array<string,mixed> $acc birikimli {n, first, last}; $row aynı şekle sahip tek grup. */
-    private static function foldLogBoardBucket(array &$acc, array $row): void
+    private static function foldLogDeviceBucket(array &$acc, array $row): void
     {
         $acc['n'] += (int) $row['n'];
         if ($row['first'] !== null && ($acc['first'] === null || $row['first'] < $acc['first'])) {
@@ -187,22 +187,22 @@ final class LogStatsApi
     }
 
     /** Oranlı boyut tahminini ekleyip tek bir yanıt şekline sokar. */
-    private function logStatsResponseShape(array $byBoard, array $unmatched, int $grandN, int $bytesTotal): array
+    private function logStatsResponseShape(array $byDevice, array $unmatched, int $grandN, int $bytesTotal): array
     {
         $withBytes = fn(array $row) => $row + [
             'est_bytes' => Storage::share($bytesTotal, $row['n'], $grandN),
         ];
-        usort($byBoard, fn($a, $b) => strcasecmp((string) $a['name'], (string) $b['name']));
+        usort($byDevice, fn($a, $b) => strcasecmp((string) $a['name'], (string) $b['name']));
         return [
-            'boards' => array_map($withBytes, $byBoard),
+            'devices' => array_map($withBytes, $byDevice),
             'unmatched' => $unmatched['n'] > 0 ? $withBytes($unmatched) : null,
             'total' => [
                 'n' => $grandN,
-                'first' => $byBoard || $unmatched['n'] > 0
-                    ? min(array_filter(array_merge(array_column($byBoard, 'first'), [$unmatched['first']])))
+                'first' => $byDevice || $unmatched['n'] > 0
+                    ? min(array_filter(array_merge(array_column($byDevice, 'first'), [$unmatched['first']])))
                     : null,
-                'last' => $byBoard || $unmatched['n'] > 0
-                    ? max(array_filter(array_merge(array_column($byBoard, 'last'), [$unmatched['last']])))
+                'last' => $byDevice || $unmatched['n'] > 0
+                    ? max(array_filter(array_merge(array_column($byDevice, 'last'), [$unmatched['last']])))
                     : null,
                 'bytes' => $bytesTotal,
             ],

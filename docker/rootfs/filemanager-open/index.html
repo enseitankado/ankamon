@@ -19,14 +19,14 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 <div class="msg" id="msg">Bağlanılıyor…</div>
 <script>
 (function () {
-  // Bağlantı bilgisi BoardOps.filemanager()'dan gelir: yalnız cihaz kimliği (+ başlık için host/ad).
+  // Bağlantı bilgisi DeviceOps.filemanager()'dan gelir: yalnız cihaz kimliği (+ başlık için host/ad).
   // Kimlik bilgisi tarayıcıya hiç gelmez — bağlama köprüsü onu kendisi veritabanından okur.
   var q = new URLSearchParams(location.search);
-  var board = q.get("board"), hostname = q.get("hostname"), title = q.get("title") || hostname || board;
+  var device = q.get("device"), hostname = q.get("hostname"), title = q.get("title") || hostname || device;
   document.title = "Dosya yöneticisi — " + title;
   var msg = document.getElementById("msg");
   function fail(text) { msg.className = "err"; msg.textContent = text; }
-  if (!board) {
+  if (!device) {
     fail("Eksik bağlantı bilgisi."); return;
   }
 
@@ -56,7 +56,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   }
 
   // 1) Cihazı bu makineye bağla (sshfs; idempotent — zaten bağlıysa anında döner).
-  fetch("/filemanager-mount/mount/" + encodeURIComponent(board), {
+  fetch("/filemanager-mount/mount/" + encodeURIComponent(device), {
     method: "POST",
     headers: { "X-Requested-With": "ankamon" }
   }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })

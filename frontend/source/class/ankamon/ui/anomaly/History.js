@@ -29,7 +29,7 @@
  * Sağlık ▸ Geçmiş'in alt bölmesi (bkz. ui.anomaly.Records): sürekli izlemenin seçili dönemle örtüşen tüm kayıtları
  * (sürenler dahil); Kaynak sütunu bulgunun nereden çıkarıldığını yazar (Log / Ölçüm / SSH verisi — bkz. backend
  * AnomaliesApi KINDS source). Excel tarzı sütun süzgeçli (bkz. page.Base _addColumnFilters). Üstteki özette satır
- * seçilince o cihazın o bulgusuna süzülür (filterBoardKind). Satıra çift tıklama: kaydın bütün alanları (kırpılmadan)
+ * seçilince o cihazın o bulgusuna süzülür (filterDeviceKind). Satıra çift tıklama: kaydın bütün alanları (kırpılmadan)
  * kipli pencerede — ui.anomaly.RowDetail (kullanıcı isteği 2026-11-12).
  */
 qx.Class.define("ankamon.ui.anomaly.History", {
@@ -40,7 +40,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
     super(new qx.ui.layout.VBox(4));
 
     this.__columns = [
-      { id: "board", label: "Cihaz", width: 200 },
+      { id: "device", label: "Cihaz", width: 200 },
       { id: "kind", label: "Bulgu", width: 160 },
       { id: "source", label: "Kaynak", width: 90 },
       { id: "started", label: "Başlangıç", width: 150 },
@@ -81,7 +81,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
           seconds,
           anomaly: a,
           cells: [
-            a.id, a.board, a.kindLabel, a.source || "", F.dateTime(a.started_at * 1000),
+            a.id, a.device, a.kindLabel, a.source || "", F.dateTime(a.started_at * 1000),
             a.ended_at ? F.dateTime(a.ended_at * 1000) : "—",
             F.span(seconds) + (a.ended_at ? "" : " (sürüyor)"),
             a.text
@@ -95,7 +95,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
     __showRow(row) {
       const a = row.anomaly;
       const c = row.cells;
-      ankamon.ui.anomaly.RowDetail.open(`${a.kindLabel} — ${a.board}`, [
+      ankamon.ui.anomaly.RowDetail.open(`${a.kindLabel} — ${a.device}`, [
         ["Cihaz", c[1]],
         ["Bulgu", c[2]],
         ["Kaynak", c[3]],
@@ -108,8 +108,8 @@ qx.Class.define("ankamon.ui.anomaly.History", {
     },
 
     /** Cihaz ve Bulgu süzgeçlerini doldurur (özette satır seçimi; null: o süzgeç boş). */
-    filterBoardKind(board, kind) {
-      this.__filterFields.board.setValue(board || "");
+    filterDeviceKind(device, kind) {
+      this.__filterFields.device.setValue(device || "");
       this.__filterFields.kind.setValue(kind || "");
       this.__apply();
     },

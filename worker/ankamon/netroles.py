@@ -27,9 +27,9 @@
 
 Ankamon bütün giriş/çıkış hizmetlerini (ağ taraması ve akış gözlemi, servis/paylaşım/etkinlik taramaları, loglardan cihaz
 kaydı, syslog alımı, WoL, ekran yansıtma, panel) sunucunun BÜTÜN ağ arabirimleri üzerinden yürütür (Ayarlar ▸ Ağ
-arabirimleri yalnız listeler). Eski settings.network_roles kaydı göç 048'de silindi. Arayüz (roles / is_board_net /
-scan_iface / board_net_sql / board_cidrs) çağıranlar değişmesin diye korunur: her ağ "cihaz ağı" sayılır. Cihaz olup
-olmadığına yine MAC karar verir (netscan/boardmac.py); ağlar arası IP yönlendirmesi engeli (install.sh ankamon-netguard)
+arabirimleri yalnız listeler). Eski settings.network_roles kaydı göç 048'de silindi. Arayüz (roles / is_device_net /
+scan_iface / device_net_sql / device_cidrs) çağıranlar değişmesin diye korunur: her ağ "cihaz ağı" sayılır. Cihaz olup
+olmadığına yine MAC karar verir (netscan/devicemac.py); ağlar arası IP yönlendirmesi engeli (install.sh ankamon-netguard)
 bir Ankamon hizmeti değildir, sürer.
 """
 
@@ -39,10 +39,10 @@ import ipaddress
 
 
 def roles(conn) -> dict:
-    return {"board_iface": "", "admin_iface": ""}
+    return {"device_iface": "", "admin_iface": ""}
 
 
-def is_board_net(ifaces: list[str], role: dict) -> bool:
+def is_device_net(ifaces: list[str], role: dict) -> bool:
     return True
 
 
@@ -51,11 +51,11 @@ def scan_iface(net: dict, role: dict) -> str:
     return net["iface"]
 
 
-def board_net_sql(alias: str = "n") -> str:
+def device_net_sql(alias: str = "n") -> str:
     """net_networks satırı (alias) cihaz ağı mı — her ağ (SQL koşulu)."""
     return "true"
 
 
-def board_cidrs(conn, networks: list[dict]) -> list:
+def device_cidrs(conn, networks: list[dict]) -> list:
     """Bağlı bütün ağların ip_network listesi (networks: ifaces.networks() çıktısı)."""
     return [ipaddress.ip_network(n["cidr"]) for n in networks]

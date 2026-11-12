@@ -40,9 +40,9 @@ use Ankamon\Core\Settings;
  * Anomaliler (Cihazlar ▸ Anomaliler): worker'ın kurallarla ön hesapladığı sıra dışı durum aralıkları
  * (bkz. db/migrations/033_anomalies.sql, worker/ankamon/anomaly). İstek başına hesap yapılmaz.
  *
- * Yanıt: {"kinds": {tür: {label, description, scan, source, source_detail, every}}, "anomalies": [{id, kind, board_id, board, host,
+ * Yanıt: {"kinds": {tür: {label, description, scan, source, source_detail, every}}, "anomalies": [{id, kind, device_id, device, host,
  * started_at, ended_at|null, detail}], "computed_at", "last_scan_job"} — sürenlerin TÜMÜ + [from, to] aralığıyla
- * örtüşen bitmişler (epoch saniye). board: cihazın güncel adı; cihaz silindiyse kayıttaki ad.
+ * örtüşen bitmişler (epoch saniye). device: cihazın güncel adı; cihaz silindiyse kayıttaki ad.
  */
 final class AnomaliesApi
 {
@@ -323,11 +323,11 @@ final class AnomaliesApi
         $limit = $request->queryInt('limit', 20000, 1, 100000);
 
         $rows = Db::all(
-            "SELECT a.id, a.kind, a.board_id, COALESCE(NULLIF(b.label, ''), NULLIF(a.board_name, ''), a.host) AS board, a.host,
+            "SELECT a.id, a.kind, a.device_id, COALESCE(NULLIF(b.label, ''), NULLIF(a.device_name, ''), a.host) AS device, a.host,
                     extract(epoch FROM a.started_at)::bigint AS started_at,
                     extract(epoch FROM a.ended_at)::bigint AS ended_at,
                     a.detail
-             FROM anomalies a LEFT JOIN boards b ON b.id = a.board_id
+             FROM anomalies a LEFT JOIN devices b ON b.id = a.device_id
              WHERE a.ended_at IS NULL OR (a.ended_at >= to_timestamp(?) AND a.started_at <= to_timestamp(?))
              ORDER BY a.started_at DESC LIMIT ?",
             [$from, $to, $limit]

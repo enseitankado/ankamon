@@ -41,7 +41,7 @@ use Ankamon\Core\Request;
  * index: güvenilir listesindeki adreslerin (erişim noktası / Wi-Fi cihazı — MAC'li kayıtlar) ve aynı fiziksel cihazın diğer radyo
  * adreslerinin (ilk 5 bayt aynı — ör. Edgecore 2,4 GHz …:B0 + 5 GHz …:A0) sensör × bant sinyal istatistikleri (son `days` gün;
  * worker screen/wifimon_signal_log.py yazar), elle atanmış konumlar ve sensör listesi (açılır liste: kod adı ya da
- * bilgisayar adı / kablolu MAC). Öneri ve gruplama arayüzde (ui.boards.WifimonLocation).
+ * bilgisayar adı / kablolu MAC). Öneri ve gruplama arayüzde (ui.devices.WifimonLocation).
  * save: adreslere konum (yanındaki sensör) yazar ya da siler; sensörün kablolu MAC'i ve adı da saklanır.
  * Yetki "screen" (Wi-Fi Monitör'ü açabilen herkes; bkz. routes.php).
  */
@@ -54,7 +54,7 @@ final class WifimonLocationsApi
         $days = $request->queryInt('days', 30, 1, 90);
         $stats = Db::all(
             "WITH pre AS (SELECT DISTINCT left(upper(value), 14) AS p FROM wifimon_fixed_emitters WHERE kind IN ('bssid', 'probe'))
-             SELECT s.addr, s.board_id, s.band, sum(s.n)::int AS n, sum(s.n_est)::int AS n_est,
+             SELECT s.addr, s.device_id, s.band, sum(s.n)::int AS n, sum(s.n_est)::int AS n_est,
                     round((sum(s.sum_dbm) / sum(s.n))::numeric, 1)::float8 AS avg,
                     round(sqrt(greatest(sum(s.sum_sq_dbm) / sum(s.n) - (sum(s.sum_dbm) / sum(s.n)) ^ 2, 0))::numeric, 1)::float8 AS sd,
                     min(s.min_dbm)::float8 AS min, max(s.max_dbm)::float8 AS max,
@@ -64,11 +64,11 @@ final class WifimonLocationsApi
                     (extract(epoch FROM max(s.last_at)) * 1000)::bigint AS last_ts
              FROM wifimon_signal_stats s JOIN pre ON left(s.addr, 14) = pre.p
              WHERE s.day >= current_date - ?::int AND s.n > 0
-             GROUP BY s.addr, s.board_id, s.band",
+             GROUP BY s.addr, s.device_id, s.band",
             [$days]
         );
         foreach ($stats as &$row) {
-            foreach (['board_id', 'n', 'n_est', 'days', 'last_ts'] as $key) {
+            foreach (['device_id', 'n', 'n_est', 'days', 'last_ts'] as $key) {
                 $row[$key] = (int) $row[$key];
             }
             foreach (['avg', 'sd', 'min', 'max', 'last'] as $key) {
@@ -77,16 +77,16 @@ final class WifimonLocationsApi
         }
         unset($row);
         $locations = Db::all(
-            "SELECT l.addr, l.board_id, l.sensor_mac::text AS sensor_mac, l.sensor_name, l.note, l.set_by,
+            "SELECT l.addr, l.device_id, l.sensor_mac::text AS sensor_mac, l.sensor_name, l.note, l.set_by,
                     (extract(epoch FROM l.set_at) * 1000)::bigint AS set_ts
              FROM wifimon_emitter_locations l ORDER BY l.addr"
         );
         foreach ($locations as &$row) {
-            $row['board_id'] = $row['board_id'] === null ? null : (int) $row['board_id'];
+            $row['device_id'] = $row['device_id'] === null ? null : (int) $row['device_id'];
             $row['set_ts'] = (int) $row['set_ts'];
         }
         unset($row);
-        $sensors = Db::all("SELECT id, label, hostname, mac::text AS mac, host(ip) AS ip FROM boards ORDER BY id");
+        $sensors = Db::all("SELECT id, label, hostname, mac::text AS mac, host(ip) AS ip FROM devices ORDER BY id");
         foreach ($sensors as &$row) {
             $row['id'] = (int) $row['id'];
         }
@@ -94,7 +94,7 @@ final class WifimonLocationsApi
         return ['days' => $days, 'stats' => $stats, 'locations' => $locations, 'sensors' => $sensors];
     }
 
-    /** addrs [..], board_id (null = konumu sil), note? — aynı fiziksel cihazın adresleri birlikte gönderilir. */
+    /** addrs [..], device_id (null = konumu sil), note? — aynı fiziksel cihazın adresleri birlikte gönderilir. */
     public function save(Request $request, array $user): array
     {
         $addrs = array_values(array_unique(array_map(
@@ -110,35 +110,35 @@ final class WifimonLocationsApi
                 throw ApiError::badRequest('Geçersiz adres: ' . $addr);
             }
         }
-        $raw = $request->input('board_id');
-        $boardId = $raw === null || $raw === '' ? null : (int) $raw;
+        $raw = $request->input('device_id');
+        $deviceId = $raw === null || $raw === '' ? null : (int) $raw;
         $note = mb_substr(trim((string) $request->input('note', '')), 0, 200);
         $placeholders = implode(',', array_fill(0, count($addrs), '?'));
-        if ($boardId === null) {
+        if ($deviceId === null) {
             $changed = Db::exec("DELETE FROM wifimon_emitter_locations WHERE addr IN ($placeholders)", $addrs);
         } else {
-            $board = Db::one(
-                "SELECT id, mac::text AS mac, coalesce(nullif(label, ''), hostname, host(ip), '#' || id) AS name FROM boards WHERE id = ?",
-                [$boardId]
+            $device = Db::one(
+                "SELECT id, mac::text AS mac, coalesce(nullif(label, ''), hostname, host(ip), '#' || id) AS name FROM devices WHERE id = ?",
+                [$deviceId]
             );
-            if (!$board) {
+            if (!$device) {
                 throw ApiError::badRequest('Sensör (cihaz) bulunamadı.');
             }
-            $changed = Db::transaction(static function () use ($addrs, $board, $note, $user): int {
+            $changed = Db::transaction(static function () use ($addrs, $device, $note, $user): int {
                 $count = 0;
                 foreach ($addrs as $addr) {
                     $count += Db::exec(
-                        'INSERT INTO wifimon_emitter_locations (addr, board_id, sensor_mac, sensor_name, note, set_by, set_at)
+                        'INSERT INTO wifimon_emitter_locations (addr, device_id, sensor_mac, sensor_name, note, set_by, set_at)
                          VALUES (?, ?, ?::macaddr, ?, ?, ?, now())
-                         ON CONFLICT (addr) DO UPDATE SET board_id = EXCLUDED.board_id, sensor_mac = EXCLUDED.sensor_mac,
+                         ON CONFLICT (addr) DO UPDATE SET device_id = EXCLUDED.device_id, sensor_mac = EXCLUDED.sensor_mac,
                            sensor_name = EXCLUDED.sensor_name, note = EXCLUDED.note, set_by = EXCLUDED.set_by, set_at = now()',
-                        [$addr, (int) $board['id'], $board['mac'], (string) $board['name'], $note, (string) ($user['username'] ?? '—')]
+                        [$addr, (int) $device['id'], $device['mac'], (string) $device['name'], $note, (string) ($user['username'] ?? '—')]
                     );
                 }
                 return $count;
             });
         }
-        Audit::log($user, $request, 'wifimon.location.save', '', ['addrs' => $addrs, 'board_id' => $boardId, 'changed' => $changed]);
+        Audit::log($user, $request, 'wifimon.location.save', '', ['addrs' => $addrs, 'device_id' => $deviceId, 'changed' => $changed]);
         return ['ok' => true, 'changed' => $changed];
     }
 }

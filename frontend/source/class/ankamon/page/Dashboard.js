@@ -34,7 +34,7 @@
  *    olduğundan tampondan çizilir; tampon CACHE_MS'ten eskiyse arkada yeniden hesaplanır (bkz. ui.DiskUsageSummary).
  *    Dilime/satıra tıklama o veri türünün sekmesini açar.
  *  - "Sağlık — acil bulgular" (yetki "anomalies" ya da "diagnose"): Sağlık ▸ Durum'daki Acil bulgular
- *    (GET /api/board-health). Çift tık: Sağlık ▸ Durum.
+ *    (GET /api/device-health). Çift tık: Sağlık ▸ Durum.
  *
  * Düzen (kullanıcı isteği 2026-11-10: daha kompakt, basit; "Son görevler" altta kırpılıyordu): üstte küçük kartlar (geniş
  * ekranda tek satır), ortada disk + acil bulgular (sabit, alçak), altta "Son hatalar" ve "Son görevler" YAN YANA —
@@ -84,7 +84,7 @@ qx.Class.define("ankamon.page.Dashboard", {
     bottom.add(errorsBox, 0);
     this.__addLogsMenu(this.__errors, id => {
       const row = this.__errorRows && this.__errorRows[id];
-      return row && row.board_id ? [{ id: row.board_id, name: row.board_label || row.host }] : [];
+      return row && row.device_id ? [{ id: row.device_id, name: row.device_label || row.host }] : [];
     });
 
     const jobsBox = this.__panel("Son görevler");
@@ -213,7 +213,7 @@ qx.Class.define("ankamon.page.Dashboard", {
         const box = this.__panel("Sağlık — acil bulgular");
         this.__urgentTitle = box.getChildren()[0].getChildren()[0];
         this.__urgent = this._createTable([
-          { id: "board", label: "Cihaz", width: 150 },
+          { id: "device", label: "Cihaz", width: 150 },
           { id: "check", label: "Bulgu", width: 220 },
           { id: "path", label: "Yol", width: 110 },
           { id: "at", label: "Zaman", width: 140 },
@@ -331,7 +331,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       const P = ankamon.ui.health.Status.PATH;
       let data;
       try {
-        data = await ankamon.io.Api.get("/board-health");
+        data = await ankamon.io.Api.get("/device-health");
       } catch (e) {
         return;
       }
@@ -339,10 +339,10 @@ qx.Class.define("ankamon.page.Dashboard", {
         return;
       }
       const bad = (data.findings || []).filter(f => f.level === "bad");
-      const boards = new Set(bad.map(f => f.board_id ?? f.board));
-      this.__urgentTitle.setValue(bad.length ? `Sağlık — acil bulgular (${boards.size} cihazda ${bad.length})`
+      const devices = new Set(bad.map(f => f.device_id ?? f.device));
+      this.__urgentTitle.setValue(bad.length ? `Sağlık — acil bulgular (${devices.size} cihazda ${bad.length})`
         : "Sağlık — acil bulgu yok");
-      this.__urgent.getTableModel().setData(bad.map((f, i) => [i, f.board || "?", f.check, P[f.path] ? P[f.path].text : f.path,
+      this.__urgent.getTableModel().setData(bad.map((f, i) => [i, f.device || "?", f.check, P[f.path] ? P[f.path].text : f.path,
         f.since ? ankamon.ui.health.Status.when(f.since) : "", (f.text || "") + (f.advice ? ` — Öneri: ${f.advice}` : "")]));
     },
 
@@ -356,12 +356,12 @@ qx.Class.define("ankamon.page.Dashboard", {
 
       const b = data.backups;
       const n = v => Number(v).toLocaleString("tr-TR");
-      const bt = data.boards;
+      const bt = data.devices;
       this.__stats.removeAll().forEach(card => card.dispose());
       // [başlık, değer, renk, alt satır, ipucu anahtarı] — ipucu her kartın KENDİ konusunu anlatır
       // (bkz. __tip); her yenilemede güncel değerlerle yeniden kurulur.
       [
-        ["Kayıtlı cihaz", n(bt.total), null, `${n(bt.total - bt.online)} kapalı`, "boards"],
+        ["Kayıtlı cihaz", n(bt.total), null, `${n(bt.total - bt.online)} kapalı`, "devices"],
         ["Çevrimiçi", n(bt.online), "app-ok", bt.total ? `%${Math.round(bt.online * 100 / bt.total)}` : null, "online"],
         ["Sensör verisi gelen", n(bt.exporter_ok), null, `${n(bt.total - bt.exporter_ok)} cihazdan gelmiyor`, "exporter"],
         ["Log gönderen (24 sa)", n(bt.logging), null, `${n(bt.total - bt.logging)} cihazdan gelmiyor`, "logging"],
@@ -381,7 +381,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       this.__errorRows = data.recent_errors;
       this.__jobRows = data.recent_jobs;
       this.__errors.getTableModel().setData(data.recent_errors.map((row, index) => [
-        index, F.dateTime(row.ts), row.board_label || "", row.host, F.severity(row.severity), row.program, row.message
+        index, F.dateTime(row.ts), row.device_label || "", row.host, F.severity(row.severity), row.program, row.message
       ]));
       this.__jobs.getTableModel().setData(data.recent_jobs.map(job => [
         job.id, F.dateTime(job.created_at * 1000), job.title, F.jobStatus(job.status), job.summary
@@ -392,39 +392,39 @@ qx.Class.define("ankamon.page.Dashboard", {
      * Satır sağ menüsü: "Hata loglarını göster" — Loglar sayfasını o cihaza ve "Hata ve üstü"
      * önem düzeyine süzülmüş açar (bkz. ui.Shell.OPEN_LOGS). Görevlerin birden çok hedef cihazı
      * olabildiğinden, birden fazlaysa her cihaz için ayrı madde (alt menü) çıkar.
-     * @param boardsOf {Function} satırın kimlik değeri → [{id, name}]
+     * @param devicesOf {Function} satırın kimlik değeri → [{id, name}]
      */
-    __addLogsMenu(table, boardsOf) {
+    __addLogsMenu(table, devicesOf) {
       if (!this._can("logs")) {
         return;
       }
-      const open = boardId => qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_LOGS, { boardId, severity: "3" });
+      const open = deviceId => qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_LOGS, { deviceId, severity: "3" });
       const label = `${ankamon.ui.Shell.ICON.logs} Hata loglarını göster`;
       table.addListener("cellContextmenu", e => {
         const row = e.getRow();
-        const boards = row === null || row === undefined ? [] : boardsOf(table.getTableModel().getValue(0, row));
+        const devices = row === null || row === undefined ? [] : devicesOf(table.getTableModel().getValue(0, row));
         const old = table.getContextMenu();
         if (old) {
           qx.event.Timer.once(() => old.destroy(), null, 0);
         }
-        if (!boards.length) {
+        if (!devices.length) {
           table.setContextMenu(null);
           return;
         }
         table.getSelectionModel().setSelectionInterval(row, row);
         const menu = new qx.ui.menu.Menu();
-        if (boards.length === 1) {
-          const item = new qx.ui.menu.Button(`${label} — ${boards[0].name}`);
-          item.addListener("execute", () => open(boards[0].id));
+        if (devices.length === 1) {
+          const item = new qx.ui.menu.Button(`${label} — ${devices[0].name}`);
+          item.addListener("execute", () => open(devices[0].id));
           menu.add(item);
         } else {
           const sub = new qx.ui.menu.Menu();
-          boards.forEach(b => {
+          devices.forEach(b => {
             const item = new qx.ui.menu.Button(b.name);
             item.addListener("execute", () => open(b.id));
             sub.add(item);
           });
-          menu.add(new qx.ui.menu.Button(`${label} (${boards.length} cihaz)`, null, null, sub));
+          menu.add(new qx.ui.menu.Button(`${label} (${devices.length} cihaz)`, null, null, sub));
         }
         table.setContextMenu(menu);
       });
@@ -442,12 +442,12 @@ qx.Class.define("ankamon.page.Dashboard", {
       const disk = (text, tab) => this._can("logs.manage") ? { text, open: send(Shell.OPEN_PAGE, { diskUsage: tab }) } : null;
       const logs = (text, open) => this._can("logs") ? { text, open } : null;
       switch (key) {
-        case "boards": return page("Cihazlar listesi", { page: "boards", status: "" }, "boards");
-        case "online": return page("Çevrimiçi cihazlar", { page: "boards", status: "Çevrimiçi" }, "boards");
+        case "devices": return page("Cihazlar listesi", { page: "devices", status: "" }, "devices");
+        case "online": return page("Çevrimiçi cihazlar", { page: "devices", status: "Çevrimiçi" }, "devices");
         case "exporter": return page("Sensörler", { page: "metrics" }, "metrics");
         case "logging":
         case "logs": return logs("Sistem logları", send(Shell.OPEN_LOGS_MODE, "system"));
-        case "errors": return logs("Hata düzeyindeki sistem logları", send(Shell.OPEN_LOGS, { boardId: null, severity: "3" }));
+        case "errors": return logs("Hata düzeyindeki sistem logları", send(Shell.OPEN_LOGS, { deviceId: null, severity: "3" }));
         case "metrics": return disk("Disk kullanımı — Sensör verileri", "metrics") || page("Sensörler", { page: "metrics" }, "metrics");
         case "queue": return disk("Disk kullanımı — Log kuyruğu", "queue");
         case "db": return page("Sistem — Veritabanı", { page: "system", tab: "database" }, true);
@@ -464,9 +464,9 @@ qx.Class.define("ankamon.page.Dashboard", {
     /**
      * Kartın ipucu (zengin metin): yalnız O kartın konusu — ne saydığı, güncel ayrıntısı ve (veri
      * tutan kartlarda) verinin nerede, ne kadar süre saklandığı. Her yenilemede güncel değerlerle
-     * yeniden kurulur. Kaynak: /api/dashboard (boards, log_histogram, recent_errors, storage,
+     * yeniden kurulur. Kaynak: /api/dashboard (devices, log_histogram, recent_errors, storage,
      * log_queue, backups).
-     * @param key {String} boards|online|exporter|logging|logs|errors|metrics|queue|db|backups
+     * @param key {String} devices|online|exporter|logging|logs|errors|metrics|queue|db|backups
      * @param ctx {Map} {logs, errors} — son 24 saatin toplamları (_refresh'te hesaplanıyor)
      */
     __tip(key, data, ctx) {
@@ -476,7 +476,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       const gun = s => esc((s || "?").replace(/ days?/, " gün").replace(/ mons?/, " ay"));
       const t = data.storage.tables;
       const p = data.storage.policies;
-      const bt = data.boards;
+      const bt = data.devices;
       const off = bt.total - bt.online;
       const hist = data.log_histogram;
       const lastHour = hist.length ? hist[hist.length - 1] : { total: 0, errors: 0 };
@@ -488,7 +488,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       let body;
 
       switch (key) {
-        case "boards":
+        case "devices":
           title = "Kayıtlı cihaz";
           body = `Ankamon'un tanıdığı cihazların tamamı: <b>${n(bt.total)}</b><br>` +
             `├ çevrimiçi: ${n(bt.online)}<br>└ kapalı: ${n(off)}<br><br>` +
@@ -537,7 +537,7 @@ qx.Class.define("ankamon.page.Dashboard", {
             (ctx.logs ? ` — tüm logların %${(ctx.errors * 100 / ctx.logs).toFixed(1)}'i` : "") + "<br>" +
             `├ son 1 saatte: ${n(lastHour.errors)}<br>` +
             (last
-              ? `└ en son: ${esc(F.dateTime(last.ts))} · ${esc(last.board_label || last.host)} · ${esc(last.program)}<br>`
+              ? `└ en son: ${esc(F.dateTime(last.ts))} · ${esc(last.device_label || last.host)} · ${esc(last.program)}<br>`
               : "└ hiç hata yok<br>") + "<br>" +
             muted("Son 15 hata aşağıdaki tabloda; tamamı Loglar sayfasında önem süzgeciyle görülebilir.");
           break;
@@ -572,7 +572,7 @@ qx.Class.define("ankamon.page.Dashboard", {
               row("metrics", "sensör ölçümleri", true) +
               row("command_log", "çalıştırılan komutlar") +
               row("job_events", "komut çıktı satırları (30 gün)") +
-              row("board_sessions", "oturum açma/kapama") +
+              row("device_sessions", "oturum açma/kapama") +
               row("activity_log", "arka plan işlemleri çubuğu") +
               row("audit_log", "arayüzde kim ne yaptı", false, true)) +
             muted("Silinen kayıtların yeri hemen diske iade edilmez, veritabanı içinde yeniden kullanılır;<br>" +

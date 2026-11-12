@@ -121,43 +121,43 @@ def _published(stream: str, wait_seconds: int = 12) -> bool:
     return False
 
 
-def start_source(board: dict, user: str, password: str, stream: str) -> dict:
+def start_source(device: dict, user: str, password: str, stream: str) -> dict:
     """Kaynakta yayını başlatır, MediaMTX'te görünene dek bekler. Döner: {"status", "rc", "output"}."""
     if not STREAM_RE.match(stream):
         return {"status": "failed", "rc": None, "output": "Geçersiz yayın adı."}
-    wrapper = _WRAPPER.replace("__URL__", cast.stream_url(board["ip"], stream))
-    result = _ssh(board, user, password, _START.replace("__WRAPPER__", wrapper), timeout=20)
+    wrapper = _WRAPPER.replace("__URL__", cast.stream_url(device["ip"], stream))
+    result = _ssh(device, user, password, _START.replace("__WRAPPER__", wrapper), timeout=20)
     if result["status"] != "ok":
         return result
     if not _published(stream):
-        stop_source(board, user, password)
+        stop_source(device, user, password)
         return {"status": "failed", "rc": None, "output": "Kaynak cihazdan yayın gelmedi (ffmpeg başlamadı ya da sunucuya ulaşamadı)."}
     return result
 
 
-def stop_source(board: dict, user: str, password: str) -> dict:
-    return _ssh(board, user, password, _STOP, timeout=15)
+def stop_source(device: dict, user: str, password: str) -> dict:
+    return _ssh(device, user, password, _STOP, timeout=15)
 
 
-def _board(conn, board_id: int) -> dict | None:
+def _device(conn, device_id: int) -> dict | None:
     row = conn.execute(
-        "SELECT id AS board_id, host(ip) AS ip, COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name FROM boards WHERE id = %s",
-        (board_id,)).fetchone()
+        "SELECT id AS device_id, host(ip) AS ip, COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name FROM devices WHERE id = %s",
+        (device_id,)).fetchone()
     return dict(row) if row else None
 
 
 def start(conn, source_id: int, targets: list[dict], stream: str, started_by: str, user: str, password: str, on_target) -> None:
     """Kaynağı başlatır, sonra hedefleri on_target'a devreder: on_target(work) her hedef için `work(t) -> sonuç` çalıştırır
     (runner paralel yürütür, sonuçları {cihaz: sonuç} döner); başarılılar tabloya yazılır."""
-    source = _board(conn, source_id)
+    source = _device(conn, source_id)
     if source is None or not source["ip"]:
         raise RuntimeError("Kaynak cihaz bulunamadı.")
     # Aynı kaynağın önceki yayını sürüyorsa hedefleri korunur: yeni yayın adına geçilir.
-    previous = conn.execute("SELECT target_board_id FROM screen_relays WHERE source_board_id = %s", (source_id,)).fetchall()
+    previous = conn.execute("SELECT target_device_id FROM screen_relays WHERE source_device_id = %s", (source_id,)).fetchall()
     # Hedefler başka bir kaynaktan buraya geçebilir: o kaynakta hedef kalmazsa yayını sonda kapatılır.
-    moved_from = {r["source_board_id"] for r in conn.execute(
-        "SELECT source_board_id FROM screen_relays WHERE target_board_id = ANY(%s) AND source_board_id <> %s",
-        ([t["board_id"] for t in targets], source_id)).fetchall()}
+    moved_from = {r["source_device_id"] for r in conn.execute(
+        "SELECT source_device_id FROM screen_relays WHERE target_device_id = ANY(%s) AND source_device_id <> %s",
+        ([t["device_id"] for t in targets], source_id)).fetchall()}
     res = start_source(source, user, password, stream)
     if res["status"] != "ok":
         raise RuntimeError(f"{source['name']}: {res['output']}")
@@ -167,44 +167,44 @@ def start(conn, source_id: int, targets: list[dict], stream: str, started_by: st
 
     done = on_target(work)
     for t in targets:
-        if done.get(t["board_id"], {}).get("status") == "ok":
+        if done.get(t["device_id"], {}).get("status") == "ok":
             conn.execute(
-                """INSERT INTO screen_relays (target_board_id, source_board_id, stream, started_by) VALUES (%s, %s, %s, %s)
-                   ON CONFLICT (target_board_id) DO UPDATE SET source_board_id = EXCLUDED.source_board_id,
+                """INSERT INTO screen_relays (target_device_id, source_device_id, stream, started_by) VALUES (%s, %s, %s, %s)
+                   ON CONFLICT (target_device_id) DO UPDATE SET source_device_id = EXCLUDED.source_device_id,
                        stream = EXCLUDED.stream, started_by = EXCLUDED.started_by, started_at = now()""",
-                (t["board_id"], source_id, stream, started_by))
+                (t["device_id"], source_id, stream, started_by))
     # Önceki hedefler yeni yayını da göstersin (kaynak ffmpeg'i yeniden başladı).
-    wanted = {t["board_id"] for t in targets}
+    wanted = {t["device_id"] for t in targets}
     for row in previous:
-        if row["target_board_id"] not in wanted:
-            old = _board(conn, row["target_board_id"])
+        if row["target_device_id"] not in wanted:
+            old = _device(conn, row["target_device_id"])
             if old and cast.start(old, user, password, stream, False)["status"] == "ok":
-                conn.execute("UPDATE screen_relays SET stream = %s WHERE target_board_id = %s", (stream, row["target_board_id"]))
-    if not conn.execute("SELECT 1 FROM screen_relays WHERE source_board_id = %s LIMIT 1", (source_id,)).fetchone():
+                conn.execute("UPDATE screen_relays SET stream = %s WHERE target_device_id = %s", (stream, row["target_device_id"]))
+    if not conn.execute("SELECT 1 FROM screen_relays WHERE source_device_id = %s LIMIT 1", (source_id,)).fetchone():
         stop_source(source, user, password)
         raise RuntimeError("Hiçbir hedef cihazda görüntü açılamadı.")
     _release_orphans(conn, user, password, moved_from)
 
 
-def stop(conn, board: dict, user: str, password: str) -> dict:
+def stop(conn, device: dict, user: str, password: str) -> dict:
     """Bu cihazdaki aktarımı durdurur: kaynaksa bütün hedefleri, hedefse yalnız kendisini normale döndürür."""
     lines = []
     rows = conn.execute(
-        "SELECT target_board_id, source_board_id FROM screen_relays WHERE source_board_id = %s OR target_board_id = %s",
-        (board["board_id"], board["board_id"])).fetchall()
-    sources = {r["source_board_id"] for r in rows}
+        "SELECT target_device_id, source_device_id FROM screen_relays WHERE source_device_id = %s OR target_device_id = %s",
+        (device["device_id"], device["device_id"])).fetchall()
+    sources = {r["source_device_id"] for r in rows}
     for row in rows:
-        target = _board(conn, row["target_board_id"])
+        target = _device(conn, row["target_device_id"])
         res = cast.stop(target, user, password) if target else {"status": "ok", "output": ""}
-        name = target["name"] if target else row["target_board_id"]
+        name = target["name"] if target else row["target_device_id"]
         if res["status"] == "ok":
             lines.append(f"{name}: ekran normale döndü.")
         else:
             # Kapalı hedef: yayın zaten bitti; kaydı tutmanın anlamı yok.
             lines.append(f"{name}: ulaşılamadı ({res['output']}); yayın bitince oynatıcı kendisi kapanır.")
-        conn.execute("DELETE FROM screen_relays WHERE target_board_id = %s", (row["target_board_id"],))
+        conn.execute("DELETE FROM screen_relays WHERE target_device_id = %s", (row["target_device_id"],))
     if not rows:
-        res = stop_source(board, user, password)    # kayıt yok ama kalmış olabilir
+        res = stop_source(device, user, password)    # kayıt yok ama kalmış olabilir
         return {"status": res["status"], "rc": res["rc"], "output": "Bu cihazda ekran aktarımı yoktu."}
     # Hedef durdurulduysa kaynağında başka hedef kalmamış olabilir; kaynaksa kendisi.
     lines.extend(_release_orphans(conn, user, password, sources))
@@ -214,12 +214,12 @@ def stop(conn, board: dict, user: str, password: str) -> dict:
 def _release_orphans(conn, user: str, password: str, candidates: set[int]) -> list[str]:
     """Verilen cihazlardan hedefi kalmayanlarda kaynak yayınını kapatır."""
     out = []
-    for board_id in candidates:
-        if conn.execute("SELECT 1 FROM screen_relays WHERE source_board_id = %s LIMIT 1", (board_id,)).fetchone():
+    for device_id in candidates:
+        if conn.execute("SELECT 1 FROM screen_relays WHERE source_device_id = %s LIMIT 1", (device_id,)).fetchone():
             continue
-        board = _board(conn, board_id)
-        if board and board["ip"]:
-            res = stop_source(board, user, password)
+        device = _device(conn, device_id)
+        if device and device["ip"]:
+            res = stop_source(device, user, password)
             if res["status"] == "ok":
-                out.append(f"{board['name']}: {res['output']}")
+                out.append(f"{device['name']}: {res['output']}")
     return out

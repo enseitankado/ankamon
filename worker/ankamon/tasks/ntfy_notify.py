@@ -93,37 +93,37 @@ def _where(rule) -> tuple[str, list]:
     if rule["kinds"]:
         sql += " AND a.kind = ANY(%s)"
         args.append(rule["kinds"])
-    if rule["board_ids"]:
-        sql += " AND a.board_id = ANY(%s)"
-        args.append(rule["board_ids"])
+    if rule["device_ids"]:
+        sql += " AND a.device_id = ANY(%s)"
+        args.append(rule["device_ids"])
     return sql, args
 
 
 def _name(a) -> str:
-    return a["board"] or a["host"]
+    return a["device"] or a["host"]
 
 
 def _live(conn, rule, cfg, labels, title_prefix) -> None:
     where, args = _where(rule)
     rows = conn.execute(
-        f"""SELECT a.id, a.kind, a.host, a.board_id, COALESCE(NULLIF(b.label, ''), NULLIF(a.board_name, '')) AS board, a.started_at
-            FROM anomalies a LEFT JOIN boards b ON b.id = a.board_id
+        f"""SELECT a.id, a.kind, a.host, a.device_id, COALESCE(NULLIF(b.label, ''), NULLIF(a.device_name, '')) AS device, a.started_at
+            FROM anomalies a LEFT JOIN devices b ON b.id = a.device_id
             WHERE a.ended_at IS NULL {where}
               AND NOT EXISTS (SELECT 1 FROM ntfy_sent s WHERE s.rule_id = %s AND s.anomaly_id = a.id)
             ORDER BY a.started_at""", (*args, rule["id"])).fetchall()
     room = _room(conn, rule)
     for a in rows:
         if rule["interval_minutes"] > 0 and conn.execute(
-                """SELECT 1 FROM ntfy_messages WHERE rule_id = %s AND board_id IS NOT DISTINCT FROM %s AND kind = %s AND status = 'ok'
+                """SELECT 1 FROM ntfy_messages WHERE rule_id = %s AND device_id IS NOT DISTINCT FROM %s AND kind = %s AND status = 'ok'
                    AND sent_at > now() - make_interval(mins => %s) LIMIT 1""",
-                (rule["id"], a["board_id"], a["kind"], rule["interval_minutes"])).fetchone():
+                (rule["id"], a["device_id"], a["kind"], rule["interval_minutes"])).fetchone():
             conn.execute("INSERT INTO ntfy_sent VALUES (%s, %s) ON CONFLICT DO NOTHING", (rule["id"], a["id"]))
             continue
         if room <= 0:
             return
         label = labels.get(a["kind"], a["kind"])
         ok = ntfy.send_logged(conn, cfg, rule["id"], rule["name"], f"{title_prefix}{label}",
-                              f"{_name(a)}: {label} ({a['started_at']:%d.%m.%Y %H:%M} başladı)", a["board_id"], a["kind"])
+                              f"{_name(a)}: {label} ({a['started_at']:%d.%m.%Y %H:%M} başladı)", a["device_id"], a["kind"])
         if ok:
             room -= 1
             conn.execute("INSERT INTO ntfy_sent VALUES (%s, %s) ON CONFLICT DO NOTHING", (rule["id"], a["id"]))
@@ -136,13 +136,13 @@ def _summary(conn, rule, cfg, labels, title_prefix) -> None:
         return
     where, args = _where(rule)
     rows = conn.execute(
-        f"""SELECT COALESCE(NULLIF(b.label, ''), NULLIF(a.board_name, ''), a.host) AS board, a.kind, count(*) AS n
-            FROM anomalies a LEFT JOIN boards b ON b.id = a.board_id
+        f"""SELECT COALESCE(NULLIF(b.label, ''), NULLIF(a.device_name, ''), a.host) AS device, a.kind, count(*) AS n
+            FROM anomalies a LEFT JOIN devices b ON b.id = a.device_id
             WHERE (a.ended_at IS NULL OR a.ended_at >= %s) {where}
             GROUP BY 1, 2 ORDER BY 3 DESC""", (rule["last_run_at"], *args)).fetchall()
     conn.execute("UPDATE ntfy_rules SET last_run_at = now() WHERE id = %s", (rule["id"],))
     if rows and _room(conn, rule) > 0:
-        lines = [f"{r['board']}: {labels.get(r['kind'], r['kind'])} × {r['n']}" for r in rows[:30]]
+        lines = [f"{r['device']}: {labels.get(r['kind'], r['kind'])} × {r['n']}" for r in rows[:30]]
         ntfy.send_logged(conn, cfg, rule["id"], rule["name"], f"{title_prefix}Anomali özeti ({sum(r['n'] for r in rows)} kayıt)", "\n".join(lines))
 
 

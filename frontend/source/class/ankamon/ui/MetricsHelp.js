@@ -170,7 +170,7 @@ qx.Class.define("ankamon.ui.MetricsHelp", {
       const c = d.collection;
       const scrape = this.__seconds(c.scrape_interval) || 60;
       const targets = new Set(c.targets);
-      const scanned = d.boards.filter(b => targets.has(b.id));
+      const scanned = d.devices.filter(b => targets.has(b.id));
       const tg = d.telegraf;
       const r = d.rate;
 
@@ -192,16 +192,16 @@ qx.Class.define("ankamon.ui.MetricsHelp", {
       let h = `<div class="mh">${css}`;
 
       // --- Özet
-      const perBoardCpu = tg && tg.cpu_percent !== null && scanned.length ? tg.cpu_percent / scanned.length : null;
+      const perDeviceCpu = tg && tg.cpu_percent !== null && scanned.length ? tg.cpu_percent / scanned.length : null;
       h += "<h3>Şu an</h3><table>";
-      h += `<tr><th>Kayıtlı cihaz</th><td>${n(d.boards.length)}</td><th>Şu an taranan</th><td>${n(scanned.length)}</td></tr>`;
+      h += `<tr><th>Kayıtlı cihaz</th><td>${n(d.devices.length)}</td><th>Şu an taranan</th><td>${n(scanned.length)}</td></tr>`;
       h += `<tr><th>Son 10 dk yazılan satır</th><td>${n(r.rows_10m)}</td><th>Bu hızla günde</th><td>~${n(r.rows_per_day)} satır</td></tr>`;
       h += `<tr><th>Günlük büyüme (ham)</th><td>~${r.bytes_per_day !== null ? F.bytes(r.bytes_per_day) : "—"}</td>` +
         `<th>Sıkıştırıldıktan sonra</th><td>~${r.bytes_per_day_compressed !== null ? F.bytes(r.bytes_per_day_compressed) : "—"}` +
         (r.compression_ratio ? ` <span class="muted">(oran ~${Math.round(1 / r.compression_ratio)}×)</span>` : "") + "</td></tr>";
       if (tg) {
         h += `<tr><th>Telegraf işlemci (ort.)</th><td>%${tg.cpu_percent} tek çekirdek` +
-          (perBoardCpu !== null ? ` <span class="muted">(~%${perBoardCpu.toFixed(3)} / cihaz)</span>` : "") +
+          (perDeviceCpu !== null ? ` <span class="muted">(~%${perDeviceCpu.toFixed(3)} / cihaz)</span>` : "") +
           `</td><th>Telegraf bellek</th><td>${tg.rss_bytes ? F.bytes(tg.rss_bytes) : "—"}</td></tr>`;
         h += `<tr><td colspan="4" class="muted">Telegraf ${esc(F.duration(tg.uptime))} önce başladı (PID ${tg.pid}); ` +
           `o zamandan beri toplam ${tg.cpu_seconds} işlemci-saniyesi harcadı. Makinede ${tg.cores} çekirdek var. İşlemci ortalaması ` +
@@ -220,7 +220,7 @@ qx.Class.define("ankamon.ui.MetricsHelp", {
       h += `<p>Veriyi cihaz <b>göndermez</b>; Ankamon konteynerindeki <b>Telegraf</b> her cihazın ` +
         `<code>node_exporter</code> ucunu (<code>http://&lt;ip&gt;:9100/metrics</code>) kendisi okur.</p>`;
       h += `<div class="flow">` +
-        `worker (board_status)  ─ her ${c.status_tick} sn ─►  cihaza TCP yoklama (SSH 22 + sensör portu, ${c.probe_timeout ?? "?"} sn zaman aşımı)\n` +
+        `worker (device_status)  ─ her ${c.status_tick} sn ─►  cihaza TCP yoklama (SSH 22 + sensör portu, ${c.probe_timeout ?? "?"} sn zaman aşımı)\n` +
         `      │  sensör portu ${c.fails_before_offline ?? "?"} kez üst üste yanıt vermezse "erişilemez" sayılır (tek sıçrama kaydı kesmez)\n` +
         `      ▼\n` +
         `worker (telegraf_targets) ─ her ${c.status_tick} sn ─►  /data/telegraf/targets.conf  (izlenen + erişilebilir cihazlar)\n` +
@@ -237,7 +237,7 @@ qx.Class.define("ankamon.ui.MetricsHelp", {
       // --- Cihazlar
       h += "<h3>Cihazlar (son 10 dakika, ölçülen)</h3><table><tr><th>Cihaz</th><th>Adres</th><th>Durum</th>" +
         "<th>Taranıyor</th><th class=\"r\">Seri</th><th class=\"r\">Satır (10 dk)</th><th class=\"r\">Beklenen</th><th>Son ölçüm</th></tr>";
-      d.boards.forEach(b => {
+      d.devices.forEach(b => {
         const inT = targets.has(b.id);
         const expected = inT ? Math.round(b.series * 600 / scrape) : 0;
         const why = inT ? "" : !b.monitor_enabled ? "izleme kapalı" : !b.exporter_ok ? "sensör portu yanıt vermiyor" : "IP yok";

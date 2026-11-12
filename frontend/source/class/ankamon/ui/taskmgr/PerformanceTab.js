@@ -42,23 +42,23 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
     this.__selected = "cpu";
 
     // Cihaz seçici (yalnız çok cihazda).
-    const boardBar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-    boardBar.add(new qx.ui.basic.Label("Bilgisayar:"));
-    this.__boardBox = new qx.ui.form.SelectBox().set({ width: 340 });
-    this.__boardBox.addListener("changeSelection", e => {
+    const deviceBar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
+    deviceBar.add(new qx.ui.basic.Label("Bilgisayar:"));
+    this.__deviceBox = new qx.ui.form.SelectBox().set({ width: 340 });
+    this.__deviceBox.addListener("changeSelection", e => {
       const item = e.getData()[0];
       if (!this.__syncing && item) {
-        this.__boardId = item.getModel();
+        this.__deviceId = item.getModel();
         this.update();
       }
     });
-    boardBar.add(this.__boardBox);
-    this.__boardNote = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
-    boardBar.add(this.__boardNote);
+    deviceBar.add(this.__deviceBox);
+    this.__deviceNote = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
+    deviceBar.add(this.__deviceNote);
     if (!win.isMulti()) {
-      boardBar.exclude();
+      deviceBar.exclude();
     }
-    this.add(boardBar);
+    this.add(deviceBar);
     const body = new qx.ui.container.Composite(new qx.ui.layout.HBox(10));
     this.add(body, { flex: 1 });
 
@@ -104,10 +104,10 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
   },
 
   members: {
-    __boardBox: null,
-    __boardNote: null,
-    __boardId: null,
-    __boardSig: null,
+    __deviceBox: null,
+    __deviceNote: null,
+    __deviceId: null,
+    __deviceSig: null,
     __syncing: false,
     __list: null,
     __tiles: null,
@@ -186,13 +186,13 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
     onBoardFilter() {
       const single = this._win.getSingleChosen();
       if (single) {
-        this.__boardId = single.getId();
+        this.__deviceId = single.getId();
       }
     },
 
     /**
      * Çok cihazda seçicideki cihazlar (süzgece uyanlar) — liste yalnız değişince yeniden kurulur; seçili cihaz
-     * süzgeçten çıktıysa ilk bağlı cihaza geçilir. @return {ankamon.ui.taskmgr.TaskBoardLink?} grafikleri gösterilecek cihaz
+     * süzgeçten çıktıysa ilk bağlı cihaza geçilir. @return {ankamon.ui.taskmgr.TaskDeviceLink?} grafikleri gösterilecek cihaz
      */
     __currentLink() {
       const win = this._win;
@@ -200,28 +200,28 @@ qx.Class.define("ankamon.ui.taskmgr.PerformanceTab", {
         return win.getLinks()[0];
       }
       const links = win.getVisibleLinks();
-      let link = links.find(l => l.getId() === this.__boardId);
+      let link = links.find(l => l.getId() === this.__deviceId);
       if (!link) {
         link = links.find(l => l.getModel().snap) || links[0] || null;
-        this.__boardId = link ? link.getId() : null;
+        this.__deviceId = link ? link.getId() : null;
       }
       const state = l => (l.getModel().snap ? "" : (l.getState() === "closed" ? " — bağlanamadı" : " — bağlanıyor…"));
       const sig = links.map(l => l.getId() + "|" + l.getDisplay() + state(l)).join("\n");
       this.__syncing = true;
       try {
-        if (sig !== this.__boardSig) {
-          this.__boardSig = sig;
-          this.__boardBox.removeAll().forEach(item => item.dispose());
-          links.forEach(l => this.__boardBox.add(new qx.ui.form.ListItem(l.getDisplay() + state(l), null, l.getId())));
+        if (sig !== this.__deviceSig) {
+          this.__deviceSig = sig;
+          this.__deviceBox.removeAll().forEach(item => item.dispose());
+          links.forEach(l => this.__deviceBox.add(new qx.ui.form.ListItem(l.getDisplay() + state(l), null, l.getId())));
         }
-        const item = this.__boardBox.getSelectables().find(i => i.getModel() === this.__boardId);
-        if (item && this.__boardBox.getSelection()[0] !== item) {
-          this.__boardBox.setSelection([item]);
+        const item = this.__deviceBox.getSelectables().find(i => i.getModel() === this.__deviceId);
+        if (item && this.__deviceBox.getSelection()[0] !== item) {
+          this.__deviceBox.setSelection([item]);
         }
       } finally {
         this.__syncing = false;
       }
-      this.__boardNote.setValue(links.length > 1 ? `${links.length} cihazdan biri — grafikler seçilen cihazın` : "");
+      this.__deviceNote.setValue(links.length > 1 ? `${links.length} cihazdan biri — grafikler seçilen cihazın` : "");
       return link;
     },
 

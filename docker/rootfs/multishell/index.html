@@ -67,7 +67,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     p.set("username", c.username);
     p.set("password", c.password);
     p.set("title", c.title || c.hostname);
-    // Yazı boyutu: web terminal penceresinin A−/A+ seçimi (bkz. ui/BoardOps.js __terminalWindow).
+    // Yazı boyutu: web terminal penceresinin A−/A+ seçimi (bkz. ui/DeviceOps.js __terminalWindow).
     try {
       var fs = parseInt(localStorage.getItem("ankamon.webshell.fontSize"), 10);
       if (fs) p.set("fontsize", fs);

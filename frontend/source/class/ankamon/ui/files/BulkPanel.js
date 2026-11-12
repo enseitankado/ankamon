@@ -72,19 +72,19 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
 
   /**
    * @param mode {String} "distribute" | "collect"
-   * @param boards {Array} sunulan cihazlar [{id, name}]
+   * @param devices {Array} sunulan cihazlar [{id, name}]
    * @param selected {Array} başlangıçta işaretli cihaz numaraları
    * @param user {Map} oturum sahibi
    */
-  construct(mode, boards, selected, user) {
+  construct(mode, devices, selected, user) {
     super(new qx.ui.layout.Grow());
     this.__mode = mode;
     this.__user = user;
     this.__files = [];
     this.__checked = new Set();
-    this.__boardUsers = [];
+    this.__deviceUsers = [];
     this.__stack = new qx.ui.container.Stack();
-    this.__stack.add(this.__createSetup(boards, selected));
+    this.__stack.add(this.__createSetup(devices, selected));
     this.__stack.add(this.__createRun());
     this.add(this.__stack);
 
@@ -102,10 +102,10 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
     __user: null,
     __files: null,
     __checked: null,
-    __boardUsers: null,
+    __deviceUsers: null,
     __stack: null,
-    __boardBoxes: null,
-    __boardCount: null,
+    __deviceBoxes: null,
+    __deviceCount: null,
     __fileTree: null,
     __fileBusy: null,
     __fileBusyLabel: null,
@@ -170,7 +170,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       return ankamon.ui.StepBox.create(n, title, hint);
     },
 
-    __createSetup(boards, selected) {
+    __createSetup(devices, selected) {
       const distribute = this.__mode === "distribute";
       const page = new qx.ui.container.Composite(new qx.ui.layout.VBox(10));
       const body = new qx.ui.container.Composite(new qx.ui.layout.HBox(10));
@@ -178,7 +178,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       // 1 — bilgisayarlar
       const step1 = this.__step(1, "Bilgisayarları seç");
       step1.set({ width: 290 });
-      step1.add(this.__createBoardColumn(boards, selected), { flex: 1 });
+      step1.add(this.__createDeviceColumn(devices, selected), { flex: 1 });
       body.add(step1);
 
       const right = new qx.ui.container.Composite(new qx.ui.layout.VBox(10));
@@ -258,31 +258,31 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       return { box, scroll };
     },
 
-    __createBoardColumn(boards, selected) {
+    __createDeviceColumn(devices, selected) {
       const col = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
-      this.__boardCount = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
-      col.add(this.__boardCount);
+      this.__deviceCount = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
+      col.add(this.__deviceCount);
       const filter = new qx.ui.form.TextField().set({ placeholder: "Süz…" });
       col.add(filter);
       const list = this.__checkList(null);
-      this.__boardBoxes = boards.map(b => {
+      this.__deviceBoxes = devices.map(b => {
         const cb = new qx.ui.form.CheckBox(b.name).set({ value: selected.includes(b.id) });
-        cb.setUserData("board", b);
-        cb.addListener("changeValue", this.__boardsChanged, this);
+        cb.setUserData("device", b);
+        cb.addListener("changeValue", this.__devicesChanged, this);
         list.box.add(cb);
         return cb;
       });
-      if (!boards.length) {
+      if (!devices.length) {
         list.box.add(new qx.ui.basic.Label("Çevrimiçi cihaz yok.").set({ textColor: "app-muted" }));
       }
       col.add(list.scroll, { flex: 1 });
       filter.addListener("input", () => {
         const q = (filter.getValue() || "").toLocaleLowerCase("tr");
-        this.__boardBoxes.forEach(cb => cb.setVisibility(
+        this.__deviceBoxes.forEach(cb => cb.setVisibility(
           cb.getLabel().toLocaleLowerCase("tr").includes(q) ? "visible" : "excluded"));
       });
       const buttons = new qx.ui.container.Composite(new qx.ui.layout.HBox(6));
-      const setAll = value => () => this.__boardBoxes
+      const setAll = value => () => this.__deviceBoxes
         .filter(cb => cb.isVisible())
         .forEach(cb => cb.setValue(value));
       const all = new qx.ui.form.Button("Tümü");
@@ -292,20 +292,20 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       buttons.add(all, { flex: 1 });
       buttons.add(none, { flex: 1 });
       col.add(buttons);
-      this.__updateBoardCount();
+      this.__updateDeviceCount();
       return col;
     },
 
-    __selectedBoards() {
-      return this.__boardBoxes.filter(cb => cb.getValue()).map(cb => cb.getUserData("board"));
+    __selectedDevices() {
+      return this.__deviceBoxes.filter(cb => cb.getValue()).map(cb => cb.getUserData("device"));
     },
 
-    __updateBoardCount() {
-      this.__boardCount.setValue(`${this.__selectedBoards().length} / ${this.__boardBoxes.length} çevrimiçi bilgisayar seçili`);
+    __updateDeviceCount() {
+      this.__deviceCount.setValue(`${this.__selectedDevices().length} / ${this.__deviceBoxes.length} çevrimiçi bilgisayar seçili`);
     },
 
-    __boardsChanged() {
-      this.__updateBoardCount();
+    __devicesChanged() {
+      this.__updateDeviceCount();
       // Kutular art arda işaretlenirken her tıklamada sorgu atılmasın.
       if (this.__usersTimer) {
         this.__usersTimer.stop();
@@ -365,7 +365,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         }
         const menu = new qx.ui.menu.Menu();
         const n = this.__selectedPaths().length;
-        menu.add(ankamon.ui.BoardOps.menuButton(ankamon.ui.Shell.ICON.delete,
+        menu.add(ankamon.ui.DeviceOps.menuButton(ankamon.ui.Shell.ICON.delete,
           n > 1 ? `Kaldır (${n} öğe)` : "Kaldır", () => this.__removeSelected()));
         menu.addListenerOnce("disappear", () => qx.event.Timer.once(() => menu.destroy(), null, 0));
         tree.setContextMenu(menu);
@@ -601,18 +601,18 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
     },
 
     async __loadUsers() {
-      const boards = this.__selectedBoards();
+      const devices = this.__selectedDevices();
       const seq = ++this.__usersSeq;
-      if (!boards.length) {
-        this.__boardUsers = [];
+      if (!devices.length) {
+        this.__deviceUsers = [];
         this.__renderUsers();
         this.__userInfo.setValue("Önce cihaz seçin.");
         return;
       }
-      this.__userInfo.setValue(`${boards.length} cihazdan okunuyor…`);
+      this.__userInfo.setValue(`${devices.length} cihazdan okunuyor…`);
       let res;
       try {
-        res = await ankamon.ui.files.Api.post("/bulk/users", { boards: boards.map(b => b.id) });
+        res = await ankamon.ui.files.Api.post("/bulk/users", { devices: devices.map(b => b.id) });
       } catch (e) {
         if (seq === this.__usersSeq) {
           this.__userInfo.setValue(`<span style="color:${this.__color("error")}">${qx.bom.String.escape(e.message)}</span>`);
@@ -622,11 +622,11 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       if (seq !== this.__usersSeq || this.isDisposed()) {
         return; // bu arada seçim değişti: yeni sorgunun sonucu geçerli
       }
-      this.__boardUsers = res.boards;
+      this.__deviceUsers = res.devices;
       this.__renderUsers();
-      const bad = res.boards.filter(b => b.error);
-      const logged = res.boards.filter(b => (b.users || []).some(u => u.logged)).length;
-      this.__userInfo.setValue(`${res.boards.length - bad.length} cihazdan okundu · ${logged} cihazda oturum açık` +
+      const bad = res.devices.filter(b => b.error);
+      const logged = res.devices.filter(b => (b.users || []).some(u => u.logged)).length;
+      this.__userInfo.setValue(`${res.devices.length - bad.length} cihazdan okundu · ${logged} cihazda oturum açık` +
         (bad.length ? ` · <span style="color:${this.__color("error")}" title="${qx.bom.String.escape(
           bad.map(b => b.name + ": " + b.error).join("\n"))}">${bad.length} cihaza ulaşılamadı</span>` : ""));
     },
@@ -640,18 +640,18 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         cb.destroy();
       });
       const stats = new Map();
-      this.__boardUsers.forEach(b => (b.users || []).forEach(u => {
-        const s = stats.get(u.name) || { boards: 0, logged: 0 };
-        s.boards++;
+      this.__deviceUsers.forEach(b => (b.users || []).forEach(u => {
+        const s = stats.get(u.name) || { devices: 0, logged: 0 };
+        s.devices++;
         s.logged += u.logged ? 1 : 0;
         stats.set(u.name, s);
       }));
       const names = Array.from(stats.keys()).sort((a, b) =>
         stats.get(b).logged - stats.get(a).logged || a.localeCompare(b, "tr", { numeric: true }));
-      const n = this.__boardUsers.length;
+      const n = this.__deviceUsers.length;
       names.forEach(name => {
         const s = stats.get(name);
-        const where = s.boards === n ? (n > 1 ? "tüm cihazlarda" : "") : `${s.boards} cihazda`;
+        const where = s.devices === n ? (n > 1 ? "tüm cihazlarda" : "") : `${s.devices} cihazda`;
         const extra = [where, s.logged ? (n > 1 ? `${s.logged} cihazda oturumu açık` : "oturumu açık") : ""]
           .filter(Boolean).join(", ");
         const cb = new qx.ui.form.CheckBox(name + (extra ? `  — ${extra}` : "")).set({ value: this.__checked.has(name) });
@@ -815,8 +815,8 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
           throw new Error(kind === "sub" ? "Ev dizini altındaki yolu yazın." : "Mutlak yolu yazın (/ ile başlayan).");
         }
       }
-      const boards = this.__selectedBoards().map(b => b.id);
-      if (!boards.length) {
+      const devices = this.__selectedDevices().map(b => b.id);
+      if (!devices.length) {
         throw new Error("En az bir cihaz seçin.");
       }
       const users = { logged: this.__logged.getValue(), names: Array.from(this.__checked) };
@@ -829,7 +829,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       if (this.__mode === "collect" && !this.__whatRequest().what) {
         throw new Error("Toplanacak öğeleri belirleyin: en az bir dosya türü seçin ya da bir ad deseni yazın.");
       }
-      return { boards, users, location };
+      return { devices, users, location };
     },
 
     /** @param dry {Boolean} Topla ▸ Önizle: yalnız sayılır, hiçbir şey aktarılmaz/silinmez. */
@@ -854,7 +854,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       }
       if (this.__mode === "collect" && !dry && this.__move.getValue()) {
         const ok = await ankamon.ui.Dialog.confirm(
-          `<b>Taşıma</b>: ${req.boards.length} cihazda ${where} konumundan alınan öğeler, sunucuya sağ salim ` +
+          `<b>Taşıma</b>: ${req.devices.length} cihazda ${where} konumundan alınan öğeler, sunucuya sağ salim ` +
           "aktarıldıktan sonra <b>cihazdan silinecek</b>." +
           (req.location.kind === "home" ? "<br><br>Konum <b>ev dizininin tamamı</b> — gizli ayar dosyaları da taşınır!" : ""),
           "Taşı");
@@ -937,7 +937,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         text = `Dosyalar sunucuya yüklenirken durduruldu (${n} / ${this.__files.length} dosya yüklendi).<br>` +
           "Cihazlara henüz hiçbir şey kopyalanmadı.";
       } else {
-        const rows = this.__job ? this.__job.boards : [];
+        const rows = this.__job ? this.__job.devices : [];
         const done = rows.filter(b => ["done", "partial"].includes(b.state)).length;
         const half = rows.filter(b => b.targets.some(t => (t.created || []).length) && !["done", "partial"].includes(b.state)).length;
         const rest = rows.length - done;
@@ -985,7 +985,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
             return;
           }
           this.__phase.setValue(`<span style="color:${this.__color("error")}">${esc(e.message)}</span>`);
-          this.__finishUi(this.__job && this.__job.boards ? this.__job : null);
+          this.__finishUi(this.__job && this.__job.devices ? this.__job : null);
           return;
         }
         this.__lastJson = null;
@@ -1007,7 +1007,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
           this.__renderRows(job);
           this.__renderEvents(job);
           this.__phase.setValue(`<span style="color:${this.__color("app-warn")}">Durduruldu ve geri alındı</span> — ` +
-            `${res.boards} cihazda ${res.removed} öğe silindi` +
+            `${res.devices} cihazda ${res.removed} öğe silindi` +
             (res.failed ? `, <span style="color:${this.__color("error")}">${res.failed} cihazda silinemedi</span>` : ""));
         } catch (e) {
           ankamon.ui.Dialog.error(e);
@@ -1108,7 +1108,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         return;
       }
       this.__job = job;
-      const json = JSON.stringify([job.boards, job.events.length, job.state, job.limit, job.running]);
+      const json = JSON.stringify([job.devices, job.events.length, job.state, job.limit, job.running]);
       this.__renderProgress(job);
       if (json !== this.__lastJson) {
         this.__lastJson = json;
@@ -1127,9 +1127,9 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
 
     __renderProgress(job) {
       const fmt = ankamon.util.Format.bytes;
-      const n = job.boards.length || 1;
-      const finished = job.boards.filter(b => !["queued", "running"].includes(b.state)).length;
-      const frac = job.boards.reduce((sum, b) => sum + (["queued"].includes(b.state) ? 0
+      const n = job.devices.length || 1;
+      const finished = job.devices.filter(b => !["queued", "running"].includes(b.state)).length;
+      const frac = job.devices.reduce((sum, b) => sum + (["queued"].includes(b.state) ? 0
         : b.state === "running" ? (b.total ? Math.min(0.99, b.bytes / b.total) : 0.05) : 1), 0) / n;
       this.__bar.setValue(Math.floor(frac * 100));
       const now = Date.now() / 1000;
@@ -1141,7 +1141,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         this.__speed.bytes = job.bytes;
       }
       const elapsed = Math.round((job.finished || now) - job.started);
-      const parts = [`%${Math.floor(frac * 100)}`, `${finished} / ${job.boards.length} cihaz bitti`];
+      const parts = [`%${Math.floor(frac * 100)}`, `${finished} / ${job.devices.length} cihaz bitti`];
       if (job.state === "running") {
         parts.push(`${job.running} yürüyor (paralel sınır ${job.limit})`);
         if (this.__speed.rate > 0) {
@@ -1157,7 +1157,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       const STATES = ankamon.ui.files.BulkPanel.STATES;
       const fmt = ankamon.util.Format.bytes;
       const rows = [];
-      job.boards.forEach(b => {
+      job.devices.forEach(b => {
         const pct = b.state === "running" && b.total ? ` %${Math.min(99, Math.floor((b.bytes / b.total) * 100))}` : "";
         if (!b.targets.length) {
           rows.push([b.name, "", "", (STATES[b.state] || b.state) + pct, "", b.bytes ? fmt(b.bytes) : "", b.message]);
@@ -1192,12 +1192,12 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         node.files.sort((a, b) => a[0].localeCompare(b[0], "tr")).forEach(([name, size]) =>
           parent.add(new T.TreeFile(`${name}  —  ${fmt(size)}`)));
       };
-      job.boards.forEach(b => {
+      job.devices.forEach(b => {
         const targets = b.targets.filter(t => t.tree && t.tree.length);
         const total = targets.reduce((n, t) => n + (t.total || 0), 0);
-        const boardNode = new T.TreeFolder(targets.length ? `${b.name}  —  ${fmt(total)}` : `${b.name}  —  ${b.message}`);
-        boardNode.setOpen(true);
-        root.add(boardNode);
+        const deviceNode = new T.TreeFolder(targets.length ? `${b.name}  —  ${fmt(total)}` : `${b.name}  —  ${b.message}`);
+        deviceNode.setOpen(true);
+        root.add(deviceNode);
         targets.forEach(t => {
           const tree = { dirs: new Map(), files: [], size: 0, count: 0 };
           t.tree.forEach(([rel, size]) => {
@@ -1215,7 +1215,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
           });
           const userNode = new T.TreeFolder(`${t.user || t.dir}  (${t.dir})  —  ${fmt(t.total || 0)} · ${t.items} öğe`);
           userNode.setOpen(true);
-          boardNode.add(userNode);
+          deviceNode.add(userNode);
           addNodes(userNode, tree);
           if (t.tree_more) {
             userNode.add(new T.TreeFile(`… ve ${t.tree_more} dosya daha (önizlemede gösterilmedi)`));
@@ -1252,8 +1252,8 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
     __finished(job) {
       const esc = qx.bom.String.escape;
       const counts = {};
-      job.boards.forEach(b => (counts[b.state] = (counts[b.state] || 0) + 1));
-      const targets = job.boards.reduce((list, b) => list.concat(b.targets), []);
+      job.devices.forEach(b => (counts[b.state] = (counts[b.state] || 0) + 1));
+      const targets = job.devices.reduce((list, b) => list.concat(b.targets), []);
       const ok = targets.filter(t => t.state === "ok").length;
       const bad = targets.filter(t => t.state === "failed").length;
       const color = job.state === "done" ? this.__color("app-ok") : job.state === "cancelled" ? this.__color("app-warn") : this.__color("error");
@@ -1272,7 +1272,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
       }
       this.__phase.setValue(`<span style="color:${color}">${title}</span>`);
       this.__reportText.setValue(
-        `<b>Rapor</b>: ${job.boards.length} cihaz (${esc(summary)}) · ${ok} ${job.kind === "distribute" ? "hedefe kopyalandı" : "kaynaktan alındı"}` +
+        `<b>Rapor</b>: ${job.devices.length} cihaz (${esc(summary)}) · ${ok} ${job.kind === "distribute" ? "hedefe kopyalandı" : "kaynaktan alındı"}` +
         (bad ? `, <span style="color:${this.__color("error")}">${bad} hedefte hata</span>` : "") +
         ` · konum: ${esc(job.options.location_text)}` +
         (job.kind === "collect" && job.options.move ? " · <b>taşıma</b>" : ""));
@@ -1292,7 +1292,7 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
         this.__reportButtons.add(b);
       };
       if (job) {
-        const hasData = job.kind === "collect" && !job.options.dry && job.boards.some(b => b.targets.some(t => t.state === "ok"));
+        const hasData = job.kind === "collect" && !job.options.dry && job.devices.some(b => b.targets.some(t => t.state === "ok"));
         if (hasData) {
           button("ZIP indir", () => this.__deliver("zip"));
           button("tar.gz indir", () => this.__deliver("tgz"));
@@ -1356,10 +1356,10 @@ qx.Class.define("ankamon.ui.files.BulkPanel", {
     __saveReport(job) {
       const head = ["Cihaz", "Kullanıcı", "Konum", "Durum", "Öğe", "Boyut", "Ayrıntı"];
       const rows = [];
-      let board = "";
+      let device = "";
       this.__rows(job).forEach(r => {
-        board = r[0] || board;
-        rows.push([board].concat(r.slice(1)));
+        device = r[0] || device;
+        rows.push([device].concat(r.slice(1)));
       });
       const cell = v => `"${String(v).replace(/"/g, '""')}"`;
       const csv = "﻿" + [head].concat(rows).map(r => r.map(cell).join(";")).join("\r\n") + "\r\n\r\n" +

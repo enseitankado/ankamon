@@ -139,7 +139,7 @@ final class UsersApi
 
     /**
      * Yalnız katalogda tanımlı anahtarları bırakır; alt özelliklerin üstünü kendiliğinden ekler
-     * (ör. "screen.control" → "screen" → "boards"): üstü olmadan alt özellik arayüzde kullanılamaz.
+     * (ör. "screen.control" → "screen" → "devices"): üstü olmadan alt özellik arayüzde kullanılamaz.
      */
     private static function cleanFeatures(mixed $features): array
     {

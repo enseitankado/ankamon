@@ -73,11 +73,11 @@ def publish(server: str, topic: str, title: str, body: str, tags: list[str] | No
         return f"Bağlanılamadı: {getattr(e, 'reason', e)}"
 
 
-def send_logged(conn, cfg: dict, rule_id, rule_name: str, title: str, body: str, board_id=None, kind=None, tags=None) -> bool:
+def send_logged(conn, cfg: dict, rule_id, rule_name: str, title: str, body: str, device_id=None, kind=None, tags=None) -> bool:
     """Gönderir ve sonucu ntfy_messages'a yazar."""
     error = publish(cfg["server"], cfg["topic"], title, body, tags)
     conn.execute(
-        """INSERT INTO ntfy_messages (rule_id, rule_name, topic, title, body, board_id, kind, status, error)
+        """INSERT INTO ntfy_messages (rule_id, rule_name, topic, title, body, device_id, kind, status, error)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-        (rule_id, rule_name, cfg["topic"], title, body, board_id, kind, "failed" if error else "ok", error))
+        (rule_id, rule_name, cfg["topic"], title, body, device_id, kind, "failed" if error else "ok", error))
     return error is None

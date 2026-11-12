@@ -30,7 +30,7 @@ SSH oturumu) açılır. Cihaza port açılmaz, kurulum yapılmaz: ajan SSH üst�
 gönderilmez `chat_messages`'a yazılır (Oturumlar ▸ Sohbet geçmişi). Son pencere kapanınca cihazdaki pencere de kapanır.
 Ajan düşerse (oturum değişti → 75, cihaz kapandı) pencere açık kaldıkça birkaç saniyede bir yeniden başlatılır.
 
-Yetki: nginx /screen/ws/chat/ → "boards.chat". Tarayıcı iletileri: {"text": "..."}. Sunucu iletileri:
+Yetki: nginx /screen/ws/chat/ → "devices.chat". Tarayıcı iletileri: {"text": "..."}. Sunucu iletileri:
 {"t":"msg", id, direction, author, text, at} / {"t":"status", "state":"online|closed|offline", "detail"}.
 Kapanış kodları: 4001 cihaz yok · 4029 sınır aşıldı.
 """
@@ -50,7 +50,7 @@ from ..executor.cast import _FIND_DISPLAY
 
 log = logging.getLogger("ankamon.screen.chat")
 
-MAX_BOARDS = int(os.environ.get("CHAT_MAX_BOARDS", "64"))
+MAX_DEVICES = int(os.environ.get("CHAT_MAX_DEVICES", "64"))
 HISTORY = 100
 RETRY_SECONDS = 5
 EXIT_VT_CHANGED = 75
@@ -67,20 +67,20 @@ exec python3 -u -c "import base64,sys;exec(compile(base64.b64decode(sys.argv[1])
 _hubs: dict[int, "Hub"] = {}
 
 
-def _save(board_id: int, name: str, session: str | None, direction: str, author: str, body: str) -> dict:
+def _save(device_id: int, name: str, session: str | None, direction: str, author: str, body: str) -> dict:
     with db.connect() as conn:
         row = conn.execute(
-            """INSERT INTO chat_messages (board_id, board_name, session_username, direction, author, body)
+            """INSERT INTO chat_messages (device_id, device_name, session_username, direction, author, body)
                VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, extract(epoch FROM sent_at)::bigint AS at""",
-            (board_id, name, session, direction, author, body)).fetchone()
+            (device_id, name, session, direction, author, body)).fetchone()
     return {"t": "msg", "id": row["id"], "direction": direction, "author": author, "text": body, "at": row["at"]}
 
 
-def _history(board_id: int) -> list[dict]:
+def _history(device_id: int) -> list[dict]:
     with db.connect() as conn:
         rows = conn.execute(
             """SELECT id, direction, author, body, extract(epoch FROM sent_at)::bigint AS at FROM chat_messages
-               WHERE board_id = %s ORDER BY id DESC LIMIT %s""", (board_id, HISTORY)).fetchall()
+               WHERE device_id = %s ORDER BY id DESC LIMIT %s""", (device_id, HISTORY)).fetchall()
     return [{"t": "msg", "id": r["id"], "direction": r["direction"], "author": r["author"], "text": r["body"], "at": r["at"]}
             for r in reversed(rows)]
 
@@ -91,8 +91,8 @@ def _opened(name: str, user: str) -> None:
 
 
 class Hub:
-    def __init__(self, board_id: int, lookup, ssh_opts):
-        self.board_id = board_id
+    def __init__(self, device_id: int, lookup, ssh_opts):
+        self.device_id = device_id
         self._lookup = lookup
         self._ssh_opts = ssh_opts
         self.clients: set = set()
@@ -133,19 +133,19 @@ class Hub:
             else:
                 self.set_status("offline", "Cihaza ulaşılamıyor; yeniden deneniyor…")
             await asyncio.sleep(RETRY_SECONDS)
-        _hubs.pop(self.board_id, None)
+        _hubs.pop(self.device_id, None)
 
     async def _run_agent(self) -> tuple[int | None, str]:
-        found = await asyncio.to_thread(self._lookup, self.board_id)
+        found = await asyncio.to_thread(self._lookup, self.device_id)
         if found is None:
             self.set_status("offline", "Cihaz bulunamadı.")
             await asyncio.sleep(RETRY_SECONDS)
             return None, ""
-        board, ssh_user, password = found
-        self.name = board["name"]
+        device, ssh_user, password = found
+        self.name = device["name"]
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
         proc = await asyncio.create_subprocess_exec(
-            "sshpass", "-e", "ssh", *self._ssh_opts, f"{ssh_user}@{board['ip']}", _REMOTE,
+            "sshpass", "-e", "ssh", *self._ssh_opts, f"{ssh_user}@{device['ip']}", _REMOTE,
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=env,
         )
         self.proc = proc
@@ -154,7 +154,7 @@ class Hub:
                 raw = await proc.stdout.readline()
                 if not raw:
                     break
-                await self._from_board(raw.decode("utf-8", "replace").strip())
+                await self._from_device(raw.decode("utf-8", "replace").strip())
         finally:
             self.proc = None
             if proc.returncode is None:
@@ -162,7 +162,7 @@ class Hub:
             rc = await proc.wait()
         return rc, (await proc.stderr.read()).decode("utf-8", "replace")
 
-    async def _from_board(self, line: str) -> None:
+    async def _from_device(self, line: str) -> None:
         if line.startswith("U "):
             # Giriş ekranının kullanıcısı (lightdm) oturum değildir.
             name = line[2:].strip()
@@ -181,7 +181,7 @@ class Hub:
             self.set_status("closed", "Cihazdaki kişi pencereyi kapattı; yeni iletiyle yeniden açılır.")
         elif msg.get("t") == "msg" and msg.get("text"):
             author = self.session or "Cihaz"
-            saved = await asyncio.to_thread(_save, self.board_id, self.name, self.session, "in", author, str(msg["text"])[:4000])
+            saved = await asyncio.to_thread(_save, self.device_id, self.name, self.session, "in", author, str(msg["text"])[:4000])
             self.sent_now.append(saved)
             self.broadcast(saved)
 
@@ -191,7 +191,7 @@ class Hub:
             proc.stdin.write((json.dumps(msg, ensure_ascii=False) + "\n").encode())
 
     async def from_browser(self, user: str, text: str) -> None:
-        saved = await asyncio.to_thread(_save, self.board_id, self.name, self.session, "out", user, text)
+        saved = await asyncio.to_thread(_save, self.device_id, self.name, self.session, "out", user, text)
         self.sent_now.append(saved)
         self.broadcast(saved)
         self._write_agent({"t": "msg", "author": user, "text": text})
@@ -212,21 +212,21 @@ class ChatSocket(tornado.websocket.WebSocketHandler):
         self._lookup = lookup
         self._ssh_opts = ssh_opts
 
-    async def open(self, board_id: str):
-        board_id = int(board_id)
+    async def open(self, device_id: str):
+        device_id = int(device_id)
         self.user = self.request.headers.get("X-Auth-User", "") or "?"
-        found = await asyncio.to_thread(self._lookup, board_id)
+        found = await asyncio.to_thread(self._lookup, device_id)
         if found is None:
-            self.close(4001, "board")
+            self.close(4001, "device")
             return
-        if board_id not in _hubs and len(_hubs) >= MAX_BOARDS:
+        if device_id not in _hubs and len(_hubs) >= MAX_DEVICES:
             self.close(4029, "limit")
             return
-        hub = _hubs.get(board_id)
+        hub = _hubs.get(device_id)
         if hub is None:
-            hub = _hubs[board_id] = Hub(board_id, self._lookup, self._ssh_opts)
+            hub = _hubs[device_id] = Hub(device_id, self._lookup, self._ssh_opts)
         hub.name = found[0]["name"]
-        for msg in await asyncio.to_thread(_history, board_id):
+        for msg in await asyncio.to_thread(_history, device_id):
             await self.write_message(json.dumps(msg, ensure_ascii=False))
         self.hub = hub
         hub.clients.add(self)

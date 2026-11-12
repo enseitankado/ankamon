@@ -32,7 +32,7 @@ ext/<ad>/
 ├── worker/
 │   ├── tasks.py                   TASKS = [run(conn) tanımlayan modüller]
 │   ├── job_hooks.py               JOB_DONE / JOB_FINISHED = {hazır işlem id: fn}
-│   └── tools.json                 tahtalara taşınan dış araçlar
+│   └── tools.json                 cihazlara taşınan dış araçlar
 ├── actions/<id>/                  hazır işlemler (action.json + run.sh)
 ├── db/migrations/*.sql            eklentinin tabloları (ext:<ad>:<dosya> olarak bir kez)
 ├── features.php, feature_deps.php eklentinin yetkileri
@@ -55,14 +55,14 @@ ext/<ad>/
   Eklentinin `worker/` dizini import yoluna eklenir.
 - **Hazır işlemler:** `actions/<id>/action.json` + `run.sh` (çekirdek actions/ ile aynı biçim; id'ler geneldir,
   eklentiye özgü önek kullanın). `worker/job_hooks.py`: `JOB_DONE = {id: fn}` işlem 'ok' bitince,
-  `JOB_FINISHED = {id: fn}` betik tahtada bittiğinde (başarısız olsa da; fn'e sonuç da verilir) çağrılır —
-  büyük sonuçlar tahtadaki dosyadan okunup eklentinin tablosuna yazılır.
+  `JOB_FINISHED = {id: fn}` betik cihazda bittiğinde (başarısız olsa da; fn'e sonuç da verilir) çağrılır —
+  büyük sonuçlar cihazdaki dosyadan okunup eklentinin tablosuna yazılır.
 - **Dış araçlar:** `worker/tools.json` — tek dosyalı araç (`repo`, `branch`, `file`, `remote_dir`) ya da
   `"kind": "archive"` ile çok dosyalı araç (`sources: [{repo, ref: "release"|<dal>, include, dest?}]`): sunucu
-  günde en çok bir kez sürüm denetler, tahtaya yalnız değişince SFTP ile koyar (`action.json` `"tools"`).
+  günde en çok bir kez sürüm denetler, cihaza yalnız değişince SFTP ile koyar (`action.json` `"tools"`).
 - **Yetkiler:** `features.php` (anahtar → açıklama) ve `feature_deps.php` (alt → üst) çekirdek kataloğuyla
   birleşir; kullanıcılara Kullanıcılar penceresinden verilir. Rotada erişim düzeyi olarak kullanılır.
-- **Tahtalar sağ menüsü / araç çubuğu:** `ankamon.ext.Extensions.addBoardMenu({build, bar})` — madde grid
+- **Cihazlar sağ menüsü / araç çubuğu:** `ankamon.ext.Extensions.addDeviceMenu({build, bar})` — madde grid
   satırı ve ekran kutucuğu menüsüne eklenir; `bar` verilirse araç çubuğunda düğme olur (`mirror`: maddenin alt
   menüsü düğmenin menüsüdür).
 
@@ -71,9 +71,9 @@ ext/<ad>/
   ağaç, üst yol gösterimi ve sekme yaprakları çekirdek sayfalarındaki gibi kendiliğinden gelir.
 
 - **Wi-Fi Monitör güvenilir listesi:** `ankamon.ext.Extensions.addWifiTrustedAction({label, hint, run(rows)})` — pencerenin
-  düğme satırına düğme; `run` işaretli kayıtlarla (`{id, kind, value, label, board_id, board_name}`) çağrılır.
-- **Cihaz kimliği satırları (kilit ekranı):** `worker/device_identity.py` içinde `ROWS(conn, board_ids)` →
-  `{board_id: [[ad, değer], …]}` — Ekranı kilitle'de tahtanın kilit ekranındaki kimlik bilgisine satır eklenir (kod adının
+  düğme satırına düğme; `run` işaretli kayıtlarla (`{id, kind, value, label, device_id, device_name}`) çağrılır.
+- **Cihaz kimliği satırları (kilit ekranı):** `worker/device_identity.py` içinde `ROWS(conn, device_ids)` →
+  `{device_id: [[ad, değer], …]}` — Ekranı kilitle'de cihazın kilit ekranındaki kimlik bilgisine satır eklenir (kod adının
   altına; boş değerler atlanır). Bkz. worker `ankamon.ext.device_identity_rows`.
 - **Ayarın çekirdekten dolması:** `extension.json` ayarında `"default_from": "organization.name"` — alan boşken çekirdek ayarının
   değeri gösterilir ve `Core\Extensions::setting` onu döndürür (ör. Ayarlar ▸ Kuruluş); aynı değer kaydedilirse izlemeyi sürdürür.

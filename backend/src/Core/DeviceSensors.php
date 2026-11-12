@@ -1,0 +1,162 @@
+<?php
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Ankamon — ETAP akıllı tahtaları için merkezi log, izleme ve yönetim sunucusu
+ * Copyright (C) 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * https://github.com/enseitankado/ankamon
+ *
+ * Bu program özgür yazılımdır: Free Software Foundation tarafından yayımlanan
+ * GNU Affero Genel Kamu Lisansı'nın 3. sürümü ya da (tercihinize bağlı olarak)
+ * daha sonraki herhangi bir sürümü koşulları altında yeniden dağıtabilir ve/veya
+ * değiştirebilirsiniz.
+ *
+ * Bu program yararlı olması umuduyla dağıtılmaktadır, ancak HİÇBİR GARANTİSİ
+ * YOKTUR; satılabilirlik veya belirli bir amaca uygunluk garantisi dahi
+ * verilmez. Ayrıntılar için GNU Affero Genel Kamu Lisansı'na bakınız.
+ *
+ * Bu programla birlikte GNU Affero Genel Kamu Lisansı'nın bir kopyasını (LICENSE
+ * dosyası) almış olmalısınız. Almadıysanız <https://www.gnu.org/licenses/>
+ * adresine bakınız.
+ *
+ * Bu dosyadan (sınıf, işlev ya da işlev içi kod bloğu dahil) alınan her türlü
+ * parça da AGPL-3.0-or-later ile lisanslıdır: parçayı kullanan türev eser aynı
+ * lisansla yayımlanmalı, bu telif/atıf bildirimi ve değişiklik notu
+ * korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
+ * kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
+ */
+
+declare(strict_types=1);
+
+namespace Ankamon\Core;
+
+/**
+ * Cihaz sensörlerini (node_exporter hwmon + smartmon/nvme textfile) anlamlı göstergelere indirger:
+ *   cpu_temp   işlemci (coretemp/k10temp)       device_temp  anakart (Super I/O temp1)
+ *   acpi_temp  kasa içi (ACPI termal bölge)     disk_temp   disk (SMART 194/190, NVMe)
+ *   fan_rpm    işlemci fanı (Super I/O)         battery_v   CMOS pili (Super I/O in8 = Vbat)
+ * Super I/O değerleri cihazda sürücü yüklüyse gelir (bkz. actions/node-exporter, Super I/O adımı). Bir göstergeye
+ * birden çok seri düşerse (ör. çekirdek başına sıcaklık, bağlı olmayan fan3 = 0) son değeri en yüksek
+ * olan seçilir; en düşük/en yüksek değerler de o serinin kendisinden verilir.
+ */
+final class DeviceSensors
+{
+    public const KEYS = ['cpu_temp', 'device_temp', 'acpi_temp', 'disk_temp', 'fan_rpm', 'battery_v'];
+
+    private const NAMES = "'node_hwmon_temp_celsius', 'node_hwmon_fan_rpm', 'node_hwmon_in_volts',
+        'smartmon_temperature_celsius_raw_value', 'smartmon_airflow_temperature_cel_raw_value', 'nvme_temperature_celsius'";
+
+    private const SUPERIO = "(chip LIKE '%it87%' OR chip LIKE '%nct67%' OR chip LIKE '%f71%')";
+
+    private const KEY_SQL = "CASE
+        WHEN name = 'node_hwmon_temp_celsius' AND (chip LIKE '%coretemp%' OR chip LIKE '%k10temp%') THEN 'cpu_temp'
+        WHEN name = 'node_hwmon_temp_celsius' AND sensor = 'temp1' AND " . self::SUPERIO . " THEN 'device_temp'
+        WHEN name = 'node_hwmon_temp_celsius' AND chip LIKE 'thermal_thermal_zone%' THEN 'acpi_temp'
+        WHEN name = 'node_hwmon_fan_rpm' THEN 'fan_rpm'
+        WHEN name = 'node_hwmon_in_volts' THEN 'battery_v'
+        WHEN name LIKE 'smartmon_%' OR name LIKE 'nvme_%' THEN 'disk_temp'
+    END";
+
+    /** Sensörler sütununun penceresi: bu süre içinde sensör verisi gelen cihaz "Var" sayılır. */
+    public const SEEN_WINDOW = '24 hours';
+
+    /**
+     * Son SEEN_WINDOW içinde sensör (metrik izleme / node_exporter → Telegraf) verisi gelen cihazlar ve son geliş anı:
+     * [device_id => epoch]. Varlıklar ve Akıllı Tahtalar'ın "Sensörler" sütunu (kullanıcı isteği 2026-11-12). Her
+     * cihazda tek seri olan node_boot_time_seconds bakılır: saatlik özet (metrics_1h, ~30 ms) + özetin henüz
+     * kapsamadığı son 10 dakikanın ham verisi. Ham tabloda 24 saatlik tarama sıkıştırılmış parçalar yüzünden ~8 sn sürüyordu.
+     */
+    public static function lastSeenAll(): array
+    {
+        $rows = Db::all(
+            "SELECT device_id, extract(epoch FROM max(t))::bigint AS at FROM (
+                 SELECT g.device_id, m.time + interval '1 hour' AS t FROM metrics_1h m JOIN metrics_tag g USING (tag_id)
+                 WHERE g.name = 'node_boot_time_seconds' AND m.time > now() - interval '" . self::SEEN_WINDOW . "'
+                 UNION ALL
+                 SELECT g.device_id, m.time FROM metrics m JOIN metrics_tag g USING (tag_id)
+                 WHERE g.name = 'node_boot_time_seconds' AND m.time > now() - interval '10 minutes'
+             ) x WHERE device_id ~ '^[0-9]+$' GROUP BY device_id"
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            // Saatlik özetin dilimi bitişiyle sayılır; şimdiden ileri olamaz.
+            $out[(int) $row['device_id']] = min(time(), (int) $row['at']);
+        }
+        return $out;
+    }
+
+    /** Tüm cihazların son 5 dakikadaki değerleri: [device_id => [key => değer]]. */
+    public static function latestAll(): array
+    {
+        $rows = Db::all(
+            "SELECT s.device_id, s.key, last(m.value, m.time) AS last
+             FROM metrics m
+             JOIN (SELECT tag_id, device_id, " . self::KEY_SQL . " AS key
+                   FROM metrics_tag WHERE device_id <> '' AND name IN (" . self::NAMES . ")) s USING (tag_id)
+             WHERE m.time > now() - interval '5 minutes' AND s.key IS NOT NULL
+             GROUP BY s.device_id, s.key, m.tag_id"
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) $row['device_id'];
+            $key = $row['key'];
+            $value = (float) $row['last'];
+            if (!isset($out[$id][$key]) || $value > $out[$id][$key]) {
+                $out[$id][$key] = $value;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Tek cihaz: son değer + saklanan tüm geçmişteki (metrics_1h özeti — ayrıntılı veri silinse de
+     * kalır) en düşük/en yüksek değer ve zamanları. [key => {value, min, max, min_at, max_at, since}]
+     */
+    public static function withRange(int $deviceId): array
+    {
+        $rows = Db::all(
+            "WITH s AS (
+                 SELECT tag_id, " . self::KEY_SQL . " AS key FROM metrics_tag WHERE device_id = ? AND name IN (" . self::NAMES . ")
+             ), h AS (
+                 SELECT m.tag_id, m.time, m.min, m.max FROM metrics_1h m JOIN s USING (tag_id) WHERE s.key IS NOT NULL
+             ), cur AS (
+                 SELECT m.tag_id, last(m.value, m.time) AS last FROM metrics m JOIN s USING (tag_id)
+                 WHERE s.key IS NOT NULL AND m.time > now() - interval '5 minutes' GROUP BY m.tag_id
+             )
+             SELECT s.key, s.tag_id, cur.last,
+                    (SELECT min(min) FROM h WHERE h.tag_id = s.tag_id) AS min,
+                    (SELECT max(max) FROM h WHERE h.tag_id = s.tag_id) AS max,
+                    (SELECT extract(epoch FROM time)::bigint FROM h WHERE h.tag_id = s.tag_id ORDER BY min, time DESC LIMIT 1) AS min_at,
+                    (SELECT extract(epoch FROM time)::bigint FROM h WHERE h.tag_id = s.tag_id ORDER BY max DESC, time DESC LIMIT 1) AS max_at,
+                    (SELECT extract(epoch FROM min(time))::bigint FROM h WHERE h.tag_id = s.tag_id) AS since
+             FROM s LEFT JOIN cur USING (tag_id)
+             WHERE s.key IS NOT NULL",
+            [(string) $deviceId]
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            if ($row['max'] === null && $row['last'] === null) {
+                continue;
+            }
+            $key = $row['key'];
+            // Seri seçimi: son değeri olan önce, sonra en yüksek son değer (yoksa en yüksek tepe).
+            $rank = $row['last'] !== null ? [1, (float) $row['last']] : [0, (float) $row['max']];
+            if (isset($out[$key]) && $out[$key]['rank'] >= $rank) {
+                continue;
+            }
+            $out[$key] = [
+                'rank' => $rank,
+                'value' => $row['last'] === null ? null : (float) $row['last'],
+                'min' => $row['min'] === null ? null : (float) $row['min'],
+                'max' => $row['max'] === null ? null : (float) $row['max'],
+                'min_at' => $row['min_at'] === null ? null : (int) $row['min_at'],
+                'max_at' => $row['max_at'] === null ? null : (int) $row['max_at'],
+                'since' => $row['since'] === null ? null : (int) $row['since'],
+            ];
+        }
+        foreach ($out as &$item) {
+            unset($item['rank']);
+        }
+        return $out;
+    }
+}

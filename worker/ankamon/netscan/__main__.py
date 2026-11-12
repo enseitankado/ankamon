@@ -153,7 +153,7 @@ def _shares_loop() -> None:
                     _set(conn, shares={"phase": "scanning", "pending": pending, "total": total, "target": dev["ip"]})
                     log.info("paylaşım taraması: %s (%s)", dev["ip"], dev["mac"])
                     # Cihazların Samba parolası yalnız kayıtlı cihazlarda denenir (başka cihaza sızmasın).
-                    result = probe.smb_shares(dev["ip"], dev["hostname"], creds if dev["is_board"] else None)
+                    result = probe.smb_shares(dev["ip"], dev["hostname"], creds if dev["is_device"] else None)
                     store.apply_shares(conn, dev, result)
                     log.info("paylaşım taraması bitti: %s — %d paylaşım (%s)", dev["ip"],
                              len(result["shares"]), result["auth"])
@@ -277,11 +277,11 @@ def _sweep(conn) -> None:
     filled = store.fill_labels(conn)
     if filled:
         log.info("takma ad dolduruldu: %d kayıt", filled)
-    created = store.boards_from_devices(conn)
+    created = store.devices_from_devices(conn)
     if created:
         log.info("ağ envanterindeki akıllı tahtalar için cihaz kaydı açıldı: %d", created)
-    ips = store.fill_board_ips(conn)
-    moved = store.device_ips_from_boards(conn)
+    ips = store.fill_device_ips(conn)
+    moved = store.device_ips_from_devices(conn)
     if moved:
         log.info("cihaz IP'si cihazın güncel (log) adresiyle güncellendi: %d", moved)
     if ips:

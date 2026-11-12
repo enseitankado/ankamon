@@ -28,7 +28,7 @@
 Her kural ayrı bir modüldür: KIND (anomalies.kind) ve detect(conn, since) tanımlar. detect, `since`ten
 sonra süren/biten kaynak aralıklarını (ör. cihazın açık aralıkları) baştan hesaplar ve
 (bulunanlar, kapsamlar) döndürür:
-  bulunanlar: [{host, board_id, board_name, started_at, ended_at|None, detail}] — ended_at None = sürüyor
+  bulunanlar: [{host, device_id, device_name, started_at, ended_at|None, detail}] — ended_at None = sürüyor
   kapsamlar:  [(host, başlangıç, bitiş)] — yeniden hesaplanan aralıklar; bu aralıklarda başlayıp artık
               bulunmayan eski kayıtlar silinir (ör. oturum kaydı gecikip geldiyse 15 dk dolmamış olabilir).
 Kapsam dışındaki eski kayıtlara dokunulmaz: kaynak veriler (loglar) silinse de rapor kalır.
@@ -144,16 +144,16 @@ def _apply(conn, rule) -> None:
                 (kind, host, start, end, keep.get(host, [])))
         for a in found:
             conn.execute(
-                """INSERT INTO anomalies (kind, host, board_id, board_name, started_at, ended_at, detail)
+                """INSERT INTO anomalies (kind, host, device_id, device_name, started_at, ended_at, detail)
                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
                    ON CONFLICT (kind, host, started_at) DO UPDATE SET
                      ended_at = EXCLUDED.ended_at, detail = EXCLUDED.detail,
-                     board_id = COALESCE(EXCLUDED.board_id, anomalies.board_id),
-                     board_name = COALESCE(NULLIF(EXCLUDED.board_name, ''), anomalies.board_name),
+                     device_id = COALESCE(EXCLUDED.device_id, anomalies.device_id),
+                     device_name = COALESCE(NULLIF(EXCLUDED.device_name, ''), anomalies.device_name),
                      updated_at = now()
                    WHERE anomalies.ended_at IS DISTINCT FROM EXCLUDED.ended_at
                       OR anomalies.detail <> EXCLUDED.detail""",
-                (kind, a["host"], a["board_id"], a["board_name"], a["started_at"], a["ended_at"], _json(a["detail"])))
+                (kind, a["host"], a["device_id"], a["device_name"], a["started_at"], a["ended_at"], _json(a["detail"])))
         conn.execute(
             """INSERT INTO task_cursors (name, value, updated_at) VALUES (%s, now(), now())
                ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value, updated_at = now()""",

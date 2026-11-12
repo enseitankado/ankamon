@@ -3,14 +3,14 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # Cihaza özel SSH parolası: konteynerdeki bütün "sshpass -e ssh|sftp … kullanıcı@ip" çağrıları PATH'te önce buraya
-# gelir. O adres için kayıt varsa (/run/ankamon/board-ssh/<ip>, worker executor/board_password.py yazar) parola onunla
+# gelir. O adres için kayıt varsa (/run/ankamon/device-ssh/<ip>, worker executor/device_password.py yazar) parola onunla
 # değişir; yoksa çağıranın verdiği genel parola (Ayarlar ▸ SSH erişimi) kalır. ANKAMON_SSHPASS_DIRECT=1: tam verilen
-# parolayla bağlanılır (executor/board_password.py — parola doğrulama/değiştirme).
+# parolayla bağlanılır (executor/device_password.py — parola doğrulama/değiştirme).
 [ "${ANKAMON_SSHPASS_DIRECT:-0}" = 1 ] || for a in "$@"; do
     case "$a" in
         *[!a-zA-Z0-9_.@-]*) continue ;;
         *@*.*.*.*)
-            f="/run/ankamon/board-ssh/${a#*@}"
+            f="/run/ankamon/device-ssh/${a#*@}"
             if [ -r "$f" ]; then
                 SSHPASS=$(cat "$f")
                 export SSHPASS

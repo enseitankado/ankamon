@@ -86,7 +86,16 @@ final class Auth
     /** @param array<string,mixed> $user */
     public static function can(array $user, string $feature): bool
     {
-        return $user['is_admin'] || in_array($feature, $user['features'], true);
+        return $user['is_admin'] || in_array(self::feature($feature), $user['features'], true);
+    }
+
+    /**
+     * Eski yetki adını yenisine çevirir (terim geçişi 2026-11-12: "boards…" → "devices…", bkz. göç 053). Eklentiler
+     * (ext/<ad>/features.php, feature_deps.php, Auth::can çağrıları) eski adı kullanmaya devam edebilir.
+     */
+    public static function feature(string $feature): string
+    {
+        return preg_match('/^boards(\.|$)/', $feature) ? 'devices' . substr($feature, 6) : $feature;
     }
 
     public static function start(int $userId, Request $request): void

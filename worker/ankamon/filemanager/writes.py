@@ -92,8 +92,8 @@ class ResourcesProxy(tornado.web.RequestHandler):
                 if src and src[0] == to[0]:
                     continue
             targets.setdefault(to[0], []).append(to[1])
-        for board_id, paths in targets.items():
-            await self._fixer.fix_now(board_id, paths)
+        for device_id, paths in targets.items():
+            await self._fixer.fix_now(device_id, paths)
         self._reply(resp)
 
     async def put(self, *_):

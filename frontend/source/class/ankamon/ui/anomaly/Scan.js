@@ -59,8 +59,8 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     this.setLayout(new qx.ui.layout.Grow());
     this.setPadding(8);
     const prefs = page._user.ui_prefs || {};
-    this.__checked = new Set(prefs["anomalies.scan.boards"] || []);
-    this.__hasBoardPref = Array.isArray(prefs["anomalies.scan.boards"]);
+    this.__checked = new Set(prefs["anomalies.scan.devices"] || []);
+    this.__hasDevicePref = Array.isArray(prefs["anomalies.scan.devices"]);
     this.__kindPref = prefs["anomalies.scan.kinds"] || null;
 
     // İki ayırıcı: (1 | 2) / 3. Konumları kullanıcı başına sunucuda (ui_prefs["anomalies.denetle.split"] = {left, top};
@@ -75,22 +75,22 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     this.__mainSplit = split;
     outer.add(split, 0);
     split.addListener("changeHeight", e => this.__saveSplit("top", e.getData()));
-    const boards = this.__createBoardsPane().set({ width: saved.left || null });
+    const devices = this.__createDevicesPane().set({ width: saved.left || null });
     if (!saved.left) {
       // İlk açılış: eskisi gibi 2/5 genişlik (kullanıcı sürüklemediği için kaydedilmez).
       this.__splitDefaulting = true;
       split.addListenerOnce("resize", e => {
-        boards.setWidth(Math.round(e.getData().width * 0.4));
+        devices.setWidth(Math.round(e.getData().width * 0.4));
         this.__splitDefaulting = false;
       });
     }
-    split.add(boards, 0);
+    split.add(devices, 0);
     split.add(this.__createKindPane(), 1);
-    boards.addListener("changeWidth", e => this.__saveSplit("left", e.getData()));
+    devices.addListener("changeWidth", e => this.__saveSplit("left", e.getData()));
     outer.add(this.__createResultsPane(), 1);
 
     // Sekme ilk kez açılınca cihazlar yüklenir (sayfa 30 sn'de bir yenilense de liste yalnız açıkken tazelenir).
-    this.addListener("appear", () => this.__loadBoards());
+    this.addListener("appear", () => this.__loadDevices());
   },
 
   statics: {
@@ -117,10 +117,10 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     __outerSplit: null,
     __reports: null,
     __checked: null,
-    __hasBoardPref: false,
+    __hasDevicePref: false,
     __kindPref: null,
-    __boards: null,
-    __boardTable: null,
+    __devices: null,
+    __deviceTable: null,
     __search: null,
     __selCount: null,
     __kindBox: null,
@@ -136,11 +136,11 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     __lastJobShown: null,
 
     // Adımlar "Dosyaları dağıt"taki numaralı kutularla aynı görünümde (bkz. ui.StepBox).
-    __createBoardsPane() {
+    __createDevicesPane() {
       const box = ankamon.ui.StepBox.create(1, "Cihazları seç").set({ marginRight: 5 });
       const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(4).set({ alignY: "middle" }));
       this.__search = new qx.ui.form.TextField().set({ placeholder: "Ara: ad, konum, IP…", liveUpdate: true });
-      this.__search.addListener("changeValue", () => this.__renderBoards());
+      this.__search.addListener("changeValue", () => this.__renderDevices());
       bar.add(this.__search, { flex: 1 });
       [["Tümü", "Listede görünen tüm cihazları seç", b => true],
         ["Çevrim içi", "Listede görünen çevrim içi cihazları seç (diğerlerinin seçimi kalkar)", b => b.online],
@@ -157,19 +157,19 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         { id: "status", label: "Durum", width: 100 },
         { id: "ip", label: "IP" }
       ];
-      this.__boardTable = this.__page._createTable(columns, { checkable: true, prefsKey: "anomalies.scan.boards.columns", persistSort: true, filterable: true });
-      this.__boardTable.getTableColumnModel().setDataCellRenderer(4, new ankamon.ui.table.StatusRenderer());
+      this.__deviceTable = this.__page._createTable(columns, { checkable: true, prefsKey: "anomalies.scan.devices.columns", persistSort: true, filterable: true });
+      this.__deviceTable.getTableColumnModel().setDataCellRenderer(4, new ankamon.ui.table.StatusRenderer());
       // Liste her zaman Durum sütununa göre (çevrim içi önce, sonra ada göre) sıralı (kullanıcı isteği): öteki sütunlar
       // sıralanmaz, Durum başlığına tıklamak da sırayı bozmaz (iki yön aynı). keepSortOnReload her setData'da yeniden dizer.
-      const model = this.__boardTable.getTableModel();
+      const model = this.__deviceTable.getTableModel();
       const onlineFirst = (a, b) => (a[4] === b[4] ? 0 : a[4] === "Çevrim içi" ? -1 : 1) ||
         String(a[2]).localeCompare(String(b[2]), "tr", { numeric: true });
       [1, 2, 3, 5].forEach(col => model.setColumnSortable(col, false));
       model.setSortMethods(4, { ascending: onlineFirst, descending: onlineFirst });
       model.sortByColumn(4, true);
       // İşaret değişince seçim kümesi güncellenir (arama süzgeci gizlenen satırların seçimini korur).
-      this.__boardTable.getTableModel().addListener("dataChanged", () => this.__syncChecked());
-      box.add(this.__boardTable, { flex: 1 });
+      this.__deviceTable.getTableModel().addListener("dataChanged", () => this.__syncChecked());
+      box.add(this.__deviceTable, { flex: 1 });
       this.__selCount = new qx.ui.basic.Label("").set({ textColor: "app-muted" });
       box.add(this.__selCount);
       return box;
@@ -264,7 +264,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       results.add(head);
 
       this.__resultColumns = [
-        { id: "board", label: "Cihaz", width: 170 },
+        { id: "device", label: "Cihaz", width: 170 },
         { id: "check", label: "Denetim", width: 210 },
         { id: "result", label: "Sonuç", width: 100, choices: true },
         { id: "detail", label: "Ayrıntı", width: 420 },
@@ -280,8 +280,8 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         const id = this.__resultTable.getTableModel().getValue(0, e.getRow());
         const row = (this.__mergedRows || []).find(r => r.cells[0] === id);
         if (row) {
-          ankamon.ui.anomaly.RowDetail.open(`${row.plain.check} — ${row.plain.board}`, [
-            ["Cihaz", row.plain.board], ["Denetim", row.plain.check], ["Sonuç", row.plain.result], ["Ayrıntı", row.plain.detail],
+          ankamon.ui.anomaly.RowDetail.open(`${row.plain.check} — ${row.plain.device}`, [
+            ["Cihaz", row.plain.device], ["Denetim", row.plain.check], ["Sonuç", row.plain.result], ["Ayrıntı", row.plain.detail],
             ["Öneri", row.plain.advice], ["Kaynak", row.plain.source], ["Zaman", row.plain.at]
           ]);
         }
@@ -293,13 +293,13 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       return results;
     },
 
-    /** ③'te raporu gösterir; board verilirse grid o cihaza süzülür (Durum'dan bulguya çift tık — page.Anomalies.openFinding). */
-    showReport(board) {
+    /** ③'te raporu gösterir; device verilirse grid o cihaza süzülür (Durum'dan bulguya çift tık — page.Anomalies.openFinding). */
+    showReport(device) {
       if (this.__reports) {
         this.__reports.refresh();
       }
-      if (board && this.__resultFields) {
-        this.__resultFields.board.setValue(`"${board}"`);
+      if (device && this.__resultFields) {
+        this.__resultFields.device.setValue(`"${device}"`);
       }
     },
 
@@ -355,10 +355,10 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
 
     __kindLabels: null,
 
-    async __loadBoards() {
+    async __loadDevices() {
       let data;
       try {
-        data = await ankamon.io.Api.get("/boards");
+        data = await ankamon.io.Api.get("/devices");
       } catch (e) {
         this.__selCount.setValue("Cihazlar alınamadı: " + (e.message || e));
         return;
@@ -366,7 +366,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       if (this.isDisposed()) {
         return;
       }
-      this.__boards = data.boards.map(b => ({
+      this.__devices = data.devices.map(b => ({
         id: b.id,
         name: b.label || b.hostname || b.ip || ("#" + b.id),
         location: b.location || "",
@@ -374,23 +374,23 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         online: !!b.online
       }));
       // İlk kullanımda (kayıtlı seçim yok) çevrim içi cihazlar seçili gelir.
-      if (!this.__hasBoardPref && !this.__checked.size) {
-        this.__boards.filter(b => b.online).forEach(b => this.__checked.add(b.id));
+      if (!this.__hasDevicePref && !this.__checked.size) {
+        this.__devices.filter(b => b.online).forEach(b => this.__checked.add(b.id));
       }
-      const ids = new Set(this.__boards.map(b => b.id));
+      const ids = new Set(this.__devices.map(b => b.id));
       [...this.__checked].filter(id => !ids.has(id)).forEach(id => this.__checked.delete(id)); // silinmiş cihazlar
-      this.__renderBoards();
+      this.__renderDevices();
     },
 
-    __visibleBoards() {
+    __visibleDevices() {
       const q = (this.__search.getValue() || "").trim().toLocaleLowerCase("tr");
-      return (this.__boards || []).filter(b => !q ||
+      return (this.__devices || []).filter(b => !q ||
         [b.name, b.location, b.ip].some(v => v.toLocaleLowerCase("tr").includes(q)));
     },
 
-    __renderBoards() {
+    __renderDevices() {
       this.__rendering = true;
-      this.__boardTable.getTableModel().setData(this.__visibleBoards().map(b =>
+      this.__deviceTable.getTableModel().setData(this.__visibleDevices().map(b =>
         [b.id, this.__checked.has(b.id), b.name, b.location, b.online ? "Çevrim içi" : "Çevrim dışı", b.ip]));
       this.__rendering = false;
       this.__updateButton();
@@ -403,7 +403,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       if (this.__rendering) {
         return;
       }
-      const tm = this.__boardTable.getTableModel();
+      const tm = this.__deviceTable.getTableModel();
       for (let row = 0; row < tm.getRowCount(); row++) {
         const id = tm.getValue(0, row);
         if (tm.getValue(1, row)) {
@@ -416,8 +416,8 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     },
 
     __pickVisible(pick) {
-      this.__visibleBoards().forEach(b => (pick(b) ? this.__checked.add(b.id) : this.__checked.delete(b.id)));
-      this.__renderBoards();
+      this.__visibleDevices().forEach(b => (pick(b) ? this.__checked.add(b.id) : this.__checked.delete(b.id)));
+      this.__renderDevices();
     },
 
     __selectedKinds() {
@@ -435,15 +435,15 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     __sshNote: null,
 
     __updateButton() {
-      const boards = (this.__boards || []).filter(b => this.__checked.has(b.id));
-      const offline = boards.filter(b => !b.online).length;
-      this.__selCount.setValue(`${boards.length} cihaz seçili` +
+      const devices = (this.__devices || []).filter(b => this.__checked.has(b.id));
+      const offline = devices.filter(b => !b.online).length;
+      this.__selCount.setValue(`${devices.length} cihaz seçili` +
         (offline ? ` (${offline} tanesi çevrim dışı — taranamaz)` : ""));
       const kinds = this.__selectedKinds().length + (this.__sshSelected() ? 1 : 0);
       const running = this.__job && ["queued", "running"].includes(this.__job.status);
       this.__scanButton.set({
-        enabled: !running && boards.length > 0 && kinds > 0,
-        label: running ? "Taranıyor…" : (boards.length && kinds ? `Tara (${boards.length} cihaz, ${kinds} denetim)` : "Tara")
+        enabled: !running && devices.length > 0 && kinds > 0,
+        label: running ? "Taranıyor…" : (devices.length && kinds ? `Tara (${devices.length} cihaz, ${kinds} denetim)` : "Tara")
       });
     },
 
@@ -451,21 +451,21 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       const ids = [...this.__checked];
       const kinds = this.__selectedKinds();
       const S = ankamon.page.Base;
-      S.savePref(this.__page._user, "anomalies.scan.boards", ids);
+      S.savePref(this.__page._user, "anomalies.scan.devices", ids);
       S.savePref(this.__page._user, "anomalies.scan.kinds", kinds);
-      this.__hasBoardPref = true;
+      this.__hasDevicePref = true;
       if (this.__sshAllowed) {
         S.savePref(this.__page._user, "anomalies.scan.ssh", this.__sshSelected());
       }
       if (this.__sshSelected()) {
         // Kapalı cihaz SSH ile denetlenemez: yalnız çevrim içi olanlar.
-        const online = (this.__boards || []).filter(b => this.__checked.has(b.id) && b.online).map(b => b.id);
+        const online = (this.__devices || []).filter(b => this.__checked.has(b.id) && b.online).map(b => b.id);
         this.__sshRow.setVisibility("visible");
         if (!online.length) {
           this.__sshNote.setValue("Tam denetim: seçili cihazların hiçbiri açık değil; kapalı cihaz denetlenemez.");
         } else {
           try {
-            const job = await ankamon.io.Api.post("/jobs", { type: "diagnose", board_ids: online });
+            const job = await ankamon.io.Api.post("/jobs", { type: "diagnose", device_ids: online });
             this.__sshNote.setValue(`Tam denetim başlatıldı (${online.length} açık cihaz, görev #${job.id}); ` +
               "sonuçlar aşağıda ve Durum'da görünür.");
             this.showReport(); // süren denetim raporu ③'e gelsin
@@ -481,7 +481,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       }
       let res;
       try {
-        res = await ankamon.io.Api.post("/jobs", { type: "anomaly_scan", board_ids: ids, kinds });
+        res = await ankamon.io.Api.post("/jobs", { type: "anomaly_scan", device_ids: ids, kinds });
       } catch (e) {
         ankamon.ui.Dialog.error(e);
         return;
@@ -518,7 +518,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       }
     },
 
-    /** Görevin cihaz sonuçları → satırlar [{board, kind, state: found|clear|unknown, text}]. */
+    /** Görevin cihaz sonuçları → satırlar [{device, kind, state: found|clear|unknown, text}]. */
     __resultRows() {
       const job = this.__job;
       if (!job) {
@@ -548,7 +548,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
           } else {
             text = t.status === "unreachable" ? "Cihaza ulaşılamadı (kapalı olabilir): " + (t.output || "") : (t.output || "Taranamadı");
           }
-          rows.push({ id: t.board_id + ":" + kind, board: t.board, kind, state, text, running: t.status === "running" });
+          rows.push({ id: t.device_id + ":" + kind, device: t.device, kind, state, text, running: t.status === "running" });
         });
       });
       return rows;
@@ -568,7 +568,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       const rows = [];
       const add = (id, rank, plain, resultHtml, detailHtml) => {
         rows.push({ rank, plain, problem: rank < 4,
-          cells: [id, plain.board, plain.check, plain.result, detailHtml, plain.source, plain.at],
+          cells: [id, plain.device, plain.check, plain.result, detailHtml, plain.source, plain.at],
           html: resultHtml });
       };
       // 1) Tam denetim raporu (seçili rapor).
@@ -584,13 +584,13 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         }
         const at = r && r.collected_at ? F.dateTime(r.collected_at * 1000) : (t.finished_at ? F.dateTime(t.finished_at * 1000) : "");
         if (["queued", "running"].includes(t.status)) {
-          add(`ssh:${t.board_id}:pending`, 5, { board: t.board, check: "Tam denetim", result: t.status === "running" ? "Denetleniyor" : "Sırada",
+          add(`ssh:${t.device_id}:pending`, 5, { device: t.device, check: "Tam denetim", result: t.status === "running" ? "Denetleniyor" : "Sırada",
             detail: "", source: SRC.ssh, at: "" }, null, "");
           return;
         }
         if (!r) {
           const why = String(t.output || "").replace(/\s+/g, " ").trim();
-          add(`ssh:${t.board_id}:err`, 1, { board: t.board, check: "Tam denetim", result: "Ulaşılamadı", detail: why, source: SRC.ssh, at },
+          add(`ssh:${t.device_id}:err`, 1, { device: t.device, check: "Tam denetim", result: "Ulaşılamadı", detail: why, source: SRC.ssh, at },
             null, esc(why));
           return;
         }
@@ -599,7 +599,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
           const rank = { bad: 0, warn: 2, info: 3, ok: 6 }[c.level] ?? 5;
           // Son 24 saatin sıcaklığı cihaza bağlanılarak değil, Ankamon'un sürekli topladığı ölçümlerden hesaplanır.
           const source = c.group === "İşlemci sıcaklığı" ? SRC.metric : SRC.ssh;
-          add(`ssh:${t.board_id}:${i}`, rank, { board: t.board, check: `${c.group} › ${c.title}`, result: level.text,
+          add(`ssh:${t.device_id}:${i}`, rank, { device: t.device, check: `${c.group} › ${c.title}`, result: level.text,
             detail: c.detail || "", advice: c.advice || "", source, at },
           level.color ? S.html(level.text, level.color) : null,
           esc(c.detail || "") + (c.advice ? ` <span style="opacity:.65">— ${esc(c.advice)}</span>` : ""));
@@ -610,7 +610,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       const when = this.__job ? F.dateTime((this.__job.finished_at || this.__job.created_at) * 1000) : "";
       this.__resultRows().forEach(r => {
         const [text, color, rank] = label[r.state];
-        add(`quick:${r.id}`, rank, { board: r.board, check: (this.__kindLabels || {})[r.kind] || r.kind, result: text,
+        add(`quick:${r.id}`, rank, { device: r.device, check: (this.__kindLabels || {})[r.kind] || r.kind, result: text,
           detail: r.text || "", source: SRC.quick, at: r.state === "pending" ? "" : when },
         r.running ? ankamon.ui.JobSpinner.label("Taranıyor") : (color ? S.html(text, color) : null), esc(r.text || ""));
       });
@@ -618,11 +618,11 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       (this.__active || []).forEach(a => {
         // Kural verisinin kaynağı (AnomaliesApi KINDS source): Log / Ölçüm / SSH verisi (daha önce SSH ile toplanan donanım bilgisi).
         const source = { "Log": SRC.log, "Ölçüm": SRC.metric, "SSH verisi": SRC.facts }[a.source] || a.source || "";
-        add(`watch:${a.id}`, 1, { board: a.board, check: a.kindLabel || a.kind, result: "Sürüyor",
+        add(`watch:${a.id}`, 1, { device: a.device, check: a.kindLabel || a.kind, result: "Sürüyor",
           detail: a.text || "", advice: a.kindDesc || "", source, at: F.dateTime(a.started_at * 1000) },
         S.html("Sürüyor", red), esc(a.text || ""));
       });
-      rows.sort((x, y) => x.rank - y.rank || String(x.plain.board).localeCompare(String(y.plain.board), "tr", { numeric: true }));
+      rows.sort((x, y) => x.rank - y.rank || String(x.plain.device).localeCompare(String(y.plain.device), "tr", { numeric: true }));
       this.__mergedRows = rows;
       this.__applyResults();
       if (this.__job) {
@@ -659,16 +659,16 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       const red = S.colorOf("Çevrim dışı");
       const green = S.colorOf("Çevrim içi");
       const esc = qx.bom.String.escape;
-      const boards = job.targets.length;
+      const devices = job.targets.length;
       const pending = job.targets.filter(t => ["queued", "running"].includes(t.status)).length;
-      const foundBoards = new Set(all.filter(r => r.state === "found").map(r => r.board)).size;
+      const foundDevices = new Set(all.filter(r => r.state === "found").map(r => r.device)).size;
       const found = all.filter(r => r.state === "found").length;
       const unreachable = job.targets.filter(t => !["queued", "running", "ok"].includes(t.status)).length;
       const when = ankamon.util.Format.dateTime((job.finished_at || job.created_at) * 1000);
-      let html = pending ? ankamon.ui.JobSpinner.label(`Taranıyor: ${boards - pending} / ${boards} cihaz tamamlandı…`)
+      let html = pending ? ankamon.ui.JobSpinner.label(`Taranıyor: ${devices - pending} / ${devices} cihaz tamamlandı…`)
         : `<span style="font-weight:bold;color:${found ? red : green}">` +
-          (found ? `${foundBoards} cihazda ${found} anomali bulundu` : "Anomali bulunmadı") + "</span>";
-      html += ` <span style="opacity:.75">· ${boards} cihaz` + (unreachable ? `, ${unreachable} tanesine ulaşılamadı` : "") +
+          (found ? `${foundDevices} cihazda ${found} anomali bulundu` : "Anomali bulunmadı") + "</span>";
+      html += ` <span style="opacity:.75">· ${devices} cihaz` + (unreachable ? `, ${unreachable} tanesine ulaşılamadı` : "") +
         (pending ? "" : ` · ${esc(String(when))}`) + "</span>";
       this.__status.setValue(html);
     },

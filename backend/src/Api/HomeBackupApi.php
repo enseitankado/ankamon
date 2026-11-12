@@ -37,7 +37,7 @@ use Ankamon\Core\Request;
 
 /**
  * "Yedekle" görevinin ürettiği ev dizini arşivlerinin indirilmesi (bkz. worker executor/backup.py:
- * /data/home-backups/job-<görev>/<dosya>.tar.gz). Yalnız "boards.backup" yetkisiyle ve yalnız görevi
+ * /data/home-backups/job-<görev>/<dosya>.tar.gz). Yalnız "devices.backup" yetkisiyle ve yalnız görevi
  * başlatan kullanıcı (ya da yönetici) indirebilir. Dosyayı PHP okumaz: denetimden sonra nginx'e
  * X-Accel-Redirect ile devredilir (bkz. nginx-default.conf /_home-backups/) — çok büyük arşivler
  * php-fpm süresine/belleğine takılmaz, kaldığı yerden indirme (Range) de nginx'te çalışır.

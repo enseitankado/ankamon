@@ -26,7 +26,7 @@
 """Cihazdaki grafik oturumun ANLIK durumu: kim oturum açmış, ekran kilitli mi (SSH + loginctl).
 
 Cihazlar grid'inin "Oturum" sütununu besler (bkz. tasks/session_probe.py periyodik yoklama,
-boards.session_username/session_locked/session_checked_at — migration 012).
+devices.session_username/session_locked/session_checked_at — migration 012).
 
 ETAP'ta ekran kilidi LightDM'in `dm-tool lock`'udur (Cinnamon'un custom-screensaver-command'ı):
 kilitlenince kullanıcının oturumu AÇIK kalır ama pasifleşir, seat0'da giriş ekranı (greeter) aktif
@@ -42,7 +42,7 @@ import subprocess
 
 from . import autoshutdown, inputlock, netif, screenlock
 
-# Son satır: etkin VT'deki X'in monitör güç durumu ("M On|Off|Standby|Suspend" — bkz. 025_board_display_state.sql;
+# Son satır: etkin VT'deki X'in monitör güç durumu ("M On|Off|Standby|Suspend" — bkz. 025_device_display_state.sql;
 # X seçimi screen/remote.py ile aynı).
 _SCRIPT = r"""
 for s in $(loginctl list-sessions --no-legend 2>/dev/null | awk '$4 == "seat0" {print $1}'); do
@@ -98,13 +98,13 @@ def parse(output: str) -> tuple[str | None, bool]:
     return users[0]["Name"], True   # oturum açık ama seat0'da greeter aktif: dm-tool lock
 
 
-def probe(board: dict, user: str, password: str, timeout: int = 8) -> dict:
+def probe(device: dict, user: str, password: str, timeout: int = 8) -> dict:
     """Döner: {"ok": bool, "user": str|None, "locked": bool, "display": str, "netifs": dict|None,
     "shutdown": dict|None, "screen_locked": bool, "error": str}."""
-    if not board.get("ip"):
+    if not device.get("ip"):
         return {"ok": False, "user": None, "locked": False, "error": "IP yok"}
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", f"ConnectTimeout={min(timeout, 6)}",
-           f"{user}@{board['ip']}", _SCRIPT]
+           f"{user}@{device['ip']}", _SCRIPT]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=timeout)
@@ -119,38 +119,38 @@ def probe(board: dict, user: str, password: str, timeout: int = 8) -> dict:
             "screen_locked": "L 1" in out.splitlines(), "input_locks": inputlock.parse(out), "error": ""}
 
 
-def store_extras(conn, board_id: int, res: dict) -> None:
+def store_extras(conn, device_id: int, res: dict) -> None:
     """Ağ arabirimleri, otomatik kapatma ve ekran kilidi durumunu yazar (bkz. göç 026, 035; None =
-    bilinmiyor/yok). Wi-Fi kartının kalıcı MAC'i okunduysa Cihazlar ▸ Kablosuz MAC'e (boards.wifi_mac, göç 043)
+    bilinmiyor/yok). Wi-Fi kartının kalıcı MAC'i okunduysa Cihazlar ▸ Kablosuz MAC'e (devices.wifi_mac, göç 043)
     de yazılır — donanımdan okunan değer elle girileni günceller; kart okunamadıysa eski değer kalır."""
     conn.execute(
-        "UPDATE boards SET netifs = %s::jsonb, autoshutdown = %s::jsonb, screen_locked = %s, input_locks = %s,"
+        "UPDATE devices SET netifs = %s::jsonb, autoshutdown = %s::jsonb, screen_locked = %s, input_locks = %s,"
         " wifi_mac = COALESCE(%s::macaddr, wifi_mac) WHERE id = %s",
         (json.dumps(res.get("netifs")) if res.get("netifs") else None,
          json.dumps(res.get("shutdown")) if res.get("shutdown") else None,
-         bool(res.get("screen_locked")), res.get("input_locks") or [], netif.wifi_mac(res.get("netifs")), board_id))
+         bool(res.get("screen_locked")), res.get("input_locks") or [], netif.wifi_mac(res.get("netifs")), device_id))
 
 
-def store_screen_lock(conn, board_id: int, locked: bool) -> None:
+def store_screen_lock(conn, device_id: int, locked: bool) -> None:
     """Ekran ▸ Kilitle / Kilidi aç başarılı olunca (bkz. runner) — bir sonraki yoklamayı beklemeden."""
-    conn.execute("UPDATE boards SET screen_locked = %s WHERE id = %s", (locked, board_id))
+    conn.execute("UPDATE devices SET screen_locked = %s WHERE id = %s", (locked, device_id))
 
 
-def store_display(conn, board_id: int, state: str) -> None:
+def store_display(conn, device_id: int, state: str) -> None:
     """Monitör güç durumunu yazar ("" = bilinmiyor → NULL)."""
-    conn.execute("UPDATE boards SET display_state = NULLIF(%s, '') WHERE id = %s", (state, board_id))
+    conn.execute("UPDATE devices SET display_state = NULLIF(%s, '') WHERE id = %s", (state, device_id))
 
 
-def store(conn, board_id: int, user: str | None, locked: bool | None = None) -> None:
+def store(conn, device_id: int, user: str | None, locked: bool | None = None) -> None:
     """Cihazın oturum durumunu yazar. user boş/None = oturum kapalı. locked None ise (ör. `who`
     tabanlı "Oturumları sorgula" kilidi bilmez) kullanıcı değişmediyse önceki kilit durumu korunur,
     değiştiyse kilitsiz sayılır — bir sonraki periyodik yoklama kesinleştirir."""
     conn.execute(
-        """UPDATE boards SET
+        """UPDATE devices SET
                session_locked = CASE WHEN %(locked)s::boolean IS NOT NULL THEN %(locked)s::boolean
                                      WHEN session_username IS NOT DISTINCT FROM %(user)s THEN session_locked
                                      ELSE false END,
                session_username = %(user)s,
                session_checked_at = now()
            WHERE id = %(id)s""",
-        {"user": (user or "").strip() or None, "locked": locked, "id": board_id})
+        {"user": (user or "").strip() or None, "locked": locked, "id": device_id})

@@ -58,6 +58,19 @@ qx.Class.define("ankamon.Application", {
       ankamon.ui.table.RightClickPatch.install();
       // İpuçları süreyle kapanmaz, fare hareket edince kapanır.
       ankamon.ui.ToolTipPolicy.install();
+      // Terim geçişi (2026-11-12): tarayıcıda saklı "boards" anahtarlı tercihler "devices" adına bir kez taşınır
+      // (ör. ankamon.boards.screenView, sütun genişlikleri) — sunucudaki tercihleri göç 053 taşır.
+      try {
+        Object.keys(localStorage).filter(key => /(^|[.:_])boards?([.:_]|$)/.test(key)).forEach(key => {
+          const renamed = key.replace(/(^|[.:_])board(s?)(?=[.:_]|$)/g, "$1device$2");
+          if (localStorage.getItem(renamed) === null) {
+            localStorage.setItem(renamed, localStorage.getItem(key));
+          }
+          localStorage.removeItem(key);
+        });
+      } catch (e) {
+        // localStorage erişilemiyor: tercihler varsayılana düşer.
+      }
       // Bütün pencerelerin başlığı ince (küçük yazı, az dolgu) — pencereler açılmadan önce kurulmalı.
       ankamon.ui.Dialog.installSlimWindowCaptions();
       // Ön plandaki pencere ESC ile kapanır (kaydedilmemiş değişiklik varsa onayla — bkz. ui.WindowEscClose).

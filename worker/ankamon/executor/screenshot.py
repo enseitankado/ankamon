@@ -72,14 +72,14 @@ def read_embedded_meta(jpeg: bytes) -> dict | None:
     return meta if META_KEY in meta else None
 
 
-def _session_of(conn, board_id: int) -> dict | None:
+def _session_of(conn, device_id: int) -> dict | None:
     """Cihazdaki açık oturum: log tabanlı kaydın kimliği + kullanıcı; kayıt yoksa anlık yoklamadaki kullanıcı."""
     row = conn.execute(
-        """SELECT id, username, extract(epoch FROM started_at)::bigint AS started_at FROM board_sessions
-           WHERE board_id = %s AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1""", (board_id,)).fetchone()
+        """SELECT id, username, extract(epoch FROM started_at)::bigint AS started_at FROM device_sessions
+           WHERE device_id = %s AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1""", (device_id,)).fetchone()
     if row:
         return dict(row)
-    row = conn.execute("SELECT session_username FROM boards WHERE id = %s", (board_id,)).fetchone()
+    row = conn.execute("SELECT session_username FROM devices WHERE id = %s", (device_id,)).fetchone()
     return {"id": None, "username": row["session_username"], "started_at": None} if row and row["session_username"] else None
 
 
@@ -102,11 +102,11 @@ def _store(path: str, data: bytes) -> None:
     os.rename(tmp, path)
 
 
-def take(conn, board: dict, user: str, password: str, taken_by: str) -> dict:
+def take(conn, device: dict, user: str, password: str, taken_by: str) -> dict:
     """Görüntüyü alır, kimliği gömüp kaydeder. Döner: {"status", "rc", "output"} (bkz. accounts._ssh)."""
-    if not board.get("ip"):
+    if not device.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
-    cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", "ConnectTimeout=8", f"{user}@{board['ip']}", "sh -c " + shlex.quote(_CAPTURE)]
+    cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", "ConnectTimeout=8", f"{user}@{device['ip']}", "sh -c " + shlex.quote(_CAPTURE)]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=30)
@@ -119,22 +119,22 @@ def take(conn, board: dict, user: str, password: str, taken_by: str) -> dict:
         return {"status": "failed", "rc": proc.returncode, "output": text or "Görüntü alınamadı."}
 
     now = datetime.now().astimezone()
-    extra = conn.execute("SELECT hostname, host(ip) AS ip, mac::text AS mac FROM boards WHERE id = %s", (board["board_id"],)).fetchone() or {}
-    session = _session_of(conn, board["board_id"])
+    extra = conn.execute("SELECT hostname, host(ip) AS ip, mac::text AS mac FROM devices WHERE id = %s", (device["device_id"],)).fetchone() or {}
+    session = _session_of(conn, device["device_id"])
     meta = {
-        "board": {"id": board["board_id"], "name": board.get("name"), "hostname": extra.get("hostname"),
+        "device": {"id": device["device_id"], "name": device.get("name"), "hostname": extra.get("hostname"),
                   "ip": extra.get("ip"), "mac": extra.get("mac")},
         "session": session,
         "taken_at": now.isoformat(timespec="seconds"),
         "taken_by": taken_by,
     }
-    rel = f"{board['board_id']}/{now.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(4)}.jpg"
+    rel = f"{device['device_id']}/{now.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(4)}.jpg"
     data = embed_meta(proc.stdout, meta)
     _store(os.path.join(BASE_DIR, rel), data)
     conn.execute(
-        """INSERT INTO screenshots (board_id, board_name, session_id, session_username, taken_at, taken_by, file, bytes)
+        """INSERT INTO screenshots (device_id, device_name, session_id, session_username, taken_at, taken_by, file, bytes)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-        (board["board_id"], board.get("name") or "?", session["id"] if session else None,
+        (device["device_id"], device.get("name") or "?", session["id"] if session else None,
          session["username"] if session else None, now, taken_by, rel, len(data)))
     who = f"oturum: {session['username']}" if session else "oturum yok"
     return {"status": "ok", "rc": 0, "output": f"Ekran görüntüsü alındı ({len(data) // 1024} KB, {who})."}

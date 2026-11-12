@@ -49,7 +49,7 @@ qx.Class.define("ankamon.ui.sessions.Chats", {
 
     this.__columns = [
       { id: "time", label: "Zaman", width: 150 },
-      { id: "board", label: "Bilgisayar", width: 190, choices: true },
+      { id: "device", label: "Bilgisayar", width: 190, choices: true },
       { id: "session", label: "Oturum", width: 130, choices: true },
       { id: "direction", label: "Yön", width: 90, choices: true },
       { id: "author", label: "Yazan", width: 130, choices: true },
@@ -73,7 +73,7 @@ qx.Class.define("ankamon.ui.sessions.Chats", {
         const F = ankamon.util.Format;
         const data = await ankamon.io.Api.get("/chat/messages");
         this.__rows = data.messages.map(m => [
-          m.id, F.dateTime(m.sent_at * 1000), m.board_name, m.session_username || "",
+          m.id, F.dateTime(m.sent_at * 1000), m.device_name, m.session_username || "",
           m.direction === "out" ? "Ankamon → cihaz" : "Cihaz → Ankamon", m.author, m.body
         ]);
         this.__apply();

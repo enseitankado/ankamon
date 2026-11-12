@@ -83,7 +83,7 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
     rulesBox.add(ruleBar);
     this.__ruleTable = page._createTable([
       { id: "name", label: "Kural", width: 180 },
-      { id: "boards", label: "Bilgisayarlar", width: 200 },
+      { id: "devices", label: "Bilgisayarlar", width: 200 },
       { id: "kinds", label: "Anomali türleri" },
       { id: "mode", label: "Gönderim", width: 130 },
       { id: "interval", label: "Sıklık / sınır", width: 190 },
@@ -172,16 +172,16 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
     __delBtn: null,
     __delMsg: null,
     __data: null,
-    __boards: null,
+    __devices: null,
 
     async load() {
       try {
-        const [data, boards] = await Promise.all([ankamon.io.Api.get("/ntfy"), ankamon.io.Api.get("/boards")]);
+        const [data, devices] = await Promise.all([ankamon.io.Api.get("/ntfy"), ankamon.io.Api.get("/devices")]);
         if (this.isDisposed()) {
           return;
         }
         this.__data = data;
-        this.__boards = boards.boards;
+        this.__devices = devices.devices;
         if (!this.__topic.getValue()) {
           this.__server.setValue(data.config.server || "https://ntfy.sh");
           this.__topic.setValue(data.config.topic || "");
@@ -192,8 +192,8 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       }
     },
 
-    __boardName(id) {
-      const b = (this.__boards || []).find(x => x.id === id);
+    __deviceName(id) {
+      const b = (this.__devices || []).find(x => x.id === id);
       return b ? b.label || b.hostname || b.ip : "#" + id;
     },
 
@@ -203,7 +203,7 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       const d = this.__data;
       this.__ruleTable.getTableModel().setData(d.rules.map(r => [
         r.id, r.name,
-        r.board_ids.length ? r.board_ids.map(id => this.__boardName(id)).join(", ") : "Tümü",
+        r.device_ids.length ? r.device_ids.map(id => this.__deviceName(id)).join(", ") : "Tümü",
         r.kinds.length ? r.kinds.map(k => (d.kinds[k] || {}).label || k).join(", ") : "Tümü",
         N.MODES[r.mode][0], N.intervalText(r.mode, r.interval_minutes), r.max_per_hour, r.enabled ? "Açık" : "Kapalı"
       ]));
@@ -318,16 +318,16 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       };
       const lists = new qx.ui.container.Composite(new qx.ui.layout.HBox(10)).set({ height: 300 });
       const left = ankamon.ui.StepBox.create(1, "Bilgisayarlar", "hiçbiri işaretli değilse tümü");
-      const boardList = new ankamon.ui.homebackup.CheckColumn();
-      left.add(boardList, { flex: 1 });
+      const deviceList = new ankamon.ui.homebackup.CheckColumn();
+      left.add(deviceList, { flex: 1 });
       const right = ankamon.ui.StepBox.create(2, "Anomali türleri", "hiçbiri işaretli değilse tümü");
       const kindList = new ankamon.ui.homebackup.CheckColumn();
       right.add(kindList, { flex: 1 });
       lists.add(left, { flex: 1 });
       lists.add(right, { flex: 1 });
       win.add(lists, { flex: 1 });
-      boardList.setItems(this.__boards.map(b => ({
-        value: b.id, label: b.label || b.hostname || b.ip || "#" + b.id, checked: !!rule && rule.board_ids.includes(b.id)
+      deviceList.setItems(this.__devices.map(b => ({
+        value: b.id, label: b.label || b.hostname || b.ip || "#" + b.id, checked: !!rule && rule.device_ids.includes(b.id)
       })), "Kayıtlı bilgisayar yok.");
       kindList.setItems(Object.entries(d.kinds).map(([key, k]) => ({ value: key, label: k.label, checked: !!rule && rule.kinds.includes(key) })), "Tür yok.");
       if (rule) {
@@ -339,7 +339,7 @@ qx.Class.define("ankamon.ui.anomaly.Notifications", {
       ok.addListener("execute", async () => {
         const body = {
           name: name.getValue() || "", mode: mode.getSelection()[0].getModel(), interval_minutes: interval.getSelection()[0].getModel(),
-          max_per_hour: max.getValue(), enabled: enabled.getValue(), board_ids: boardList.getChecked(), kinds: kindList.getChecked()
+          max_per_hour: max.getValue(), enabled: enabled.getValue(), device_ids: deviceList.getChecked(), kinds: kindList.getChecked()
         };
         try {
           await (rule ? ankamon.io.Api.put(`/ntfy/rules/${rule.id}`, body) : ankamon.io.Api.post("/ntfy/rules", body));

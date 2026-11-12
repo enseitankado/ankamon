@@ -50,7 +50,7 @@ import time
 import tornado.web
 
 from .. import activity, db, sshactivity
-from ..executor.jobs import _board_access
+from ..executor.jobs import _device_access
 from . import writes
 from .ownership import Fixer
 
@@ -72,7 +72,7 @@ _SSHFS_OPTS = (
     "follow_symlinks"
 )
 
-# board_id -> son erişim (time.monotonic) / bağlama noktası. Yalnız bu süreçte tutulur; süreç yeniden
+# device_id -> son erişim (time.monotonic) / bağlama noktası. Yalnız bu süreçte tutulur; süreç yeniden
 # başlarsa önceki bağlar açılışta temizlenir (bkz. _cleanup_stale).
 _last_used: dict[int, float] = {}
 _mount_paths: dict[int, str] = {}
@@ -84,10 +84,10 @@ _mount_lock = asyncio.Lock()
 _UNSAFE = re.compile(r'[\x00-\x1f\x7f/\\?#%*:|"<>]+')
 
 
-def _mount_point(board_id: int, name: str, ip: str) -> str:
+def _mount_point(device_id: int, name: str, ip: str) -> str:
     """Cihazın takma adından dizin adı üretir; başka bir bağlı cihazla çakışırsa IP'yi ekler."""
     base = " ".join(_UNSAFE.sub("-", name).split()).strip(" .")[:100] or ip
-    taken = {p for b, p in _mount_paths.items() if b != board_id}
+    taken = {p for b, p in _mount_paths.items() if b != device_id}
     path = os.path.join(ROOT, base)
     if path in taken:
         path = os.path.join(ROOT, f"{base} ({ip})")
@@ -108,43 +108,43 @@ def _rmdir_quiet(path: str) -> None:
         pass
 
 
-def _lookup(board_id: int):
+def _lookup(device_id: int):
     with db.connect() as conn:
-        board = conn.execute(
-            "SELECT host(ip) AS ip, coalesce(nullif(label, ''), hostname, host(ip)) AS name FROM boards WHERE id = %s",
-            (board_id,),
+        device = conn.execute(
+            "SELECT host(ip) AS ip, coalesce(nullif(label, ''), hostname, host(ip)) AS name FROM devices WHERE id = %s",
+            (device_id,),
         ).fetchone()
-        if not board or not board["ip"]:
+        if not device or not device["ip"]:
             return None
-        ssh_user, password = _board_access(conn)
+        ssh_user, password = _device_access(conn)
         # sshfs parolayı stdin'den alır (sshpass süzgecinden geçmez): cihaza özel root parolası burada.
-        own = conn.execute("SELECT root_password FROM board_credentials WHERE board_id = %s", (board_id,)).fetchone()
-        return board, ssh_user, (own["root_password"] if own else password)
+        own = conn.execute("SELECT root_password FROM device_credentials WHERE device_id = %s", (device_id,)).fetchone()
+        return device, ssh_user, (own["root_password"] if own else password)
 
 
-async def _mount(board_id: int, username: str) -> tuple[bool, str]:
+async def _mount(device_id: int, username: str) -> tuple[bool, str]:
     """İdempotent: zaten bağlıysa hemen döner. Döner: (başarılı mı, hata ya da bağlama noktası)."""
     async with _mount_lock:
-        looked_up = await asyncio.to_thread(_lookup, board_id)
+        looked_up = await asyncio.to_thread(_lookup, device_id)
         if looked_up is None:
             return False, "Cihaz bulunamadı ya da IP'si yok."
-        board, ssh_user, password = looked_up
+        device, ssh_user, password = looked_up
 
-        old = _mount_paths.get(board_id)
-        if old and old == _mount_point(board_id, board["name"], board["ip"]) and _is_mounted(old):
-            _last_used[board_id] = time.monotonic()
+        old = _mount_paths.get(device_id)
+        if old and old == _mount_point(device_id, device["name"], device["ip"]) and _is_mounted(old):
+            _last_used[device_id] = time.monotonic()
             return True, old
         if old:
             # Takma ad bağlıyken değişmiş (ya da bağ kopmuş): eski dizini ayırıp yeni adla bağla.
-            await _unmount(board_id)
-        path = _mount_point(board_id, board["name"], board["ip"])
+            await _unmount(device_id)
+        path = _mount_point(device_id, device["name"], device["ip"])
 
         if not password:
             return False, "SSH parolası tanımlı değil (Ayarlar → SSH erişimi)."
 
         os.makedirs(path, exist_ok=True)
         proc = await asyncio.create_subprocess_exec(
-            "sshfs", "-o", _SSHFS_OPTS, f"{ssh_user}@{board['ip']}:/", path,
+            "sshfs", "-o", _SSHFS_OPTS, f"{ssh_user}@{device['ip']}:/", path,
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
         )
         try:
@@ -158,29 +158,29 @@ async def _mount(board_id: int, username: str) -> tuple[bool, str]:
             hint = (out or b"").decode("utf-8", "replace").strip().splitlines()[-1:] or ["sshfs"]
             return False, f"Bağlanılamadı: {hint[0][:200]}"
 
-        _mount_paths[board_id] = path
-        _ssh_started[board_id] = sshactivity.start(f"sshfs:{board_id}", "filemanager", "sshfs",
-                                                   f"{ssh_user}@{board['ip']}", f"sshfs bağla :/ → {path} (dosya yöneticisi)")
-        _last_used[board_id] = time.monotonic()
-        await asyncio.to_thread(_record, board_id, board["name"], username)
+        _mount_paths[device_id] = path
+        _ssh_started[device_id] = sshactivity.start(f"sshfs:{device_id}", "filemanager", "sshfs",
+                                                   f"{ssh_user}@{device['ip']}", f"sshfs bağla :/ → {path} (dosya yöneticisi)")
+        _last_used[device_id] = time.monotonic()
+        await asyncio.to_thread(_record, device_id, device["name"], username)
         return True, path
 
 
-def _record(board_id: int, name: str, username: str) -> None:
+def _record(device_id: int, name: str, username: str) -> None:
     with db.connect() as conn:
         conn.execute(
-            "INSERT INTO command_log (board_id, board_name, username, source, command, status)"
+            "INSERT INTO command_log (device_id, device_name, username, source, command, status)"
             " VALUES (%s, %s, %s, 'filemanager', 'dosya yöneticisi bağlandı', 'ok')",
-            (board_id, name, username or "—"),
+            (device_id, name, username or "—"),
         )
         activity.record(conn, f"Dosya yöneticisi: {username or '—'} → {name}", "warn")
 
 
-async def _unmount(board_id: int) -> None:
-    path = _mount_paths.pop(board_id, None)
-    _last_used.pop(board_id, None)
-    if board_id in _ssh_started:
-        sshactivity.end(f"sshfs:{board_id}", _ssh_started.pop(board_id))
+async def _unmount(device_id: int) -> None:
+    path = _mount_paths.pop(device_id, None)
+    _last_used.pop(device_id, None)
+    if device_id in _ssh_started:
+        sshactivity.end(f"sshfs:{device_id}", _ssh_started.pop(device_id))
     if not path:
         return
     if _is_mounted(path):
@@ -195,20 +195,20 @@ async def _sweep() -> None:
     while True:
         await asyncio.sleep(60)
         deadline = time.monotonic() - IDLE_MINUTES * 60
-        for board_id in [b for b, t in _last_used.items() if t < deadline]:
-            log.info("boşta kalan cihaz #%s ayrılıyor", board_id)
+        for device_id in [b for b, t in _last_used.items() if t < deadline]:
+            log.info("boşta kalan cihaz #%s ayrılıyor", device_id)
             try:
-                await _unmount(board_id)
+                await _unmount(device_id)
             except Exception:
-                log.exception("ayırma başarısız: #%s", board_id)
+                log.exception("ayırma başarısız: #%s", device_id)
 
 
 class MountHandler(tornado.web.RequestHandler):
     # Oturum/yetki denetimi nginx auth_request'te zaten yapıldı; köprü yalnız 127.0.0.1'i dinler.
     # X-Auth-User nginx tarafından oturumdan doldurulur (istemcininki varsa ezilir).
-    async def post(self, board_id: str):
+    async def post(self, device_id: str):
         username = self.request.headers.get("X-Auth-User", "")
-        ok, res = await _mount(int(board_id), username)
+        ok, res = await _mount(int(device_id), username)
         if not ok:
             self.set_status(502)
             self.write({"ok": False, "error": res})
@@ -219,20 +219,20 @@ class MountHandler(tornado.web.RequestHandler):
 def _locate(fb_path: str):
     """FileBrowser yolu ("/<bağlama dizini>/home/…") → (cihaz id, cihazdaki yol, bu makinedeki yol)."""
     name, _, rest = fb_path.lstrip("/").partition("/")
-    for board_id, path in _mount_paths.items():
+    for device_id, path in _mount_paths.items():
         if os.path.basename(path) == name:
-            _last_used[board_id] = time.monotonic()
+            _last_used[device_id] = time.monotonic()
             remote = posixpath.normpath("/" + rest)
-            return board_id, remote, os.path.join(path, remote.lstrip("/"))
+            return device_id, remote, os.path.join(path, remote.lstrip("/"))
     return None
 
 
-async def _access(board_id: int):
-    looked_up = await asyncio.to_thread(_lookup, board_id)
+async def _access(device_id: int):
+    looked_up = await asyncio.to_thread(_lookup, device_id)
     if looked_up is None or not looked_up[2]:
         return None
-    board, ssh_user, password = looked_up
-    return {"ip": board["ip"], "user": ssh_user, "password": password}
+    device, ssh_user, password = looked_up
+    return {"ip": device["ip"], "user": ssh_user, "password": password}
 
 
 def _cleanup_stale() -> None:

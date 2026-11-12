@@ -58,7 +58,7 @@ satırları (ör. envanter numarası — ankamon.ext.device_identity_rows), bilg
 MAC ve IP — kilitli cihazı bulmak/bildirmek için.
 
 Oturum yoklaması (executor/session_probe.py) SCRIPT'teki "L" satırıyla kilit durumunu okur
-(boards.screen_locked — göç 035); Cihazlar grid'inin "Oturum" hücresi "… / Kilitli" yazar.
+(devices.screen_locked — göç 035); Cihazlar grid'inin "Oturum" hücresi "… / Kilitli" yazar.
 """
 
 from __future__ import annotations
@@ -425,12 +425,12 @@ if [ -n "$was" ]; then echo "Ekran kilidi açıldı."; else echo "Cihazda ekran 
 """.replace("__DIR__", DIR).replace("__UNIT__", UNIT).replace("__XKB_RESTORE__", _XKB_RESTORE)
 
 
-def identities(conn, board_ids: list[int]) -> dict[int, dict]:
-    """Kilit ekranında yazacak kimlik: {board_id: {"code", "rows": [[ad, değer], …]}} (boş değerler atlanır)."""
+def identities(conn, device_ids: list[int]) -> dict[int, dict]:
+    """Kilit ekranında yazacak kimlik: {device_id: {"code", "rows": [[ad, değer], …]}} (boş değerler atlanır)."""
     rows = conn.execute(
         "SELECT id, label, hostname, mac::text AS mac, wifi_mac::text AS wifi_mac, host(ip) AS ip, etap"
-        " FROM boards WHERE id = ANY(%s)",
-        (board_ids,)).fetchall()
+        " FROM devices WHERE id = ANY(%s)",
+        (device_ids,)).fetchall()
     out = {}
     for r in rows:
         etap = r["etap"] or {}
@@ -444,24 +444,24 @@ def identities(conn, board_ids: list[int]) -> dict[int, dict]:
                                  ["Kablolu MAC", (r["mac"] or "").upper()],
                                  ["Kablosuz MAC", (r["wifi_mac"] or "").upper()], ["IP", r["ip"] or ""]]}
     # Eklentilerin kimlik satırları (ör. envanter numarası) kod adının hemen altına; çekirdek eklentiyi adıyla bilmez.
-    for board_id, extra in ext.device_identity_rows(conn, board_ids).items():
-        if board_id in out:
-            out[board_id]["rows"] = list(extra) + out[board_id]["rows"]
+    for device_id, extra in ext.device_identity_rows(conn, device_ids).items():
+        if device_id in out:
+            out[device_id]["rows"] = list(extra) + out[device_id]["rows"]
     return out
 
 
-def lock(board: dict, user: str, password: str, identity: dict | None = None) -> dict:
+def lock(device: dict, user: str, password: str, identity: dict | None = None) -> dict:
     """Ekran ▸ Kilitle. Döner: {"status", "rc", "output"} (bkz. accounts._ssh). identity: bkz. identities()."""
     info = dict(identity or {"code": "", "rows": []})
-    if board.get("ip"):
+    if device.get("ip"):
         # Bağlanılan adres kayıttakinden günceldir.
-        info["rows"] = [[k, board["ip"] if k == "IP" else v] for k, v in info.get("rows") or [["IP", ""]]]
+        info["rows"] = [[k, device["ip"] if k == "IP" else v] for k, v in info.get("rows") or [["IP", ""]]]
     # Tek satır, yalnız ASCII (ensure_ascii): heredoc sonlandırıcısıyla ya da betikteki yer tutucularla karışmaz.
     script = (_LOCK.replace("__DAEMON__", _DAEMON).replace("__COVER__", _COVER).replace("__WAKE__", _WAKE)
               .replace("__INFO__", json.dumps(info)))
-    return _ssh(board, user, password, script, timeout=30)
+    return _ssh(device, user, password, script, timeout=30)
 
 
-def unlock(board: dict, user: str, password: str) -> dict:
+def unlock(device: dict, user: str, password: str) -> dict:
     """Ekran ▸ Kilidi aç. Döner: {"status", "rc", "output"}."""
-    return _ssh(board, user, password, _UNLOCK, timeout=20)
+    return _ssh(device, user, password, _UNLOCK, timeout=20)

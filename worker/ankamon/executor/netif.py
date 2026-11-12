@@ -25,7 +25,7 @@
 
 """Cihazın fiziksel ağ arabirimleri (kablolu, kablosuz, diğer) ve yapılandırmaları.
 
-Ekranlar önizlemesinin alt barındaki ağ simgeleri ve ipuçları için (bkz. boards.netifs, göç 026). Betik
+Ekranlar önizlemesinin alt barındaki ağ simgeleri ve ipuçları için (bkz. devices.netifs, göç 026). Betik
 oturum yoklamasının SSH turuna eklenir (bkz. session_probe._SCRIPT) — ayrı bağlantı açılmaz. Yalnız
 `/sys/class/net/<ad>/device`'ı olan (fiziksel) arabirimler sayılır: lo, docker/veth/köprüler dışarıda.
 Yapılandırma NetworkManager'dan (`nmcli`, ETAP'ta kurulu) okunur; yoksa yalnız /sys bilgileri gelir.
@@ -36,7 +36,7 @@ Satırlar:  NI ad|tür|operstate|carrier|mac|hız|sürücü|kalıcı_mac      ND
 
 mac = arabirimin O ANKİ adresi; Wi-Fi'de NetworkManager tarama sırasında rastgele (yerel yönetimli) adres
 takar. kalıcı_mac (perm_mac) yalnız Wi-Fi'de: kartın fabrika adresi (/sys/class/ieee80211/<phy>/macaddress) —
-Cihazlar ▸ "Kablosuz MAC" (boards.wifi_mac, göç 043) bundan yazılır (bkz. session_probe.store_extras).
+Cihazlar ▸ "Kablosuz MAC" (devices.wifi_mac, göç 043) bundan yazılır (bkz. session_probe.store_extras).
 """
 
 from __future__ import annotations

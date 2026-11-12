@@ -47,10 +47,10 @@ final class SessionActivityApi
     {
         $where = ['TRUE'];
         $args = [];
-        $boardId = (string) $request->query('board_id', '');
-        if ($boardId !== '') {
-            $where[] = 'a.board_id = ?';
-            $args[] = (int) $boardId;
+        $deviceId = (string) $request->query('device_id', '');
+        if ($deviceId !== '') {
+            $where[] = 'a.device_id = ?';
+            $args[] = (int) $deviceId;
         }
         $username = (string) $request->query('username', '');
         if ($username === '-') {
@@ -83,14 +83,14 @@ final class SessionActivityApi
         $limit = $request->queryInt('limit', 5000, 1, 20000);
         // En yeni $limit satır alınır, ekranda kronolojik (eskiden yeniye) gösterilir.
         $rows = Db::all(
-            'SELECT a.id, extract(epoch FROM a.at)::bigint AS at, a.board_id, a.board_name, a.session_id, a.username, a.kind, a.summary, a.detail
+            'SELECT a.id, extract(epoch FROM a.at)::bigint AS at, a.device_id, a.device_name, a.session_id, a.username, a.kind, a.summary, a.detail
              FROM session_activity a WHERE ' . implode(' AND ', $where) . ' ORDER BY a.at DESC, a.id DESC LIMIT ?',
             [...$args, $limit]
         );
         return [
             'events' => array_reverse($rows),
             'limited' => count($rows) >= $limit,
-            'boards' => Db::all('SELECT DISTINCT board_id, board_name FROM session_activity ORDER BY board_name'),
+            'devices' => Db::all('SELECT DISTINCT device_id, device_name FROM session_activity ORDER BY device_name'),
             'users' => array_column(Db::all('SELECT DISTINCT username FROM session_activity WHERE username IS NOT NULL ORDER BY username'), 'username'),
         ];
     }
@@ -99,23 +99,23 @@ final class SessionActivityApi
     public function stats(Request $request): array
     {
         $bytes = Storage::relationBytes('session_activity');
-        $boards = Db::all(
-            "SELECT board_name AS name, count(*) AS n,
+        $devices = Db::all(
+            "SELECT device_name AS name, count(*) AS n,
                     (extract(epoch FROM min(at)) * 1000)::bigint AS first,
                     (extract(epoch FROM max(at)) * 1000)::bigint AS last
-             FROM session_activity GROUP BY board_name ORDER BY n DESC"
+             FROM session_activity GROUP BY device_name ORDER BY n DESC"
         );
-        $total = array_sum(array_column($boards, 'n'));
-        foreach ($boards as &$board) {
-            $board['est_bytes'] = Storage::share($bytes, (int) $board['n'], $total);
+        $total = array_sum(array_column($devices, 'n'));
+        foreach ($devices as &$device) {
+            $device['est_bytes'] = Storage::share($bytes, (int) $device['n'], $total);
         }
-        unset($board);
+        unset($device);
         return [
-            'boards' => $boards,
+            'devices' => $devices,
             'total' => [
                 'n' => $total, 'bytes' => $bytes,
-                'first' => $boards ? min(array_column($boards, 'first')) : null,
-                'last' => $boards ? max(array_column($boards, 'last')) : null,
+                'first' => $devices ? min(array_column($devices, 'first')) : null,
+                'last' => $devices ? max(array_column($devices, 'last')) : null,
             ],
             'disk' => Storage::diskSpace(),
         ];
@@ -132,7 +132,7 @@ final class SessionActivityApi
             if ($scope === '') {
                 throw ApiError::badRequest('Silinecek kapsam seçilmedi.');
             }
-            $deleted = Db::exec('DELETE FROM session_activity WHERE board_name = ?', [$scope]);
+            $deleted = Db::exec('DELETE FROM session_activity WHERE device_name = ?', [$scope]);
         }
         Audit::log($user, $request, 'session-activity.delete', $scope, ['deleted' => $deleted]);
         return ['ok' => true, 'deleted' => $deleted];

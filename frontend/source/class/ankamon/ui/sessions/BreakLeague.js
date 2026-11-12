@@ -45,11 +45,11 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
 
   /**
    * @param page {ankamon.page.Leagues} yetki denetimi (_can) için
-   * @param by {String} "boards" | "users" — bazında (sekme başına sabit; etiket/kimlik page.Leagues TABS'tan)
+   * @param by {String} "devices" | "users" — bazında (sekme başına sabit; etiket/kimlik page.Leagues TABS'tan)
    */
   construct(page, by) {
     super("Teneffüsler"); // eski adları "Teneffüs Ligi", "Ders arası sıralaması" (Ligler sayfası — bkz. page.Leagues)
-    this.__byFixed = by === "users" ? "users" : "boards";
+    this.__byFixed = by === "users" ? "users" : "devices";
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
 
@@ -67,7 +67,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
     this.__sort.addListener("changeSelection", () => this.load());
     bar.add(this.__sort);
     this.__out = ankamon.ui.sessions.LeagueExclusions.toolbar(bar, {
-      league: "break", page, kind: () => this.__byKey() === "users" ? "user" : "board", onChange: () => this.load()
+      league: "break", page, kind: () => this.__byKey() === "users" ? "user" : "device", onChange: () => this.load()
     });
     this.__legend = new qx.ui.basic.Label("").set({ rich: true, alignY: "middle", marginLeft: 8 });
     this.__updateLegend();
@@ -113,7 +113,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
     __loading: false,
     __reloadAfter: false,
 
-    /** "boards" (bilgisayar/cihaz bazında) | "users" (kullanıcı adı bazında). */
+    /** "devices" (bilgisayar/cihaz bazında) | "users" (kullanıcı adı bazında). */
     __byKey() {
       return this.__byFixed;
     },
@@ -157,7 +157,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
             "bilinmiyor. Ayarlar ▸ Ders saatleri'nden derslerin başlangıç/bitiş saatlerini girin; ardışık dersler " +
             "arasındaki boşluklar (teneffüsler, öğle arası) burada sayılır.</div>");
         } else {
-          this.__renderBreakLeague(data.periods || [], sort, data.boards || 0, data.by === "users");
+          this.__renderBreakLeague(data.periods || [], sort, data.devices || 0, data.by === "users");
         }
         this.__status.setValue(`Teneffüsler: ${qx.bom.String.escape(breaks.join(", ") || "—")} · güncelleme: ` +
           new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
@@ -183,10 +183,10 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
           `\nTeneffüste: ${F.duration(r.seconds)}` +
           `\n  oturumu açıkken: ${F.duration(r.session_seconds)}` +
           `\n  oturumu kapattıktan sonra cihazı açık bıraktığı: ${F.duration(r.idle_seconds)}` +
-          `\n${r.days} gün · ${r.boards} cihaz` + (r.board ? `\nEn çok: ${r.board}` : "") + (r.excluded ? "\n(sıralama dışı)" : "");
+          `\n${r.days} gün · ${r.devices} cihaz` + (r.device ? `\nEn çok: ${r.device}` : "") + (r.excluded ? "\n(sıralama dışı)" : "");
       }
       const share = r.break_seconds ? Math.round(r.seconds / r.break_seconds * 100) : 0;
-      return `${rank}. ${r.board}` + (r.board !== r.host ? ` (${r.host})` : "") +
+      return `${rank}. ${r.device}` + (r.device !== r.host ? ` (${r.host})` : "") +
         `\nTeneffüste açık: ${F.duration(r.seconds)} (teneffüs payı %${share})` +
         `\n  oturum açıkken: ${F.duration(r.session_seconds)}\n  oturum kapalıyken: ${F.duration(r.idle_seconds)}` +
         `\n${r.days} gün` + (r.excluded ? "\n(sıralama dışı)" : "");
@@ -196,7 +196,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
      * Kartlar; users: kullanıcı adı bazında (satır = kullanıcı, alt satırda gün/cihaz sayısı ve en çok süre biriktirdiği
      * cihaz; mavi kısım oturumunu kapatıp cihazı açık bıraktığı süre). Görsel dil iki kipte aynı.
      */
-    __renderBreakLeague(periods, sort, boardCount, users) {
+    __renderBreakLeague(periods, sort, deviceCount, users) {
       const F = ankamon.util.Format;
       const esc = qx.bom.String.escape;
       const League = ankamon.ui.sessions.ChampionsLeague;
@@ -204,13 +204,13 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
       const C = ankamon.ui.sessions.BreakLeague.BREAK_COLORS;
       const outTag = r => r.excluded ? `<span class="lg-outtag">sıralama dışı</span>` : "";
       const out = r => r.excluded ? " lg-out" : "";
-      const name = r => users ? (r.full_name || r.username) : r.board;
+      const name = r => users ? (r.full_name || r.username) : r.device;
       const menuAttrs = r => users
         ? ankamon.ui.sessions.LeagueExclusions.rowAttrs("user", r.username, name(r), r.excluded)
-        : ankamon.ui.sessions.LeagueExclusions.rowAttrs("board", r.host, r.board, r.excluded);
+        : ankamon.ui.sessions.LeagueExclusions.rowAttrs("device", r.host, r.device, r.excluded);
       // "%24'ü/%51'i" ekleri sayıya göre değişir (ses uyumu): eksiz yazılır.
       const sub = r => users
-        ? `${r.days} gün · ${r.boards} cihaz` + (r.board ? ` · en çok ${r.board}` : "")
+        ? `${r.days} gün · ${r.devices} cihaz` + (r.device ? ` · en çok ${r.device}` : "")
         : `${r.days} gün · teneffüs payı %${r.break_seconds ? Math.round(r.seconds / r.break_seconds * 100) : 0}`;
       const tip = (r, rank) => this.__breakTip(r, rank, users);
       // Tarih biçimleri Şampiyonlar Ligi ile aynı (ortak yardımcı yok: o sınıfın üyeleri; küçük kopya).
@@ -252,7 +252,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
           `<span class="lg-time">${esc(F.duration(this.__metric(r, sort)))}</span></div>`).join("");
         const idle = p.total_seconds - p.total_session_seconds;
         const foot = `<div class="lg-foot">` +
-          (users ? `${p.participants} kullanıcı · ` : `${p.participants}${boardCount ? ` / ${boardCount}` : ""} cihaz teneffüste açık kaldı · `) +
+          (users ? `${p.participants} kullanıcı · ` : `${p.participants}${deviceCount ? ` / ${deviceCount}` : ""} cihaz teneffüste açık kaldı · `) +
           `toplam ${esc(F.duration(p.total_seconds))} (oturum açık ${esc(F.duration(p.total_session_seconds))}, ` +
           `kapalı ${esc(F.duration(idle))})` +
           // Kullanıcı bazında: cihaz açıldığından beri kimse oturum açmadıysa oturumsuz süre kimseye yazılamaz.

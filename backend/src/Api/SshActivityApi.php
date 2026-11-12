@@ -260,7 +260,7 @@ final class SshActivityApi
         $rows = Db::all(
             "SELECT ip, name FROM (
                 SELECT host(ip) AS ip, COALESCE(NULLIF(label, ''), NULLIF(hostname, '')) AS name, 1 AS pri
-                  FROM boards WHERE ip = ANY(?::inet[])
+                  FROM devices WHERE ip = ANY(?::inet[])
                 UNION ALL
                 SELECT host(ip), COALESCE(NULLIF(label, ''), NULLIF(hostname, '')), 2
                   FROM net_devices WHERE ip = ANY(?::inet[])

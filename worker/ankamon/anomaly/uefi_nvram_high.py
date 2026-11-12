@@ -25,7 +25,7 @@
 
 """Anomali: UEFI değişken deposunun (NVRAM) boş alanı %10'un altında.
 
-Kaynak: boards.facts->firmware_boot (store_used / store_total — efivarfs'in df'i, firmware QueryVariableInfo;
+Kaynak: devices.facts->firmware_boot (store_used / store_total — efivarfs'in df'i, firmware QueryVariableInfo;
 bkz. executor/hwfacts.py _firmware_boot). Bilgi kartı, ilk tanıma ve haftalık otomatik sorun taraması toplar.
 
 Neden: NVRAM dolarsa firmware yeni değişken (açılış girdisi, BootNext, Secure Boot anahtarı) yazamaz;
@@ -55,7 +55,7 @@ KIND = "uefi_nvram_high"
 FREE_MIN_PCT = 10.0   # boş alan %10'un altıysa anomali (128 KB depoda ~13 KB)
 WINDOW = datetime.timedelta(hours=1)
 
-_BOARDS = """
+_DEVICES = """
 SELECT id, lower(COALESCE(NULLIF(hostname, ''), host(ip))) AS host,
        COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name,
        (facts->'firmware_boot'->>'store_used')::bigint AS used,
@@ -63,7 +63,7 @@ SELECT id, lower(COALESCE(NULLIF(hostname, ''), host(ip))) AS host,
        (SELECT sum((v->>'size')::bigint) FROM jsonb_array_elements(
             CASE WHEN jsonb_typeof(facts->'uefi_vars') = 'array' THEN facts->'uefi_vars' ELSE '[]' END) v) AS live,
        (facts->>'hw_collected_at')::bigint AS collected_at
-FROM boards
+FROM devices
 WHERE (facts->'firmware_boot'->>'store_total')::bigint > 0
 """
 
@@ -93,7 +93,7 @@ def judge(used: int, total: int, live: int | None = None) -> tuple[bool, str, di
 
 
 def detect(conn, since):
-    rows = [r for r in conn.execute(_BOARDS).fetchall() if r["host"]]
+    rows = [r for r in conn.execute(_DEVICES).fetchall() if r["host"]]
     open_ = {r["host"]: r for r in conn.execute(_OPEN, (KIND,)).fetchall()}
     now = datetime.datetime.now(datetime.timezone.utc)
     found = []
@@ -104,11 +104,11 @@ def detect(conn, since):
         known = open_.pop(r["host"], None)
         detail["text"] = text
         if anomaly:
-            found.append({"host": r["host"], "board_id": r["id"], "board_name": r["name"],
+            found.append({"host": r["host"], "device_id": r["id"], "device_name": r["name"],
                           "started_at": known["started_at"] if known else at, "ended_at": None, "detail": detail})
         elif known:
             # Boş alan açıldı (firmware topladı) ya da eşik altına hiç inmemişti: son toplanma anında biter.
-            found.append({"host": r["host"], "board_id": r["id"], "board_name": r["name"],
+            found.append({"host": r["host"], "device_id": r["id"], "device_name": r["name"],
                           "started_at": known["started_at"], "ended_at": max(at, known["started_at"]),
                           "detail": {**(known["detail"] or {}), "end_text": text}})
     # Kapsam yok: geçmiş kayıtlar silinmez, yalnız güncellenir (verisi kalkan cihazın kaydı açık kalır).

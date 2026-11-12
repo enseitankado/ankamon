@@ -54,12 +54,12 @@ final class NtfyApi
     public function index(): array
     {
         $rules = Db::all(
-            "SELECT id, name, array_to_json(board_ids) AS board_ids, array_to_json(kinds) AS kinds, mode, interval_minutes, max_per_hour, enabled,
+            "SELECT id, name, array_to_json(device_ids) AS device_ids, array_to_json(kinds) AS kinds, mode, interval_minutes, max_per_hour, enabled,
                     extract(epoch FROM last_run_at)::bigint AS last_run_at
              FROM ntfy_rules ORDER BY id"
         );
         foreach ($rules as &$rule) {
-            $rule['board_ids'] = json_decode((string) $rule['board_ids'], true) ?: [];
+            $rule['device_ids'] = json_decode((string) $rule['device_ids'], true) ?: [];
             $rule['kinds'] = json_decode((string) $rule['kinds'], true) ?: [];
         }
         unset($rule);
@@ -108,7 +108,7 @@ final class NtfyApi
         $kinds = array_values(array_intersect(array_keys(AnomaliesApi::kinds()), array_map('strval', (array) $request->input('kinds', []))));
         return [
             $name,
-            '{' . implode(',', array_map('intval', (array) $request->input('board_ids', []))) . '}',
+            '{' . implode(',', array_map('intval', (array) $request->input('device_ids', []))) . '}',
             '{' . implode(',', array_map(static fn(string $k) => '"' . $k . '"', $kinds)) . '}',
             $mode, $interval,
             max(1, min(600, (int) $request->input('max_per_hour', 20))),
@@ -120,7 +120,7 @@ final class NtfyApi
     {
         $values = $this->ruleInput($request);
         $id = Db::value(
-            'INSERT INTO ntfy_rules (name, board_ids, kinds, mode, interval_minutes, max_per_hour, enabled)
+            'INSERT INTO ntfy_rules (name, device_ids, kinds, mode, interval_minutes, max_per_hour, enabled)
              VALUES (?, ?::int[], ?::text[], ?, ?, ?, ?::boolean) RETURNING id', $values
         );
         Audit::log($user, $request, 'ntfy.rule.create', $values[0]);
@@ -131,7 +131,7 @@ final class NtfyApi
     {
         $values = $this->ruleInput($request);
         $n = Db::exec(
-            'UPDATE ntfy_rules SET name = ?, board_ids = ?::int[], kinds = ?::text[], mode = ?, interval_minutes = ?, max_per_hour = ?,
+            'UPDATE ntfy_rules SET name = ?, device_ids = ?::int[], kinds = ?::text[], mode = ?, interval_minutes = ?, max_per_hour = ?,
                     enabled = ?::boolean, last_run_at = NULL WHERE id = ?',
             [...$values, $request->arg('id')]
         );
@@ -185,7 +185,7 @@ final class NtfyApi
         }
         unset($row);
         return [
-            'boards' => $rows,
+            'devices' => $rows,
             'total' => ['n' => $total, 'bytes' => $bytes,
                 'first' => $rows ? min(array_column($rows, 'first')) : null,
                 'last' => $rows ? max(array_column($rows, 'last')) : null],

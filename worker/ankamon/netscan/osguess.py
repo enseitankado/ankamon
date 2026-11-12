@@ -71,9 +71,9 @@ def _from_services(ports: list[dict]) -> str:
     return ""
 
 
-def guess(scan: dict, is_board: bool = False) -> str:
+def guess(scan: dict, is_device: bool = False) -> str:
     """scan: probe.service_scan sonucu. Bulunamazsa ''."""
-    if is_board:
+    if is_device:
         return "Linux (Pardus ETAP)"
     os_name = scan.get("os") or ""
     accuracy = int(scan.get("os_accuracy") or 0)

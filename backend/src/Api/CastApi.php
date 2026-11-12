@@ -37,7 +37,7 @@ use Ankamon\Core\Request;
 /**
  * Ekran yansıtma penceresinin canlı tüketim tablosu (docker/rootfs/cast/index.html): bir yayını okuyan
  * cihazların sunucudan çektiği veri miktarı. MediaMTX denetim API'si (yalnız 127.0.0.1, bkz.
- * docker/rootfs/services/mediamtx.sh) cihaz başına bir RTSP oturumu verir; uzak adres boards.ip ile
+ * docker/rootfs/services/mediamtx.sh) cihaz başına bir RTSP oturumu verir; uzak adres devices.ip ile
  * eşleştirilir. Hız (Mbit/sn) pencerede iki örnek arasındaki farktan hesaplanır. CPU/RAM ayrı kanaldan
  * gelir (nginx /cast/ws/perf/, worker/ankamon/screen/perf.py).
  */
@@ -74,8 +74,8 @@ final class CastApi
         }
         if ($byIp) {
             $placeholders = implode(',', array_fill(0, count($byIp), '?::inet'));
-            foreach (Db::all("SELECT id, host(ip) AS ip FROM boards WHERE ip IN ($placeholders)", array_keys($byIp)) as $b) {
-                $byIp[$b['ip']]['board_id'] = (int) $b['id'];
+            foreach (Db::all("SELECT id, host(ip) AS ip FROM devices WHERE ip IN ($placeholders)", array_keys($byIp)) as $b) {
+                $byIp[$b['ip']]['device_id'] = (int) $b['id'];
             }
         }
         return ['ts' => (int) round(microtime(true) * 1000), 'readers' => array_values($byIp)];

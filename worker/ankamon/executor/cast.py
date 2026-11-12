@@ -293,22 +293,22 @@ if [ -n "$stopped" ]; then echo "Yansıtma durduruldu."; else echo "Cihazda yans
 """
 
 
-def server_address(board_ip: str) -> str:
+def server_address(device_ip: str) -> str:
     """Cihazın Ankamon'a hangi adresle ulaşacağı: çekirdeğin o cihaza giden yolda seçtiği kaynak
     adres (host ağındayız; birden çok arayüz/segment olsa da cihazın gördüğü adres seçilir)."""
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.connect((board_ip, 9))  # UDP connect paket göndermez, yalnız yolu seçer
+        s.connect((device_ip, 9))  # UDP connect paket göndermez, yalnız yolu seçer
         return s.getsockname()[0]
 
 
-def stream_url(board_ip: str, stream: str) -> str:
-    return f"rtsp://{server_address(board_ip)}:{RTSP_PORT}/{stream}"
+def stream_url(device_ip: str, stream: str) -> str:
+    return f"rtsp://{server_address(device_ip)}:{RTSP_PORT}/{stream}"
 
 
-def _ssh(board: dict, user: str, password: str, script: str, timeout: int) -> dict:
-    if not board.get("ip"):
+def _ssh(device: dict, user: str, password: str, script: str, timeout: int) -> dict:
+    if not device.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
-    cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, f"{user}@{board['ip']}", "sh -c " + shlex.quote(script)]
+    cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, f"{user}@{device['ip']}", "sh -c " + shlex.quote(script)]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=timeout)
@@ -325,28 +325,28 @@ def _ssh(board: dict, user: str, password: str, script: str, timeout: int) -> di
     return {"status": "failed", "rc": proc.returncode, "output": "\n".join(x for x in (out, err) if x)}
 
 
-def start(board: dict, user: str, password: str, stream: str, audio: bool, volume: int | None = None) -> dict:
+def start(device: dict, user: str, password: str, stream: str, audio: bool, volume: int | None = None) -> dict:
     """Cihazda yansıtmayı başlatır; görüntü gerçekten gelene dek (en çok ~12 sn) bekler.
     volume: sesli yansıtmada cihaz çıkışının geçici düzeyi (0-100); None = cihazın düzeyine dokunma."""
     if not STREAM_RE.match(stream):
         return {"status": "failed", "rc": None, "output": "Geçersiz yayın adı."}
-    if not board.get("ip"):
+    if not device.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     vol = "" if volume is None else str(max(0, min(VOLUME_MAX, int(volume))))
-    wrapper = (_WRAPPER.replace("__URL__", shlex.quote(stream_url(board["ip"], stream)))
+    wrapper = (_WRAPPER.replace("__URL__", shlex.quote(stream_url(device["ip"], stream)))
                .replace("__AUDIO__", "1" if audio else "0")
                .replace("__AUDIO_RESTORE__", _AUDIO_RESTORE))
     script = (_START.replace("__FIND__", _FIND_DISPLAY).replace("__WRAPPER__", wrapper)
               .replace("__COVER__", _COVER).replace("__AUDIO_SET__", _AUDIO_SET)
               .replace("__AUDIO__", "1" if audio else "0").replace("__VOL__", shlex.quote(vol)))
-    return _ssh(board, user, password, script, timeout=40)
+    return _ssh(device, user, password, script, timeout=40)
 
 
-def stop(board: dict, user: str, password: str) -> dict:
-    return _ssh(board, user, password, _STOP.replace("__AUDIO_RESTORE__", _AUDIO_RESTORE), timeout=20)
+def stop(device: dict, user: str, password: str) -> dict:
+    return _ssh(device, user, password, _STOP.replace("__AUDIO_RESTORE__", _AUDIO_RESTORE), timeout=20)
 
 
-def volume(board: dict, user: str, password: str, level: int) -> dict:
+def volume(device: dict, user: str, password: str, level: int) -> dict:
     """Sesli yansıtma sürerken cihaz çıkışının düzeyini değiştirir (kayıtlı asıl düzey korunur)."""
     vol = str(max(0, min(VOLUME_MAX, int(level))))
-    return _ssh(board, user, password, "VOL=" + vol + "\n" + _VOLUME, timeout=15)
+    return _ssh(device, user, password, "VOL=" + vol + "\n" + _VOLUME, timeout=15)

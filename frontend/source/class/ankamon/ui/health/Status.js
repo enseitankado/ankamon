@@ -26,7 +26,7 @@
  */
 
 /**
- * Sağlık ▸ Durum: her cihazın şu anki sağlığı tek yerde (bkz. backend BoardHealthApi, GET /api/board-health).
+ * Sağlık ▸ Durum: her cihazın şu anki sağlığı tek yerde (bkz. backend DeviceHealthApi, GET /api/device-health).
  *
  * Bulgular iki yoldan gelir ve her satırda hangisinden geldiği yazar:
  *   - Sürekli izleme: Ankamon cihaza BAĞLANMADAN, cihazın gönderdiği loglardan, kendi okuduğu ölçümlerden ve daha önce
@@ -67,8 +67,8 @@ qx.Class.define("ankamon.ui.health.Status", {
     split.getChildControl("splitter").set({ height: thick, minHeight: thick, maxHeight: thick });
     this.add(split, { flex: 1 });
 
-    this.__boardColumns = [
-      { id: "board", label: "Cihaz", width: 200 },
+    this.__deviceColumns = [
+      { id: "device", label: "Cihaz", width: 200 },
       { id: "online", label: "Açık mı", width: 90 },
       { id: "level", label: "Durum", width: 90 },
       // Durum = iki yolun EN KÖTÜSÜ; her yolun kendi sütunu düzeyiyle yazılır (kullanıcı isteği 2026-11-10: Durum "Acil"
@@ -80,19 +80,19 @@ qx.Class.define("ankamon.ui.health.Status", {
       { id: "last", label: "Son denetim / bulgu", width: 300, hint: "Son SSH denetimi ya da sürekli izlemenin en yeni bulgusu" },
       { id: "count", label: "Bulgu", width: 70 }
     ];
-    this.__boardTable = page._createTable(this.__boardColumns, { prefsKey: "health.status.boards.columns", persistSort: true });
-    this.__boardFilters = page._addColumnFilters(this.__boardTable, this.__boardColumns, () => this.__applyBoards(),
-      { rows: () => (this.__boardRows || []).map(r => r.cells), persist: true });
-    this.__levelRenderer(this.__boardTable, 3);
-    this.__boardTable.getSelectionModel().addListener("changeSelection", () => this.__applyFindings());
-    this.__boardTable.setToolTipText("Bir cihazı seçin: aşağıda yalnız onun bulguları görünür");
+    this.__deviceTable = page._createTable(this.__deviceColumns, { prefsKey: "health.status.devices.columns", persistSort: true });
+    this.__deviceFilters = page._addColumnFilters(this.__deviceTable, this.__deviceColumns, () => this.__applyDevices(),
+      { rows: () => (this.__deviceRows || []).map(r => r.cells), persist: true });
+    this.__levelRenderer(this.__deviceTable, 3);
+    this.__deviceTable.getSelectionModel().addListener("changeSelection", () => this.__applyFindings());
+    this.__deviceTable.setToolTipText("Bir cihazı seçin: aşağıda yalnız onun bulguları görünür");
     const gap = ankamon.ui.health.Status.PANE_GAP;
     const top = new qx.ui.container.Composite(new qx.ui.layout.VBox(4)).set({ paddingBottom: gap });
-    top.add(this.__boardTable, { flex: 1 });
+    top.add(this.__deviceTable, { flex: 1 });
     split.add(top, 1);
 
     this.__findingColumns = [
-      { id: "board", label: "Cihaz", width: 180 },
+      { id: "device", label: "Cihaz", width: 180 },
       { id: "level", label: "Düzey", width: 80 },
       { id: "check", label: "Bulgu", width: 220 },
       { id: "path", label: "Yol", width: 130 },
@@ -163,11 +163,11 @@ qx.Class.define("ankamon.ui.health.Status", {
     __page: null,
     __info: null,
     __summary: null,
-    __boardColumns: null,
-    __boardTable: null,
-    __boardFilters: null,
-    __boardRows: null,
-    __shownBoards: null,
+    __deviceColumns: null,
+    __deviceTable: null,
+    __deviceFilters: null,
+    __deviceRows: null,
+    __shownDevices: null,
     __findingColumns: null,
     __findingTable: null,
     __findingFilters: null,
@@ -195,7 +195,7 @@ qx.Class.define("ankamon.ui.health.Status", {
         "Her denetimin ne olduğu, nasıl ve ne sıklıkla bakıldığı: <b>Yardım ▸ Denetim türleri</b>.</div>";
     },
 
-    /** @param data {Map} GET /api/board-health yanıtı */
+    /** @param data {Map} GET /api/device-health yanıtı */
     setData(data) {
       const F = ankamon.util.Format;
       const esc = qx.bom.String.escape;
@@ -209,18 +209,18 @@ qx.Class.define("ankamon.ui.health.Status", {
       const when = ankamon.ui.health.Status.when;
 
       const order = { bad: 3, warn: 2, info: 1, ok: 0 };
-      const byBoard = new Map();
+      const byDevice = new Map();
       (data.findings || []).forEach(f => {
-        const key = f.board_id ?? f.board;
-        if (!byBoard.has(key)) {
-          byBoard.set(key, []);
+        const key = f.device_id ?? f.device;
+        if (!byDevice.has(key)) {
+          byDevice.set(key, []);
         }
-        byBoard.get(key).push(f);
+        byDevice.get(key).push(f);
       });
-      const boardIds = new Set();
-      this.__boardRows = (data.boards || []).map(b => {
-        boardIds.add(b.id);
-        const list = byBoard.get(b.id) || [];
+      const deviceIds = new Set();
+      this.__deviceRows = (data.devices || []).map(b => {
+        deviceIds.add(b.id);
+        const list = byDevice.get(b.id) || [];
         const worst = list.reduce((w, f) => (order[f.level] > order[w] ? f.level : w), "ok");
         const ssh = paths.includes("ssh") ? b.ssh || false : null;
         const last = this.__lastText(list, ssh, when);
@@ -237,34 +237,34 @@ qx.Class.define("ankamon.ui.health.Status", {
         return { id: b.id, name: b.name, cells: [b.id, b.name, b.online ? "Açık" : "Kapalı", text(worst), watchText, sshText, last, list.length] };
       });
       // Kaydı silinmiş cihazın süren bulguları da görünsün.
-      byBoard.forEach((list, key) => {
-        if (typeof key === "number" && boardIds.has(key)) {
+      byDevice.forEach((list, key) => {
+        if (typeof key === "number" && deviceIds.has(key)) {
           return;
         }
         const worst = list.reduce((w, f) => (order[f.level] > order[w] ? f.level : w), "ok");
-        this.__boardRows.push({ id: key, name: list[0].board, cells: [key, list[0].board || "?", "—", text(worst),
+        this.__deviceRows.push({ id: key, name: list[0].device, cells: [key, list[0].device || "?", "—", text(worst),
           this.__pathText(list.filter(f => f.path === "watch")), this.__pathText(list.filter(f => f.path === "ssh")),
           this.__lastText(list, null, when), list.length] });
       });
-      this.__boardRows.sort((a, b) => (order[this.__levelKey(b.cells[3])] - order[this.__levelKey(a.cells[3])]) ||
+      this.__deviceRows.sort((a, b) => (order[this.__levelKey(b.cells[3])] - order[this.__levelKey(a.cells[3])]) ||
         String(a.name).localeCompare(String(b.name), "tr", { numeric: true }));
 
       this.__findingRows = (data.findings || []).map(f => ({
         finding: f,
-        cells: [f.board_id ?? f.board, f.board || "?", text(f.level), f.check, P[f.path] ? P[f.path].text : f.path,
+        cells: [f.device_id ?? f.device, f.device || "?", text(f.level), f.check, P[f.path] ? P[f.path].text : f.path,
           f.source || "", f.how || "", f.every || "", f.since ? F.dateTime(f.since * 1000) : "",
           (f.text || "") + (f.advice ? ` — Öneri: ${f.advice}` : "")]
       }));
 
-      const boardsBad = this.__boardRows.filter(r => r.cells[3] === text("bad")).length;
-      const boardsWarn = this.__boardRows.filter(r => r.cells[3] === text("warn")).length;
-      const color = boardsBad ? "#c5221f" : boardsWarn ? "#e37400" : "#1e8e3e";
+      const devicesBad = this.__deviceRows.filter(r => r.cells[3] === text("bad")).length;
+      const devicesWarn = this.__deviceRows.filter(r => r.cells[3] === text("warn")).length;
+      const color = devicesBad ? "#c5221f" : devicesWarn ? "#e37400" : "#1e8e3e";
       this.__summary.setValue(`<span style="font-size:14px;font-weight:bold;color:${color}">` +
-        (boardsBad || boardsWarn
-          ? [boardsBad && `${boardsBad} cihazda acil`, boardsWarn && `${boardsWarn} cihazda dikkat gerektiren`].filter(Boolean).join(", ") + " bulgu var"
+        (devicesBad || devicesWarn
+          ? [devicesBad && `${devicesBad} cihazda acil`, devicesWarn && `${devicesWarn} cihazda dikkat gerektiren`].filter(Boolean).join(", ") + " bulgu var"
           : "Şu an acil ya da dikkat gerektiren bulgu yok") +
-        `</span> <span style="opacity:.7">· ${esc(String(this.__boardRows.length))} cihaz · güncellendi ${F.dateTime(data.generated_at * 1000)}</span>`);
-      this.__applyBoards();
+        `</span> <span style="opacity:.7">· ${esc(String(this.__deviceRows.length))} cihaz · güncellendi ${F.dateTime(data.generated_at * 1000)}</span>`);
+      this.__applyDevices();
     },
 
     /**
@@ -311,17 +311,17 @@ qx.Class.define("ankamon.ui.health.Status", {
         .filter(f => f.text);
     },
 
-    __applyBoards() {
-      if (!this.__boardRows) {
+    __applyDevices() {
+      if (!this.__deviceRows) {
         return;
       }
-      const selected = this.__selectedBoard();
-      const filters = this.__filtersOf(this.__boardColumns, this.__boardFilters);
-      this.__shownBoards = this.__boardRows.filter(({ cells }) => filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
-      this.__boardTable.getTableModel().setData(this.__shownBoards.map(r => r.cells));
+      const selected = this.__selectedDevice();
+      const filters = this.__filtersOf(this.__deviceColumns, this.__deviceFilters);
+      this.__shownDevices = this.__deviceRows.filter(({ cells }) => filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
+      this.__deviceTable.getTableModel().setData(this.__shownDevices.map(r => r.cells));
       // Tazelemede seçim korunur.
-      const index = selected === null ? -1 : this.__shownBoards.findIndex(r => r.id === selected);
-      const sm = this.__boardTable.getSelectionModel();
+      const index = selected === null ? -1 : this.__shownDevices.findIndex(r => r.id === selected);
+      const sm = this.__deviceTable.getSelectionModel();
       if (index >= 0) {
         sm.setSelectionInterval(index, index);
       } else {
@@ -330,12 +330,12 @@ qx.Class.define("ankamon.ui.health.Status", {
       this.__applyFindings();
     },
 
-    __selectedBoard() {
-      const sm = this.__boardTable.getSelectionModel();
+    __selectedDevice() {
+      const sm = this.__deviceTable.getSelectionModel();
       if (sm.isSelectionEmpty()) {
         return null;
       }
-      const row = this.__boardTable.getTableModel().getRowData(sm.getLeadSelectionIndex());
+      const row = this.__deviceTable.getTableModel().getRowData(sm.getLeadSelectionIndex());
       return row ? row[0] : null;
     },
 
@@ -343,11 +343,11 @@ qx.Class.define("ankamon.ui.health.Status", {
       if (!this.__findingRows) {
         return;
       }
-      const board = this.__selectedBoard();
+      const device = this.__selectedDevice();
       const filters = this.__filtersOf(this.__findingColumns, this.__findingFilters);
       // Cihaz seçilmeden boş (kullanıcı isteği: sekmeye girişte alt tablo boş gelsin).
-      this.__shownFindings = board === null ? [] : this.__findingRows.filter(({ cells }) =>
-        cells[0] === board && filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
+      this.__shownFindings = device === null ? [] : this.__findingRows.filter(({ cells }) =>
+        cells[0] === device && filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
       this.__findingTable.getTableModel().setData(this.__shownFindings.map(r => r.cells));
     }
   }

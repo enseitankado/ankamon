@@ -37,7 +37,7 @@ koleksiyon (ansible.posix json callback) gerektirmez. Dosyalardan çıkış kodu
 (TÜM cihazlar değil, yalnız O cihaz) dosyayı diske yazar — yani ağaç dizini ansible süreci HÂLÂ
 ÇALIŞIRKEN cihaz cihaz dolar. ``run()`` bunu kullanır: süreci ``subprocess.run`` ile bloke etmek
 yerine ``Popen`` ile başlatıp ağaç dizinini kısa aralıklarla yoklar, yeni beliren her dosyayı hemen
-okuyup (varsa) ``on_result(board_id, result)`` ile çağırana anında bildirir — çağıran (jobs.py) bunu
+okuyup (varsa) ``on_result(device_id, result)`` ile çağırana anında bildirir — çağıran (jobs.py) bunu
 ``job_targets``'a o anda yazar, en yavaş cihazı beklemeden.
 """
 
@@ -58,13 +58,13 @@ _CONNECT_TIMEOUT = 10
 
 
 def _inventory(hosts: list[dict], user: str, password: str) -> str:
-    """Hedef cihazlardan geçici bir INI envanteri üretir. Satır: board_<id> ansible_host=<ip>."""
-    lines = ["[boards]"]
+    """Hedef cihazlardan geçici bir INI envanteri üretir. Satır: device_<id> ansible_host=<ip>."""
+    lines = ["[devices]"]
     for host in hosts:
-        lines.append(f"board_{host['id']} ansible_host={host['ip']}")
+        lines.append(f"device_{host['id']} ansible_host={host['ip']}")
     lines += [
         "",
-        "[boards:vars]",
+        "[devices:vars]",
         f"ansible_user={user}",
         f"ansible_password={password}",
         "ansible_connection=ssh",
@@ -93,10 +93,10 @@ def run(hosts: list[dict], user: str, password: str, *, body: str,
     """``body`` kabuk betiğini her cihazda çalıştırır.
 
     Süreç devam ederken ağaç dizinini yoklar; bir cihazın sonucu belirir belirmez (varsa)
-    ``on_result(board_id, result)`` ile anında bildirir — ``on_result`` None ise yalnız dönüş
-    değeri üzerinden (eskisi gibi, iş bitince toplu) kullanılabilir (bkz. board_identity.py).
+    ``on_result(device_id, result)`` ile anında bildirir — ``on_result`` None ise yalnız dönüş
+    değeri üzerinden (eskisi gibi, iş bitince toplu) kullanılabilir (bkz. device_identity.py).
 
-    Döner: board_id → {"status": ok|failed|unreachable, "rc": int|None, "output": str}.
+    Döner: device_id → {"status": ok|failed|unreachable, "rc": int|None, "output": str}.
     """
     results: dict[int, dict] = {
         host["id"]: {"status": "failed", "rc": None, "output": "Ansible sonucu alınamadı."}
@@ -112,7 +112,7 @@ def run(hosts: list[dict], user: str, password: str, *, body: str,
             f.write(_wrapper(body, env))
         os.chmod(script, os.stat(script).st_mode | stat.S_IEXEC)
 
-        cmd = ["ansible", "boards", "-i", inv, "--tree", tree,
+        cmd = ["ansible", "devices", "-i", inv, "--tree", tree,
                "-m", "ansible.builtin.script", "-a", script,
                "-f", "20"]  # en çok 20 cihaza paralel
         deadline = time.monotonic() + timeout * max(1, len(hosts)) + 60
@@ -122,8 +122,8 @@ def run(hosts: list[dict], user: str, password: str, *, body: str,
             # final=False iken ağaç dosyası var ama henüz tam yazılmamışsa (tree callback'in
             # open+write'ı arasına denk gelindiyse) sessizce atlanır, bir sonraki yoklamada tekrar
             # denenir — yarım dosyayı "okunamadı" diye yanlış yere kalıcı başarısız yazmamak için.
-            for board_id in list(pending):
-                path = os.path.join(tree, f"board_{board_id}")
+            for device_id in list(pending):
+                path = os.path.join(tree, f"device_{device_id}")
                 if not os.path.exists(path):
                     continue
                 try:
@@ -135,10 +135,10 @@ def run(hosts: list[dict], user: str, password: str, *, body: str,
                     result = {"status": "failed", "rc": None, "output": "Sonuç dosyası okunamadı."}
                 else:
                     result = _parse_result(raw)
-                results[board_id] = result
-                pending.discard(board_id)
+                results[device_id] = result
+                pending.discard(device_id)
                 if on_result:
-                    on_result(board_id, result)
+                    on_result(device_id, result)
 
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
@@ -154,16 +154,16 @@ def run(hosts: list[dict], user: str, password: str, *, body: str,
             proc.wait()
         collect(final=True)  # süreç bitti/öldürüldü: son kez kesin karar ver (geç yazılmış dosyalar dahil)
 
-        for board_id in pending:
+        for device_id in pending:
             timed_out = {"status": "failed", "rc": None, "output": "İşlem zaman aşımına uğradı."}
-            results[board_id] = timed_out
+            results[device_id] = timed_out
             if on_result:
-                on_result(board_id, timed_out)
+                on_result(device_id, timed_out)
     return results
 
 
 def _parse_result(res: dict) -> dict:
-    """``--tree`` JSON dosyasının (zaten yüklenmiş) içeriğini board sonucuna çevirir."""
+    """``--tree`` JSON dosyasının (zaten yüklenmiş) içeriğini device sonucuna çevirir."""
     if res.get("unreachable"):
         return {"status": "unreachable", "rc": None,
                 "output": (res.get("msg") or "Cihaza bağlanılamadı.")[:4000]}

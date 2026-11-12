@@ -27,7 +27,7 @@
 
 /**
  * Görev yöneticisinin ayrı pencereleri (ui.taskmgr.Window'u küçük tutmak için buradadır): Yeni görev çalıştır,
- * İşlemci benzeşimi, Özellikler. Her biri satırın / seçilen cihazın bağına (ui.taskmgr.TaskBoardLink) komut
+ * İşlemci benzeşimi, Özellikler. Her biri satırın / seçilen cihazın bağına (ui.taskmgr.TaskDeviceLink) komut
  * gönderir; pencere "her zaman üstte" ise diyaloglar da üstte açılır (win.dialog).
  */
 qx.Class.define("ankamon.ui.taskmgr.TaskDialogs", {

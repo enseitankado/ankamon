@@ -35,12 +35,12 @@ qx.Class.define("ankamon.ui.homebackup.RestorePanel", {
   extend: qx.ui.container.Composite,
 
   /**
-   * @param boards {Array} [{id, name}] çevrim içi cihazlar
+   * @param devices {Array} [{id, name}] çevrim içi cihazlar
    * @param selected {Array} başta işaretli cihaz kimlikleri
    */
-  construct(boards, selected) {
+  construct(devices, selected) {
     super(new qx.ui.layout.VBox(10));
-    this.__boards = boards;
+    this.__devices = devices;
 
     const step1 = ankamon.ui.StepBox.create(1, "Yedek dosyasını seç", "Yedekle sekmesiyle alınmış .tar.gz");
     const pick = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
@@ -55,8 +55,8 @@ qx.Class.define("ankamon.ui.homebackup.RestorePanel", {
     this.add(step1);
 
     const step2 = ankamon.ui.StepBox.create(2, "Cihazları seç", "hesap bu cihazlarda yeniden oluşturulur");
-    this.__boardList = new ankamon.ui.homebackup.CheckColumn();
-    step2.add(this.__boardList, { flex: 1 });
+    this.__deviceList = new ankamon.ui.homebackup.CheckColumn();
+    step2.add(this.__deviceList, { flex: 1 });
     this.add(step2, { flex: 1 });
 
     const step3 = ankamon.ui.StepBox.create(3, "Geri al");
@@ -73,23 +73,23 @@ qx.Class.define("ankamon.ui.homebackup.RestorePanel", {
     head.add(this.__start);
     this.add(step3);
 
-    this.__boardList.addListener("changeChecked", () => this.__update());
-    this.__boardList.setItems(boards.map(b => ({ value: b.id, label: b.name, checked: selected.includes(b.id) })), "Çevrim içi cihaz yok.");
+    this.__deviceList.addListener("changeChecked", () => this.__update());
+    this.__deviceList.setItems(devices.map(b => ({ value: b.id, label: b.name, checked: selected.includes(b.id) })), "Çevrim içi cihaz yok.");
   },
 
   members: {
-    __boards: null,
+    __devices: null,
     __pickButton: null,
     __bar: null,
     __info: null,
-    __boardList: null,
+    __deviceList: null,
     __overwrite: null,
     __start: null,
     __summary: null,
     __xhr: null,
 
     __update() {
-      const n = this.__boardList.getChecked().length;
+      const n = this.__deviceList.getChecked().length;
       this.__start.setEnabled(!!this.__summary && n > 0);
       this.__start.setLabel(this.__summary && n ? `Geri al (${n} cihaz)` : "Geri al");
     },
@@ -154,9 +154,9 @@ qx.Class.define("ankamon.ui.homebackup.RestorePanel", {
 
     async __run() {
       const s = this.__summary;
-      const ids = this.__boardList.getChecked();
+      const ids = this.__deviceList.getChecked();
       const overwrite = this.__overwrite.getValue();
-      const names = this.__boards.filter(b => ids.includes(b.id)).map(b => b.name);
+      const names = this.__devices.filter(b => ids.includes(b.id)).map(b => b.name);
       const esc = qx.bom.String.escape;
       const ok = await ankamon.ui.Dialog.confirm(
         `<b>${esc(s.username)}</b> hesabı <b>${esc(names.join(", "))}</b> cihazında yedekten yeniden oluşturulsun mu?` +
@@ -168,9 +168,9 @@ qx.Class.define("ankamon.ui.homebackup.RestorePanel", {
       this.__summary = null;
       this.__info.setValue("");
       this.__update();
-      ankamon.ui.BoardOps.forgetAccounts(ids.map(id => ({ id })));
+      ankamon.ui.DeviceOps.forgetAccounts(ids.map(id => ({ id })));
       ankamon.ui.Jobs.show(
-        ankamon.io.Api.post("/jobs", { type: "restore_home", token: s.token, username: s.username, overwrite, board_ids: ids }).then(res => res.id),
+        ankamon.io.Api.post("/jobs", { type: "restore_home", token: s.token, username: s.username, overwrite, device_ids: ids }).then(res => res.id),
         `Geri al — ${s.username}` + (ids.length > 1 ? ` (${ids.length} cihaz)` : ""),
         { progress: true });
     }

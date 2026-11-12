@@ -121,8 +121,8 @@ def run(conn) -> None:
         """SELECT b.id,
                   extract(epoch FROM max(j.created_at) FILTER (WHERE t.status = 'ok'))::float8 AS last,
                   extract(epoch FROM max(j.created_at))::float8 AS tried
-           FROM boards b
-           LEFT JOIN job_targets t ON t.board_id = b.id
+           FROM devices b
+           LEFT JOIN job_targets t ON t.device_id = b.id
            LEFT JOIN jobs j ON j.id = t.job_id AND j.type = 'diagnose'
            WHERE b.online AND b.ip IS NOT NULL
            GROUP BY b.id"""
@@ -151,14 +151,14 @@ def run(conn) -> None:
                      mode, len(due), res["load"], res["mem"] * 100, res["net"] / 1048576)
         return
 
-    ids = [board_id for board_id, _ in due]
+    ids = [device_id for device_id, _ in due]
     params = {"auto": True, "mode": mode, "load": round(res["load"], 2), "mem_free": round(res["mem"], 2),
               "net_bps": int(res["net"])}
     job_id = conn.execute(
         "INSERT INTO jobs (type, title, params, created_by) VALUES ('diagnose', 'Sorun tespiti (otomatik)', %s::jsonb, NULL) RETURNING id",
         (json.dumps(params),),
     ).fetchone()["id"]
-    conn.execute("INSERT INTO job_targets (job_id, board_id) SELECT %s, unnest(%s::int[])", (job_id, ids))
+    conn.execute("INSERT INTO job_targets (job_id, device_id) SELECT %s, unnest(%s::int[])", (job_id, ids))
     conn.execute("SELECT pg_notify('ankamon_jobs', %s)", (str(job_id),))
     activity.record(conn, f"Otomatik sorun tespiti başlatıldı: {len(ids)} cihaz ({mode})")
     log.info("otomatik sorun tespiti #%s: %d cihaz (%s)", job_id, len(ids), mode)

@@ -19,9 +19,9 @@ done
 """
 
 
-def query(board: dict, user: str, password: str) -> dict:
+def query(device: dict, user: str, password: str) -> dict:
     """Çıktı JSON: {"<hesap>": <MB>}."""
-    res = _ssh(board, user, password, _SCRIPT, timeout=120)
+    res = _ssh(device, user, password, _SCRIPT, timeout=120)
     if res["status"] != "ok":
         return res
     sizes = {}

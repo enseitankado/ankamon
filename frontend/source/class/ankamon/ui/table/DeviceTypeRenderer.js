@@ -42,7 +42,7 @@ qx.Class.define("ankamon.ui.table.DeviceTypeRenderer", {
       laptop: '<rect x="3" y="3" width="10" height="7" rx=".8"/><path d="M1.5 12.5h13"/>',
       server: '<rect x="2" y="2" width="12" height="5" rx="1"/><rect x="2" y="9" width="12" height="5" rx="1"/>' +
         '<circle class="F" cx="4.6" cy="4.5" r=".75"/><circle class="F" cx="4.6" cy="11.5" r=".75"/><path d="M8 4.5h3.5M8 11.5h3.5"/>',
-      board: '<rect x="1.5" y="1.5" width="13" height="9" rx=".6"/><path d="M4 8l2.5-2.5 2 1.5L12 3.8M8 10.5v2.3M5 14.5l3-1.7 3 1.7"/>',
+      device: '<rect x="1.5" y="1.5" width="13" height="9" rx=".6"/><path d="M4 8l2.5-2.5 2 1.5L12 3.8M8 10.5v2.3M5 14.5l3-1.7 3 1.7"/>',
       printer: '<path d="M4.5 6V1.5h7V6"/><rect x="1.5" y="6" width="13" height="5.5" rx="1"/><rect x="4.5" y="9.5" width="7" height="5"/>',
       camera: '<path d="M1.5 5 11 2.5l1.2 4.3-9.5 2.5z"/><path d="M12.2 5.4 14.5 5v3l-2.1-.3M5 8.6V13H1.8"/>',
       switch: '<rect x="1.5" y="5" width="13" height="6" rx="1"/>' +
@@ -65,7 +65,7 @@ qx.Class.define("ankamon.ui.table.DeviceTypeRenderer", {
     TYPE_SHAPE: {
       "Bilgisayar": "monitor",
       "Sunucu": "server",
-      "Akıllı tahta": "board",
+      "Akıllı tahta": "device",
       "Yazıcı": "printer",
       "IP kamera": "camera",
       "Ağ cihazı": "switch",

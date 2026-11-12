@@ -35,7 +35,7 @@
  *
  * Satır sağ menüsü: her satırda "Oturum geçmişi" (o kullanıcının zaman çizelgesi — Kullanıcılar
  * sekmesine geçer, bkz. page.Sessions.showUserHistory). Devam eden bir cihaz oturumunda ayrıca
- * "Oturumu kapat" / "Oturumu kilitle" (yetki "boards.login" — bkz. ui.BoardOps.sessionAction).
+ * "Oturumu kapat" / "Oturumu kilitle" (yetki "devices.login" — bkz. ui.DeviceOps.sessionAction).
  * Hedef o satırın KULLANICISIDIR (cihazdaki etkin oturum değil): kullanıcı değiştirilmiş cihazda
  * arka plandaki oturum da kapatılabilir.
  */
@@ -66,7 +66,7 @@ qx.Class.define("ankamon.ui.sessions.List", {
     this.__columns = [
       { id: "kind", label: "Tür", width: 110 },
       { id: "username", label: "Kullanıcı adı", width: 160 },
-      { id: "board", label: "Cihaz", width: 180 },
+      { id: "device", label: "Cihaz", width: 180 },
       { id: "started", label: "Oturum açma", width: 150 },
       { id: "ended", label: "Oturum kapama", width: 150 },
       { id: "duration", label: "Süre", width: 100 },
@@ -97,7 +97,7 @@ qx.Class.define("ankamon.ui.sessions.List", {
     __shownIds: null,
     __shownRows: null,
 
-    /** @param sessions {Array} /board-sessions yanıtındaki satırlar */
+    /** @param sessions {Array} /device-sessions yanıtındaki satırlar */
     setData(sessions) {
       const F = ankamon.util.Format;
       const now = Date.now() / 1000;
@@ -110,7 +110,7 @@ qx.Class.define("ankamon.ui.sessions.List", {
             (s.kind === "webshell" ? "w:" : "b:") + s.id,
             s.kind === "webshell" ? "Web terminal" : "Cihaz oturumu",
             s.username,
-            s.board || s.host,
+            s.device || s.host,
             F.dateTime(s.started_at * 1000),
             s.ended_at ? F.dateTime(s.ended_at * 1000) : "—",
             F.duration(durationSeconds) + (s.ended_at ? "" : " (devam ediyor)"),
@@ -145,27 +145,27 @@ qx.Class.define("ankamon.ui.sessions.List", {
 
     /**
      * Her satırda "Oturum geçmişi"; yalnız sürmekte olan cihaz (greeter) oturumlarında ve
-     * "boards.login" yetkisiyle ayrıca oturumu kapat/kilitle.
+     * "devices.login" yetkisiyle ayrıca oturumu kapat/kilitle.
      */
     __rowMenu(s) {
-      const ops = ankamon.ui.BoardOps;
+      const ops = ankamon.ui.DeviceOps;
       const icon = ankamon.ui.Shell.ICON;
       const menu = new qx.ui.menu.Menu();
       menu.add(ops.menuButton(icon.sessions,`Oturum geçmişi (${s.username})`,
         () => this.__page.showUserHistory(s.username, s.kind)));
-      if (s.kind === "board") {
+      if (s.kind === "device") {
         menu.add(ops.menuButton(icon.movements, "Oturum hareketleri", () => this.__page.showMovements({
-          session: { id: s.id, label: `${s.username} · ${s.board || s.host} · ${ankamon.util.Format.dateTime(s.started_at * 1000)}` },
-          username: s.username, board_id: s.board_id, board_name: s.board || s.host
+          session: { id: s.id, label: `${s.username} · ${s.device || s.host} · ${ankamon.util.Format.dateTime(s.started_at * 1000)}` },
+          username: s.username, device_id: s.device_id, device_name: s.device || s.host
         })));
       }
-      if (s.kind === "board" && !s.ended_at && s.board_id && this.__page._can("boards.login")) {
-        const board = { id: s.board_id, label: s.board };
+      if (s.kind === "device" && !s.ended_at && s.device_id && this.__page._can("devices.login")) {
+        const device = { id: s.device_id, label: s.device };
         menu.add(new qx.ui.menu.Separator());
         menu.add(ops.menuButton(icon.logout, `Oturumu kapat (${s.username})`,
-          () => ops.sessionAction("logout", [board], null, s.username)));
+          () => ops.sessionAction("logout", [device], null, s.username)));
         menu.add(ops.menuButton(icon.lock, `Oturumu kilitle (${s.username})`,
-          () => ops.sessionAction("lock", [board], null, s.username)));
+          () => ops.sessionAction("lock", [device], null, s.username)));
       }
       return menu;
     },
@@ -190,7 +190,7 @@ qx.Class.define("ankamon.ui.sessions.List", {
       }
       try {
         const pick = prefix => ids.filter(id => id.startsWith(prefix)).map(id => Number(id.slice(2)));
-        const res = await ankamon.io.Api.del("/board-sessions", { ids: pick("b:"), webshell_ids: pick("w:") });
+        const res = await ankamon.io.Api.del("/device-sessions", { ids: pick("b:"), webshell_ids: pick("w:") });
         ankamon.ui.Dialog.alert(`${res.deleted} oturum kaydı silindi.`, "Kayıtlar silindi");
         this.__page.refresh();
       } catch (e) {

@@ -33,7 +33,7 @@
  * cihaz kaydının konum, sensör portu, sensör toplama, not alanları.
  *
  * Alan bütün seçilenlerde aynıysa o değerle, değilse boş ve "farklı değerler" ipucuyla açılır; YALNIZ değiştirilen alanlar
- * seçilen her kayda yazılır (PATCH /network/devices/{id}, PATCH /boards/{id} — ikisi de kısmi gövde kabul eder).
+ * seçilen her kayda yazılır (PATCH /network/devices/{id}, PATCH /devices/{id} — ikisi de kısmi gövde kabul eder).
  */
 qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
   type: "static",
@@ -42,29 +42,29 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
     MIXED: "— farklı değerler; boş bırakılırsa korunur —",
 
     /**
-     * @param opts {Map} {devices?: ağ envanteri satırları, boards?: cihaz satırları (en az biri), user?, onSaved?}
+     * @param opts {Map} {assets?: ağ envanteri satırları, devices?: cihaz satırları (en az biri), user?, onSaved?}
      *   Varlıklar'dan gelen cihazların cihaz kayıtları ve Akıllı Tahtalar'dan gelen cihazların cihaz kayıtları burada bulunur.
      */
     async open(opts) {
-      let { devices = [], boards = [], user = null } = opts;
+      let { assets = [], devices = [], user = null } = opts;
       try {
         if (!user) {
           user = await ankamon.io.Api.get("/auth/me");
         }
         const can = f => user.is_admin || (user.features || []).includes(f);
-        if (!devices.length && boards.length && can("network")) {
-          const ids = new Set(boards.map(b => b.id));
-          devices = (await ankamon.io.Api.get("/network/devices", { network: 0 })).devices.filter(d => ids.has(d.board_id));
+        if (!assets.length && devices.length && can("network")) {
+          const ids = new Set(devices.map(b => b.id));
+          assets = (await ankamon.io.Api.get("/network/devices", { network: 0 })).devices.filter(d => ids.has(d.device_id));
         }
-        if (can("boards")) {
-          const want = new Set(boards.map(b => b.id).concat(devices.map(d => d.board_id).filter(Boolean)));
-          boards = want.size ? (await ankamon.io.Api.get("/boards")).boards.filter(b => want.has(b.id)) : [];
+        if (can("devices")) {
+          const want = new Set(devices.map(b => b.id).concat(assets.map(d => d.device_id).filter(Boolean)));
+          devices = want.size ? (await ankamon.io.Api.get("/devices")).devices.filter(b => want.has(b.id)) : [];
         }
       } catch (e) {
         ankamon.ui.Dialog.error(e);
         return;
       }
-      this.__show(devices, boards, user, opts.onSaved, (opts.devices || []).length || (opts.boards || []).length);
+      this.__show(assets, devices, user, opts.onSaved, (opts.assets || []).length || (opts.devices || []).length);
     },
 
     /** Ortak değer: hepsinde aynıysa o (null/undefined → ""), değilse undefined. */
@@ -116,7 +116,7 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
       return out;
     },
 
-    __show(devices, boards, user, onSaved, count) {
+    __show(assets, devices, user, onSaved, count) {
       const can = f => user.is_admin || (user.features || []).includes(f);
       const Ops = ankamon.ui.network.Ops;
       const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
@@ -130,38 +130,38 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
       const tabs = new qx.ui.tabview.TabView().set({ contentPadding: 0 });
       const page = label => new qx.ui.tabview.Page(label).set({ layout: new qx.ui.layout.VBox(6), padding: 8 });
 
-      let deviceForm = null;
-      if (devices.length && can("network.manage")) {
-        deviceForm = new ankamon.ui.Form();
-        this.__fixed(deviceForm, "label", "Takma ad", devices, d => Ops.deviceName(d));
-        this.__fixed(deviceForm, "ip", "IP adresi", devices, d => d.ip);
-        this.__fixed(deviceForm, "hostname", "Bilgisayar adı", devices, d => d.hostname);
-        this.__fixed(deviceForm, "mac", "MAC", devices, d => d.mac);
+      let assetForm = null;
+      if (assets.length && can("network.manage")) {
+        assetForm = new ankamon.ui.Form();
+        this.__fixed(assetForm, "label", "Takma ad", assets, d => Ops.deviceName(d));
+        this.__fixed(assetForm, "ip", "IP adresi", assets, d => d.ip);
+        this.__fixed(assetForm, "hostname", "Bilgisayar adı", assets, d => d.hostname);
+        this.__fixed(assetForm, "mac", "MAC", assets, d => d.mac);
         const typeBox = new qx.ui.form.ComboBox();
         Ops.TYPES.forEach(t => typeBox.add(new qx.ui.form.ListItem(t)));
         typeBox.setToolTipText("Seçilen bütün varlıkların türü. 'Akıllı tahta' türlü varlıklar Akıllı Tahtalar listesinde görünür.");
-        this.__editable(deviceForm, "device_type", "Varlık türü", devices, d => d.device_type_manual, typeBox);
-        this.__editable(deviceForm, "model", "Marka / model", devices, d => d.model_manual);
-        this.__editable(deviceForm, "notes", "Not", devices, d => d.notes);
-        const general = page(`Genel (${devices.length} varlık)`);
-        general.add(new qx.ui.container.Scroll(deviceForm), { flex: 1 });
+        this.__editable(assetForm, "device_type", "Varlık türü", assets, d => d.device_type_manual, typeBox);
+        this.__editable(assetForm, "model", "Marka / model", assets, d => d.model_manual);
+        this.__editable(assetForm, "notes", "Not", assets, d => d.notes);
+        const general = page(`Genel (${assets.length} varlık)`);
+        general.add(new qx.ui.container.Scroll(assetForm), { flex: 1 });
         tabs.add(general);
       }
 
-      let boardForm = null;
-      if (boards.length && can("boards.manage")) {
-        boardForm = new ankamon.ui.Form();
-        if (!deviceForm) {
-          this.__fixed(boardForm, "label", "Takma ad", boards, b => b.label);
+      let deviceForm = null;
+      if (devices.length && can("devices.manage")) {
+        deviceForm = new ankamon.ui.Form();
+        if (!assetForm) {
+          this.__fixed(deviceForm, "label", "Takma ad", devices, b => b.label);
         }
-        this.__editable(boardForm, "location", "Konum", boards, b => b.location);
-        this.__fixed(boardForm, "ip", "IP adresi", boards, b => b.ip);
-        this.__fixed(boardForm, "mac", "Kablolu MAC", boards, b => b.mac);
-        this.__fixed(boardForm, "wifi_mac", "Kablosuz MAC", boards, b => b.wifi_mac);
-        this.__editable(boardForm, "exporter_port", "Sensör portu", boards, b => b.exporter_port);
+        this.__editable(deviceForm, "location", "Konum", devices, b => b.location);
+        this.__fixed(deviceForm, "ip", "IP adresi", devices, b => b.ip);
+        this.__fixed(deviceForm, "mac", "Kablolu MAC", devices, b => b.mac);
+        this.__fixed(deviceForm, "wifi_mac", "Kablosuz MAC", devices, b => b.wifi_mac);
+        this.__editable(deviceForm, "exporter_port", "Sensör portu", devices, b => b.exporter_port);
         // İşletim sistemi (kullanıcı isteği 2026-11-12; platforms/README.md): toplu seçim — ör. birkaç cihazı Windows yapmak.
-        const P = ankamon.ui.boards.Platforms;
-        const commonOs = this.__common(boards, b => b.os_family_manual || "");
+        const P = ankamon.ui.devices.Platforms;
+        const commonOs = this.__common(devices, b => b.os_family_manual || "");
         const osBox = new qx.ui.form.SelectBox().set({ toolTipText: "İşlevler (ekran, kilit, komut, kapat…) cihazın işletim sistemine göre uygulanır" });
         const osItems = (commonOs === undefined ? [[null, "— farklı; değiştirme —"]] : [])
           .concat([["", "Kendiliğinden (SSH bilgisi / ağ taraması)"]], (P.catalog().family_order || ["linux"]).map(f => [f, P.label(f)]));
@@ -173,45 +173,45 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
           }
         });
         osBox.setUserData("bulkInitial", commonOs === undefined ? null : commonOs);
-        boardForm.addField("os_family", "İşletim sistemi", osBox);
-        const monitor = this.__common(boards, b => b.monitor_enabled !== false);
+        deviceForm.addField("os_family", "İşletim sistemi", osBox);
+        const monitor = this.__common(devices, b => b.monitor_enabled !== false);
         const check = new qx.ui.form.CheckBox().set({ triState: monitor === undefined, value: monitor === undefined ? null : monitor === "true" });
         check.setUserData("bulkInitial", monitor === undefined ? null : monitor === "true");
         check.setToolTipText(monitor === undefined ? "Seçilenlerin bir kısmında açık, bir kısmında kapalı; tıklayınca hepsi için seçilir" : null);
-        boardForm.addField("monitor_enabled", "Sensör verisi toplansın", check);
-        this.__editable(boardForm, "notes", "Not (cihaz)", boards, b => b.notes);
-        const boardPage = page(`Cihaz (${boards.length} cihaz)`);
-        boardPage.add(new qx.ui.container.Scroll(boardForm), { flex: 1 });
-        tabs.add(boardPage);
+        deviceForm.addField("monitor_enabled", "Sensör verisi toplansın", check);
+        this.__editable(deviceForm, "notes", "Not (cihaz)", devices, b => b.notes);
+        const devicePage = page(`Cihaz (${devices.length} cihaz)`);
+        devicePage.add(new qx.ui.container.Scroll(deviceForm), { flex: 1 });
+        tabs.add(devicePage);
       }
 
-      if (!deviceForm && !boardForm) {
+      if (!assetForm && !deviceForm) {
         win.add(new qx.ui.basic.Label("Bu kayıtları düzenleme yetkiniz yok.").set({ textColor: "app-muted" }));
       } else {
         win.add(tabs, { flex: 1 });
       }
 
-      const cancel = new qx.ui.form.Button(deviceForm || boardForm ? "Vazgeç" : "Kapat");
+      const cancel = new qx.ui.form.Button(assetForm || deviceForm ? "Vazgeç" : "Kapat");
       cancel.addListener("execute", () => win.close());
       const buttons = [cancel];
-      if (deviceForm || boardForm) {
+      if (assetForm || deviceForm) {
         const save = new qx.ui.form.Button(`Kaydet (${count} bilgisayar)`);
         save.addListener("execute", async () => {
-          const deviceChanges = deviceForm ? this.__changed(deviceForm, ["device_type", "model", "notes"]) : {};
-          const boardChanges = boardForm ? this.__changed(boardForm, ["location", "exporter_port", "os_family", "monitor_enabled", "notes"]) : {};
-          if ("exporter_port" in boardChanges) {
-            const port = parseInt(boardChanges.exporter_port, 10);
+          const assetChanges = assetForm ? this.__changed(assetForm, ["device_type", "model", "notes"]) : {};
+          const deviceChanges = deviceForm ? this.__changed(deviceForm, ["location", "exporter_port", "os_family", "monitor_enabled", "notes"]) : {};
+          if ("exporter_port" in deviceChanges) {
+            const port = parseInt(deviceChanges.exporter_port, 10);
             if (!(port > 0 && port < 65536)) {
               ankamon.ui.Dialog.error("Sensör portu 1–65535 arasında bir sayı olmalı.");
               return;
             }
-            boardChanges.exporter_port = port;
+            deviceChanges.exporter_port = port;
           }
           // Varlık türü "Akıllı tahta" seçildiyse cihaz kaydı da cihaz sayılsın (eski "Bu bir akıllı tahtadır" işaretinin yerine).
-          if (deviceChanges.device_type === "Akıllı tahta" && boards.length) {
-            boardChanges.smart_board = true;
+          if (assetChanges.device_type === "Akıllı tahta" && devices.length) {
+            deviceChanges.smart_board = true;
           }
-          if (!Object.keys(deviceChanges).length && !Object.keys(boardChanges).length) {
+          if (!Object.keys(assetChanges).length && !Object.keys(deviceChanges).length) {
             ankamon.ui.Dialog.alert("Hiçbir alan değiştirilmedi.");
             return;
           }
@@ -226,11 +226,11 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
               }
             }
           };
-          if (Object.keys(deviceChanges).length) {
-            await run(devices, "/network/devices/", deviceChanges);
+          if (Object.keys(assetChanges).length) {
+            await run(assets, "/network/devices/", assetChanges);
           }
-          if (Object.keys(boardChanges).length) {
-            await run(boards, "/boards/", boardChanges);
+          if (Object.keys(deviceChanges).length) {
+            await run(devices, "/devices/", deviceChanges);
           }
           if (failed) {
             ankamon.ui.Dialog.error(`${failed} kayıt kaydedilemedi; ötekiler kaydedildi.`);

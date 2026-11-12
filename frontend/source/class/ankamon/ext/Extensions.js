@@ -36,13 +36,13 @@
  *
  * Kancalar: on(ad, işleyici) ile kaydolunur; çekirdek handle(ad, ...) ile sorar. İşleyicilerden biri true
  * döndürürse olay "işlendi" sayılır ve çekirdek kendi varsayılan davranışını atlar. Kancalar:
- *  - "boards.statusFilter" (metin, sayfa): Cihazlar grid'inin Durum süzgeç kutusuna yazılan metin.
+ *  - "devices.statusFilter" (metin, sayfa): Cihazlar grid'inin Durum süzgeç kutusuna yazılan metin.
  *    İşlendi ise kutu temizlenir, süzme yapılmaz.
  *  - "settings.extensionHidden" (eklenti adı): Ayarlar ▸ Eklentiler listesi. İşlendi ise (true) o eklentinin
  *    bölümü gösterilmez (yalnız arayüz; API yönetici yetkisiyle yine erişilebilir).
  *  - "statusBar.usersVisible" (): alt çubuktaki oturum açmış kullanıcılar göstergesi (👤 + ipucu).
  *    Varsayılan gizli; işlendi ise (true) görünür.
- * Kanca dışındaki eklenti noktaları: addMaintenanceTab (Bakım sekmesi), addBoardMenu (Cihazlar sağ menüsü
+ * Kanca dışındaki eklenti noktaları: addMaintenanceTab (Bakım sekmesi), addDeviceMenu (Cihazlar sağ menüsü
  * maddesi ve isteğe bağlı araç çubuğu düğmesi), addPage (sol menüde eklentinin kendi sayfası), addWifiTrustedAction
  * (Wi-Fi Monitör güvenilir listesinde işaretli kayıtlara düğme), addDiskUsageTab (Sistem ▸ Disk kullanımı'nda eklentinin
  * verisi için sekme), addSettingsTab (Ayarlar ▸ Eklentiler'de eklentinin bölümüne ayar formunun yanında ek sekme).
@@ -63,7 +63,7 @@ qx.Class.define("ankamon.ext.Extensions", {
     __maintenanceTabs: [],  // eklentilerin Bakım sekmeleri (bkz. addMaintenanceTab)
     __pages: [],            // eklentilerin sol menü sayfaları (bkz. addPage)
     __wifiTrustedActions: [], // eklentilerin Wi-Fi Monitör güvenilir listesi düğmeleri (bkz. addWifiTrustedAction)
-    __boardMenus: [],       // eklentilerin Cihazlar sağ menüsü maddeleri (bkz. addBoardMenu)
+    __deviceMenus: [],       // eklentilerin Cihazlar sağ menüsü maddeleri (bkz. addDeviceMenu)
     __diskUsageTabs: [],    // eklentilerin Disk kullanımı sekme tanımı üreticileri (bkz. addDiskUsageTab)
     __settingsTabs: {},     // {eklenti-adı: [{key, label, create}]} Ayarlar ▸ Eklentiler ek sekmeleri (bkz. addSettingsTab)
 
@@ -112,11 +112,11 @@ qx.Class.define("ankamon.ext.Extensions", {
     },
 
     /**
-     * Bir eklenti Cihazlar sağ menüsüne (grid satırı ve ekran kutucuğu — ikisi de page.Boards.__rowMenu) madde
-     * ekler; araç çubuğu menüden türediği için madde çubukta da görünür (bkz. ui.boards.ActionBar). init() içinde
+     * Bir eklenti Cihazlar sağ menüsüne (grid satırı ve ekran kutucuğu — ikisi de page.Devices.__rowMenu) madde
+     * ekler; araç çubuğu menüden türediği için madde çubukta da görünür (bkz. ui.devices.ActionBar). init() içinde
      * yalnız eklenti etkinse çağrılmalı.
      * @param spec {Map} {
-     *   build: (board, boards, user) → qx.ui.menu.Button|null — maddeyi kurar (BoardOps.menuButton ile; null: yok).
+     *   build: (device, devices, user) → qx.ui.menu.Button|null — maddeyi kurar (DeviceOps.menuButton ile; null: yok).
      *     ActionBar yetkiyi sınamak için sentetik cihazla da çağırır ({id: 0, online, label: ""}).
      *   parent: isteğe bağlı çekirdek grubunun etiketi (ör. "Komut çalıştır"): madde o grubun alt menüsüne girer;
      *     araç çubuğunda da o grubun düğmesinde görünür (grup yoksa — yetki/çevrimdışı — eklentinin kendi bölümüne).
@@ -124,16 +124,21 @@ qx.Class.define("ankamon.ext.Extensions", {
      *     mirror maddenin etiketiyse düğmenin menüsü maddenin alt menüsünün aynısıdır.
      * }
      */
+    addDeviceMenu(spec) {
+      this.__deviceMenus.push(spec);
+    },
+
+    /** UYUMLULUK (terim geçişi 2026-11-12): eski adı — addDeviceMenu ile aynı. */
     addBoardMenu(spec) {
-      this.__boardMenus.push(spec);
+      this.addDeviceMenu(spec);
     },
 
     /** @return {Array} eklentilerin bu cihaz(lar) için kurduğu sağ menü maddeleri (hata veren eklenti atlanır); parent
-     * verilen maddede userData "ankamon.menuParent" (bkz. page.Boards.__rowMenu). */
-    boardMenuItems(board, boards, user) {
-      return this.__boardMenus.map(spec => {
+     * verilen maddede userData "ankamon.menuParent" (bkz. page.Devices.__rowMenu). */
+    deviceMenuItems(device, devices, user) {
+      return this.__deviceMenus.map(spec => {
         try {
-          const item = spec.build(board, boards, user) || null;
+          const item = spec.build(device, devices, user) || null;
           if (item && spec.parent) {
             item.setUserData("ankamon.menuParent", spec.parent);
           }
@@ -145,9 +150,9 @@ qx.Class.define("ankamon.ext.Extensions", {
       }).filter(Boolean);
     },
 
-    /** @return {Array} eklentilerin Cihazlar araç çubuğu grupları (bkz. addBoardMenu bar). */
-    boardBarGroups() {
-      return this.__boardMenus.filter(spec => spec.bar).map(spec => spec.bar);
+    /** @return {Array} eklentilerin Cihazlar araç çubuğu grupları (bkz. addDeviceMenu bar). */
+    deviceBarGroups() {
+      return this.__deviceMenus.filter(spec => spec.bar).map(spec => spec.bar);
     },
 
     /**
@@ -162,8 +167,8 @@ qx.Class.define("ankamon.ext.Extensions", {
     },
 
     /**
-     * Wi-Fi Monitör ▸ Güvenilir listesi penceresine düğme ekler (ui.boards.WifimonFixedDialog): {label, hint?, run(rows)}.
-     * run, işaretli kayıtlarla çağrılır — [{id, kind, value, label, board_id, board_name}] (kind: bssid erişim noktası,
+     * Wi-Fi Monitör ▸ Güvenilir listesi penceresine düğme ekler (ui.devices.WifimonFixedDialog): {label, hint?, run(rows)}.
+     * run, işaretli kayıtlarla çağrılır — [{id, kind, value, label, device_id, device_name}] (kind: bssid erişim noktası,
      * probe Wi-Fi cihazı) — ve Promise döndürebilir. İşaret yoksa düğme uyarır, run çağrılmaz.
      */
     addWifiTrustedAction(spec) {
@@ -220,6 +225,8 @@ qx.Class.define("ankamon.ext.Extensions", {
 
     /** @param name {String} kanca adı  @param handler {Function} true dönerse olay işlendi sayılır */
     on(name, handler) {
+      // Eski kanca adları (terim geçişi 2026-11-12): "boards.…" → "devices.…".
+      name = String(name).replace(/^boards\./, "devices.");
       (this.__handlers[name] = this.__handlers[name] || []).push(handler);
     },
 

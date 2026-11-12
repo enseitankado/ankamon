@@ -63,7 +63,7 @@ MAX_DOMAINS = 500
 
 _APPLY_WAIT = 150  # cihazdaki işlemin üst sınırı (sn)
 
-_BOARD_PROGRAM = r'''
+_DEVICE_PROGRAM = r'''
 import base64, fcntl, glob, gzip, json, os, re, shutil, subprocess, sys, time
 
 P = json.loads(base64.b64decode("__PARAMS__"))
@@ -479,15 +479,15 @@ else:
 '''
 
 
-def _send(board: dict, user: str, password: str, params: dict, timeout: int) -> dict:
+def _send(device: dict, user: str, password: str, params: dict, timeout: int) -> dict:
     """Programı stdin ile cihazdaki python3'e verir. Döner: {"status", "rc", "output"} (bkz. accounts._ssh)."""
-    if not board.get("ip"):
+    if not device.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     encoded = base64.b64encode(json.dumps(params).encode()).decode()
-    cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", "ConnectTimeout=8", f"{user}@{board['ip']}", "python3 -B -"]
+    cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", "ConnectTimeout=8", f"{user}@{device['ip']}", "python3 -B -"]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:
-        proc = subprocess.run(cmd, input=_BOARD_PROGRAM.replace("__PARAMS__", encoded).encode(),
+        proc = subprocess.run(cmd, input=_DEVICE_PROGRAM.replace("__PARAMS__", encoded).encode(),
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=timeout)
     except subprocess.TimeoutExpired:
         return {"status": "failed", "rc": None, "output": f"Zaman aşımı ({timeout} sn)."}
@@ -516,19 +516,19 @@ def clean_domains(domains) -> list[str] | None:
     return seen if len(seen) <= MAX_DOMAINS else None
 
 
-def read_status(board: dict, user: str, password: str) -> dict:
+def read_status(device: dict, user: str, password: str) -> dict:
     """Cihazdaki profil, filtre durumu ve sayımlar; başarılıysa output JSON."""
-    return _send(board, user, password, {"op": "status"}, timeout=40)
+    return _send(device, user, password, {"op": "status"}, timeout=40)
 
 
-def _reattach(board: dict, user: str, password: str, run_id: str) -> dict:
+def _reattach(device: dict, user: str, password: str, run_id: str) -> dict:
     """SSH koptuysa cihazdaki işlem sürer: yeni bağlantıyla sonuç dosyası beklenir."""
     path = f"/run/ankamon-webfilter-{run_id}.json"
     end = time.time() + _APPLY_WAIT
     last = None
     unreachable = 0
     while time.time() < end:
-        last = _ssh(board, user, password, f"cat {path} 2>/dev/null && rm -f {path}", timeout=15)
+        last = _ssh(device, user, password, f"cat {path} 2>/dev/null && rm -f {path}", timeout=15)
         if last["status"] == "ok" and last["output"]:
             return last
         unreachable = unreachable + 1 if last["status"] == "unreachable" else 0
@@ -538,7 +538,7 @@ def _reattach(board: dict, user: str, password: str, run_id: str) -> dict:
     return last or {"status": "failed", "rc": None, "output": "Sonuç okunamadı."}
 
 
-def apply(board: dict, user: str, password: str, mode: str, denylist, allowlist) -> dict:
+def apply(device: dict, user: str, password: str, mode: str, denylist, allowlist) -> dict:
     """Modu ve listeleri uygular; output kullanıcıya gösterilen metin. Liste None ise cihazdaki liste korunur."""
     if mode not in MODES:
         return {"status": "failed", "rc": None, "output": "Geçersiz mod."}
@@ -548,13 +548,13 @@ def apply(board: dict, user: str, password: str, mode: str, denylist, allowlist)
         return {"status": "failed", "rc": None, "output": "Geçersiz alan adı."}
     if mode != "off" and not (deny if mode == "denylist" else allow):
         return {"status": "failed", "rc": None, "output": "Adres listesi boş."}
-    if not board.get("ip"):
+    if not device.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     run_id = secrets.token_hex(8)
-    res = _send(board, user, password, {"op": "apply", "mode": mode, "denylist": deny, "allowlist": allow,
+    res = _send(device, user, password, {"op": "apply", "mode": mode, "denylist": deny, "allowlist": allow,
                                         "run_id": run_id, "wait": _APPLY_WAIT}, timeout=_APPLY_WAIT + 20)
     if res["rc"] == 255 or res["rc"] is None:
-        res = _reattach(board, user, password, run_id)
+        res = _reattach(device, user, password, run_id)
     if res["status"] != "ok":
         return res
     try:

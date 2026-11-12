@@ -29,7 +29,7 @@
  * Oturumlar sayfasının "Zaman çizelgesi" sekmesi (eski adı "Kullanıcılar"): kullanıcıların hangi cihazda, ne zaman, ne kadar
  * süre oturum açtığını (ve hangilerinin düzgün kapanmadığını) zaman çizelgesinde gösterir.
  *
- * Veri, Oturumlar sekmesiyle aynı (/board-sessions — page.Sessions çeker, setData ile verir);
+ * Veri, Oturumlar sekmesiyle aynı (/device-sessions — page.Sessions çeker, setData ile verir);
  * süzme ve özetleme tamamen istemcide yapılır.
  *  - Üstteki tablo (kullanıcı isteği 2026-11-06: eski Kullanıcı/Cihaz/Tür seçicileri tabloya girdi): her satır bir
  *    cihaz × kullanıcı × tür (cihaz oturumu / web terminal) birleşimi. Cihaz, Kullanıcı ve Tür sütunları hazır listeyle
@@ -42,13 +42,13 @@
  *  - "Satırlar: Cihazlar" görünümünde cihazın KAPALI olduğu aralıklar satırda gri taralı arka plan
  *    olarak görünür (kurum kapalıyken boşluk ile "kimse oturum açmadı"yı ayırır — bkz. __loadUptime).
  *  - Tablo satırına çift tıklama o cihazı ve kullanıcıyı süzgece alır; çubuğa sağ tıklama süzme
- *    ve (açık cihaz oturumunda, "boards.login" yetkisiyle) oturumu kapat/kilitle menüsü açar.
+ *    ve (açık cihaz oturumunda, "devices.login" yetkisiyle) oturumu kapat/kilitle menüsü açar.
  *  - Satır (tablo satırı ya da çizelgedeki satır adı) sağ menüsü: süzgece alma; Cihazlar'a kayıtlı olmayan
  *    bilgisayarda ("sessions.hosts" yetkisiyle) onaylı "Bu bilgisayarın kayıtlarını sil".
  *
  * "Düzgün kapanmadı": kapanış mesajı gelmeden cihaz çevrimdışı oldu (offline — elektrik kesintisi,
  * güç düğmesiyle kapatma) ya da kapanmadan yeni oturum açıldı (superseded) ya da web terminal
- * hizmeti yeniden başladı (restart) — bkz. worker/ankamon/tasks/board_sessions.py.
+ * hizmeti yeniden başladı (restart) — bkz. worker/ankamon/tasks/device_sessions.py.
  */
 qx.Class.define("ankamon.ui.sessions.Users", {
   extend: qx.ui.tabview.Page,
@@ -63,7 +63,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     this.setPadding(8);
 
     // Çizelge satırları ve "yalnız düzgün kapanmayanlar": alttaki aralık satırında (tablonun üstünde ayrı satır yok).
-    this.__groupBy = this.__select([["board", "Cihazlar"], ["user", "Kullanıcılar"]]).set({ width: 120 });
+    this.__groupBy = this.__select([["device", "Cihazlar"], ["user", "Kullanıcılar"]]).set({ width: 120 });
     this.__groupBy.addListener("changeSelection", () => this.__changed());
     this.__badOnly = new qx.ui.form.CheckBox("Yalnız düzgün kapanmayanlar").set({ alignY: "middle" });
     this.__badOnly.addListener("changeValue", () => this.__changed());
@@ -139,7 +139,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
 
     const C = ankamon.ui.sessions.Users.COL;
     this.__columns = [
-      { id: "board", label: "Cihaz", choices: true, hint: "Oturumun açıldığı cihaz (Cihazlar'a kayıtlı değilse bilgisayar adı). Süzgeç zaman çizelgesini de süzer." },
+      { id: "device", label: "Cihaz", choices: true, hint: "Oturumun açıldığı cihaz (Cihazlar'a kayıtlı değilse bilgisayar adı). Süzgeç zaman çizelgesini de süzer." },
       { id: "user", label: "Kullanıcı", choices: true, hint: "Oturumu açan kullanıcı: cihazda giriş ekranından oturum açan kişi ya da web terminal açan Ankamon kullanıcısı. Süzgeç zaman çizelgesini de süzer." },
       { id: "kind", label: "Tür", choices: true, hint: "Cihaz oturumu: cihazın giriş ekranından açılan oturum · Web terminal: Ankamon üzerinden açılan uzak terminal. Süzgeç zaman çizelgesini de süzer." },
       { id: "count", label: "Oturum", hint: "Görünen aralıktaki oturum sayısı" },
@@ -154,7 +154,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     this.__filters = page._addColumnFilters(this.__table, this.__columns, () => this.__filtersChanged(),
       { rows: () => this.__allRows || [] });
     // Varsayılan (eski "Tür: Cihaz oturumu" seçimi gibi): yalnız cihaz oturumları.
-    this.__filters.kind.setValue(`"${ankamon.ui.sessions.Users.KIND.board}"`);
+    this.__filters.kind.setValue(`"${ankamon.ui.sessions.Users.KIND.device}"`);
     // Süre/tarih sütunları ekranda metin; sıralama satır sonundaki ham sayılarla yapılır (bkz. __summarize).
     const model = this.__table.getTableModel();
     [[C.total, C.rawTotal], [C.avg, C.rawAvg], [C.first, C.rawFirst], [C.last, C.rawLast]].forEach(([col, raw]) =>
@@ -177,10 +177,10 @@ qx.Class.define("ankamon.ui.sessions.Users", {
 
   statics: {
     /** Tablo modeli sütunları (0 = satır anahtarı); raw* sıralama için ham değerler. */
-    COL: { board: 1, user: 2, kind: 3, count: 4, total: 5, avg: 6, bad: 7, first: 8, last: 9,
-      rawTotal: 10, rawAvg: 11, rawFirst: 12, rawLast: 13, boardKey: 14, kindKey: 15, username: 16 },
+    COL: { device: 1, user: 2, kind: 3, count: 4, total: 5, avg: 6, bad: 7, first: 8, last: 9,
+      rawTotal: 10, rawAvg: 11, rawFirst: 12, rawLast: 13, deviceKey: 14, kindKey: 15, username: 16 },
     /** Tür sütununun metinleri. */
-    KIND: { board: "Cihaz oturumu", webshell: "Web terminal" },
+    KIND: { device: "Cihaz oturumu", webshell: "Web terminal" },
 
     /** Tablo ile çizelge arasındaki sürüklenebilir ayracın kalınlığı (px). */
     SPLITTER_HEIGHT: 8,
@@ -222,7 +222,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     __page: null,
     __filters: null,
     __allRows: null,
-    __pendingBoard: null,
+    __pendingDevice: null,
     __groupBy: null,
     __badOnly: null,
     __summary: null,
@@ -257,22 +257,22 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     },
 
     /** Süzgece uyan görüntülerin çizelge öğeleri; satırlar `groups`a eklenir (oturumu olmayan cihaz/kişi de görünsün). */
-    __shotItems(groups, byBoard, badOnly) {
+    __shotItems(groups, byDevice, badOnly) {
       const f = this.__textFilters();
-      if (badOnly || !ankamon.page.Base.filterMatch(ankamon.ui.sessions.Users.KIND.board, f.kind)) {
+      if (badOnly || !ankamon.page.Base.filterMatch(ankamon.ui.sessions.Users.KIND.device, f.kind)) {
         return [];
       }
       const F = ankamon.util.Format;
       const esc = qx.bom.String.escape;
       const M = ankamon.page.Base.filterMatch;
-      return (this.__shots || []).filter(s => M(s.board_name, f.board) && (!f.user || M(s.session_username || "", f.user))).map(s => {
-        const group = byBoard ? (s.board_id ? "b" + s.board_id : "h" + s.board_name) : "board:" + (s.session_username || "");
+      return (this.__shots || []).filter(s => M(s.device_name, f.device) && (!f.user || M(s.session_username || "", f.user))).map(s => {
+        const group = byDevice ? (s.device_id ? "b" + s.device_id : "h" + s.device_name) : "device:" + (s.session_username || "");
         if (!groups.has(group)) {
-          groups.set(group, byBoard ? s.board_name : (s.session_username || "(oturum yok)"));
+          groups.set(group, byDevice ? s.device_name : (s.session_username || "(oturum yok)"));
         }
         return {
           id: "s:" + s.id, group, type: "box", start: new Date(s.taken_at * 1000), content: "📷", className: "tm-shot",
-          title: `<b>Ekran görüntüsü</b> · ${esc(s.board_name)}<br>Oturum: ${esc(s.session_username || "yok")}<br>` +
+          title: `<b>Ekran görüntüsü</b> · ${esc(s.device_name)}<br>Oturum: ${esc(s.session_username || "yok")}<br>` +
             `${F.dateTime(s.taken_at * 1000)} · çeken: ${esc(s.taken_by)}`
         };
       });
@@ -290,12 +290,12 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       }
     },
 
-    /** @param sessions {Array} /board-sessions yanıtındaki satırlar */
+    /** @param sessions {Array} /device-sessions yanıtındaki satırlar */
     setData(sessions) {
       this.__sessions = sessions;
       this.__loadShots();
-      if (this.__pendingBoard) {
-        this.__applyBoard();
+      if (this.__pendingDevice) {
+        this.__applyDevice();
       } else {
         this.__render();
       }
@@ -379,10 +379,10 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     showUser(username, kind) {
       this.__updatingOptions = true;
       try {
-        this.__setFilter("kind", ankamon.ui.sessions.Users.KIND[kind === "webshell" ? "webshell" : "board"]);
+        this.__setFilter("kind", ankamon.ui.sessions.Users.KIND[kind === "webshell" ? "webshell" : "device"]);
         this.__setFilter("user", username);
-        this.__setFilter("board", "");
-        this.__selectValue(this.__groupBy, "board");
+        this.__setFilter("device", "");
+        this.__selectValue(this.__groupBy, "device");
         this.__badOnly.setValue(false);
       } finally {
         this.__updatingOptions = false;
@@ -395,23 +395,23 @@ qx.Class.define("ankamon.ui.sessions.Users", {
      * Cihazlar/Ekranlar sağ menüsü "Oturum geçmişi" (bkz. page.Sessions.openWith): yalnız o cihaz — tür süzgeci boş
      * (web terminal dahil), satırlar kullanıcılara göre, aralık cihazın bütün oturumlarını kapsar. Veri henüz
      * gelmediyse (sayfa ilk açılıyor) setData'da uygulanır.
-     * @param board {Map} {id, name}
+     * @param device {Map} {id, name}
      */
-    showBoard(board) {
-      this.__pendingBoard = board;
+    showDevice(device) {
+      this.__pendingDevice = device;
       if (this.__sessions) {
-        this.__applyBoard();
+        this.__applyDevice();
       }
     },
 
-    __applyBoard() {
-      const board = this.__pendingBoard;
-      this.__pendingBoard = null;
+    __applyDevice() {
+      const device = this.__pendingDevice;
+      this.__pendingDevice = null;
       this.__updatingOptions = true;
       try {
         this.__setFilter("kind", "");
         this.__setFilter("user", "");
-        this.__setFilter("board", board.name);
+        this.__setFilter("device", device.name);
         this.__selectValue(this.__groupBy, "user");
         this.__badOnly.setValue(false);
       } finally {
@@ -439,8 +439,8 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       }
     },
 
-    __boardKey(s) {
-      return s.board_id ? "b" + s.board_id : "h" + (s.host || "");
+    __deviceKey(s) {
+      return s.device_id ? "b" + s.device_id : "h" + (s.host || "");
     },
 
     /** Sütun süzgecini tek değere (tam eşleşme: "değer") ayarlar; boş değer süzgeci temizler. */
@@ -451,7 +451,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     /** Tablonun Cihaz / Kullanıcı / Tür süzgeç metinleri (çizelgeyi de süzenler). */
     __textFilters() {
       const get = id => (this.__filters[id].getValue() || "").trim();
-      return { board: get("board"), user: get("user"), kind: get("kind") };
+      return { device: get("device"), user: get("user"), kind: get("kind") };
     },
 
     /** Süzgeçte tek değer seçiliyse o değer (ör. hareketler için kullanıcı adı), yoksa null. */
@@ -462,7 +462,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
 
     __sessionMatches(s, f) {
       const M = ankamon.page.Base.filterMatch;
-      return M(s.board || s.host || "?", f.board) && M(s.username, f.user) &&
+      return M(s.device || s.host || "?", f.device) && M(s.username, f.user) &&
         M(ankamon.ui.sessions.Users.KIND[s.kind] || s.kind, f.kind);
     },
 
@@ -499,7 +499,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const f = this.__textFilters();
       this.__lastText = JSON.stringify(f);
       const kind = /^"[^"|]*"$/.test(f.kind) ? (Object.keys(S.KIND).find(k => `"${S.KIND[k]}"` === f.kind) || "") : "";
-      const byBoard = this.__value(this.__groupBy) === "board";
+      const byDevice = this.__value(this.__groupBy) === "device";
       const badOnly = this.__badOnly.getValue();
       const now = Date.now() / 1000;
 
@@ -509,12 +509,12 @@ qx.Class.define("ankamon.ui.sessions.Users", {
 
       const groups = new Map();
       const items = this.__shown.map(s => {
-        const boardName = s.board || s.host || "?";
+        const deviceName = s.device || s.host || "?";
         // Aynı ad iki türde (cihaz kullanıcısı / Ankamon kullanıcısı) farklı kişiler olabilir.
         const userKey = s.kind + ":" + s.username;
         const userName = s.kind === "webshell" && !kind ? `${s.username} (web terminal)` : s.username;
-        const group = byBoard ? this.__boardKey(s) : userKey;
-        groups.set(group, byBoard ? boardName : userName);
+        const group = byDevice ? this.__deviceKey(s) : userKey;
+        groups.set(group, byDevice ? deviceName : userName);
         const end = s.ended_at || now;
         const state = S.state(s);
         return {
@@ -522,23 +522,23 @@ qx.Class.define("ankamon.ui.sessions.Users", {
           group,
           start: new Date(s.started_at * 1000),
           end: new Date(Math.max(end, s.started_at + 1) * 1000),
-          content: esc(byBoard ? userName : boardName),
+          content: esc(byDevice ? userName : deviceName),
           className: "tm-s-" + state,
-          title: `<b>${esc(s.username)}</b> · ${esc(boardName)}<br>` +
+          title: `<b>${esc(s.username)}</b> · ${esc(deviceName)}<br>` +
             `Süre: ${F.duration(end - s.started_at)} (${F.dateTime(s.started_at * 1000)} → ` +
             `${s.ended_at ? F.dateTime(s.ended_at * 1000) : "devam ediyor"})<br>` +
             `${s.kind === "webshell" ? "Web terminal · " : ""}${s.locked ? "Açık (kilitli)" : (s.end_detail || F.sessionEndReason(s.end_reason))}` +
             (s.kind === "webshell" ? "" : this.__lessonLines(s, end))
         };
       });
-      items.push(...this.__shotItems(groups, byBoard, badOnly));
-      if (byBoard) {
+      items.push(...this.__shotItems(groups, byDevice, badOnly));
+      if (byDevice) {
         items.push(...this.__offItems(new Set(groups.keys())));
       }
       this.__timeline.setData([...groups.entries()].map(([id, content]) => ({ id, content: esc(content) })), items);
       // Satır adları sütununun başlığı: cihaz satırlarında kayıtlı cihazlar dışında, log gönderen ama
       // cihaz olarak eklenmemiş makineler (bilgisayar adıyla) de bulunabildiğinden "Bilgisayar".
-      this.__timeline.setGroupHeader(byBoard ? "Bilgisayar" : "Kullanıcı");
+      this.__timeline.setGroupHeader(byDevice ? "Bilgisayar" : "Kullanıcı");
       if (!this.__framed) {
         this.__framed = true;
         this.__frameToday();
@@ -577,7 +577,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       }
       const F = ankamon.util.Format;
       const S = ankamon.ui.sessions.Users;
-      const byBoard = this.__value(this.__groupBy) === "board";
+      const byDevice = this.__value(this.__groupBy) === "device";
       const from = this.__range.start.getTime() / 1000;
       const to = this.__range.end.getTime() / 1000;
       const now = Date.now() / 1000;
@@ -587,9 +587,9 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const inRange = s => !((s.ended_at || now) < from || s.started_at > to);
       const seconds = s => Math.max(0, Math.min(s.ended_at || now, to) - Math.max(s.started_at, from));
       (this.__base || []).filter(inRange).forEach(s => {
-        const key = this.__boardKey(s) + "|" + s.kind + ":" + s.username;
-        const row = per.get(key) || { key, board: s.board || s.host || "?", user: s.username, kind: s.kind,
-          boardKey: this.__boardKey(s), count: 0, total: 0, bad: 0, first: Infinity, last: 0 };
+        const key = this.__deviceKey(s) + "|" + s.kind + ":" + s.username;
+        const row = per.get(key) || { key, device: s.device || s.host || "?", user: s.username, kind: s.kind,
+          deviceKey: this.__deviceKey(s), count: 0, total: 0, bad: 0, first: Infinity, last: 0 };
         row.count++;
         row.total += seconds(s);
         row.bad += S.isBad(s) ? 1 : 0;
@@ -604,20 +604,20 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         count++;
         total += seconds(s);
         bad += S.isBad(s) ? 1 : 0;
-        groupsSeen.add(byBoard ? this.__boardKey(s) : s.kind + ":" + s.username);
+        groupsSeen.add(byDevice ? this.__deviceKey(s) : s.kind + ":" + s.username);
       });
 
       const span = `${F.dateTime(from * 1000)} – ${F.dateTime(to * 1000)}`;
       this.__summary.setValue(count
         ? `<b>${count}</b> oturum · toplam <b>${F.duration(total)}</b> · ortalama <b>${F.duration(total / count)}</b> · ` +
           `<b style="color:${bad ? "#d93025" : "inherit"}">${bad}</b> düzgün kapanmadı · ` +
-          `<b>${groupsSeen.size}</b> ${byBoard ? "cihaz" : "kullanıcı"} <span style="color:#5f6368">(${span})</span>`
+          `<b>${groupsSeen.size}</b> ${byDevice ? "cihaz" : "kullanıcı"} <span style="color:#5f6368">(${span})</span>`
         : `<span style="color:#5f6368">Bu aralıkta süzgece uyan oturum yok (${span}). "Tümü" ile bütün kayıtları görebilirsiniz.</span>`);
 
       this.__allRows = [...per.values()].sort((a, b) => b.total - a.total).map(r => [
-        r.key, r.board, r.user, KIND[r.kind] || r.kind, r.count, F.duration(r.total), F.duration(r.total / r.count), r.bad,
+        r.key, r.device, r.user, KIND[r.kind] || r.kind, r.count, F.duration(r.total), F.duration(r.total / r.count), r.bad,
         F.dateTime(r.first * 1000), F.dateTime(r.last * 1000),
-        r.total, r.total / r.count, r.first, r.last, r.boardKey, r.kind, r.user
+        r.total, r.total / r.count, r.first, r.last, r.deviceKey, r.kind, r.user
       ]);
       this.__applyTable();
     },
@@ -640,7 +640,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const F = ankamon.util.Format;
       const C = ankamon.ui.sessions.Users.COL;
       return {
-        board: r => `${r[C.board]} — çift tık: yalnız bu cihaz ve ${r[C.user]}`,
+        device: r => `${r[C.device]} — çift tık: yalnız bu cihaz ve ${r[C.user]}`,
         user: r => r[C.kindKey] === "webshell" ? `${r[C.user]}: web terminal açan Ankamon kullanıcısı`
           : `${r[C.user]}: cihazda giriş ekranından oturum açan kullanıcı`,
         kind: r => r[C.kindKey] === "webshell" ? "Web terminal: Ankamon üzerinden cihaza açılan uzak terminal"
@@ -656,13 +656,13 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     },
 
     /**
-     * Cihazların açık aralıkları (GET /board-uptime — worker'ın loglardan ARTIMLI doldurduğu tablo,
+     * Cihazların açık aralıkları (GET /device-uptime — worker'ın loglardan ARTIMLI doldurduğu tablo,
      * her istekte yeniden hesaplanmaz). Görünen aralığın iki yanına birer aralık boyu pay eklenerek
      * çekilir; önbellek görünen aralığı kapsıyor ve 60 sn'den yeniyse yeniden istenmez. Uç yoksa
      * ya da hata verirse çizelge kapalı gölgesi olmadan çalışmaya devam eder.
      */
     async __loadUptime() {
-      if (this.__uptimeLoading || !this.__range || this.__value(this.__groupBy) !== "board") {
+      if (this.__uptimeLoading || !this.__range || this.__value(this.__groupBy) !== "device") {
         return;
       }
       const from = this.__range.start.getTime() / 1000;
@@ -675,11 +675,11 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const q = { from: Math.floor(from - span), to: Math.ceil(to + span) };
       this.__uptimeLoading = true;
       try {
-        const res = await ankamon.io.Api.get(`/board-uptime?from=${q.from}&to=${q.to}`);
-        this.__uptime = { from: q.from, to: q.to, at: Date.now(), boards: res.boards || [] };
+        const res = await ankamon.io.Api.get(`/device-uptime?from=${q.from}&to=${q.to}`);
+        this.__uptime = { from: q.from, to: q.to, at: Date.now(), devices: res.devices || [] };
       } catch (e) {
         // Uç henüz yoksa / hata: aynı aralık için 60 sn boyunca yeniden denenmez.
-        this.__uptime = { from: q.from, to: q.to, at: Date.now(), boards: null };
+        this.__uptime = { from: q.from, to: q.to, at: Date.now(), devices: null };
       } finally {
         this.__uptimeLoading = false;
       }
@@ -694,14 +694,14 @@ qx.Class.define("ankamon.ui.sessions.Users", {
      */
     __offItems(groups) {
       const c = this.__uptime;
-      if (!c || !c.boards) {
+      if (!c || !c.devices) {
         return [];
       }
       const now = Date.now() / 1000;
       const to = Math.min(c.to, now);
       const out = [];
-      c.boards.forEach(b => {
-        const group = b.board_id ? "b" + b.board_id : "h" + (b.host || "");
+      c.devices.forEach(b => {
+        const group = b.device_id ? "b" + b.device_id : "h" + (b.host || "");
         if (!groups.has(group)) {
           return;
         }
@@ -733,7 +733,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const C = ankamon.ui.sessions.Users.COL;
       this.__updatingOptions = true;
       try {
-        this.__setFilter("board", row[C.board]);
+        this.__setFilter("device", row[C.device]);
         this.__setFilter("user", row[C.user]);
         this.__setFilter("kind", row[C.kind]);
       } finally {
@@ -747,9 +747,9 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       if (!key) {
         return;
       }
-      if (this.__value(this.__groupBy) === "board") {
-        const s = (this.__sessions || []).find(x => this.__boardKey(x) === key);
-        this.__setFilter("board", s ? s.board || s.host : key.slice(1));
+      if (this.__value(this.__groupBy) === "device") {
+        const s = (this.__sessions || []).find(x => this.__deviceKey(x) === key);
+        this.__setFilter("device", s ? s.device || s.host : key.slice(1));
       } else {
         const i = key.indexOf(":");
         this.__updatingOptions = true;
@@ -765,8 +765,8 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     /** Tablo satırı sağ menüsü: cihaz (bilgisayar) menüsü + kullanıcı süzgeci. */
     __tableMenu(row) {
       const C = ankamon.ui.sessions.Users.COL;
-      const menu = this.__groupMenu(row[C.boardKey], true);
-      menu.add(ankamon.ui.BoardOps.menuButton(ankamon.ui.Shell.ICON.sessions, `Yalnız bu kullanıcı (${row[C.user]})`,
+      const menu = this.__groupMenu(row[C.deviceKey], true);
+      menu.add(ankamon.ui.DeviceOps.menuButton(ankamon.ui.Shell.ICON.sessions, `Yalnız bu kullanıcı (${row[C.user]})`,
         () => this.__pickKey(row[C.kindKey] + ":" + row[C.username])));
       return menu;
     },
@@ -775,7 +775,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     __itemMenu(data) {
       if (this.__shotOf(data.item)) {
         const open = new qx.ui.menu.Menu();
-        open.add(ankamon.ui.BoardOps.menuButton(ankamon.ui.Shell.ICON.screenshot, "Görüntüyü aç", () => this.__openShot(data.item)));
+        open.add(ankamon.ui.DeviceOps.menuButton(ankamon.ui.Shell.ICON.screenshot, "Görüntüyü aç", () => this.__openShot(data.item)));
         this.__openMenu(open, data.event);
         return;
       }
@@ -783,33 +783,33 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       if (!s) {
         return;
       }
-      const ops = ankamon.ui.BoardOps;
+      const ops = ankamon.ui.DeviceOps;
       const icon = ankamon.ui.Shell.ICON;
       const menu = new qx.ui.menu.Menu();
       menu.add(ops.menuButton(icon.sessions, `Yalnız bu kullanıcı (${s.username})`, () => this.__pickKey(s.kind + ":" + s.username)));
-      menu.add(ops.menuButton(icon.boards, `Yalnız bu cihaz (${s.board || s.host})`, () => this.__setFilter("board", s.board || s.host)));
-      if (s.kind === "board") {
+      menu.add(ops.menuButton(icon.devices, `Yalnız bu cihaz (${s.device || s.host})`, () => this.__setFilter("device", s.device || s.host)));
+      if (s.kind === "device") {
         menu.add(new qx.ui.menu.Separator());
         menu.add(ops.menuButton(icon.movements, "Oturum hareketleri", () => this.__page.showMovements({
-          session: { id: s.id, label: `${s.username} · ${s.board || s.host} · ${ankamon.util.Format.dateTime(s.started_at * 1000)}` },
-          username: s.username, board_id: s.board_id, board_name: s.board || s.host
+          session: { id: s.id, label: `${s.username} · ${s.device || s.host} · ${ankamon.util.Format.dateTime(s.started_at * 1000)}` },
+          username: s.username, device_id: s.device_id, device_name: s.device || s.host
         })));
         menu.add(ops.menuButton(icon.movements, `Bu kullanıcının tüm hareketleri (${s.username})`,
           () => this.__page.showMovements({ username: s.username })));
       }
       // Açık cihaz oturumu: o cihazın canlı ekranı (Ekran ▸ Ekranı göster ile aynı işlev).
-      if (s.kind === "board" && !s.ended_at && s.board_id && this.__page._can("screen")) {
+      if (s.kind === "device" && !s.ended_at && s.device_id && this.__page._can("screen")) {
         menu.add(new qx.ui.menu.Separator());
-        menu.add(ops.menuButton(icon.screen, `Ekranı göster (${s.board || s.host})`,
-          () => ops.screen([{ id: s.board_id, label: s.board || s.host }], this.__page._user)));
+        menu.add(ops.menuButton(icon.screen, `Ekranı göster (${s.device || s.host})`,
+          () => ops.screen([{ id: s.device_id, label: s.device || s.host }], this.__page._user)));
       }
-      if (s.kind === "board" && !s.ended_at && s.board_id && this.__page._can("boards.login")) {
-        const board = { id: s.board_id, label: s.board };
+      if (s.kind === "device" && !s.ended_at && s.device_id && this.__page._can("devices.login")) {
+        const device = { id: s.device_id, label: s.device };
         menu.add(new qx.ui.menu.Separator());
         menu.add(ops.menuButton(icon.logout, `Oturumu kapat (${s.username})`,
-          () => ops.sessionAction("logout", [board], null, s.username)));
+          () => ops.sessionAction("logout", [device], null, s.username)));
         menu.add(ops.menuButton(icon.lock, `Oturumu kilitle (${s.username})`,
-          () => ops.sessionAction("lock", [board], null, s.username)));
+          () => ops.sessionAction("lock", [device], null, s.username)));
       }
       this.__openMenu(menu, data.event);
     },
@@ -828,18 +828,18 @@ qx.Class.define("ankamon.ui.sessions.Users", {
      * silme. @param key {String} satır anahtarı (cihaz satırlarında "b<id>"/"h<ad>", kullanıcıda "<tür>:<ad>")
      * @return {qx.ui.menu.Menu|null}
      */
-    __groupMenu(key, forceBoard) {
-      const byBoard = forceBoard || this.__value(this.__groupBy) === "board";
-      const ops = ankamon.ui.BoardOps;
+    __groupMenu(key, forceDevice) {
+      const byDevice = forceDevice || this.__value(this.__groupBy) === "device";
+      const ops = ankamon.ui.DeviceOps;
       const icon = ankamon.ui.Shell.ICON;
       const menu = new qx.ui.menu.Menu();
-      if (byBoard) {
-        const s = (this.__shown || []).find(x => this.__boardKey(x) === key);
-        const name = s ? s.board || s.host : key.slice(1);
-        menu.add(ops.menuButton(icon.boards, `Yalnız bu bilgisayar (${name})`, () => this.__setFilter("board", name)));
+      if (byDevice) {
+        const s = (this.__shown || []).find(x => this.__deviceKey(x) === key);
+        const name = s ? s.device || s.host : key.slice(1);
+        menu.add(ops.menuButton(icon.devices, `Yalnız bu bilgisayar (${name})`, () => this.__setFilter("device", name)));
         if (key.startsWith("b")) {
           menu.add(ops.menuButton(icon.movements, "Oturum hareketleri", () => this.__page.showMovements(
-            { board_id: Number(key.slice(1)), board_name: name, username: this.__single("user") || undefined })));
+            { device_id: Number(key.slice(1)), device_name: name, username: this.__single("user") || undefined })));
         }
         if (key.startsWith("h") && this.__page._can("sessions.hosts")) {
           menu.add(new qx.ui.menu.Separator());
@@ -854,12 +854,12 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         } else {
           menu.add(ops.menuButton(icon.movements, "Oturumsuz hareketler", () => this.__page.showMovements({ username: "-" })));
         }
-        if (key.startsWith("board:") && key.slice(i + 1)) {
+        if (key.startsWith("device:") && key.slice(i + 1)) {
           // Cihaz süzgecinde tek kayıtlı cihaz seçiliyse o cihazdaki, değilse bütün cihazlardaki hareketleri.
-          const name = this.__single("board");
-          const s = name && (this.__sessions || []).find(x => x.board_id && x.board === name);
+          const name = this.__single("device");
+          const s = name && (this.__sessions || []).find(x => x.device_id && x.device === name);
           menu.add(ops.menuButton(icon.movements, "Oturum hareketleri", () => this.__page.showMovements({
-            username: key.slice(i + 1), board_id: s ? s.board_id : undefined, board_name: s ? name : undefined
+            username: key.slice(i + 1), device_id: s ? s.device_id : undefined, device_name: s ? name : undefined
           })));
         }
       }
@@ -868,11 +868,11 @@ qx.Class.define("ankamon.ui.sessions.Users", {
 
     /**
      * Kayıtlı olmayan bilgisayarın oturum ve açık/kapalı kayıtlarını (isteğe bağlı ham loglarını) onay
-     * aldıktan sonra siler (DELETE /api/board-hosts — bkz. SessionsApi::deleteHost).
+     * aldıktan sonra siler (DELETE /api/device-hosts — bkz. SessionsApi::deleteHost).
      */
     async __deleteHost(host) {
       const esc = qx.bom.String.escape;
-      const count = (this.__sessions || []).filter(s => !s.board_id && s.host === host).length;
+      const count = (this.__sessions || []).filter(s => !s.device_id && s.host === host).length;
       const win = ankamon.ui.Dialog.window("Bilgisayarın kayıtlarını sil", 480);
       win.add(new qx.ui.basic.Label(
         `<b>${esc(host)}</b> Cihazlar'a kayıtlı değil. Bu bilgisayarın <b>${count} oturum kaydı</b> ve açık/kapalı ` +
@@ -897,10 +897,10 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         return;
       }
       try {
-        const res = await ankamon.io.Api.del("/board-hosts", { host, logs: logs.getValue() });
+        const res = await ankamon.io.Api.del("/device-hosts", { host, logs: logs.getValue() });
         this.__uptime = null;   // açık/kapalı aralıkları yeniden çekilsin
-        if (this.__single("board") === host) {
-          this.__setFilter("board", "");
+        if (this.__single("device") === host) {
+          this.__setFilter("device", "");
         }
         await this.__page.refresh();
         ankamon.ui.Dialog.alert(`<b>${esc(host)}</b>: ${res.sessions} oturum kaydı, ${res.uptime} açık/kapalı aralığı` +

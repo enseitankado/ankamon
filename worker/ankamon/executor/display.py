@@ -90,11 +90,11 @@ esac
 """
 
 
-def wake(board: dict, user: str, password: str) -> dict:
+def wake(device: dict, user: str, password: str) -> dict:
     """Döner: {"status", "rc", "output"} (bkz. accounts._ssh)."""
-    return _ssh(board, user, password, _WAKE_SCRIPT, timeout=20)
+    return _ssh(device, user, password, _WAKE_SCRIPT, timeout=20)
 
 
-def sleep(board: dict, user: str, password: str) -> dict:
+def sleep(device: dict, user: str, password: str) -> dict:
     """Ekran ▸ Uyut. Döner: {"status", "rc", "output"} (bkz. accounts._ssh)."""
-    return _ssh(board, user, password, _SLEEP_SCRIPT, timeout=20)
+    return _ssh(device, user, password, _SLEEP_SCRIPT, timeout=20)

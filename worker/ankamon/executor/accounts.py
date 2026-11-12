@@ -25,9 +25,9 @@
 
 """Cihazdaki kullanıcı hesaplarını listeler ve seçilen hesapla cihazda grafik oturum açar.
 
-Cihazlar/Ekranlar sağ menüsü "Oturum aç" (bkz. frontend ui/BoardOps.js loginMenu) iki görev türü kullanır:
+Cihazlar/Ekranlar sağ menüsü "Oturum aç" (bkz. frontend ui/DeviceOps.js loginMenu) iki görev türü kullanır:
   - "accounts": tek cihazdan hesap listesi (UID 1000-59999, kabuğu nologin/false olmayan yerel
-    hesaplar; GECOS'un ilk alanı tam ad). Sonuç boards.facts'e (accounts + accounts_at) yazılır,
+    hesaplar; GECOS'un ilk alanı tam ad). Sonuç devices.facts'e (accounts + accounts_at) yazılır,
     CACHE_SECONDS boyunca aynı cihaza tekrar bağlanılmaz. Çoklu seçimde menü listeyi ilk cihazdan alır.
   - "logout" ("Oturumu kapat"): seat0'daki kullanıcı oturumunu loginctl ile sonlandırır (kullanıcı adı
     verilirse o kullanıcının oturumunu — Oturumlar grid'i; verilmezse etkin olanı).
@@ -217,11 +217,11 @@ _SSH_OPTS = [
 ]
 
 
-def _ssh(board: dict, user: str, password: str, script: str, timeout: int) -> dict:
-    if not board.get("ip"):
+def _ssh(device: dict, user: str, password: str, script: str, timeout: int) -> dict:
+    if not device.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", f"ConnectTimeout={min(timeout, 8)}",
-           f"{user}@{board['ip']}", script]
+           f"{user}@{device['ip']}", script]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=timeout)
@@ -236,9 +236,9 @@ def _ssh(board: dict, user: str, password: str, script: str, timeout: int) -> di
     return {"status": "ok" if proc.returncode == 0 else "failed", "rc": proc.returncode, "output": out}
 
 
-def list_accounts(board: dict, user: str, password: str) -> dict:
+def list_accounts(device: dict, user: str, password: str) -> dict:
     """Döner: {"status", "rc", "output"} — başarılıysa output [{name, full_name}] JSON'u (ada göre sıralı)."""
-    res = _ssh(board, user, password, _LIST_SCRIPT, timeout=15)
+    res = _ssh(device, user, password, _LIST_SCRIPT, timeout=15)
     if res["status"] != "ok":
         return res
     accounts = []
@@ -250,28 +250,28 @@ def list_accounts(board: dict, user: str, password: str) -> dict:
     return {"status": "ok", "rc": 0, "output": json.dumps(accounts, ensure_ascii=False)}
 
 
-def cached(conn, board_id: int, cutoff_ts: int) -> list | None:
-    row = conn.execute("SELECT facts FROM boards WHERE id = %s", (board_id,)).fetchone()
+def cached(conn, device_id: int, cutoff_ts: int) -> list | None:
+    row = conn.execute("SELECT facts FROM devices WHERE id = %s", (device_id,)).fetchone()
     facts = (row or {}).get("facts") or {}
     if (facts.get("accounts_at") or 0) < cutoff_ts or not isinstance(facts.get("accounts"), list):
         return None
     return facts["accounts"]
 
 
-def invalidate(conn, board_id: int) -> None:
+def invalidate(conn, device_id: int) -> None:
     """Hesap listesi önbelleğini düşürür (ör. "Kullanıcı sil" sonrası): sonraki istek cihazdan yeniden okur."""
-    conn.execute("UPDATE boards SET facts = facts - 'accounts' - 'accounts_at' WHERE id = %s", (board_id,))
+    conn.execute("UPDATE devices SET facts = facts - 'accounts' - 'accounts_at' WHERE id = %s", (device_id,))
 
 
-def store(conn, board_id: int, accounts: list, ts: int) -> None:
-    conn.execute("UPDATE boards SET facts = facts || %s::jsonb WHERE id = %s",
-                 (json.dumps({"accounts": accounts, "accounts_at": ts}, ensure_ascii=False), board_id))
+def store(conn, device_id: int, accounts: list, ts: int) -> None:
+    conn.execute("UPDATE devices SET facts = facts || %s::jsonb WHERE id = %s",
+                 (json.dumps({"accounts": accounts, "accounts_at": ts}, ensure_ascii=False), device_id))
 
 
-def login(board: dict, user: str, password: str, username: str) -> dict:
+def login(device: dict, user: str, password: str, username: str) -> dict:
     if not USERNAME_RE.match(username or ""):
         return {"status": "failed", "rc": None, "output": "Geçersiz kullanıcı adı."}
-    return _ssh(board, user, password, _LOGIN_SCRIPT.replace("{user}", username), timeout=75)
+    return _ssh(device, user, password, _LOGIN_SCRIPT.replace("{user}", username), timeout=75)
 
 
 def _target(username: str | None) -> str | None:
@@ -280,15 +280,15 @@ def _target(username: str | None) -> str | None:
     return username if not username or USERNAME_RE.match(username) else None
 
 
-def logout(board: dict, user: str, password: str, username: str | None = None) -> dict:
+def logout(device: dict, user: str, password: str, username: str | None = None) -> dict:
     target = _target(username)
     if target is None:
         return {"status": "failed", "rc": None, "output": "Geçersiz kullanıcı adı."}
-    return _ssh(board, user, password, _LOGOUT_SCRIPT.replace("{user}", target), timeout=40)
+    return _ssh(device, user, password, _LOGOUT_SCRIPT.replace("{user}", target), timeout=40)
 
 
-def lock(board: dict, user: str, password: str, username: str | None = None) -> dict:
+def lock(device: dict, user: str, password: str, username: str | None = None) -> dict:
     target = _target(username)
     if target is None:
         return {"status": "failed", "rc": None, "output": "Geçersiz kullanıcı adı."}
-    return _ssh(board, user, password, _LOCK_SCRIPT.replace("{user}", target), timeout=30)
+    return _ssh(device, user, password, _LOCK_SCRIPT.replace("{user}", target), timeout=30)

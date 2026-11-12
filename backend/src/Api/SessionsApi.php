@@ -38,8 +38,8 @@ use Ankamon\Core\Storage;
 
 /**
  * Oturumlar — iki tür, tek listede (her satırda `kind`):
- *  - "board": cihaz (greeter) oturumları — worker/ankamon/tasks/board_sessions.py'nin lightdm PAM
- *    loglarından çıkardığı gerçek kullanıcı oturum açma/kapama kayıtları (bkz. 007_board_sessions.sql).
+ *  - "device": cihaz (greeter) oturumları — worker/ankamon/tasks/device_sessions.py'nin lightdm PAM
+ *    loglarından çıkardığı gerçek kullanıcı oturum açma/kapama kayıtları (bkz. 007_device_sessions.sql).
  *  - "webshell": Ankamon üzerinden açılan web terminal (SSH) oturumları; username Ankamon
  *    kullanıcısıdır (bkz. 011_webshell_sessions.sql, docker/rootfs/webssh-hook.py).
  * Silmede kimlikler türe göre ayrı gelir (ids / webshell_ids) — iki tablonun kimlikleri çakışabilir.
@@ -49,9 +49,9 @@ use Ankamon\Core\Storage;
 final class SessionsApi
 {
     // locked: sürmekte olan oturum ekran kilidinde mi — Cihazlar grid'iyle aynı kaynak (session_probe'un
-    // boards.session_* alanları, bkz. 012_board_session_state.sql). Yalnız cihazdaki etkin oturumun
+    // devices.session_* alanları, bkz. 012_device_session_state.sql). Yalnız cihazdaki etkin oturumun
     // kullanıcısı bu satırın kullanıcısıysa ve bilgi tazeyse (yoklama cihaz erişilebilirken 30 sn'de bir).
-    private const COLUMNS = "s.id, s.board_id, COALESCE(NULLIF(b.label, ''), s.host) AS board, s.host,
+    private const COLUMNS = "s.id, s.device_id, COALESCE(NULLIF(b.label, ''), s.host) AS device, s.host,
         s.username, s.uid,
         extract(epoch FROM s.started_at)::bigint AS started_at,
         extract(epoch FROM s.ended_at)::bigint AS ended_at,
@@ -64,23 +64,23 @@ final class SessionsApi
         $limit = $request->queryInt('limit', 5000, 1, 20000);
         $rows = Db::all(
             'SELECT ' . self::COLUMNS . '
-             FROM board_sessions s LEFT JOIN boards b ON b.id = s.board_id
+             FROM device_sessions s LEFT JOIN devices b ON b.id = s.device_id
              ORDER BY s.started_at DESC LIMIT ?',
             [$limit]
         );
         $shells = Db::all(
-            "SELECT w.id, w.board_id, COALESCE(NULLIF(b.label, ''), NULLIF(w.board_name, ''), w.ip) AS board, w.ip AS host,
+            "SELECT w.id, w.device_id, COALESCE(NULLIF(b.label, ''), NULLIF(w.device_name, ''), w.ip) AS device, w.ip AS host,
                     w.username, NULL::integer AS uid,
                     extract(epoch FROM w.started_at)::bigint AS started_at,
                     extract(epoch FROM w.ended_at)::bigint AS ended_at,
                     w.end_reason, NULL::text AS end_detail, false AS locked
-             FROM webshell_sessions w LEFT JOIN boards b ON b.id = w.board_id
+             FROM webshell_sessions w LEFT JOIN devices b ON b.id = w.device_id
              WHERE w.started_at IS NOT NULL
              ORDER BY w.started_at DESC LIMIT ?",
             [$limit]
         );
         foreach ($rows as &$row) {
-            $row['kind'] = 'board';
+            $row['kind'] = 'device';
         }
         foreach ($shells as &$row) {
             $row['kind'] = 'webshell';
@@ -105,7 +105,7 @@ final class SessionsApi
             throw ApiError::badRequest('Silinecek kayıt seçilmedi.');
         }
         $deleted = 0;
-        foreach (['board_sessions' => $ids, 'webshell_sessions' => $shellIds] as $table => $list) {
+        foreach (['device_sessions' => $ids, 'webshell_sessions' => $shellIds] as $table => $list) {
             if ($list) {
                 $placeholders = implode(',', array_fill(0, count($list), '?'));
                 $deleted += Db::exec("DELETE FROM $table WHERE id IN ($placeholders)", $list);
@@ -117,8 +117,8 @@ final class SessionsApi
 
     /**
      * Cihazlar'a kayıtlı OLMAYAN bir bilgisayarın (log gönderen ama eklenmemiş, ya da yeniden kurulup
-     * adı değişmiş eski cihaz) kayıtlarını siler: cihaza bağlanmamış oturumları (board_sessions,
-     * board_id NULL) ve açık/kapalı aralıklarını (board_uptime); `logs` verilirse ham loglarını da.
+     * adı değişmiş eski cihaz) kayıtlarını siler: cihaza bağlanmamış oturumları (device_sessions,
+     * device_id NULL) ve açık/kapalı aralıklarını (device_uptime); `logs` verilirse ham loglarını da.
      * Oturum/aralık çıkarıcıları loglarda kaldıkları yerden ilerlediği için silinenler geri gelmez —
      * bilgisayar log göndermeyi sürdürürse yalnız yeni kayıtlar oluşur.
      * Ad kayıtlı bir cihazın bilgisayar adıysa (eski, cihaza bağlanmamış oturum satırları) yalnız o
@@ -130,11 +130,11 @@ final class SessionsApi
         if ($host === '') {
             throw ApiError::badRequest('Bilgisayar seçilmedi.');
         }
-        $registered = Db::value('SELECT count(*) FROM boards WHERE lower(hostname) = lower(?)', [$host]) > 0;
+        $registered = Db::value('SELECT count(*) FROM devices WHERE lower(hostname) = lower(?)', [$host]) > 0;
         $withLogs = !$registered && (bool) $request->input('logs', false);
-        $statements = [['DELETE FROM board_sessions WHERE host = ? AND board_id IS NULL', [$host]]];
+        $statements = [['DELETE FROM device_sessions WHERE host = ? AND device_id IS NULL', [$host]]];
         if (!$registered) {
-            $statements[] = ['DELETE FROM board_uptime WHERE host = ?', [$host]];
+            $statements[] = ['DELETE FROM device_uptime WHERE host = ?', [$host]];
         }
         if ($withLogs) {
             // logs sıkıştırılmış chunk'larda durur: düz DELETE açma sınırına takılır (bkz. Storage).

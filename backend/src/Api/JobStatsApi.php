@@ -97,7 +97,7 @@ final class JobStatsApi
                  SELECT count(*) AS n, sum(pg_column_size(jt.*)) AS bytes,
                         array_to_json((array_agg(COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) ORDER BY b.id)
                             FILTER (WHERE b.id IS NOT NULL))[1:3]) AS names
-                 FROM job_targets jt LEFT JOIN boards b ON b.id = jt.board_id WHERE jt.job_id = j.id
+                 FROM job_targets jt LEFT JOIN devices b ON b.id = jt.device_id WHERE jt.job_id = j.id
              ) t ON true
              LEFT JOIN LATERAL (
                  SELECT count(*) AS n, sum(pg_column_size(ev.*)) AS bytes FROM job_events ev WHERE ev.job_id = j.id

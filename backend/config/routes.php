@@ -61,13 +61,13 @@ return [
 
     ['GET',    '/api/dashboard',         [Api\DashboardApi::class, 'summary'], 'dashboard'],
 
-    ['GET',    '/api/boards',            [Api\BoardsApi::class, 'index'],      'boards'],
-    ['POST',   '/api/boards',            [Api\BoardsApi::class, 'create'],     'boards.manage'],
-    ['GET',    '/api/boards/{id}',       [Api\BoardsApi::class, 'show'],       'boards'],
-    ['PATCH',  '/api/boards/{id}',       [Api\BoardsApi::class, 'update'],     'boards.manage'],
-    ['DELETE', '/api/boards/{id}',       [Api\BoardsApi::class, 'delete'],     'boards.manage'],
-    ['GET',    '/api/boards/{id}/shell', [Api\BoardsApi::class, 'shell'],      'shell'],
-    ['GET',    '/api/boards/{id}/filemanager', [Api\BoardsApi::class, 'filemanager'], 'filemanager'],
+    ['GET',    '/api/devices',            [Api\DevicesApi::class, 'index'],      'devices'],
+    ['POST',   '/api/devices',            [Api\DevicesApi::class, 'create'],     'devices.manage'],
+    ['GET',    '/api/devices/{id}',       [Api\DevicesApi::class, 'show'],       'devices'],
+    ['PATCH',  '/api/devices/{id}',       [Api\DevicesApi::class, 'update'],     'devices.manage'],
+    ['DELETE', '/api/devices/{id}',       [Api\DevicesApi::class, 'delete'],     'devices.manage'],
+    ['GET',    '/api/devices/{id}/shell', [Api\DevicesApi::class, 'shell'],      'shell'],
+    ['GET',    '/api/devices/{id}/filemanager', [Api\DevicesApi::class, 'filemanager'], 'filemanager'],
 
     // Ağ envanteri (sol menü "Ağ") — bkz. NetworkApi, worker/ankamon/netscan.
     ['GET',    '/api/network',               [Api\NetworkApi::class, 'index'],          'network'],
@@ -90,8 +90,8 @@ return [
 
     ['GET',    '/api/logs',              [Api\LogsApi::class, 'index'],        'logs'],
     ['GET',    '/api/command-logs',      [Api\CommandLogApi::class, 'index'],  'logs'],
-    ['GET',    '/api/board-sessions',    [Api\SessionsApi::class, 'index'],    'logs'],
-    ['GET',    '/api/board-uptime',      [Api\UptimeApi::class, 'index'],      'logs'],
+    ['GET',    '/api/device-sessions',    [Api\SessionsApi::class, 'index'],    'logs'],
+    ['GET',    '/api/device-uptime',      [Api\UptimeApi::class, 'index'],      'logs'],
     // Oturumlar ▸ Şampiyonlar Ligi: en uzun oturum süresi sıralamaları (bkz. SessionLeagueApi).
     ['GET',    '/api/session-league',    [Api\SessionLeagueApi::class, 'index'], 'logs'],
     // Oturumlar ▸ Teneffüs Ligi: ders aralarında açık kalan cihazlar (bkz. BreakLeagueApi).
@@ -105,9 +105,9 @@ return [
     ['PUT',    '/api/anomaly-kinds',     [Api\AnomaliesApi::class, 'updateKind'], 'admin'],
     ['PUT',    '/api/diagnose/interval', [Api\DiagnoseApi::class, 'setInterval'], 'admin'],
     // Cihaz sağlığı ▸ Durum: sürekli izleme + SSH denetimi bulguları tek biçimde (yetki içeride: anomalies / diagnose).
-    ['GET',    '/api/board-health',      [Api\BoardHealthApi::class, 'index'], 'user'],
-    ['DELETE', '/api/board-sessions',    [Api\SessionsApi::class, 'delete'],   'sessions.manage'],
-    ['DELETE', '/api/board-hosts',       [Api\SessionsApi::class, 'deleteHost'], 'sessions.hosts'],
+    ['GET',    '/api/device-health',      [Api\DeviceHealthApi::class, 'index'], 'user'],
+    ['DELETE', '/api/device-sessions',    [Api\SessionsApi::class, 'delete'],   'sessions.manage'],
+    ['DELETE', '/api/device-hosts',       [Api\SessionsApi::class, 'deleteHost'], 'sessions.hosts'],
     ['GET',    '/api/logs/stats',        [Api\LogStatsApi::class, 'stats'],    'logs'],
     ['DELETE', '/api/logs',              [Api\LogStatsApi::class, 'delete'],   'logs.manage'],
     // Loglar grid'inden dışlanan (önemsiz) mesajlar — kayıt silinmez, grid'de herkes için gizlenir.
@@ -167,8 +167,8 @@ return [
     ['GET',    '/api/system/database',   [Api\SystemInfoApi::class, 'database'], 'admin'],
     ['GET',    '/api/system/config',     [Api\SystemInfoApi::class, 'config'],   'admin'],
     ['GET',    '/api/system/software',   [Api\SoftwareApi::class, 'index'],   'admin'],
-    ['GET',    '/api/metrics/latest',    [Api\MetricsApi::class, 'latest'],    'boards'],
-    ['GET',    '/api/metrics/{id}/sensors', [Api\MetricsApi::class, 'sensors'], 'boards'],
+    ['GET',    '/api/metrics/latest',    [Api\MetricsApi::class, 'latest'],    'devices'],
+    ['GET',    '/api/metrics/{id}/sensors', [Api\MetricsApi::class, 'sensors'], 'devices'],
     ['GET',    '/api/metrics/info',      [Api\MetricsInfoApi::class, 'info'],  'metrics'],
     ['GET',    '/api/metrics/coverage',  [Api\MetricsApi::class, 'coverage'], 'metrics'],
 
@@ -180,7 +180,7 @@ return [
     ['GET',    '/api/jobs',              [Api\JobsApi::class, 'index'],        'user'],
     ['POST',   '/api/jobs',              [Api\JobsApi::class, 'create'],       'user'],
     ['GET',    '/api/jobs/{id}',         [Api\JobsApi::class, 'show'],         'user'],
-    ['GET',    '/api/home-backups/{id}', [Api\HomeBackupApi::class, 'download'], 'boards.backup'],
+    ['GET',    '/api/home-backups/{id}', [Api\HomeBackupApi::class, 'download'], 'devices.backup'],
     ['GET',    '/api/jobs/{id}/events',  [Api\JobsApi::class, 'events'],       'user'],
 
     ['GET',    '/api/features',          [Api\UsersApi::class, 'features'],    'admin'],

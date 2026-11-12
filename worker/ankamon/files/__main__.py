@@ -25,20 +25,20 @@
 
 """Dosya gezgini servisi: http://127.0.0.1:8895 (nginx /files-api/ → yetki: oturum + "filemanager").
 
-GET  /list?board=<id>&path=/home                  → {path, real, owner, group, mode, items:[…]}
-POST /delete  {board, paths:[…]}                 → {ok}
-POST /rename  {board, path, name}                → {ok, path}
-POST /mkdir   {board, path, name}                → {ok, path}
-POST /copy    {src_board, src_dir, names:[…], dst_board, dst_dir} → {id}
+GET  /list?device=<id>&path=/home                  → {path, real, owner, group, mode, items:[…]}
+POST /delete  {device, paths:[…]}                 → {ok}
+POST /rename  {device, path, name}                → {ok, path}
+POST /mkdir   {device, path, name}                → {ok, path}
+POST /copy    {src_device, src_dir, names:[…], dst_device, dst_dir} → {id}
 GET  /copy/<id>                                  → {state: running|done|failed|cancelled, bytes, total, message, …}
 POST /copy/<id>/cancel                           → {ok}
 
 Toplu dağıtma/toplama (bkz. bulk.py; işler yalnız başlatan kullanıcıya görünür):
-POST /bulk/users      {boards:[…]}                → {boards:[{id, name, users:[…]|error}], limit}
+POST /bulk/users      {devices:[…]}                → {devices:[{id, name, users:[…]|error}], limit}
 POST /bulk/upload                                 → {token}   (dağıtılacak dosyalar için yükleme alanı)
 PUT  /bulk/upload/<jeton>?path=<göreli yol>       ← dosya gövdesi (akış)
-POST /bulk/distribute {token, boards, users:{logged, names}, location:{kind, path}, conflict, relay} → {id}
-POST /bulk/collect    {boards, users, location, patterns:[…], excludes:[…], deep, skip_hidden, move, dry} → {id}
+POST /bulk/distribute {token, devices, users:{logged, names}, location:{kind, path}, conflict, relay} → {id}
+POST /bulk/collect    {devices, users, location, patterns:[…], excludes:[…], deep, skip_hidden, move, dry} → {id}
 GET  /bulk/<id>                                   → iş durumu (cihaz/hedef satırları, olaylar)
 POST /bulk/<id>/cancel | /bulk/<id>/discard | /bulk/<id>/resume | /bulk/<id>/revert
 GET  /bulk/<id>/archive?fmt=zip|tgz | /bulk/<id>/manifest | /bulk/<id>/file?path=…   (toplananlar)
@@ -64,7 +64,7 @@ import tornado.web
 
 from .. import activity, db
 from ..executor import home_restore
-from ..executor.jobs import _board_access
+from ..executor.jobs import _device_access
 from . import bulk, copy, remote
 from .remote import RemoteError
 
@@ -73,28 +73,28 @@ log = logging.getLogger("ankamon.files")
 PORT = int(os.environ.get("FILES_PORT", "8895"))
 
 
-def _access(board_id: int) -> dict:
+def _access(device_id: int) -> dict:
     with db.connect() as conn:
-        board = conn.execute(
+        device = conn.execute(
             "SELECT id, host(ip) AS ip, coalesce(nullif(label, ''), hostname, host(ip)) AS name"
-            " FROM boards WHERE id = %s", (board_id,),
+            " FROM devices WHERE id = %s", (device_id,),
         ).fetchone()
-        if not board or not board["ip"]:
+        if not device or not device["ip"]:
             raise RemoteError("Cihaz bulunamadı ya da IP adresi yok.")
-        user, password = _board_access(conn)
+        user, password = _device_access(conn)
     if not password:
         raise RemoteError("SSH parolası tanımlı değil (Ayarlar → SSH erişimi).")
-    return {"id": board["id"], "ip": board["ip"], "name": board["name"], "user": user, "password": password}
+    return {"id": device["id"], "ip": device["ip"], "name": device["name"], "user": user, "password": password}
 
 
-def _record(board: dict, username: str, text: str, ok: bool = True) -> None:
+def _record(device: dict, username: str, text: str, ok: bool = True) -> None:
     with db.connect() as conn:
         conn.execute(
-            "INSERT INTO command_log (board_id, board_name, username, source, command, status)"
+            "INSERT INTO command_log (device_id, device_name, username, source, command, status)"
             " VALUES (%s, %s, %s, 'files', %s, %s)",
-            (board["id"], board["name"], username or "—", text[:1000], "ok" if ok else "failed"),
+            (device["id"], device["name"], username or "—", text[:1000], "ok" if ok else "failed"),
         )
-        activity.record(conn, f"Dosyalar: {username or '—'} → {board['name']}: {text}"[:300],
+        activity.record(conn, f"Dosyalar: {username or '—'} → {device['name']}: {text}"[:300],
                         "warn" if ok else "error")
 
 
@@ -106,13 +106,13 @@ def _size(n: int) -> str:
     return str(n)
 
 
-class BoardFilesRequestHandler(tornado.web.RequestHandler):
+class DeviceFilesRequestHandler(tornado.web.RequestHandler):
     def prepare(self):
         if self.request.method in ("POST", "PUT") and self.request.headers.get("X-Requested-With") != "ankamon":
             raise tornado.web.HTTPError(403)
         self.user = self.request.headers.get("X-Auth-User", "")
 
-    def board_request_json(self) -> dict:
+    def device_request_json(self) -> dict:
         try:
             data = json.loads(self.request.body or b"{}")
         except ValueError:
@@ -121,17 +121,17 @@ class BoardFilesRequestHandler(tornado.web.RequestHandler):
             raise RemoteError("Geçersiz istek.")
         return data
 
-    async def resolve_board_access(self, value) -> dict:
+    async def resolve_device_access(self, value) -> dict:
         try:
-            board_id = int(value)
+            device_id = int(value)
         except (TypeError, ValueError):
             raise RemoteError("Geçersiz cihaz.")
-        return await asyncio.to_thread(_access, board_id)
+        return await asyncio.to_thread(_access, device_id)
 
     def write_error(self, status_code, **kwargs):
         self.write({"error": "İzin verilmedi." if status_code == 403 else "Sunucu hatası."})
 
-    async def respond_board_file_op(self, coro):
+    async def respond_device_file_op(self, coro):
         """RemoteError → 400 + Türkçe ileti; diğer hatalar 500 (günlüğe)."""
         try:
             self.write(await coro)
@@ -140,56 +140,56 @@ class BoardFilesRequestHandler(tornado.web.RequestHandler):
             self.write({"error": str(exc)})
 
 
-class BoardDirListHandler(BoardFilesRequestHandler):
+class DeviceDirListHandler(DeviceFilesRequestHandler):
     async def get(self):
         async def work():
-            board = await self.resolve_board_access(self.get_argument("board", ""))
-            return await remote.listdir(board, self.get_argument("path", "/home"))
-        await self.respond_board_file_op(work())
+            device = await self.resolve_device_access(self.get_argument("device", ""))
+            return await remote.listdir(device, self.get_argument("path", "/home"))
+        await self.respond_device_file_op(work())
 
 
-class BoardFileDeleteHandler(BoardFilesRequestHandler):
+class DeviceFileDeleteHandler(DeviceFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.board_request_json()
-            board = await self.resolve_board_access(data.get("board"))
+            data = self.device_request_json()
+            device = await self.resolve_device_access(data.get("device"))
             paths = [remote.check_path(p) for p in (data.get("paths") or [])][:500]
-            await remote.delete(board, paths)
+            await remote.delete(device, paths)
             shown = ", ".join(paths[:5]) + (f" … (+{len(paths) - 5})" if len(paths) > 5 else "")
-            await asyncio.to_thread(_record, board, self.user, f"silindi: {shown}")
+            await asyncio.to_thread(_record, device, self.user, f"silindi: {shown}")
             return {"ok": True}
-        await self.respond_board_file_op(work())
+        await self.respond_device_file_op(work())
 
 
-class BoardFileRenameHandler(BoardFilesRequestHandler):
+class DeviceFileRenameHandler(DeviceFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.board_request_json()
-            board = await self.resolve_board_access(data.get("board"))
+            data = self.device_request_json()
+            device = await self.resolve_device_access(data.get("device"))
             path = remote.check_path(data.get("path", ""))
-            target = await remote.rename(board, path, data.get("name", ""))
-            await asyncio.to_thread(_record, board, self.user, f"ad değiştirildi: {path} → {target}")
+            target = await remote.rename(device, path, data.get("name", ""))
+            await asyncio.to_thread(_record, device, self.user, f"ad değiştirildi: {path} → {target}")
             return {"ok": True, "path": target}
-        await self.respond_board_file_op(work())
+        await self.respond_device_file_op(work())
 
 
-class BoardDirCreateHandler(BoardFilesRequestHandler):
+class DeviceDirCreateHandler(DeviceFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.board_request_json()
-            board = await self.resolve_board_access(data.get("board"))
-            target = await remote.mkdir(board, data.get("path", ""), data.get("name", ""))
-            await asyncio.to_thread(_record, board, self.user, f"klasör oluşturuldu: {target}")
+            data = self.device_request_json()
+            device = await self.resolve_device_access(data.get("device"))
+            target = await remote.mkdir(device, data.get("path", ""), data.get("name", ""))
+            await asyncio.to_thread(_record, device, self.user, f"klasör oluşturuldu: {target}")
             return {"ok": True, "path": target}
-        await self.respond_board_file_op(work())
+        await self.respond_device_file_op(work())
 
 
-class BoardFileCopyHandler(BoardFilesRequestHandler):
+class DeviceFileCopyHandler(DeviceFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.board_request_json()
-            src = await self.resolve_board_access(data.get("src_board"))
-            dst = await self.resolve_board_access(data.get("dst_board"))
+            data = self.device_request_json()
+            src = await self.resolve_device_access(data.get("src_device"))
+            dst = await self.resolve_device_access(data.get("dst_device"))
             names = data.get("names") or []
             if not isinstance(names, list) or len(names) > 500:
                 raise RemoteError("Geçersiz seçim.")
@@ -206,10 +206,10 @@ class BoardFileCopyHandler(BoardFilesRequestHandler):
 
             job_id = copy.start(src, data.get("src_dir", ""), names, dst, data.get("dst_dir", ""), done)
             return {"id": job_id}
-        await self.respond_board_file_op(work())
+        await self.respond_device_file_op(work())
 
 
-class CopyStatusHandler(BoardFilesRequestHandler):
+class CopyStatusHandler(DeviceFilesRequestHandler):
     def get(self, job_id: str):
         job = copy.jobs.get(int(job_id))
         if not job:
@@ -219,13 +219,13 @@ class CopyStatusHandler(BoardFilesRequestHandler):
         self.write(copy.public(job))
 
 
-class CopyCancelHandler(BoardFilesRequestHandler):
+class CopyCancelHandler(DeviceFilesRequestHandler):
     def post(self, job_id: str):
         self.write({"ok": copy.cancel(int(job_id))})
 
 
-def _board_ids(data: dict) -> list[int]:
-    ids = data.get("boards") or []
+def _device_ids(data: dict) -> list[int]:
+    ids = data.get("devices") or []
     if not isinstance(ids, list) or not ids or len(ids) > 2000:
         raise RemoteError("Cihaz seçilmedi.")
     try:
@@ -238,35 +238,35 @@ async def _accesses(ids: list[int]) -> list[dict]:
     return [await asyncio.to_thread(_access, i) for i in ids]
 
 
-class BulkUsersHandler(BoardFilesRequestHandler):
+class BulkUsersHandler(DeviceFilesRequestHandler):
     async def post(self):
         async def work():
-            boards = await _accesses(_board_ids(self.board_request_json()))
+            devices = await _accesses(_device_ids(self.device_request_json()))
             sem = asyncio.Semaphore(bulk.parallel_limit())
 
             async def one(b):
                 async with sem:
                     try:
-                        return {"id": b["id"], "name": b["name"], "users": await asyncio.to_thread(bulk.board_users, b)}
+                        return {"id": b["id"], "name": b["name"], "users": await asyncio.to_thread(bulk.device_users, b)}
                     except RemoteError as exc:
                         return {"id": b["id"], "name": b["name"], "error": str(exc)}
-            return {"boards": await asyncio.gather(*(one(b) for b in boards)), "limit": bulk.parallel_limit()}
-        await self.respond_board_file_op(work())
+            return {"devices": await asyncio.gather(*(one(b) for b in devices)), "limit": bulk.parallel_limit()}
+        await self.respond_device_file_op(work())
 
 
-class BulkUploadHandler(BoardFilesRequestHandler):
+class BulkUploadHandler(DeviceFilesRequestHandler):
     async def post(self):
         async def work():
             try:
-                total = int(self.board_request_json().get("total") or 0)
+                total = int(self.device_request_json().get("total") or 0)
             except (TypeError, ValueError):
                 total = 0
             return {"token": bulk.new_upload(self.user, total)}
-        await self.respond_board_file_op(work())
+        await self.respond_device_file_op(work())
 
 
 @tornado.web.stream_request_body
-class BulkUploadFileHandler(BoardFilesRequestHandler):
+class BulkUploadFileHandler(DeviceFilesRequestHandler):
     def prepare(self):
         super().prepare()
         self.request.connection.set_max_body_size(1 << 40)
@@ -296,9 +296,9 @@ class BulkUploadFileHandler(BoardFilesRequestHandler):
 
 
 @tornado.web.stream_request_body
-class HomeRestoreUploadHandler(BoardFilesRequestHandler):
+class HomeRestoreUploadHandler(DeviceFilesRequestHandler):
     """ "Yedekle/Geri al" ▸ Geri al: yedek dosyası akışla diske iner, hesap bilgisi okunup özeti döner (gizli
-    alanlar dönmez). Yetki nginx'te ("boards.restore", /home-restore-api/); iş sonra "restore_home" görevidir."""
+    alanlar dönmez). Yetki nginx'te ("devices.restore", /home-restore-api/); iş sonra "restore_home" görevidir."""
 
     def prepare(self):
         super().prepare()
@@ -342,7 +342,7 @@ def _bulk_record(owner: str):
         opts = job["options"]
         if opts.get("dry"):
             return   # önizleme: cihazda hiçbir şey değişmedi, kayda gerek yok
-        for row in job["boards"]:
+        for row in job["devices"]:
             if row["state"] in ("skipped", "cancelled") and not row["targets"]:
                 continue
             who = ", ".join(t["user"] or t["dir"] for t in row["targets"][:6])
@@ -357,25 +357,25 @@ def _bulk_record(owner: str):
     return done
 
 
-class BulkDistributeHandler(BoardFilesRequestHandler):
+class BulkDistributeHandler(DeviceFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.board_request_json()
-            boards = await _accesses(_board_ids(data))
+            data = self.device_request_json()
+            devices = await _accesses(_device_ids(data))
             users = bulk.check_selection(data.get("users"))
             location = bulk.check_location(data.get("location"))
             prepared = await asyncio.to_thread(bulk.prepare_distribute, self.user, str(data.get("token") or ""))
-            return {"id": bulk.start_distribute(self.user, prepared, boards, users, location,
+            return {"id": bulk.start_distribute(self.user, prepared, devices, users, location,
                                                 data.get("conflict", "overwrite"), _bulk_record(self.user),
                                                 relay=bool(data.get("relay", True)))}
-        await self.respond_board_file_op(work())
+        await self.respond_device_file_op(work())
 
 
-class BulkCollectHandler(BoardFilesRequestHandler):
+class BulkCollectHandler(DeviceFilesRequestHandler):
     async def post(self):
         async def work():
-            data = self.board_request_json()
-            boards = await _accesses(_board_ids(data))
+            data = self.device_request_json()
+            devices = await _accesses(_device_ids(data))
             users = bulk.check_selection(data.get("users"))
             location = bulk.check_location(data.get("location"))
             patterns = data.get("patterns") or []
@@ -384,14 +384,14 @@ class BulkCollectHandler(BoardFilesRequestHandler):
             excludes = data.get("excludes") or []
             if not isinstance(excludes, list):
                 raise RemoteError("Geçersiz hariç tutma.")
-            return {"id": bulk.start_collect(self.user, boards, users, location, patterns,
+            return {"id": bulk.start_collect(self.user, devices, users, location, patterns,
                                              bool(data.get("move")), _bulk_record(self.user), excludes=excludes,
                                              deep=bool(data.get("deep")), skip_hidden=bool(data.get("skip_hidden")),
                                              dry=bool(data.get("dry")))}
-        await self.respond_board_file_op(work())
+        await self.respond_device_file_op(work())
 
 
-class BulkJobHandler(BoardFilesRequestHandler):
+class BulkJobHandler(DeviceFilesRequestHandler):
     def job(self, job_id: str) -> dict:
         job = bulk.get(int(job_id), self.user)
         if not job:
@@ -439,7 +439,7 @@ class BulkRevertHandler(BulkJobHandler):
 
 
 def _record_revert(job: dict, user: str, res: dict) -> None:
-    for b in job["boards"]:
+    for b in job["devices"]:
         if any(t.get("message", "").startswith("Geri alındı") for t in b["targets"]):
             _record({"id": b["id"], "name": b["name"]}, user,
                     f"dağıtma geri alındı (iptal sonrası): kopyalanan öğeler {job['options']['location_text']} konumundan silindi")
@@ -512,11 +512,11 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     os.makedirs(remote.CM_DIR, mode=0o700, exist_ok=True)
     app = tornado.web.Application([
-        (r"/list", BoardDirListHandler),
-        (r"/delete", BoardFileDeleteHandler),
-        (r"/rename", BoardFileRenameHandler),
-        (r"/mkdir", BoardDirCreateHandler),
-        (r"/copy", BoardFileCopyHandler),
+        (r"/list", DeviceDirListHandler),
+        (r"/delete", DeviceFileDeleteHandler),
+        (r"/rename", DeviceFileRenameHandler),
+        (r"/mkdir", DeviceDirCreateHandler),
+        (r"/copy", DeviceFileCopyHandler),
         (r"/copy/(\d+)", CopyStatusHandler),
         (r"/copy/(\d+)/cancel", CopyCancelHandler),
         (r"/home-restore/upload", HomeRestoreUploadHandler),

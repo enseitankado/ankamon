@@ -77,10 +77,10 @@ final class JobsApi
         }
         unset($job['created_by_id']);
         $job['targets'] = Db::all(
-            "SELECT t.board_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS board, host(b.ip) AS ip,
+            "SELECT t.device_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS device, host(b.ip) AS ip,
                     t.status, t.exit_code, t.output
-             FROM job_targets t JOIN boards b ON b.id = t.board_id
-             WHERE t.job_id = ? ORDER BY board",
+             FROM job_targets t JOIN devices b ON b.id = t.device_id
+             WHERE t.job_id = ? ORDER BY device",
             [$job['id']]
         );
         return ['job' => $job];
@@ -104,15 +104,15 @@ final class JobsApi
         unset($job['created_by']);
         $after = max(0, (int) $request->query('after', '0'));
         $events = Db::all(
-            'SELECT id, board_id, kind, text, (extract(epoch FROM time) * 1000)::bigint AS t
+            'SELECT id, device_id, kind, text, (extract(epoch FROM time) * 1000)::bigint AS t
              FROM job_events WHERE job_id = ? AND id > ? ORDER BY id LIMIT 2000',
             [$job['id'], $after]
         );
         $targets = Db::all(
-            "SELECT t.board_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS board, host(b.ip) AS ip,
+            "SELECT t.device_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS device, host(b.ip) AS ip,
                     t.status, t.exit_code
-             FROM job_targets t JOIN boards b ON b.id = t.board_id
-             WHERE t.job_id = ? ORDER BY board",
+             FROM job_targets t JOIN devices b ON b.id = t.device_id
+             WHERE t.job_id = ? ORDER BY device",
             [$job['id']]
         );
         return ['job' => $job, 'targets' => $targets, 'events' => $events];
@@ -121,23 +121,23 @@ final class JobsApi
     public function create(Request $request, array $user): array
     {
         $type = (string) $request->input('type', '');
-        [$feature, $title, $params, $needsBoards] = match ($type) {
+        [$feature, $title, $params, $needsDevices] = match ($type) {
             'action' => $this->actionJob($request),
             'command' => $this->commandJob($request),
             'wol' => ['power', 'Uyandır (Wake-on-LAN)', [], true],
             // "screen" yetkisiyle: Ekranlar sekmesindeki önizlemelerin sağ menüsünden tetiklenir
             // (bkz. worker/ankamon/executor/whoami.py) — cihazda o an oturum açmış GERÇEK kullanıcıyı
-            // SSH ile anlık sorgular (board_sessions'ın log tabanlı, bazen bayat kaydına güvenmez).
+            // SSH ile anlık sorgular (device_sessions'ın log tabanlı, bazen bayat kaydına güvenmez).
             'whoami' => ['screen', 'Oturumları sorgula', [], true],
             // "Bilgi kartı" (Cihazlar grid'i VE Ekranlar sekmesi sağ menüsü — bkz. frontend
-            // ui/BoardOps.js infoCard): donanım bilgisini (disk/RAM/BIOS/çekirdek/anakart) SSH ile
+            // ui/DeviceOps.js infoCard): donanım bilgisini (disk/RAM/BIOS/çekirdek/anakart) SSH ile
             // canlı toplar, 60dk önbellek (bkz. worker/ankamon/executor/hwfacts.py). Her iki girişten
-            // de erişilebildiğinden yetki denetimi aşağıda özel: 'boards' YA DA 'screen' yeterli.
-            'facts' => ['boards', 'Donanım bilgisi', [], true],
-            // Sağ menü "Oturum aç" (bkz. frontend ui/BoardOps.js loginMenu, worker executor/accounts.py):
+            // de erişilebildiğinden yetki denetimi aşağıda özel: 'devices' YA DA 'screen' yeterli.
+            'facts' => ['devices', 'Donanım bilgisi', [], true],
+            // Sağ menü "Oturum aç" (bkz. frontend ui/DeviceOps.js loginMenu, worker executor/accounts.py):
             // hesap listesi (24 sa önbellek, çoklu seçimde ilk cihazdan) ve seçilen hesapla oturum açma.
             // Hesap listesi hem "Oturum aç" hem "Yedekle" alt menüsünü besler: yetki aşağıda özel.
-            'accounts' => ['boards.login', 'Cihazdaki hesaplar', [], true],
+            'accounts' => ['devices.login', 'Cihazdaki hesaplar', [], true],
             // "Sorun tespiti" sayfası (bkz. frontend page/Diagnose.js, worker executor/diagnose.py).
             'diagnose' => ['diagnose', 'Sorun tespiti', [], true],
             'login' => $this->loginJob($request),
@@ -175,15 +175,15 @@ final class JobsApi
             'relay_start' => $this->relayJob($request),
             'relay_stop' => ['screen.relay', 'Ekran aktarımını durdur', [], true],
             // Yedekle/Geri al penceresindeki hesap boyutları (bkz. worker executor/homesize.py).
-            'home_sizes' => ['boards.backup', 'Ev dizini boyutları', [], true],
-            // Parola ayarla ▸ Yönetici hesapları (bkz. worker executor/board_password.py): yetki aşağıda hesaba göre.
-            'password_status' => ['boards.passwords', 'Yönetici parolası durumu', [], true],
+            'home_sizes' => ['devices.backup', 'Ev dizini boyutları', [], true],
+            // Parola ayarla ▸ Yönetici hesapları (bkz. worker executor/device_password.py): yetki aşağıda hesaba göre.
+            'password_status' => ['devices.passwords', 'Yönetici parolası durumu', [], true],
             'password_verify' => $this->adminPasswordJob($request, false),
             'password_change' => $this->adminPasswordJob($request, true),
             // Sağ menü "Web sitesi aç" (bkz. worker executor/open_url.py).
             'open_url' => $this->openUrlJob($request),
-            // Sağ menü "Web Filtre" (bkz. worker executor/eta_kisit_webfilter.py, frontend ui/boards/EtaKisitWebFilter.js).
-            'webfilter_status' => ['boards.webfilter', 'Web Filtre durumu', [], true],
+            // Sağ menü "Web Filtre" (bkz. worker executor/eta_kisit_webfilter.py, frontend ui/devices/EtaKisitWebFilter.js).
+            'webfilter_status' => ['devices.webfilter', 'Web Filtre durumu', [], true],
             'webfilter_apply' => $this->webFilterJob($request),
             // Anomaliler ▸ Bildirimler ▸ Deneme gönder (cihazsız; bkz. worker executor/ntfy.py).
             'ntfy_test' => ['anomalies.notify', 'ntfy deneme bildirimi', [], false],
@@ -192,12 +192,12 @@ final class JobsApi
             default => throw ApiError::badRequest('Bilinmeyen görev türü.'),
         };
         if ($type === 'facts') {
-            if (!Auth::can($user, 'boards') && !Auth::can($user, 'screen')) {
+            if (!Auth::can($user, 'devices') && !Auth::can($user, 'screen')) {
                 throw ApiError::forbidden();
             }
         } elseif ($type === 'accounts') {
             // Hesap listesi: Oturum aç, Yedekle/Geri al, Kullanıcı sil ve Parola ayarla pencerelerini besler.
-            $any = array_filter(['boards.login', 'boards.backup', 'boards.users', 'boards.passwords'],
+            $any = array_filter(['devices.login', 'devices.backup', 'devices.users', 'devices.passwords'],
                 static fn(string $f) => Auth::can($user, $f));
             if (!$any) {
                 throw ApiError::forbidden();
@@ -210,36 +210,36 @@ final class JobsApi
         if ($type === 'action' && $params['action'] === 'user-password') {
             $names = preg_split('/[\s,]+/', strtolower((string) $params['values']['KULLANICILAR']), -1, PREG_SPLIT_NO_EMPTY);
             foreach (self::ADMIN_ACCOUNTS as $account) {
-                if (in_array($account, $names, true) && !Auth::can($user, "boards.passwords.$account")) {
+                if (in_array($account, $names, true) && !Auth::can($user, "devices.passwords.$account")) {
                     throw ApiError::forbidden("$account parolasını ayarlama yetkiniz yok.");
                 }
             }
         }
 
         if (in_array($type, ['password_verify', 'password_change'], true)
-            && !Auth::can($user, 'boards.passwords.' . $params['account'])) {
+            && !Auth::can($user, 'devices.passwords.' . $params['account'])) {
             throw ApiError::forbidden($params['account'] . ' parolasını ayarlama yetkiniz yok.');
         }
 
-        $boardIds = array_values(array_unique(array_map('intval', (array) $request->input('board_ids', []))));
+        $deviceIds = array_values(array_unique(array_map('intval', (array) $request->input('device_ids', []))));
         // Sorun tespiti sayfasının "Şimdi tara"sı cihaz seçmez: o an çevrimiçi TÜM cihazlar.
-        if ($type === 'diagnose' && !$boardIds && $request->input('all_online')) {
-            $boardIds = array_map('intval', array_column(
-                Db::all('SELECT id FROM boards WHERE online AND ip IS NOT NULL'), 'id'));
-            if (!$boardIds) {
+        if ($type === 'diagnose' && !$deviceIds && $request->input('all_online')) {
+            $deviceIds = array_map('intval', array_column(
+                Db::all('SELECT id FROM devices WHERE online AND ip IS NOT NULL'), 'id'));
+            if (!$deviceIds) {
                 throw ApiError::badRequest('Şu an çevrimiçi cihaz yok; denetim için cihazların açık olması gerekir.');
             }
         }
-        if ($needsBoards && !$boardIds) {
+        if ($needsDevices && !$deviceIds) {
             throw ApiError::badRequest('En az bir cihaz seçin.');
         }
-        if (in_array($type, ['password_verify', 'password_change'], true) && count($boardIds) !== 1) {
+        if (in_array($type, ['password_verify', 'password_change'], true) && count($deviceIds) !== 1) {
             throw ApiError::badRequest('Yönetici parolası cihaz başına ayrı ayarlanır: tek cihaz seçin.');
         }
         if ($type === 'relay_start') {
             // Kaynak cihaz hedef olamaz: kendi ekranını kendine aktarmak anlamsız (görüntü döngüye girer).
-            $boardIds = array_values(array_diff($boardIds, [$params['source_board_id']]));
-            if (!$boardIds) {
+            $deviceIds = array_values(array_diff($deviceIds, [$params['source_device_id']]));
+            if (!$deviceIds) {
                 throw ApiError::badRequest('Kaynak cihazdan başka en az bir hedef cihaz seçin.');
             }
         }
@@ -250,10 +250,10 @@ final class JobsApi
             'INSERT INTO jobs (type, title, params, created_by) VALUES (?, ?, ?::jsonb, ?) RETURNING id',
             [$type, $title, json_encode($params ?: new \stdClass(), JSON_UNESCAPED_UNICODE), $user['id']]
         );
-        if ($needsBoards) {
+        if ($needsDevices) {
             $added = Db::exec(
-                'INSERT INTO job_targets (job_id, board_id) SELECT ?, id FROM boards WHERE id = ANY(?::int[])',
-                [$jobId, '{' . implode(',', $boardIds) . '}']
+                'INSERT INTO job_targets (job_id, device_id) SELECT ?, id FROM devices WHERE id = ANY(?::int[])',
+                [$jobId, '{' . implode(',', $deviceIds) . '}']
             );
             if ($added === 0) {
                 $pdo->rollBack();
@@ -265,14 +265,14 @@ final class JobsApi
 
         $logged = $type === 'action' ? Actions::redactParams($params) : $params; // parola denetim kaydına yazılmaz
         unset($logged['current'], $logged['new']);                               // (yönetici parolası görevleri)
-        Audit::log($user, $request, 'job.create', $title, ['job_id' => $jobId, 'boards' => $boardIds] + $logged);
+        Audit::log($user, $request, 'job.create', $title, ['job_id' => $jobId, 'devices' => $deviceIds] + $logged);
         return ['id' => $jobId];
     }
 
     /** "Kullanıcı sil" ile asla silinmeyen cihaz hesapları (bkz. actionJob, actions/user-delete/run.sh). */
     private const UNDELETABLE_USERS = ['etapadmin', 'root'];
 
-    /** Parolası ayrı yetkiyle ("boards.passwords.<hesap>") ayarlanabilen cihaz hesapları (bkz. create). */
+    /** Parolası ayrı yetkiyle ("devices.passwords.<hesap>") ayarlanabilen cihaz hesapları (bkz. create). */
     private const ADMIN_ACCOUNTS = ['etapadmin', 'root'];
 
     private function actionJob(Request $request): array
@@ -335,7 +335,7 @@ final class JobsApi
         if (!preg_match('/^[a-z_][a-z0-9_.-]{0,31}$/', $username)) {
             throw ApiError::badRequest('Geçersiz kullanıcı adı.');
         }
-        return ['boards.login', "Oturum aç: $username", ['username' => $username], true];
+        return ['devices.login', "Oturum aç: $username", ['username' => $username], true];
     }
 
     /** logout/lock: kullanıcı adı boş (= cihazdaki etkin oturum) ya da loginJob ile AYNI kurala uyan bir ad. */
@@ -343,12 +343,12 @@ final class JobsApi
     {
         $username = (string) $request->input('username', '');
         if ($username === '') {
-            return ['boards.login', $title, [], true];
+            return ['devices.login', $title, [], true];
         }
         if (!preg_match('/^[a-z_][a-z0-9_.-]{0,31}$/', $username)) {
             throw ApiError::badRequest('Geçersiz kullanıcı adı.');
         }
-        return ['boards.login', "$title: $username", ['username' => $username], true];
+        return ['devices.login', "$title: $username", ['username' => $username], true];
     }
 
     /** Yayın adı cihazdaki RTSP adresine girer: worker executor/cast.STREAM_RE ve MediaMTX okuma kuralıyla AYNI. */
@@ -420,7 +420,7 @@ final class JobsApi
             throw ApiError::badRequest('Adres listesi boş.');
         }
         $title = 'Web Filtre: ' . $labels[$mode] . ($mode === 'off' ? '' : ' (' . count($params[$mode]) . ' adres)');
-        return ['boards.webfilter', $title, $params, true];
+        return ['devices.webfilter', $title, $params, true];
     }
 
     /** Klavye/fare/dokunmatik kilidi: aygıt ve yön (bkz. worker executor/inputlock.py). */
@@ -438,14 +438,14 @@ final class JobsApi
     /** Ekran aktarımı: görev hedefleri gösterecek cihazlar; yayın adı burada üretilir (MediaMTX okuma/yazma kuralı r-…). */
     private function relayJob(Request $request): array
     {
-        $source = (int) $request->input('source_board_id', 0);
-        $board = Db::one("SELECT id, COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name, online FROM boards WHERE id = ?", [$source])
+        $source = (int) $request->input('source_device_id', 0);
+        $device = Db::one("SELECT id, COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name, online FROM devices WHERE id = ?", [$source])
             ?? throw ApiError::badRequest('Kaynak cihaz bulunamadı.');
-        if (!$board['online']) {
+        if (!$device['online']) {
             throw ApiError::badRequest('Kaynak cihaz çevrimdışı.');
         }
-        return ['screen.relay', 'Ekranı aktar: ' . $board['name'],
-            ['source_board_id' => $source, 'stream' => 'r-' . bin2hex(random_bytes(16))], true];
+        return ['screen.relay', 'Ekranı aktar: ' . $device['name'],
+            ['source_device_id' => $source, 'stream' => 'r-' . bin2hex(random_bytes(16))], true];
     }
 
     /**
@@ -469,12 +469,12 @@ final class JobsApi
             if ($new === '' || $new !== trim($new)) {
                 throw ApiError::badRequest('Yeni parola boş olamaz, boşlukla başlayıp bitemez.');
             }
-            return ['boards.passwords', "Yönetici parolasını değiştir: $account", ['account' => $account, 'current' => $current, 'new' => $new], true];
+            return ['devices.passwords', "Yönetici parolasını değiştir: $account", ['account' => $account, 'current' => $current, 'new' => $new], true];
         }
         if ($current === '') {
             throw ApiError::badRequest('Mevcut parolayı girin.');
         }
-        return ['boards.passwords', "Mevcut parolayı doğrula: $account", ['account' => $account, 'current' => $current], true];
+        return ['devices.passwords', "Mevcut parolayı doğrula: $account", ['account' => $account, 'current' => $current], true];
     }
 
     /** Taranacak anomali türleri: yalnız anlık taranabilenler (AnomaliesApi::scannable). */
@@ -504,7 +504,7 @@ final class JobsApi
         }
         $usernames = array_values(array_unique($usernames));
         $shown = implode(', ', array_slice($usernames, 0, 5)) . (count($usernames) > 5 ? ' …' : '');
-        return ['boards.backup', "Yedekle: $shown ev dizini", ['usernames' => $usernames], true];
+        return ['devices.backup', "Yedekle: $shown ev dizini", ['usernames' => $usernames], true];
     }
 
     /** Dosyanın içeriği (hesap, güvenlik denetimleri) worker'da doğrulanır (bkz. executor/home_restore.py). */
@@ -518,6 +518,6 @@ final class JobsApi
         if (!preg_match('/^[a-z_][a-z0-9_.-]{0,31}$/', $username)) {
             throw ApiError::badRequest('Geçersiz kullanıcı adı.');
         }
-        return ['boards.restore', "Geri al: $username", ['token' => $token, 'overwrite' => (bool) $request->input('overwrite', false)], true];
+        return ['devices.restore', "Geri al: $username", ['token' => $token, 'overwrite' => (bool) $request->input('overwrite', false)], true];
     }
 }

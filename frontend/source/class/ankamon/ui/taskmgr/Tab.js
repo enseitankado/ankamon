@@ -41,7 +41,7 @@ qx.Class.define("ankamon.ui.taskmgr.Tab", {
 
   statics: {
     /** Çok cihazlı pencerede bütün tablolarda "Bilgisayar" sütunu (modelde son sütun — bkz. _table). */
-    BOARD_COLUMN: { id: "board", label: "Bilgisayar", width: 180 }
+    DEVICE_COLUMN: { id: "device", label: "Bilgisayar", width: 180 }
   },
 
   /**
@@ -91,8 +91,8 @@ qx.Class.define("ankamon.ui.taskmgr.Tab", {
      */
     _table(columns, key, model = null) {
       model = model || new qx.ui.table.model.Simple();
-      const boardCol = ankamon.ui.taskmgr.Tab.BOARD_COLUMN;
-      const all = columns.concat([boardCol]);
+      const deviceCol = ankamon.ui.taskmgr.Tab.DEVICE_COLUMN;
+      const all = columns.concat([deviceCol]);
       model.setColumns(["id"].concat(all.map(c => c.label)), ["id"].concat(all.map(c => c.id)));
       const table = new qx.ui.table.Table(model, {
         tableColumnModel: obj => new qx.ui.table.columnmodel.Resize(obj)
@@ -112,19 +112,19 @@ qx.Class.define("ankamon.ui.taskmgr.Tab", {
       // "Bilgisayar" (son sütun): çok cihazda kullanıcı sütunu, varsayılan yeri ilk sütunun (Ad) hemen yanı
       // (kayıtlı sütun sırası varsa o geçerli; kayıtta yoksa sona eklenir). Tek cihazda gizli iç sütun (sütun
       // menüsünde yok, tercihlere yazılmaz).
-      const boardIndex = columns.length + 1;
-      behavior.setWidth(boardIndex, boardCol.width);
+      const deviceIndex = columns.length + 1;
+      behavior.setWidth(deviceIndex, deviceCol.width);
       if (this._win.isMulti()) {
         // Sıra, setupColumnLayout'tan ÖNCE: henüz dinleyici yok, bu varsayılan sıra tercihlere yazılmaz.
-        cm.setColumnsOrder([0, 1, boardIndex].concat(columns.slice(1).map((c, i) => i + 2)));
+        cm.setColumnsOrder([0, 1, deviceIndex].concat(columns.slice(1).map((c, i) => i + 2)));
         // Kayıtlı sıra (tek cihazlı pencerede sürüklenmiş) "Bilgisayar"ı bilmiyorsa sona değil, kayıttaki ilk
         // sütunun yanına girsin: kayıt yalnız bellekte, kurulum süresince genişletilir (sunucuya yazılmaz).
         const prefs = this._win.getUser().ui_prefs || {};
         const orderKey = `${key}.columns.order`;
         const saved = prefs[orderKey];
-        const widen = Array.isArray(saved) && saved.length && !saved.includes(boardCol.id);
+        const widen = Array.isArray(saved) && saved.length && !saved.includes(deviceCol.id);
         if (widen) {
-          prefs[orderKey] = saved.slice(0, 1).concat([boardCol.id], saved.slice(1));
+          prefs[orderKey] = saved.slice(0, 1).concat([deviceCol.id], saved.slice(1));
         }
         try {
           ankamon.page.Base.setupColumnLayout(table, all, 1, `${key}.columns`, this._win.getUser());
@@ -134,7 +134,7 @@ qx.Class.define("ankamon.ui.taskmgr.Tab", {
           }
         }
       } else {
-        cm.setColumnVisible(boardIndex, false);
+        cm.setColumnVisible(deviceIndex, false);
         ankamon.page.Base.setupColumnLayout(table, columns, 1, `${key}.columns`, this._win.getUser());
       }
       // Sütun süzgeçleri + hazır değer listeleri (bütün grid'ler gibi; kimlik sütunu 0 hariç, "Bilgisayar" dahil).
@@ -188,17 +188,17 @@ qx.Class.define("ankamon.ui.taskmgr.Tab", {
         }
         let menu = id === null ? null : build(id);
         const parsed = this._win.isMulti() && id !== null ? this._parseId(id) : null;
-        if (parsed || (this._win.isMulti() && this._win.hasBoardFilter())) {
+        if (parsed || (this._win.isMulti() && this._win.hasDeviceFilter())) {
           menu = menu || new qx.ui.menu.Menu();
           if (menu.getChildren().length) {
             menu.add(new qx.ui.menu.Separator());
           }
           if (parsed) {
             this._item(menu, `Yalnız bu bilgisayarı göster (${parsed.link.getDisplay()})`,
-              () => this._win.setBoardFilter([parsed.link.getId()]));
+              () => this._win.setDeviceFilter([parsed.link.getId()]));
           }
-          if (this._win.hasBoardFilter()) {
-            this._item(menu, "Bütün bilgisayarları göster", () => this._win.setBoardFilter([]));
+          if (this._win.hasDeviceFilter()) {
+            this._item(menu, "Bütün bilgisayarları göster", () => this._win.setDeviceFilter([]));
           }
         }
         const old = table.getContextMenu();

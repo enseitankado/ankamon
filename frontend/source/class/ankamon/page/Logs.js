@@ -79,16 +79,16 @@ qx.Class.define("ankamon.page.Logs", {
     __body: null,
     __tabs: null,
     __mode: null,
-    __board: null,
+    __device: null,
     __range: null,
     __query: null,
     __extra: null,
     __table: null,
     __status: null,
-    __boardItems: null,
+    __deviceItems: null,
     __hostLabel: null,
-    __pendingBoardId: null,
-    __boardFilled: false,
+    __pendingDeviceId: null,
+    __deviceFilled: false,
     __seq: 0,
     __records: null,
     __page: 0,
@@ -132,18 +132,18 @@ qx.Class.define("ankamon.page.Logs", {
     },
 
     /**
-     * Boards grid'inin satır menüsündeki "Logları göster" ve Genel bakış'taki hata/görev satırlarının
+     * Devices grid'inin satır menüsündeki "Logları göster" ve Genel bakış'taki hata/görev satırlarının
      * sağ menüsü buradan çağrılır (bkz. ui.Shell OPEN_LOGS): Sistem logları moduna geçer ve cihaz
      * süzgecini bu cihaza ayarlar. Süzgeç kutusu cihaz listesini _refresh()'in başındaki
-     * __loadBoardFilter() ile (yeniden) doldurduğundan, seçim de oradan hemen sonra (API
-     * isteklerinden ÖNCE) uygulanır — bkz. __pendingBoardId.
+     * __loadDeviceFilter() ile (yeniden) doldurduğundan, seçim de oradan hemen sonra (API
+     * isteklerinden ÖNCE) uygulanır — bkz. __pendingDeviceId.
      * @param severity {String?} verilirse önem süzgeci de ("3" = Hata ve üstü) ayarlanır
      */
-    setBoardFilter(boardId, severity) {
+    setDeviceFilter(deviceId, severity) {
       this.__mode = "system";
       this.__build();
       this.selectTab("system"); // tür sekmesi de (aynı tür: dinleyici yeniden yüklemez)
-      this.__pendingBoardId = boardId;
+      this.__pendingDeviceId = deviceId;
       if (severity !== undefined && severity !== null) {
         const item = this.__extra.getSelectables().find(it => it.getModel() === String(severity));
         if (item) {
@@ -204,19 +204,19 @@ qx.Class.define("ankamon.page.Logs", {
       const command = this.__mode === "command";
       this.__title.setValue(command ? "Loglar — Komut logları" : "Loglar — Sistem logları");
       this.__body.removeAll().forEach(w => w.dispose());
-      this.__boardItems = null;
-      this.__boardFilled = false;
+      this.__deviceItems = null;
+      this.__deviceFilled = false;
       this.__page = 0;
       this.__total = null;
       this.__raw = null; // önceki türün sayfası yeni sütunlarla çizilmesin
 
       const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
-      this.__board = this.__select([["", "Tüm cihazlar"]]);
+      this.__device = this.__select([["", "Tüm cihazlar"]]);
       this.__range = this.__select([["-1 hour", "Son 1 saat"], ["-24 hours", "Son 24 saat"], ["-7 days", "Son 7 gün"], ["-30 days", "Son 30 gün"]]);
       this.__range.setSelection([this.__range.getSelectables()[command ? 2 : 1]]);
       this.__query = new qx.ui.form.TextField().set({ placeholder: command ? "Komutta ara…" : "Mesajda ara…", width: 220 });
       this.__query.addListener("keypress", e => { if (e.getKeyIdentifier() === "Enter") { this.__search(); } });
-      bar.add(this.__board);
+      bar.add(this.__device);
 
       let columns;
       if (command) {
@@ -226,7 +226,7 @@ qx.Class.define("ankamon.page.Logs", {
         bar.add(this.__extra);
         columns = [
           { id: "time", label: "Zaman", width: 160 },
-          { id: "board", label: "Takma ad", width: 150 },
+          { id: "device", label: "Takma ad", width: 150 },
           { id: "user", label: "Kullanıcı", width: 120 },
           { id: "source", label: "Kaynak", width: 110 },
           { id: "cmd", label: "Komut" },
@@ -400,59 +400,59 @@ qx.Class.define("ankamon.page.Logs", {
       });
     },
 
-    async __loadBoardFilter() {
+    async __loadDeviceFilter() {
       // Kutu __build başına bir kez doldurulur (sayfalama her yenilemede buradan geçer; eskiden
       // her yenileme listeyi yeniden ekleyip kopyalar biriktiriyordu).
-      if (this.__boardFilled) {
+      if (this.__deviceFilled) {
         return;
       }
-      this.__boardFilled = true;
-      if (this.__boardItems) {
-        this.__boardItems.forEach(b => this.__board.add(new qx.ui.form.ListItem(b.label || b.hostname || b.ip, null, String(b.id))));
+      this.__deviceFilled = true;
+      if (this.__deviceItems) {
+        this.__deviceItems.forEach(b => this.__device.add(new qx.ui.form.ListItem(b.label || b.hostname || b.ip, null, String(b.id))));
         return;
       }
-      if (!this._can("boards")) {
-        this.__boardItems = [];
+      if (!this._can("devices")) {
+        this.__deviceItems = [];
         return;
       }
-      const select = this.__board;
-      const data = await ankamon.io.Api.get("/boards");
-      if (select !== this.__board) {
+      const select = this.__device;
+      const data = await ankamon.io.Api.get("/devices");
+      if (select !== this.__device) {
         return; // bu arada __build yeni kutu kurdu; onu kendi yenilemesi doldurur
       }
-      this.__boardItems = data.boards;
-      // host/IP → takma ad eşlemesi (sistem loglarında takma ad sütunu için). Takma ad yoksa Boards
+      this.__deviceItems = data.devices;
+      // host/IP → takma ad eşlemesi (sistem loglarında takma ad sütunu için). Takma ad yoksa Devices
       // grid'iyle aynı şekilde bilgisayar adına/IP'ye düşer; eşleme boş kalmaz.
       this.__hostLabel = {};
-      data.boards.forEach(b => {
+      data.devices.forEach(b => {
         const name = b.label || b.hostname || b.ip || "";
         if (name) {
           if (b.hostname) { this.__hostLabel[b.hostname.toLowerCase()] = name; }
           if (b.ip) { this.__hostLabel[b.ip] = name; }
         }
-        this.__board.add(new qx.ui.form.ListItem(name, null, String(b.id)));
+        this.__device.add(new qx.ui.form.ListItem(name, null, String(b.id)));
       });
     },
 
     async _refresh() {
       // Yalnız EN SON başlatılan yenileme tabloya yazar: Shell sayfayı açarken activate() bir
-      // yenileme başlatır, hemen ardından setBoardFilter() __build + ikinci yenilemeyi; önceki
+      // yenileme başlatır, hemen ardından setDeviceFilter() __build + ikinci yenilemeyi; önceki
       // (süzgeçsiz) yanıt sonra gelirse yeni tabloyu ezmesin.
       const seq = ++this.__seq;
-      await this.__loadBoardFilter();
+      await this.__loadDeviceFilter();
       if (seq !== this.__seq) {
         return;
       }
-      if (this.__pendingBoardId !== null) {
-        const item = this.__board.getSelectables().find(it => it.getModel() === String(this.__pendingBoardId));
+      if (this.__pendingDeviceId !== null) {
+        const item = this.__device.getSelectables().find(it => it.getModel() === String(this.__pendingDeviceId));
         if (item) {
-          this.__board.setSelection([item]);
+          this.__device.setSelection([item]);
         }
-        this.__pendingBoardId = null;
+        this.__pendingDeviceId = null;
       }
       if (this.__mode === "command") {
         const data = await ankamon.io.Api.get("/command-logs", {
-          board_id: this.__value(this.__board), source: this.__value(this.__extra),
+          device_id: this.__value(this.__device), source: this.__value(this.__extra),
           from: this.__value(this.__range), q: this.__query.getValue(), ...this.__pageParams()
         });
         if (seq !== this.__seq) {
@@ -463,7 +463,7 @@ qx.Class.define("ankamon.page.Logs", {
         this.__render();
       } else {
         const data = await ankamon.io.Api.get("/logs", {
-          board_id: this.__value(this.__board), severity: this.__value(this.__extra),
+          device_id: this.__value(this.__device), severity: this.__value(this.__extra),
           from: this.__value(this.__range), q: this.__query.getValue(), ...this.__pageParams()
         });
         if (seq !== this.__seq) {
@@ -497,14 +497,14 @@ qx.Class.define("ankamon.page.Logs", {
           const key = command ? r.command : [r.program || "", r.message].join("\u0000");
           let g = byKey.get(key);
           if (!g) {
-            g = { count: 0, record: r, boards: new Set(), hosts: new Set(), worst: r.severity };
+            g = { count: 0, record: r, devices: new Set(), hosts: new Set(), worst: r.severity };
             byKey.set(key, g);
           }
           g.count++;
           if (r.ts > g.record.ts) {
             g.record = r; // grubun temsilcisi: en son görülen kayıt
           }
-          g.boards.add(command ? r.board_name : r.host);
+          g.devices.add(command ? r.device_name : r.host);
           g.hosts.add(r.host);
           if (!command && r.severity !== null && r.severity < g.worst) {
             g.worst = r.severity;
@@ -513,17 +513,17 @@ qx.Class.define("ankamon.page.Logs", {
         groups = [...byKey.values()].sort((a, b) => b.count - a.count || b.record.ts - a.record.ts);
       } else {
         groups = this.__collapseConsecutive(logs, command
-          ? r => [r.board_name, r.username, r.source, r.command, r.status, r.exit_code].join("\u0000")
+          ? r => [r.device_name, r.username, r.source, r.command, r.status, r.exit_code].join("\u0000")
           : r => [r.host, r.severity, r.program, r.message].join("\u0000"));
       }
       this.__records = groups.map(g => g.record);
       const prefix = g => (g.count > 1 ? `${g.count}× ` : "");
-      const several = g => frequent && g.boards.size > 1;
+      const several = g => frequent && g.devices.size > 1;
       if (command) {
         this.__table.getTableModel().setData(groups.map((g, i) => {
           const r = g.record;
           return [
-            i, F.dateTime(r.ts), several(g) ? `${g.boards.size} cihaz` : r.board_name, r.username, r.source,
+            i, F.dateTime(r.ts), several(g) ? `${g.devices.size} cihaz` : r.device_name, r.username, r.source,
             prefix(g) + r.command,
             r.status + (r.exit_code === null || r.exit_code === undefined ? "" : " (" + r.exit_code + ")")
           ];
@@ -534,7 +534,7 @@ qx.Class.define("ankamon.page.Logs", {
           const r = g.record;
           return [
             i, F.dateTime(r.ts),
-            several(g) ? `${g.boards.size} cihaz` : (map[(r.host || "").toLowerCase()] || map[r.from_ip] || ""),
+            several(g) ? `${g.devices.size} cihaz` : (map[(r.host || "").toLowerCase()] || map[r.from_ip] || ""),
             several(g) ? [...g.hosts].join(", ") : r.host,
             F.severity(frequent ? g.worst : r.severity), r.program, prefix(g) + r.message
           ];

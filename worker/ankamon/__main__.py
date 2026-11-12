@@ -25,7 +25,7 @@
 
 """Görev döngüsü.
 
-board_status (erişilebilirlik yoklaması), board_sessions (oturum açma/kapama) ve telegraf_targets
+device_status (erişilebilirlik yoklaması), device_sessions (oturum açma/kapama) ve telegraf_targets
 (Telegraf'ın tarama listesi) STATUS_TICK_SECONDS'ta bir çalışır — çevrimdışı tespiti, kullanıcı
 oturumları VE bir cihazın sensör kaydına başlaması "anında" yansısın diye (telegraf_targets ucuzdur:
 içerik değişmediyse dosyaya dokunmaz, bkz. o dosya). Diğer görevler (cihaz keşfi, MAC/kimlik) daha
@@ -38,13 +38,13 @@ import logging
 import time
 
 from . import config, db
-from .tasks import TASKS, board_credentials, board_sessions, board_status, session_probe, telegraf_targets
+from .tasks import TASKS, device_credentials, device_sessions, device_status, session_probe, telegraf_targets
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("ankamon")
 
 # session_probe kendi içinde INTERVAL_SECONDS'ta (30 sn) bir çalışır — bkz. tasks/session_probe.py.
-_FAST_TASKS = [board_credentials, board_status, board_sessions, session_probe, telegraf_targets]
+_FAST_TASKS = [device_credentials, device_status, device_sessions, session_probe, telegraf_targets]
 _OTHER_TASKS = [task for task in TASKS if task not in _FAST_TASKS]
 
 

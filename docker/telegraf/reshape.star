@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # node_exporter ölçümlerini (inputs.prometheus, metric_version = 1) tek ölçüme indirir:
-#   metrics, etiketler: board_id, name ve aşağıdaki KEEP_TAGS; alan: value
+#   metrics, etiketler: device_id, name ve aşağıdaki KEEP_TAGS; alan: value
 # Listede olmayan her şey atılır — cihaz başına seri sayısı düşük kalsın diye.
 
 KEEP = {
@@ -40,7 +40,7 @@ KEEP = {
     "node_timex_sync_status": True,
 }
 
-KEEP_TAGS = ["board_id", "cpu", "mode", "device", "mountpoint", "fstype", "chip", "sensor", "type", "zone"]
+KEEP_TAGS = ["device_id", "cpu", "mode", "device", "mountpoint", "fstype", "chip", "sensor", "type", "zone"]
 
 CPU_MODES = ["idle", "user", "system", "iowait"]
 SKIP_FSTYPES = ["tmpfs", "devtmpfs", "overlay", "squashfs", "ramfs", "autofs", "fuse.portal", "efivarfs"]

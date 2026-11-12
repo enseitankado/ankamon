@@ -137,11 +137,11 @@ qx.Class.define("ankamon.ui.taskmgr.StartupTab", {
       const rows = [];
       links.forEach(link => {
         const st = link.getModel().startup;
-        const whole = this._win.boardMatches(link, q);
-        const board = link.getDisplay();
+        const whole = this._win.deviceMatches(link, q);
+        const device = link.getDisplay();
         st.items.filter(i => whole || !q || i.name.toLowerCase().includes(q) || (i.publisher || "").toLowerCase().includes(q))
           .forEach(i => rows.push([this._rowId(link, i.id), i.name, i.publisher || "—", i.enabled ? "Etkin" : "Devre dışı",
-            "Ölçülmedi", i.exec, i.comment, board]));
+            "Ölçülmedi", i.exec, i.comment, device]));
       });
       this._setRows(this.__table, rows);
       this.__syncButtons();

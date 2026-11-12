@@ -53,44 +53,44 @@ WINDOW = datetime.timedelta(hours=1)
 
 _SAMPLES = """
 WITH s AS (
-    SELECT t.board_id, m.time,
+    SELECT t.device_id, m.time,
            max(CASE WHEN t.name = 'node_time_seconds' THEN m.value - extract(epoch FROM m.time) END) AS off,
            max(CASE WHEN t.name = 'node_timex_sync_status' THEN m.value END) AS sync
     FROM metrics m JOIN metrics_tag t USING (tag_id)
     WHERE t.name IN ('node_time_seconds', 'node_timex_sync_status') AND m.time >= %(since)s
-    GROUP BY t.board_id, m.time
+    GROUP BY t.device_id, m.time
 ), f AS (
-    SELECT board_id, time, off, sync,
+    SELECT device_id, time, off, sync,
            (COALESCE(sync = 0, false) OR COALESCE(abs(off) > %(off_max)s, false)) AS bad
     FROM s
 ), g AS (
     SELECT *, lag(time) OVER w AS prev_t, lag(bad) OVER w AS prev_bad FROM f
-    WINDOW w AS (PARTITION BY board_id ORDER BY time)
+    WINDOW w AS (PARTITION BY device_id ORDER BY time)
 ), h AS (
     SELECT *, sum(CASE WHEN bad AND (prev_bad IS NOT TRUE OR time - prev_t > %(gap)s) THEN 1 ELSE 0 END)
-                  OVER (PARTITION BY board_id ORDER BY time) AS grp
+                  OVER (PARTITION BY device_id ORDER BY time) AS grp
     FROM g
 )
-SELECT h.board_id, min(h.time) AS started_at, max(h.time) AS last_at,
+SELECT h.device_id, min(h.time) AS started_at, max(h.time) AS last_at,
        max(abs(h.off)) AS off_max, bool_or(COALESCE(h.sync = 0, false)) AS unsynced,
        (array_agg(h.off ORDER BY h.time DESC))[1] AS off_last
 FROM h WHERE h.bad
-GROUP BY h.board_id, h.grp
-ORDER BY h.board_id, started_at
+GROUP BY h.device_id, h.grp
+ORDER BY h.device_id, started_at
 """
 
 # Cihaz başına ölçüm kapsamı (yeniden hesaplanan aralık) ve son ölçüm zamanı.
 _SCOPES = """
-SELECT t.board_id, min(m.time) AS first_at, max(m.time) AS last_at
+SELECT t.device_id, min(m.time) AS first_at, max(m.time) AS last_at
 FROM metrics m JOIN metrics_tag t USING (tag_id)
 WHERE t.name = 'node_time_seconds' AND m.time >= %s
-GROUP BY t.board_id
+GROUP BY t.device_id
 """
 
-_BOARDS = """
+_DEVICES = """
 SELECT id, lower(COALESCE(NULLIF(hostname, ''), host(ip))) AS host,
        COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name
-FROM boards WHERE id = ANY(%s)
+FROM devices WHERE id = ANY(%s)
 """
 
 
@@ -101,11 +101,11 @@ ORDER BY started_at
 """
 
 
-def _board_ids(rows) -> list[int]:
+def _device_ids(rows) -> list[int]:
     ids = set()
     for r in rows:
         try:
-            ids.add(int(r["board_id"]))
+            ids.add(int(r["device_id"]))
         except (TypeError, ValueError):
             pass
     return sorted(ids)
@@ -117,15 +117,15 @@ def detect(conn, since):
     if not scopes_rows:
         return [], []
     islands = conn.execute(_SAMPLES, {"since": since, "off_max": OFFSET_MAX, "gap": GAP}).fetchall()
-    boards = {r["id"]: r for r in conn.execute(_BOARDS, (_board_ids(scopes_rows),)).fetchall()}
+    devices = {r["id"]: r for r in conn.execute(_DEVICES, (_device_ids(scopes_rows),)).fetchall()}
     last_sample = {}
     scopes = []
     for r in scopes_rows:
-        board = boards.get(int(r["board_id"])) if str(r["board_id"]).isdigit() else None
-        if not board or not board["host"]:
+        device = devices.get(int(r["device_id"])) if str(r["device_id"]).isdigit() else None
+        if not device or not device["host"]:
             continue  # cihaz kaydı silinmiş: eski kayıtlara dokunma
-        last_sample[board["id"]] = r["last_at"]
-        scopes.append((board["host"], r["first_at"], r["last_at"]))
+        last_sample[device["id"]] = r["last_at"]
+        scopes.append((device["host"], r["first_at"], r["last_at"]))
 
     # Pencerenin başında kesilmiş aralık, daha önce kaydedilmiş anomalinin devamıdır: başlangıcı oradan alınır
     # (yoksa aynı anomali pencere başlangıcıyla ikinci kez yazılırdı).
@@ -135,15 +135,15 @@ def detect(conn, since):
 
     found = []
     for iv in islands:
-        board = boards.get(int(iv["board_id"])) if str(iv["board_id"]).isdigit() else None
-        if not board or not board["host"]:
+        device = devices.get(int(iv["device_id"])) if str(iv["device_id"]).isdigit() else None
+        if not device or not device["host"]:
             continue
         start = iv["started_at"]
-        for r in known.get(board["host"], []):
+        for r in known.get(device["host"], []):
             if r["started_at"] < start and (r["ended_at"] is None or r["ended_at"] >= start - GAP):
                 start = r["started_at"]
                 break
-        ongoing = iv["last_at"] == last_sample.get(board["id"]) and now - iv["last_at"] <= GAP
+        ongoing = iv["last_at"] == last_sample.get(device["id"]) and now - iv["last_at"] <= GAP
         end = now if ongoing else iv["last_at"]
         if end - start < THRESHOLD:
             continue
@@ -151,7 +151,7 @@ def detect(conn, since):
                   "unsynced": bool(iv["unsynced"]),
                   "offset_max_s": round(iv["off_max"], 1) if iv["off_max"] is not None else None,
                   "offset_s": round(iv["off_last"], 1) if iv["off_last"] is not None else None}
-        found.append({"host": board["host"], "board_id": board["id"], "board_name": board["name"],
+        found.append({"host": device["host"], "device_id": device["id"], "device_name": device["name"],
                       "started_at": start, "ended_at": None if ongoing else iv["last_at"],
                       "detail": detail})
     return found, scopes
@@ -187,10 +187,10 @@ def evaluate(values: dict, ctx: dict) -> dict:
               "servers": values.get("servers") or None}
     offset = None
     try:
-        board_now = float(values.get("now", ""))
+        device_now = float(values.get("now", ""))
         t0, t1 = ctx["t0"], ctx["t1"]
         # Cihazın saati SSH süresince [t0, t1] aralığında olmalı; dışındaysa en yakın uca göre fark.
-        offset = 0.0 if t0 - 1 <= board_now <= t1 + 1 else (board_now - t1 if board_now > t1 else board_now - t0)
+        offset = 0.0 if t0 - 1 <= device_now <= t1 + 1 else (device_now - t1 if device_now > t1 else device_now - t0)
         detail["offset_s"] = round(offset, 1)
     except (KeyError, ValueError):
         pass

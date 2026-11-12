@@ -25,9 +25,9 @@
 
 """Cihazda o anda oturum açmış GERÇEK kullanıcıyı SSH ile anlık sorgular.
 
-board_sessions.py'nin logs tablosundan (lightdm PAM mesajlarından) türettiği kayıt bazen YANLIŞ/eski
+device_sessions.py'nin logs tablosundan (lightdm PAM mesajlarından) türettiği kayıt bazen YANLIŞ/eski
 kalabilir (kapanış mesajı kaybolmuşsa, ya da cihaz loglamadan yeniden kullanılmışsa — kullanıcı
-bildirdi). Bu modül onun yerine "Kullanıcı sorgula" / "Tüm kullanıcıları sorgula" (bkz. page.Boards,
+bildirdi). Bu modül onun yerine "Kullanıcı sorgula" / "Tüm kullanıcıları sorgula" (bkz. page.Devices,
 docker/rootfs/screen/index.html) için ANLIK, gerçek zamanlı bir yoklamadır; sonuç hiçbir tabloya
 yazılmaz, yalnız o an için görüntülenir.
 
@@ -58,12 +58,12 @@ _SSH_OPTS = [
 ]
 
 
-def query(board: dict, user: str, password: str, timeout: int = 8) -> dict:
+def query(device: dict, user: str, password: str, timeout: int = 8) -> dict:
     """Döner: {"status": ok|unreachable|failed, "rc": int|None, "output": "ali, veli" (oturum açma
     sırasıyla; boşsa açık oturum yok)}."""
-    if not board.get("ip"):
+    if not device.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
-    target = f"{user}@{board['ip']}"
+    target = f"{user}@{device['ip']}"
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", f"ConnectTimeout={min(timeout, 8)}", target, _WHO_CMD]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:

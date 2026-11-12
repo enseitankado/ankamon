@@ -48,7 +48,7 @@ KINDS = {
 APP_PROGRAMS = {
     "chrome": "Google Chrome", "chromium": "Chromium", "firefox": "Firefox", "firefox-esr": "Firefox", "vlc": "VLC",
     "soffice.bin": "LibreOffice", "libreoffice": "LibreOffice", "gimp": "GIMP", "inkscape": "Inkscape",
-    "openboard": "OpenBoard", "OpenBoard": "OpenBoard", "evince": "Belge görüntüleyici",
+    "opendevice": "OpenDevice", "OpenDevice": "OpenDevice", "evince": "Belge görüntüleyici",
 }
 
 _AUTOMATED = re.compile(r"AutoAptUpdat|ahenk_debug|tiha-|/opt/ankamon")

@@ -27,7 +27,7 @@
 
 Arayüz: "Sorun tespiti" sayfası (frontend page/Diagnose.js — Cihazlar grid'inin kendisinden türetilmiş).
 Görev türü "diagnose" (bkz. runner, backend JobsApi). Her cihaza TEK SSH turu: hwfacts.SCRIPT (donanım
-+ SMART — Bilgi kartıyla aynı; sonuç boards.facts'e de yazılır, önbellek tazelenir) + CHECK_SCRIPT (ek
++ SMART — Bilgi kartıyla aynı; sonuç devices.facts'e de yazılır, önbellek tazelenir) + CHECK_SCRIPT (ek
 sistem denetimleri). Filo karşılaştırmaları (RAM/disk ortalaması, sıcaklık ortalaması) veritabanından:
 kayıtlı TÜM cihazların son donanım bilgisi ve son 24 saatin sensör verisi — yalnız seçilenler değil.
 
@@ -172,7 +172,7 @@ SCRIPT = hwfacts.SCRIPT + CHECK_SCRIPT
 LEVELS = ["ok", "info", "warn", "bad"]
 
 # Super I/O (anakart donanım izleme yongası) hwmon adları — fan devri, CMOS pili ve anakart sıcaklığı
-# yalnız bunlardan gelir (bkz. backend Core/BoardSensors.php).
+# yalnız bunlardan gelir (bkz. backend Core/DeviceSensors.php).
 _SUPERIO = ("it87", "it86", "nct6", "f71", "w836")
 
 # Kasa içi (anakart/ortam) sıcaklığı — Super I/O temp1, yoksa ACPI termal bölge.
@@ -184,11 +184,11 @@ CPU_INFO_PCT = 80
 GIB = 1024 ** 3
 
 
-def _ssh(board: dict, user: str, password: str, timeout: int = 60) -> dict:
-    if not board.get("ip"):
+def _ssh(device: dict, user: str, password: str, timeout: int = 60) -> dict:
+    if not device.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     cmd = ["sshpass", "-e", "ssh", *hwfacts._SSH_OPTS, "-o", "ConnectTimeout=8",
-           f"{user}@{board['ip']}", SCRIPT]
+           f"{user}@{device['ip']}", SCRIPT]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=timeout)
@@ -269,19 +269,19 @@ def _sensors(output: str) -> dict:
     return {"superio": superio, "fans": fans, "vbat": vbat, "case": case}
 
 
-def history(conn, board_id: int) -> dict:
+def history(conn, device_id: int) -> dict:
     """Cihazın sensör geçmişi (veritabanı): fan başına bugüne dek en yüksek devir (fan "bağlı mı" —
     hiç dönmemiş giriş boştur), son 24 saatte kasa içi en yüksek sıcaklık, son 15 dk işlemci kullanımı."""
-    bid = str(board_id)
+    bid = str(device_id)
     fans = {r["sensor"]: float(r["mx"] or 0) for r in conn.execute(
         """SELECT t.sensor, greatest(max(h.max), (SELECT max(m.value) FROM metrics m WHERE m.tag_id = t.tag_id
                                                    AND m.time > now() - interval '2 hours')) AS mx
            FROM metrics_tag t LEFT JOIN metrics_1h h USING (tag_id)
-           WHERE t.board_id = %s AND t.name = 'node_hwmon_fan_rpm'
+           WHERE t.device_id = %s AND t.name = 'node_hwmon_fan_rpm'
            GROUP BY t.sensor, t.tag_id""", (bid,)).fetchall()}
     case = conn.execute(
         """SELECT max(m.value) AS mx FROM metrics m JOIN metrics_tag t USING (tag_id)
-           WHERE t.board_id = %s AND t.name = 'node_hwmon_temp_celsius' AND m.time > now() - interval '24 hours'
+           WHERE t.device_id = %s AND t.name = 'node_hwmon_temp_celsius' AND m.time > now() - interval '24 hours'
              AND m.value > 0 AND m.value <= 120
              AND ((t.sensor = 'temp1' AND t.chip ~ '(it87|nct6|f71|w836)') OR t.chip LIKE 'thermal_thermal_zone%%')""",
         (bid,)).fetchone()
@@ -289,7 +289,7 @@ def history(conn, board_id: int) -> dict:
         """SELECT 1 - avg(idle_rate) AS cpu FROM (
                SELECT t.cpu, (max(m.value) - min(m.value)) / NULLIF(extract(epoch FROM max(m.time) - min(m.time)), 0) AS idle_rate
                FROM metrics m JOIN metrics_tag t USING (tag_id)
-               WHERE t.board_id = %s AND t.name = 'node_cpu_seconds_total' AND t.mode = 'idle'
+               WHERE t.device_id = %s AND t.name = 'node_cpu_seconds_total' AND t.mode = 'idle'
                  AND m.time > now() - interval '15 minutes'
                GROUP BY t.cpu) per_cpu""", (bid,)).fetchone()
     return {
@@ -304,33 +304,33 @@ def history(conn, board_id: int) -> dict:
 # sıcaklık serilerine (termal bölgeler) düşülür. Fiziksel olmayan değerler (≤0, >120) atılır.
 _TEMP_SQL = """
 WITH s AS (
-    SELECT t.board_id, m.time, m.value,
+    SELECT t.device_id, m.time, m.value,
            (t.chip ~* '(coretemp|k10temp|zenpower)') AS cpu
     FROM metrics m JOIN metrics_tag t USING (tag_id)
     WHERE t.name IN ('node_hwmon_temp_celsius', 'node_thermal_zone_temp')
       AND m.time > now() - interval '24 hours' AND m.value > 0 AND m.value <= 120
 ), pick AS (
-    SELECT board_id, bool_or(cpu) AS has_cpu FROM s GROUP BY board_id
+    SELECT device_id, bool_or(cpu) AS has_cpu FROM s GROUP BY device_id
 ), per_time AS (
-    SELECT s.board_id, s.time, max(s.value) AS v
-    FROM s JOIN pick USING (board_id)
+    SELECT s.device_id, s.time, max(s.value) AS v
+    FROM s JOIN pick USING (device_id)
     WHERE s.cpu OR NOT pick.has_cpu
-    GROUP BY s.board_id, s.time
+    GROUP BY s.device_id, s.time
 )
-SELECT board_id, avg(v) AS avg24, max(v) AS max24, count(*) AS n FROM per_time GROUP BY board_id
+SELECT device_id, avg(v) AS avg24, max(v) AS max24, count(*) AS n FROM per_time GROUP BY device_id
 """
 
 
 def fleet(conn) -> dict:
     """Karşılaştırma tabanı: kayıtlı TÜM cihazların son bilinen RAM/disk kapasitesi ve 24 sa sıcaklığı."""
     mem, disk = [], []
-    for row in conn.execute("SELECT facts FROM boards").fetchall():
+    for row in conn.execute("SELECT facts FROM devices").fetchall():
         f = row["facts"] or {}
         if f.get("mem_total_bytes"):
             mem.append(f["mem_total_bytes"])
         if f.get("disk_total_bytes"):
             disk.append(f["disk_total_bytes"])
-    temps = {str(r["board_id"]): {"avg": float(r["avg24"]), "max": float(r["max24"]), "n": r["n"]}
+    temps = {str(r["device_id"]): {"avg": float(r["avg24"]), "max": float(r["max24"]), "n": r["n"]}
              for r in conn.execute(_TEMP_SQL).fetchall()}
     avg = lambda xs: sum(xs) / len(xs) if xs else None  # noqa: E731
     return {
@@ -345,7 +345,7 @@ def _gb(v) -> str:
     return f"{v / GIB:.1f} GB".replace(".", ",")
 
 
-def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | None = None) -> list[dict]:
+def evaluate(device_id: int, facts: dict, extra: dict, fl: dict, hist: dict | None = None) -> list[dict]:
     checks: list[dict] = []
 
     def add(group, title, level, detail, advice=None):
@@ -426,7 +426,7 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
 
     # 3) İşlemci sıcaklığı — son 24 saat ortalaması, filo ortalamasından %20+ yüksek
     g = "İşlemci sıcaklığı"
-    t = fl["temps"].get(str(board_id))
+    t = fl["temps"].get(str(device_id))
     cause = ("Soğutucu ve fan tozlanmış, termal macun kurumuş ya da fan arızalı/yavaş olabilir: cihazın içini "
              "temizletin, fanın döndüğünü kontrol edin, gerekirse termal macunu yenileyin.")
     if not t:
@@ -583,15 +583,15 @@ def evaluate(board_id: int, facts: dict, extra: dict, fl: dict, hist: dict | Non
     return checks
 
 
-def run(conn, board: dict, user: str, password: str) -> dict:
+def run(conn, device: dict, user: str, password: str) -> dict:
     """Tek cihazı denetler. Döner: {"status", "rc", "output"} — output bulguların JSON'u (başarılıysa)."""
-    res = _ssh(board, user, password)
+    res = _ssh(device, user, password)
     if res["status"] != "ok":
         return res
     now = int(time.time())
     facts = hwfacts.parse(res["output"])
-    hwfacts.store(conn, board["board_id"], facts, now)
-    checks = evaluate(board["board_id"], facts, _extra(res["output"]), fleet(conn), history(conn, board["board_id"]))
+    hwfacts.store(conn, device["device_id"], facts, now)
+    checks = evaluate(device["device_id"], facts, _extra(res["output"]), fleet(conn), history(conn, device["device_id"]))
     level = max((c["level"] for c in checks), key=LEVELS.index, default="ok")
     return {"status": "ok", "rc": 0,
             "output": json.dumps({"level": level, "checks": checks, "collected_at": now}, ensure_ascii=False)}

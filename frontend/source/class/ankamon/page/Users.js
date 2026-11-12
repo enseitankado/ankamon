@@ -133,7 +133,7 @@ qx.Class.define("ankamon.page.Users", {
       const isNew = !target;
       // Yeni kullanıcının varsayılan yetkileri (kullanıcı isteği): açma/kapatma/yeniden başlatma ve ekran
       // yansıtma işaretli; Sensörler (metrics) işaretsiz.
-      target = target || { is_active: true, features: ["dashboard", "boards", "logs", "power", "cast"] };
+      target = target || { is_active: true, features: ["dashboard", "devices", "logs", "power", "cast"] };
       // Geniş: özellik etiketleri uzun (bkz. backend/config/features.php); liste aşağıda boyuna göre büyür.
       const rootBounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
       const win = ankamon.ui.Dialog.window(isNew ? "Kullanıcı ekle" : "Kullanıcıyı düzenle: " + target.username,

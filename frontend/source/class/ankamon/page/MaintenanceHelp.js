@@ -75,7 +75,7 @@ qx.Class.define("ankamon.page.MaintenanceHelp", {
       const path = k => badge(P[k].color, P[k].text);
       let now = "";
       if (sc) {
-        now = `<div class="v note"><span class="t">Şu an</span>${sc.boards} kayıtlı cihaz; ` +
+        now = `<div class="v note"><span class="t">Şu an</span>${sc.devices} kayıtlı cihaz; ` +
           (sc.never_scanned ? `${sc.never_scanned} cihaz henüz hiç başarıyla denetlenmedi (açık olduklarında sırayla taranır). ` : "") +
           (sc.failing && sc.failing.length
             ? `son denemesi başarısız olan: <b>${esc(sc.failing.join(", "))}</b> — ${retry} saatte bir yeniden denenir.`

@@ -11,7 +11,7 @@ görevi değeri şöyle okur:
     enabled = setting(conn, "<ad>", "<key>", default=False)
 
 Cihaz kimliği satırları (device_identity_rows): ext/<ad>/worker/device_identity.py içinde
-ROWS(conn, board_ids) → {board_id: [[ad, değer], …]} tanımlayan eklenti, cihazın kilit ekranındaki kimlik
+ROWS(conn, device_ids) → {device_id: [[ad, değer], …]} tanımlayan eklenti, cihazın kilit ekranındaki kimlik
 bilgisine satır ekler (ör. envanter numarası). Çekirdek hiçbir eklentiyi adıyla bilmez.
 """
 
@@ -59,15 +59,15 @@ def _load_identity_modules() -> list:
     return _identity_modules
 
 
-def device_identity_rows(conn, board_ids: list[int]) -> dict[int, list]:
-    """Eklentilerin cihaz başına kimlik satırları: {board_id: [[ad, değer], …]} (boş değerler atlanır)."""
+def device_identity_rows(conn, device_ids: list[int]) -> dict[int, list]:
+    """Eklentilerin cihaz başına kimlik satırları: {device_id: [[ad, değer], …]} (boş değerler atlanır)."""
     out: dict[int, list] = {}
     for mod in _load_identity_modules():
         try:
-            for board_id, rows in (mod.ROWS(conn, list(board_ids)) or {}).items():
+            for device_id, rows in (mod.ROWS(conn, list(device_ids)) or {}).items():
                 rows = [[str(k), str(v)] for k, v in rows if str(v or "").strip()]
                 if rows:
-                    out.setdefault(int(board_id), []).extend(rows)
+                    out.setdefault(int(device_id), []).extend(rows)
         except Exception:
             log.exception("eklenti kimlik satırları alınamadı: %s", getattr(mod, "__file__", "?"))
     return out

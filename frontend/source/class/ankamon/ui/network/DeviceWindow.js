@@ -28,13 +28,13 @@
 /**
  * Bilgisayar ayrıntıları penceresi (kullanıcı isteği 2026-11-09): Ağ ▸ Varlıklar'da satıra çift tıklama / sağ menü
  * "Bilgisayar ayrıntıları" / "Düzenle" ve Ağ ▸ Akıllı Tahtalar'daki "Düzenle" (eski "Cihazı düzenle" penceresinin
- * yerini aldı — bkz. ui.BoardOps.editBoard). Düzenle kipinde açılır, alttaki düğme "Kaydet".
+ * yerini aldı — bkz. ui.DeviceOps.editDevice). Düzenle kipinde açılır, alttaki düğme "Kaydet".
  *
  * Sekmeler:
  *  - Genel: cihazın ağ envanteri kaydının düzenlenebilir alanları (network.manage) + bütün bilgiler (salt okunur,
  *    seçilip kopyalanabilir)
  *  - Cihaz: cihaz Cihazlar'da kayıtlıysa cihaza özel düzenlenebilir alanlar (kablosuz MAC, konum, sensör portu…;
- *    boards.manage). Alanlar ui.BoardOps.boardForm'dan gelir — cihaza eklenen yeni alan burada kendiliğinden görünür.
+ *    devices.manage). Alanlar ui.DeviceOps.deviceForm'dan gelir — cihaza eklenen yeni alan burada kendiliğinden görünür.
  *  - Portlar ve paylaşımlar: açık portlar/servisler ve ağ paylaşımları (varsa)
  * Kaydet yalnız değişen kaydı (cihaz ve/veya cihaz) yazar.
  */
@@ -52,28 +52,28 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
     },
 
     /**
-     * @param opts {Map} {device?: ağ envanteri satırı (NetworkApi devices), board?: cihaz ({id} yeter),
+     * @param opts {Map} {asset?: ağ envanteri satırı (NetworkApi devices), device?: cihaz ({id} yeter),
      *   user?: oturum sahibi (yoksa /auth/me), onSaved?: Function}
      */
     async open(opts) {
-      let { device = null, board = null, user = null } = opts;
+      let { asset = null, device = null, user = null } = opts;
       try {
         if (!user) {
           user = await ankamon.io.Api.get("/auth/me");
         }
         const can = f => user.is_admin || (user.features || []).includes(f);
-        if (!device && board && board.id && can("network")) {
-          device = (await ankamon.io.Api.get("/network/devices", { board: board.id })).devices[0] || null;
+        if (!asset && device && device.id && can("network")) {
+          asset = (await ankamon.io.Api.get("/network/devices", { device: device.id })).devices[0] || null;
         }
-        const boardId = (board && board.id) || (device && device.board_id);
-        if (boardId) {
-          board = (await ankamon.io.Api.get("/boards/" + boardId)).board;
+        const deviceId = (device && device.id) || (asset && asset.device_id);
+        if (deviceId) {
+          device = (await ankamon.io.Api.get("/devices/" + deviceId)).device;
         }
       } catch (e) {
         ankamon.ui.Dialog.error(e);
         return;
       }
-      this.__show(device, board, user, opts.onSaved);
+      this.__show(asset, device, user, opts.onSaved);
     },
 
     /** Genel sekmesindeki salt okunur bilgiler: [etiket, değer] (Ağ ▸ Varlıklar sütunlarıyla aynı içerik, tam tarihlerle). */
@@ -101,7 +101,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         ["Son log", d.last_log_at ? F.dateTime(d.last_log_at * 1000) : "log gelmedi"],
         ["Keşif", discovery || "—"],
         ["Faz", F.etap(d.etap) || "—"],
-        ["Cihaz kaydı", d.board_name ? `${d.board_name} (Akıllı Tahtalar'da kayıtlı)` : "yok"],
+        ["Cihaz kaydı", d.device_name ? `${d.device_name} (Akıllı Tahtalar'da kayıtlı)` : "yok"],
         ["Not", d.notes || "—"]
       ].map(([k, v]) => [k, String(v ?? "").replace(/<[^>]+>/g, "").trim() || "—"]);
     },
@@ -128,11 +128,11 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
       return page;
     },
 
-    __show(device, board, user, onSaved) {
+    __show(asset, device, user, onSaved) {
       const can = f => user.is_admin || (user.features || []).includes(f);
       const Ops = ankamon.ui.network.Ops;
       // Cihaza bağlı cihazda başlık da grid'deki cihaz adı (tek takma ad — Genel ▸ Takma ad ile aynı).
-      const name = (board && board.label) || (device ? (Ops.deviceName(device) || device.ip || device.mac) : (board.hostname || board.ip || board.mac));
+      const name = (device && device.label) || (asset ? (Ops.deviceName(asset) || asset.ip || asset.mac) : (device.hostname || device.ip || device.mac));
       const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
       const win = ankamon.ui.Dialog.window("Bilgisayar ayrıntıları — " + name, Math.min(760, root.width - 40), { maximizable: true });
       win.set({ height: Math.min(760, root.height - 40) });
@@ -140,55 +140,55 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
       const plain = [];
 
       // Genel: düzenlenebilir cihaz alanları + bilgiler.
-      let deviceForm = null;
+      let assetForm = null;
       let typeBox = null;
-      if (device) {
+      if (asset) {
         const general = this.__page("Genel");
         const body = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
         if (can("network.manage")) {
-          deviceForm = new ankamon.ui.Form();
+          assetForm = new ankamon.ui.Form();
           // Tek takma ad (kullanıcı bildirimi 2026-11-10: pencerede düzenlenen ad Akıllı Tahtalar grid'ine yansımıyordu — Genel'deki
           // ağ envanteri adı, Cihaz'daki cihaz kaydı adıydı). Cihaza bağlı cihazda değer grid'deki cihaz adıdır; kaydedince
           // ikisine de yazılır (Varlıklar ve Akıllı Tahtalar aynı adı gösterir).
-          deviceForm.text("label", "Takma ad", board ? (board.label || device.label) : device.label, "ör. Müdür odası yazıcısı")
-            .setToolTipText(board ? "Varlıklar ve Akıllı Tahtalar'da aynı ad (ikisine de kaydedilir)" : null);
+          assetForm.text("label", "Takma ad", device ? (device.label || asset.label) : asset.label, "ör. Müdür odası yazıcısı")
+            .setToolTipText(device ? "Varlıklar ve Akıllı Tahtalar'da aynı ad (ikisine de kaydedilir)" : null);
           // Salt okunur (kullanıcı isteği 2026-11-11): keşiften gelir, Kaydet göndermez.
-          deviceForm.text("ip", "IP adresi", device.ip).set({ readOnly: true, toolTipText:
+          assetForm.text("ip", "IP adresi", asset.ip).set({ readOnly: true, toolTipText:
             "En son keşifte (ağ taraması ya da cihazın logları) görülen adres; cihaz yeni adreste görülünce kendiliğinden güncellenir." });
-          deviceForm.text("hostname", "Bilgisayar adı", device.hostname);
-          typeBox = new qx.ui.form.ComboBox().set({ value: device.device_type_manual || "",
-            placeholder: device.type_auto ? `otomatik: ${device.type_auto}` : "otomatik" });
+          assetForm.text("hostname", "Bilgisayar adı", asset.hostname);
+          typeBox = new qx.ui.form.ComboBox().set({ value: asset.device_type_manual || "",
+            placeholder: asset.type_auto ? `otomatik: ${asset.type_auto}` : "otomatik" });
           Ops.TYPES.forEach(t => typeBox.add(new qx.ui.form.ListItem(t)));
           typeBox.setToolTipText("Boş bırakılırsa tarayıcının tahmini kullanılır. Akıllı Tahtalar listesi türü 'Akıllı tahta' olan varlıklardan kendiliğinden oluşur: başka bir türe çevrilen cihaz listeden çıkar.");
-          deviceForm.addField("device_type", "Varlık türü", typeBox);
-          deviceForm.text("model", "Marka / model", device.model_manual, device.model_auto ? `otomatik: ${device.model_auto}` : "ör. HP LaserJet M402dn");
-          deviceForm.text("notes", "Not", device.notes);
-          body.add(deviceForm);
+          assetForm.addField("device_type", "Varlık türü", typeBox);
+          assetForm.text("model", "Marka / model", asset.model_manual, asset.model_auto ? `otomatik: ${asset.model_auto}` : "ör. HP LaserJet M402dn");
+          assetForm.text("notes", "Not", asset.notes);
+          body.add(assetForm);
         }
         body.add(new qx.ui.basic.Label("Bilgiler").set({ font: "bold", marginTop: 6 }));
-        body.add(this.__htmlTable(null, ["Alan", "Değer"], this.infoRows(device), [170, "1*"], plain));
+        body.add(this.__htmlTable(null, ["Alan", "Değer"], this.infoRows(asset), [170, "1*"], plain));
         general.add(new qx.ui.container.Scroll(body), { flex: 1 });
         tabs.add(general);
       }
 
-      // Cihaz: cihaza özel düzenlenebilir alanlar (boardForm — tek liste).
-      let boardFields = null;
-      if (board) {
+      // Cihaz: cihaza özel düzenlenebilir alanlar (deviceForm — tek liste).
+      let deviceFields = null;
+      if (device) {
         const page = this.__page("Cihaz");
         const body = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
-        if (can("boards.manage")) {
-          boardFields = ankamon.ui.BoardOps.boardForm(board, { noLabel: !!deviceForm });
-          body.add(boardFields.form);
+        if (can("devices.manage")) {
+          deviceFields = ankamon.ui.DeviceOps.deviceForm(device, { noLabel: !!assetForm });
+          body.add(deviceFields.form);
         }
         const F = ankamon.util.Format;
-        const facts = board.facts || {};
+        const facts = device.facts || {};
         const info = [
-          ["Bilgisayar adı", board.hostname || "—"],
-          ["Durum", (board.alive ?? board.online) ? "Çevrim içi" : "Çevrim dışı"],
-          ["Yönetilebilir", (board.manageable ?? board.online) ? "Evet (SSH ile oturum açılabiliyor)"
-            : board.ssh_login_failing ? "Hayır — SSH portu açık ama root girişi reddediliyor (cihazın parolası farklı; Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları)"
+          ["Bilgisayar adı", device.hostname || "—"],
+          ["Durum", (device.alive ?? device.online) ? "Çevrim içi" : "Çevrim dışı"],
+          ["Yönetilebilir", (device.manageable ?? device.online) ? "Evet (SSH ile oturum açılabiliyor)"
+            : device.ssh_login_failing ? "Hayır — SSH portu açık ama root girişi reddediliyor (cihazın parolası farklı; Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları)"
               : "Hayır (SSH yanıt vermiyor)"],
-          ["Son log", board.last_log_at ? F.dateTime(board.last_log_at * 1000) : "—"],
+          ["Son log", device.last_log_at ? F.dateTime(device.last_log_at * 1000) : "—"],
           ["Model", facts.product || "—"],
           ["İşlemci", facts.cpu_model || "—"],
           ["İşletim sistemi", facts.os_name || "—"],
@@ -196,7 +196,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
           ["Seri no", facts.serial || facts.board_serial || "—"],
           // Wi-Fi kartı (kullanıcı isteği 2026-11-11): fabrika MAC'i, modeli, sürücüsü ve desteklediği bantlar
           // (worker executor/hwfacts — WIFI_CHIP/WIFI_BANDS; bantlar bir sonraki donanım toplamasında dolar).
-          ["Wi-Fi MAC", board.wifi_mac || facts.wifi_mac || "—"],
+          ["Wi-Fi MAC", device.wifi_mac || facts.wifi_mac || "—"],
           ["Wi-Fi kartı", [facts.wifi_chip, facts.wifi_driver ? `(${facts.wifi_driver} sürücüsü)` : ""].filter(Boolean).join(" ") || "—"],
           ["Wi-Fi bantları", ankamon.ui.network.DeviceWindow.bands(facts)]
         ];
@@ -207,31 +207,31 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
       }
 
       // Portlar ve paylaşımlar (kullanıcı isteği: ayrı sekme).
-      if (device) {
-        const count = device.services.length + (device.shares ? device.shares.length : 0);
+      if (asset) {
+        const count = asset.services.length + (asset.shares ? asset.shares.length : 0);
         const page = this.__page(`Portlar ve paylaşımlar (${count})`);
         const body = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
-        if (device.services.length) {
-          body.add(new qx.ui.basic.Label(`Açık portlar / servisler (${device.services.length})`).set({ font: "bold" }));
-          body.add(this.__htmlTable(`Açık portlar / servisler (${device.services.length})`, ["Port", "Servis", "Ürün / sürüm", "Ek bilgi"],
-            device.services.map(s => [`${s.port}/${s.proto}`, s.service || "", [s.product, s.version].filter(Boolean).join(" "), s.extra || ""]),
+        if (asset.services.length) {
+          body.add(new qx.ui.basic.Label(`Açık portlar / servisler (${asset.services.length})`).set({ font: "bold" }));
+          body.add(this.__htmlTable(`Açık portlar / servisler (${asset.services.length})`, ["Port", "Servis", "Ürün / sürüm", "Ek bilgi"],
+            asset.services.map(s => [`${s.port}/${s.proto}`, s.service || "", [s.product, s.version].filter(Boolean).join(" "), s.extra || ""]),
             [90, 130, 200, "1*"], plain));
         }
-        if (device.shares && device.shares.length) {
-          body.add(new qx.ui.basic.Label(`Ağ paylaşımları (${device.shares.length})`).set({ font: "bold", marginTop: 8 }));
-          body.add(this.__htmlTable(`Ağ paylaşımları (${device.shares.length})`, ["Tür", "Paylaşım", "Açıklama"],
-            device.shares.map(sh => [sh.stype === "printer" ? "🖨 yazıcı" : "📁 klasör", sh.path || sh.name, sh.comment || ""]),
+        if (asset.shares && asset.shares.length) {
+          body.add(new qx.ui.basic.Label(`Ağ paylaşımları (${asset.shares.length})`).set({ font: "bold", marginTop: 8 }));
+          body.add(this.__htmlTable(`Ağ paylaşımları (${asset.shares.length})`, ["Tür", "Paylaşım", "Açıklama"],
+            asset.shares.map(sh => [sh.stype === "printer" ? "🖨 yazıcı" : "📁 klasör", sh.path || sh.name, sh.comment || ""]),
             [100, 240, "1*"], plain));
         }
         if (!count) {
-          body.add(new qx.ui.basic.Label(device.services_scanned_at
+          body.add(new qx.ui.basic.Label(asset.services_scanned_at
             ? "Açık port ya da ağ paylaşımı bulunmadı." : "Bu cihazın portları henüz taranmadı (Ağ ▸ Varlıklar ▸ Servisleri tara).")
             .set({ textColor: "app-muted", rich: true, wrap: true }));
         }
         page.add(new qx.ui.container.Scroll(body), { flex: 1 });
         tabs.add(page);
       }
-      if (!device) {
+      if (!asset) {
         win.add(new qx.ui.basic.Label("Bu cihaz ağ taramasında henüz görülmedi; yalnız cihaz kaydı gösteriliyor.")
           .set({ textColor: "app-muted", rich: true, wrap: true, padding: [0, 0, 4, 0] }));
       }
@@ -240,10 +240,10 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
       const buttons = [];
       // Loglar (kullanıcı isteği 2026-11-11: Cihazlar/Varlıklar sağ menüsünden buraya taşındı): Loglar sayfasını bu
       // cihaza süzülmüş açar (bkz. ui.Shell.OPEN_LOGS).
-      if (board && can("logs")) {
+      if (device && can("logs")) {
         const logs = new qx.ui.form.Button("Loglar").set({ toolTipText: "Loglar sayfasını bu bilgisayarın loglarına süzülmüş açar" });
         logs.addListener("execute", () => {
-          qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_LOGS, board.id);
+          qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_LOGS, device.id);
           win.close();
         });
         buttons.push(logs);
@@ -251,40 +251,40 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
       const copyAll = new qx.ui.form.Button("Tümünü kopyala").set({ toolTipText: "Tüm ayrıntıları düz metin olarak panoya kopyalar" });
       copyAll.addListener("execute", () => ankamon.util.Clipboard.copy(`Bilgisayar ayrıntıları — ${name}\n` + plain.join("\n")));
       buttons.push(copyAll);
-      const editable = deviceForm || boardFields;
+      const editable = assetForm || deviceFields;
       const cancel = new qx.ui.form.Button(editable ? "Vazgeç" : "Kapat");
       cancel.addListener("execute", () => win.close());
       buttons.push(cancel);
       if (editable) {
         const save = new qx.ui.form.Button("Kaydet");
         save.addListener("execute", async () => {
-          let boardValues = null;
-          if (boardFields) {
-            boardValues = boardFields.read();
-            if (!boardValues) {
+          let deviceValues = null;
+          if (deviceFields) {
+            deviceValues = deviceFields.read();
+            if (!deviceValues) {
               tabs.setSelection([tabs.getChildren().find(p => p.getLabel() === "Cihaz")]);
               return;
             }
           }
           try {
             let label = null;
-            if (deviceForm) {
-              const values = deviceForm.values();
+            if (assetForm) {
+              const values = assetForm.values();
               delete values.ip; // salt okunur
               values.device_type = (typeBox.getValue() || "").trim();
               label = values.label;
-              await ankamon.io.Api.patch("/network/devices/" + device.id, values);
+              await ankamon.io.Api.patch("/network/devices/" + asset.id, values);
             }
-            if (boardValues) {
+            if (deviceValues) {
               if (label !== null) {
-                boardValues.label = label; // tek takma ad: cihaz kaydına da
+                deviceValues.label = label; // tek takma ad: cihaz kaydına da
               }
               // Varlık türü "Akıllı tahta" → cihaz kaydı da cihaz sayılır (eski "Bu bir akıllı tahtadır" işaretinin yerine;
-              // MAC'i ETAP öneklerine uymayan cihazın IP'si loglarından güncellensin — worker tasks/boards_from_logs).
+              // MAC'i ETAP öneklerine uymayan cihazın IP'si loglarından güncellensin — worker tasks/devices_from_logs).
               if (typeBox && (typeBox.getValue() || "").trim() === "Akıllı tahta") {
-                boardValues.smart_board = true;
+                deviceValues.smart_board = true;
               }
-              await ankamon.io.Api.patch("/boards/" + board.id, boardValues);
+              await ankamon.io.Api.patch("/devices/" + device.id, deviceValues);
             }
             win.close();
             if (onSaved) {

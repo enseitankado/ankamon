@@ -78,7 +78,7 @@ exit 0
 
 class Fixer:
     """Cihaz başına bekleyen yolları toplar, DELAY sonra tek SSH komutuyla düzeltir.
-    access(board_id) → {ip, user, password} ya da None (eşzamansız)."""
+    access(device_id) → {ip, user, password} ya da None (eşzamansız)."""
 
     def __init__(self, access):
         self._access = access
@@ -86,33 +86,33 @@ class Fixer:
         self._timers: dict[int, asyncio.TimerHandle] = {}
         os.makedirs(CM_DIR, exist_ok=True)
 
-    def add(self, board_id: int, path: str) -> None:
-        self._pending.setdefault(board_id, set()).add(path)
-        timer = self._timers.pop(board_id, None)
+    def add(self, device_id: int, path: str) -> None:
+        self._pending.setdefault(device_id, set()).add(path)
+        timer = self._timers.pop(device_id, None)
         if timer:
             timer.cancel()
         loop = asyncio.get_event_loop()
-        self._timers[board_id] = loop.call_later(DELAY, lambda: loop.create_task(self._flush(board_id)))
+        self._timers[device_id] = loop.call_later(DELAY, lambda: loop.create_task(self._flush(device_id)))
 
-    async def fix_now(self, board_id: int, paths: list[str]) -> None:
+    async def fix_now(self, device_id: int, paths: list[str]) -> None:
         """Bekletmeden düzeltir (kopyala/taşı yanıtı dönmeden önce — liste yenilenince sahip doğru görünsün)."""
         if paths:
-            await self._run(board_id, sorted(set(paths)))
+            await self._run(device_id, sorted(set(paths)))
 
-    async def _flush(self, board_id: int) -> None:
-        self._timers.pop(board_id, None)
-        paths = sorted(self._pending.pop(board_id, set()))
+    async def _flush(self, device_id: int) -> None:
+        self._timers.pop(device_id, None)
+        paths = sorted(self._pending.pop(device_id, set()))
         if paths:
-            await self._run(board_id, paths)
+            await self._run(device_id, paths)
 
-    async def _run(self, board_id: int, paths: list[str]) -> None:
+    async def _run(self, device_id: int, paths: list[str]) -> None:
         try:
-            access = await self._access(board_id)
+            access = await self._access(device_id)
             if not access:
                 return
             await run(access, _FIX, *paths, timeout=600)
-            log.info("cihaz #%s: %d yolun sahipliği düzeltildi", board_id, len(paths))
+            log.info("cihaz #%s: %d yolun sahipliği düzeltildi", device_id, len(paths))
         except RemoteError as e:
-            log.warning("cihaz #%s: sahiplik düzeltilemedi: %s", board_id, e)
+            log.warning("cihaz #%s: sahiplik düzeltilemedi: %s", device_id, e)
         except Exception:
-            log.exception("cihaz #%s: sahiplik düzeltilemedi", board_id)
+            log.exception("cihaz #%s: sahiplik düzeltilemedi", device_id)

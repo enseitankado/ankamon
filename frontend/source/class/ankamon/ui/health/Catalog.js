@@ -32,7 +32,7 @@
  * pencerede okunur ve yönetici sıklık / bulgu düzeyi / anlık taranır ayarlarını değiştirir (bkz. ui.health.CheckTypeWindow).
  *
  * Sürekli izleme denetimleri anomali kurallarıdır (tür bilgileri backend AnomaliesApi::kinds + eklentilerin
- * anomaly_kinds.json'u, yönetici ayarları uygulanmış; /api/board-health "kinds"). SSH denetiminin başlıkları
+ * anomaly_kinds.json'u, yönetici ayarları uygulanmış; /api/device-health "kinds"). SSH denetiminin başlıkları
  * worker/ankamon/executor/diagnose.py'deki gruplardır (aşağıda SSH_GROUPS — oradaki gruplar değişirse burası da güncellenir).
  * Pil gerilimi ve saat eşitlemesi SSH denetiminde değil, sürekli izlemededir (aynı soruya iki ayrı cevap verilmesin).
  */
@@ -100,7 +100,7 @@ qx.Class.define("ankamon.ui.health.Catalog", {
     __rows: null,
     __count: null,
 
-    /** @param health {Map} GET /api/board-health yanıtı (kinds, paths, ssh_every, ssh_interval_days, ssh_interval_default) */
+    /** @param health {Map} GET /api/device-health yanıtı (kinds, paths, ssh_every, ssh_interval_days, ssh_interval_default) */
     setData(health) {
       const P = ankamon.ui.health.Status.PATH;
       const text = ankamon.ui.health.Status.levelText;

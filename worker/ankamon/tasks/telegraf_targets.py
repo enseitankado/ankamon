@@ -42,17 +42,17 @@ BLOCK = """
   metric_version = 1
   timeout = "10s"
   [inputs.prometheus.tags]
-    board_id = "{id}"
+    device_id = "{id}"
 """
 
 
 def run(conn) -> None:
-    boards = conn.execute(
-        """SELECT id, host(ip) AS ip, exporter_port AS port FROM boards
+    devices = conn.execute(
+        """SELECT id, host(ip) AS ip, exporter_port AS port FROM devices
            WHERE monitor_enabled AND exporter_ok AND ip IS NOT NULL ORDER BY id"""
     ).fetchall()
     content = "# ankamon worker tarafından üretilir; elle düzenlemeyin.\n" + "".join(
-        BLOCK.format(**board) for board in boards
+        BLOCK.format(**device) for device in devices
     )
 
     path = config.TELEGRAF_TARGETS
@@ -70,4 +70,4 @@ def run(conn) -> None:
         os.fsync(out.fileno())
     os.chmod(tmp, 0o644)
     os.replace(tmp, path)
-    log.info("Telegraf hedefleri güncellendi: %d cihaz", len(boards))
+    log.info("Telegraf hedefleri güncellendi: %d cihaz", len(devices))

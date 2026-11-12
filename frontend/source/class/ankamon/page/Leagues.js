@@ -38,9 +38,9 @@ qx.Class.define("ankamon.page.Leagues", {
     /** Sekmeler (sol menü yaprakları da — bkz. ui.Shell PAGES "leagues"); group = sol menüdeki ara düğüm. */
     TABS: [
       { key: "league", league: "session", by: "users", group: "Kullanım sıralaması", label: "Kullanıcılar" },
-      { key: "league.boards", league: "session", by: "boards", group: "Kullanım sıralaması", label: "Bilgisayarlar" },
+      { key: "league.devices", league: "session", by: "devices", group: "Kullanım sıralaması", label: "Bilgisayarlar" },
       { key: "breakLeague.users", league: "break", by: "users", group: "Teneffüsler", label: "Kullanıcılar" },
-      { key: "breakLeague", league: "break", by: "boards", group: "Teneffüsler", label: "Bilgisayarlar" }
+      { key: "breakLeague", league: "break", by: "devices", group: "Teneffüsler", label: "Bilgisayarlar" }
     ]
   },
 

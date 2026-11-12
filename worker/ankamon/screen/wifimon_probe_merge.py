@@ -27,7 +27,7 @@
 
 Telefonlar bağlı değilken ağ ararken her taramada yeni bir rastgele (yerel yönetimli) MAC adresi kullanır; 20 sn'lik bir
 dinlemede tek telefon 5–10 "cihaz" gibi görünür. Aynı dinlemedeki rastgele adresli yoklamalar şu ölçütlerle tek satırda
-toplanır (ön yüz ardışık dinlemelerde aynı ölçütleri `dev` anahtarı ve ağ listesiyle sürdürür — bkz. ui.boards.WifimonClassify):
+toplanır (ön yüz ardışık dinlemelerde aynı ölçütleri `dev` anahtarı ve ağ listesiyle sürdürür — bkz. ui.devices.WifimonClassify):
 
 - wps: yoklamadaki WPS UUID-E aynı (cihaza özgü kimlik, adres değişse de sabit) — kesin.
 - ssid: aranan ağ listesi aynı ya da biri ötekini kapsıyor (telefon kayıtlı ağlarını adıyla sorar; liste cihaza özgüdür).

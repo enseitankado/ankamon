@@ -37,7 +37,7 @@
 import datetime
 from types import SimpleNamespace
 
-from .log_events import EVERY, board_fields, boards_by_host, continue_known, episodes, known_records
+from .log_events import EVERY, device_fields, devices_by_host, continue_known, episodes, known_records
 
 WINDOW = datetime.timedelta(hours=3)
 BUCKET = datetime.timedelta(minutes=10)
@@ -53,14 +53,14 @@ GROUP BY 1, 2 HAVING count(DISTINCT from_ip) > 1
 _SAME_IP = """
 SELECT host(ip) AS ip, array_agg(id ORDER BY id) AS ids, array_agg(COALESCE(NULLIF(label, ''), hostname, host(ip)) ORDER BY id) AS names,
        array_agg(lower(hostname) ORDER BY id) AS hosts
-FROM boards WHERE ip IS NOT NULL GROUP BY 1 HAVING count(*) > 1
+FROM devices WHERE ip IS NOT NULL GROUP BY 1 HAVING count(*) > 1
 """
 
 
 def _identity_detect(conn, since):
     kind = "identity_conflict"
     now = conn.execute("SELECT now() AS now").fetchone()["now"]
-    boards = boards_by_host(conn)
+    devices = devices_by_host(conn)
     known = known_records(conn, kind, since, datetime.timedelta(hours=1))
     found, scopes = [], []
     by_host: dict = {}
@@ -76,20 +76,20 @@ def _identity_detect(conn, since):
                 start = prior["started_at"]
                 ips = sorted(set(ips) | set((prior["detail"] or {}).get("ips") or []))
             last = ep[-1]["at"] + BUCKET
-            found.append(dict(board_fields(boards, host), started_at=start, ended_at=None if now - last <= BUCKET else last,
+            found.append(dict(device_fields(devices, host), started_at=start, ended_at=None if now - last <= BUCKET else last,
                               detail={"key": "name", "ips": ips[:50],
                                       "text": f"\"{host}\" adı aynı anda {len(ips)} farklı IP'den log gönderdi "
                                               f"({', '.join(ips[:6])}{'…' if len(ips) > 6 else ''}): aynı adlı birden çok cihaz"}))
     # Aynı IP'yi taşıyan kayıtlar: şu anki durum. Sürdükçe açık kalır, düzelince kapanır.
     current = set()
     for r in conn.execute(_SAME_IP).fetchall():
-        for board_id, name, host in zip(r["ids"], r["names"], r["hosts"]):
+        for device_id, name, host in zip(r["ids"], r["names"], r["hosts"]):
             if not host:
                 continue
             others = [n for n in r["names"] if n != name]
             current.add((host, r["ip"]))
             prior = next((k for k in known.get(host, []) if k["ended_at"] is None and (k["detail"] or {}).get("ip") == r["ip"]), None)
-            found.append({"host": host, "board_id": board_id, "board_name": name,
+            found.append({"host": host, "device_id": device_id, "device_name": name,
                           "started_at": prior["started_at"] if prior else now, "ended_at": None,
                           "detail": {"key": "ip", "ip": r["ip"],
                                      "text": f"{r['ip']} adresini başka cihaz kaydı da taşıyor: {', '.join(others)}"}})
@@ -97,7 +97,7 @@ def _identity_detect(conn, since):
         for k in records:
             d = k["detail"] or {}
             if k["ended_at"] is None and d.get("key") == "ip" and (host, d.get("ip")) not in current:
-                found.append(dict(board_fields(boards, host), started_at=k["started_at"], ended_at=now, detail=d))
+                found.append(dict(device_fields(devices, host), started_at=k["started_at"], ended_at=now, detail=d))
     return found, scopes
 
 
@@ -120,7 +120,7 @@ ORDER BY received_at DESC LIMIT 1
 
 def _subnet_detect(conn, since):
     now = conn.execute("SELECT now() AS now").fetchone()["now"]
-    boards = boards_by_host(conn)
+    devices = devices_by_host(conn)
     cells: dict = {}
     for r in conn.execute(_HOURLY_NET, {"since": since}).fetchall():
         if not r["ip"].replace(".", "").isdigit():
@@ -133,7 +133,7 @@ def _subnet_detect(conn, since):
         by_host.setdefault(cell["host"], []).append(dict(cell, ip=ip, net=ip.rsplit(".", 1)[0], ips=len(cell["count"])))
     found, scopes = [], []
     for host, hours in by_host.items():
-        if host not in boards or any(h["ips"] > 2 for h in hours):
+        if host not in devices or any(h["ips"] > 2 for h in hours):
             continue   # kayıtsız ad ya da kalıp adı (identity_conflict)
         scopes.append((host, since, now))
         hours.sort(key=lambda h: h["at"])
@@ -143,7 +143,7 @@ def _subnet_detect(conn, since):
             cur_net = cur["net"]
             prev_net = prev_ip.rsplit(".", 1)[0] if prev_ip else None
             if prev_net and cur_net != prev_net:
-                found.append(dict(board_fields(boards, host), started_at=cur["at"], ended_at=cur["at"] + datetime.timedelta(hours=1),
+                found.append(dict(device_fields(devices, host), started_at=cur["at"], ended_at=cur["at"] + datetime.timedelta(hours=1),
                                   detail={"from": prev_ip, "to": cur["ip"],
                                           "text": f"IP ağı değişti: {prev_net}.x → {cur_net}.x ({prev_ip} → {cur['ip']}); "
                                                   "cihaz taşındı, başka VLAN'a ya da Wi-Fi'ye geçti"}))
@@ -178,7 +178,7 @@ def _human(seconds: float) -> str:
 def _skew_detect(conn, since):
     kind = "clock_skew"
     now = conn.execute("SELECT now() AS now").fetchone()["now"]
-    boards = boards_by_host(conn)
+    devices = devices_by_host(conn)
     known = known_records(conn, kind, since, datetime.timedelta(hours=2))
     by_host: dict = {}
     for r in conn.execute(_SKEW, {"since": since}).fetchall():
@@ -188,8 +188,8 @@ def _skew_detect(conn, since):
             by_host.setdefault((r["host"], r["ip"]), []).append(dict(r, offset=r["lag"]))
     found, scopes = [], []
     for (host, ip), hours in by_host.items():
-        board = boards.get(host)
-        if board and board["ip"] and board["ip"] != ip:
+        device = devices.get(host)
+        if device and device["ip"] and device["ip"] != ip:
             continue   # kayıtlı cihazın adını taşıyan başka cihaz (kalıp kopyası): o cihazın saati değil
         scopes.append((host, since, now))
         for ep in episodes(sorted(hours, key=lambda h: h["at"]), datetime.timedelta(hours=2)):
@@ -200,7 +200,7 @@ def _skew_detect(conn, since):
             offset = ep[-1]["offset"]
             last = ep[-1]["at"] + datetime.timedelta(hours=1)
             # offset = sunucu - cihaz: pozitifse cihaz geride.
-            found.append(dict(board_fields(boards, host), started_at=start,
+            found.append(dict(device_fields(devices, host), started_at=start,
                               ended_at=None if now - last <= datetime.timedelta(hours=1) else last,
                               detail={"offset_s": round(offset), "key": "",
                                       "text": f"Cihazın saati {_human(offset)} {'geride' if offset > 0 else 'ileride'} "

@@ -52,7 +52,7 @@ qx.Class.define("ankamon.ui.network.Ops", {
 
     /** Cihazın görünen adı: etiket → MAC ↔ takma ad kaydı → bilgisayar adı → cihaz adı → IP → MAC. */
     deviceName(d) {
-      return d.label || d.known_alias || d.hostname || d.board_name || d.ip || d.mac;
+      return d.label || d.known_alias || d.hostname || d.device_name || d.ip || d.mac;
     },
 
     /**

@@ -55,15 +55,15 @@ class Events:
     (Önceden tek bağlantı iş parçacıkları arasında eşzamanlı paylaşılıyordu; bu güvenli değildi ve
     birden fazla cihaz seçilince pratikte yalnız biri gerçekten tamamlanıyordu.)"""
 
-    def __init__(self, conn, job_id: int, board_id: int | None):
+    def __init__(self, conn, job_id: int, device_id: int | None):
         self.job_id = job_id
-        self.board_id = board_id
+        self.device_id = device_id
         self.conn = conn
         self.buf: list[tuple] = []
         self.last = time.monotonic()
 
     def add(self, kind: str, text: str) -> None:
-        self.buf.append((self.job_id, self.board_id, kind, text))
+        self.buf.append((self.job_id, self.device_id, kind, text))
         if len(self.buf) >= _FLUSH_LINES or time.monotonic() - self.last >= _FLUSH_SECONDS:
             self.flush()
 
@@ -72,7 +72,7 @@ class Events:
         if not self.buf:
             return
         with self.conn.cursor() as cur:
-            cur.executemany("INSERT INTO job_events (job_id, board_id, kind, text) VALUES (%s, %s, %s, %s)", self.buf)
+            cur.executemany("INSERT INTO job_events (job_id, device_id, kind, text) VALUES (%s, %s, %s, %s)", self.buf)
         self.buf = []
 
     def close(self) -> None:
@@ -124,11 +124,11 @@ def _reader(pipe, kind: str, out: queue.Queue) -> None:
     out.put((kind, None))
 
 
-def run(board: dict, user: str, password: str, *, body: str, env: dict | None, timeout: int,
+def run(device: dict, user: str, password: str, *, body: str, env: dict | None, timeout: int,
         events: Events, secrets: list | tuple = (), shell: str = "bash") -> dict:
     """Betiği çalıştırır; olayları `events`'e yazar. Döner: {"status", "rc", "output"} (job_targets için).
     shell: hedefin kabuğu — "bash" (Linux/macOS) ya da "powershell" (Windows; bkz. remote_command)."""
-    target = f"{user}@{board['ip']}"
+    target = f"{user}@{device['ip']}"
     events.add("info", f"Bağlanılıyor: {target} …" + (" (PowerShell)" if shell == "powershell" else ""))
     started = time.monotonic()
     try:

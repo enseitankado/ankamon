@@ -25,13 +25,13 @@
 
 """Anomali: cihaz açık ama oturum açılmamış (en az THRESHOLD boyunca).
 
-Cihazın açık aralıkları (board_uptime, loglardan) eksi kullanıcı oturumları (board_sessions) = cihazın
+Cihazın açık aralıkları (device_uptime, loglardan) eksi kullanıcı oturumları (device_sessions) = cihazın
 kimse oturum açmadan çalıştığı süreler; THRESHOLD'dan uzun olanlar anomalidir. İki biçimi vardır
 (detail.reason): "boot" — açılıştan beri oturum açılmadı; "logout" — son oturum kapandı, cihaz açık kaldı.
 Ekran kilidindeki oturum açık sayılır (kullanıcı oradadır).
 
-Sürüyor (ended_at None): cihazın son açık aralığı hâlâ açıksa (board_uptime işlenmiş en yeni log
-zamanına GAP'ten yakın; UptimeApi ile aynı ölçüt) ve SSH yoklaması (boards.session_username, 30 sn'de
+Sürüyor (ended_at None): cihazın son açık aralığı hâlâ açıksa (device_uptime işlenmiş en yeni log
+zamanına GAP'ten yakın; UptimeApi ile aynı ölçüt) ve SSH yoklaması (devices.session_username, 30 sn'de
 bir) o an oturum görmüyorsa. Yoklama oturum görüp log henüz işlenmediyse anomali şimdilik "bitti"
 sayılır; oturum kaydı gelince bitiş, oturumun başlangıcına çekilir.
 
@@ -43,19 +43,19 @@ import datetime
 
 KIND = "no_login"
 THRESHOLD = datetime.timedelta(minutes=15)
-# worker/ankamon/tasks/board_uptime.py GAP ile aynı.
+# worker/ankamon/tasks/device_uptime.py GAP ile aynı.
 GAP = datetime.timedelta(minutes=15)
 # Yoklama sonucunun taze sayıldığı süre (session_probe 30 sn'de bir; SessionsApi ile aynı).
 PROBE_FRESH = datetime.timedelta(minutes=5)
 _FAR = datetime.datetime(9999, 1, 1, tzinfo=datetime.timezone.utc)
 
 _INTERVALS = """
-    SELECT u.host, u.started_at, u.last_at, b.id AS board_id, b.name AS board_name,
+    SELECT u.host, u.started_at, u.last_at, b.id AS device_id, b.name AS device_name,
            b.session_username, b.session_checked_at
-    FROM board_uptime u
+    FROM device_uptime u
     JOIN LATERAL (
         SELECT id, COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name, session_username, session_checked_at
-        FROM boards WHERE lower(hostname) = lower(u.host) ORDER BY id LIMIT 1
+        FROM devices WHERE lower(hostname) = lower(u.host) ORDER BY id LIMIT 1
     ) b ON true
     WHERE u.last_at >= %s
     ORDER BY u.host, u.started_at
@@ -63,7 +63,7 @@ _INTERVALS = """
 
 _SESSIONS = """
     SELECT host, username, started_at, ended_at
-    FROM board_sessions
+    FROM device_sessions
     WHERE host = ANY(%s) AND (ended_at IS NULL OR ended_at >= %s)
     ORDER BY host, started_at
 """
@@ -71,7 +71,7 @@ _SESSIONS = """
 
 def detect(conn, since):
     now = conn.execute("SELECT now() AS now").fetchone()["now"]
-    wm = conn.execute("SELECT value FROM task_cursors WHERE name = 'board_uptime.watermark'").fetchone()
+    wm = conn.execute("SELECT value FROM task_cursors WHERE name = 'device_uptime.watermark'").fetchone()
     watermark = wm["value"] if wm else None
     fresh = watermark is not None and now - watermark <= GAP
 
@@ -96,7 +96,7 @@ def detect(conn, since):
 
         def add(gap_start, gap_end, detail, is_open=False):
             if gap_end - gap_start >= THRESHOLD:
-                found.append({"host": host, "board_id": iv["board_id"], "board_name": iv["board_name"] or host,
+                found.append({"host": host, "device_id": iv["device_id"], "device_name": iv["device_name"] or host,
                               "started_at": gap_start, "ended_at": None if is_open else gap_end,
                               "detail": dict(detail, threshold_min=int(THRESHOLD.total_seconds() // 60))})
 
@@ -124,7 +124,7 @@ echo "uptime=$(cut -d' ' -f1 /proc/uptime)"
 """
 
 _LAST_LOGOUT = """
-SELECT extract(epoch FROM max(ended_at)) AS at FROM board_sessions
+SELECT extract(epoch FROM max(ended_at)) AS at FROM device_sessions
 WHERE lower(host) = lower(%s) AND ended_at IS NOT NULL
 """
 
@@ -141,7 +141,7 @@ def _span(minutes: int) -> str:
 
 def evaluate(values: dict, ctx: dict) -> dict:
     """PROBE çıktısı → {"anomaly", "summary", "detail"}. Oturum yoksa boşta geçen süre: açılıştan ya da
-    (açılıştan sonraysa) son oturumun kapanışından beri (board_sessions)."""
+    (açılıştan sonraysa) son oturumun kapanışından beri (device_sessions)."""
     users = values.get("users", "").split()
     try:
         uptime = float(values.get("uptime", ""))
@@ -153,7 +153,7 @@ def evaluate(values: dict, ctx: dict) -> dict:
                 "detail": {"users": sorted(users)}}
     now = ctx["t1"]
     idle_since, reason = now - uptime, "boot"
-    host = (ctx.get("board") or {}).get("hostname")
+    host = (ctx.get("device") or {}).get("hostname")
     if host and ctx.get("conn") is not None:
         row = ctx["conn"].execute(_LAST_LOGOUT, (host,)).fetchone()
         if row and row["at"] is not None and float(row["at"]) > idle_since:

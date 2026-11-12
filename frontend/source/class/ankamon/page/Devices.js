@@ -1,0 +1,1591 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Ankamon — ETAP akıllı tahtaları için merkezi log, izleme ve yönetim sunucusu
+ * Copyright (C) 2026 Özgür Koca <ozgurkoca@gmail.com>
+ * https://github.com/enseitankado/ankamon
+ *
+ * Bu program özgür yazılımdır: Free Software Foundation tarafından yayımlanan
+ * GNU Affero Genel Kamu Lisansı'nın 3. sürümü ya da (tercihinize bağlı olarak)
+ * daha sonraki herhangi bir sürümü koşulları altında yeniden dağıtabilir ve/veya
+ * değiştirebilirsiniz.
+ *
+ * Bu program yararlı olması umuduyla dağıtılmaktadır, ancak HİÇBİR GARANTİSİ
+ * YOKTUR; satılabilirlik veya belirli bir amaca uygunluk garantisi dahi
+ * verilmez. Ayrıntılar için GNU Affero Genel Kamu Lisansı'na bakınız.
+ *
+ * Bu programla birlikte GNU Affero Genel Kamu Lisansı'nın bir kopyasını (LICENSE
+ * dosyası) almış olmalısınız. Almadıysanız <https://www.gnu.org/licenses/>
+ * adresine bakınız.
+ *
+ * Bu dosyadan (sınıf, işlev ya da işlev içi kod bloğu dahil) alınan her türlü
+ * parça da AGPL-3.0-or-later ile lisanslıdır: parçayı kullanan türev eser aynı
+ * lisansla yayımlanmalı, bu telif/atıf bildirimi ve değişiklik notu
+ * korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
+ * kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
+ */
+
+/**
+ * Cihaz envanteri: durum, anlık göstergeler, satır başı onay kutularıyla çoklu seçim, durum + sütun
+ * bazlı süzme ve cihaz işlemleri. Eski "Uzaktan işlemler" sayfasının işlevi buraya taşındı
+ * ("Komut çalıştır" — hazır işlem ve serbest komutu aynı pencerede sunar).
+ *
+ * Yenilenme: sayfa her açıldığında (activate) + arka planda REFRESH_MS'de bir kendiliğinden.
+ *
+ * "online" gecikmesi iki ayrı yoldan beslenir (bkz. DevicesApi::FROM):
+ *   - Log: rsyslog bir satırı logs tablosuna yazdığı anda (worker'ı beklemeden) cihaz "çevrimiçi"
+ *     sayılır — API, son 2 dakikadaki logu burada canlı sorgular. Gecikme ≈ REFRESH_MS (bu sayfa).
+ *   - Yoklama (SSH/sensör portu): worker/tasks/device_status, log göndermeyen ama erişilebilen
+ *     cihazları STATUS_TICK_SECONDS'ta bir (varsayılan 10 sn) yoklar; çevrimdışıya dönüş,
+ *     titremeyi önlemek için üst üste 2 başarısız yoklama ister (bkz. device_status.py).
+ * Yeni bir cihazın burada görünmesi (henüz kayıtlı değilse) ayrıca tasks/devices_from_logs'un
+ * WORKER_TICK_SECONDS'ta (varsayılan 60 sn) bir çalışmasını gerektirir — bu yalnız ilk kayıt içindir,
+ * var olan cihazın çevrimiçi/çevrimdışı durumu yukarıdaki iki yoldan çok daha hızlı yansır.
+ *
+ * "Web terminal": üst araç çubuğunda düğmesi yok, yalnız satır sağ menüsünden açılır (bkz. __rowMenu).
+ * O satır işaretli ÇOKLU seçimin bir parçasıysa hepsi için ortak bir pencerede yan yana
+ * panolar (toplu komut yazılabilen) çoklu terminal açılır (DeviceOps.webshellMulti — bkz. /multishell/);
+ * değilse yalnız o cihazın tekli terminali (DeviceOps.webshell) açılır — ikisi de aynı pencere
+ * deseniyle (DeviceOps.__terminalWindow), yeni sekme YOKTUR.
+ */
+qx.Class.define("ankamon.page.Devices", {
+  extend: ankamon.page.Base,
+
+  construct(user) {
+    super(user, "Akıllı Tahtalar");
+    // Üstteki düğme satırı (Yenile, Tümünü işaretle, İşaretleri kaldır, Ekle, Düzenle, Sil, Komut çalıştır,
+    // Yansıt, Kapat, Uyandır) kaldırıldı (kullanıcı isteği): hepsi satır/kutucuk sağ menüsünde (bkz.
+    // __rowMenu — işaretleme ve "Cihaz ekle…" de orada); sayfa REFRESH_MS'de bir kendiliğinden yenilenir.
+    this._actions.exclude();
+
+    // Sütun tanımları: hem tabloya hem de her sütunun altındaki süzgeç kutusuna aynı dizi verilir.
+    // Başlıklar kısa (kullanıcı isteği; ör. üç ayrı "Disk" sütunu); "hint" tam adı verir — sütun
+    // gizleme menüsünde ve süzgeç ipucunda o görünür (bkz. Base _createTable/_addColumnFilters).
+    this.__columns = [
+      // KALICI KURAL (kullanıcı 2026-11-10): Durum = ağda canlı mı (Varlıklar'la aynı); SSH erişimi ayrı "Yönetilebilir".
+      { id: "status", label: "Durum", width: 100, hint: "Çevrimiçi: cihaz ağda canlı (Varlıklar'daki durumla aynı — ağ taraması görüyor ya da SSH yanıt veriyor). Kapalı: ağda görülmüyor." },
+      { id: "manageable", label: "Yönetilebilir", width: 120, hint: "Tek ölçüt: cihaza SSH ile root girişi başarılı mı. Evet: Ankamon son 3 dakikada cihaza SSH ile root olarak girebildi — komut, ekran, web terminali, oturum işlemleri yapılabilir. Hayır (parola): SSH portu açık ama giriş reddediliyor — cihazın root parolası Ayarlar ▸ SSH erişimi'ndekinden farklı (Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları'ndan cihazın parolası girilir). Hayır: SSH yanıt vermiyor." },
+      { id: "name", label: "Takma ad / Ad" },
+      { id: "hostname", label: "Bilgisayar adı", width: 150 },
+      { id: "ip", label: "IP", width: 120 },
+      // Kablolu MAC: kablolu ağ kartının MAC'i (devices.mac — cihazın kimliği, uzaktan uyandırma, ağ taraması).
+      // Kablosuz MAC: Wi-Fi kartının kalıcı (fabrika) MAC'i (devices.wifi_mac, göç 043 — worker oturum yoklaması
+      // yazar; NetworkManager'ın taramadaki rastgele adresi değil).
+      { id: "mac", label: "Kablolu MAC", hint: "Kablolu ağ kartının MAC adresi (uzaktan uyandırma bununla)", width: 140 },
+      { id: "wifi_mac", label: "Kablosuz MAC", hint: "Wi-Fi kartının kalıcı (fabrika) MAC adresi", width: 140 },
+      // FATİH fazı (bkz. util.Format.etap — anakart modelinden, yoksa maskelenmiş MAC önekinden).
+      { id: "faz", label: "Faz", hint: "FATİH fazı ve cihaz markası", width: 130 },
+      // İşletim sistemi ailesi + adı (göç 052; kullanıcı isteği 2026-11-12): işlevler buna göre seçilir (platforms/README.md).
+      { id: "os", label: "İşletim sistemi", hint: "Cihazın işletim sistemi — sağ menü ve araç çubuğu işlevleri buna göre uygulanır (Düzenle ▸ İşletim sistemi ile değiştirilebilir)", width: 170 },
+      // Anlık oturum (bkz. worker executor/session_probe.py — 30 sn'de bir SSH ile yoklanır; Oturum aç/
+      // kapat/sorgula sonuçları da hemen yazar): kullanıcı adı, "(kilitli)" ya da "Oturum kapalı".
+      { id: "session", label: "Oturum", width: 140 },
+      // Wi-Fi kartı etkin mi (bkz. ui.FactsView.wifiStatus — Bilgi kartıyla aynı kural). Donanım
+      // bilgisiyle birlikte toplanır; Wi-Fi aç/kapat işlemi sonrası runner hemen günceller.
+      { id: "wifi", label: "Wi-Fi", width: 110 },
+      // Cihaz yerel ağa kablolu kartıyla bağlı mı (internet değil) — bkz. Devices.cableText.
+      { id: "cable", label: "Kablo", hint: "Yerel ağa kablolu ağ kartıyla bağlı mı", width: 100 },
+      // Donanım bilgisi (bkz. worker/ankamon/executor/hwfacts.py): cihaz ilk kez tanınırken (MAC
+      // öğrenilirken) bir kez SSH ile toplanır; satır sağ menüsündeki "Bilgi kartı" bunu canlı
+      // tazeler (60dk önbellekli). Değer yoksa (henüz toplanmadıysa) hücre boş kalır.
+      { id: "disk_total", label: "Disk", hint: "Disk kapasitesi", width: 110 },
+      { id: "ram_total", label: "RAM", hint: "RAM miktarı", width: 90 },
+      { id: "bios", label: "BIOS", hint: "BIOS sürümü", width: 130 },
+      { id: "kernel", label: "Çekirdek", hint: "Çekirdek sürümü", width: 150 },
+      { id: "board_model", label: "Anakart modeli", width: 170 },
+      { id: "cpu_model", label: "İşlemci modeli", width: 180 },
+      // cpu_phys_cores (FİZİKSEL çekirdek) — cpu_cores mantıksal/iş parçacığı sayısıdır (nproc,
+      // Hyper-Threading'de fiziksel olandan büyük çıkar, ör. i3-4000M: 2 fiziksel/4 mantıksal).
+      // "CPU core" etiketi kullanıcının beklediği anlamla (fiziksel) eşleşsin diye bu kullanılır.
+      { id: "cpu_phys_cores", label: "CPU core", hint: "Fiziksel çekirdek sayısı", width: 110 },
+      { id: "cpu", label: "İşlemci", width: 80 },
+      { id: "mem", label: "Bellek", width: 80 },
+      { id: "disk", label: "Disk", hint: "Disk doluluğu", width: 70 },
+      // Ağ trafiği, Mbit/sn (bkz. backend MetricsApi::latest — node_exporter sayaçlarının son tarama aralığı).
+      // Başlıkta birim (kullanıcı isteği: "D:/U:Mbit/sn", hücrede yalnız sayı); ne olduğu ipucunda açıkça.
+      { id: "net_rx", label: "D:Mbit/sn", hint: "D (download / indirme): cihazın ağdan ALDIĞI trafik, Mbit/sn — son ölçüm aralığının ortalaması", width: 95 },
+      { id: "net_tx", label: "U:Mbit/sn", hint: "U (upload / yükleme): cihazın ağa GÖNDERDİĞİ trafik, Mbit/sn — son ölçüm aralığının ortalaması", width: 95 },
+      // Sensörler (bkz. backend Core/DeviceSensors.php). Fan/pil/anakart, cihazda Super I/O sürücüsü
+      // yüklüyse gelir ("Metrik izlemeyi kur" işlemi); Kasa yoksa ACPI bölgesidir.
+      { id: "temp", label: "CPU sıcaklığı", width: 100 },
+      { id: "case_temp", label: "Kasa", hint: "Kasa sıcaklığı", width: 100 },
+      { id: "disk_temp", label: "Disk", hint: "Disk sıcaklığı", width: 100 },
+      { id: "fan_rpm", label: "Fan", hint: "Fan devri", width: 90 },
+      { id: "battery_v", label: "CMOS pili", width: 80 },
+      // Son 24 saatte sensör verisi geldi mi — Var/Yok (Varlıklar'la aynı ölçüt; backend Core\DeviceSensors::lastSeenAll).
+      { id: "sensors", label: "Sensörler", hint: "Sensör verisi geliyor mu (son 24 saat)", width: 90, choices: true },
+      { id: "seen", label: "Son görülme", width: 120 },
+      { id: "log", label: "Son log", width: 120 }
+    ];
+    // storageKey: sütun genişliği + görünürlüğü localStorage'da kalıcı olur, sütun görünürlüğü
+    // menüsü açılır (bkz. Base.js _createTable).
+    this.__table = this._createTable(this.__columns, { checkable: true, storageKey: "devices.columns" });
+    // Sütun başlığıyla sıralama kullanıcı adına sunucuda saklanır, sayfa açılınca geri yüklenir (kullanıcı isteği).
+    ankamon.page.Base.rememberSort(this.__table, this.__columns, this.__table.getUserData("offset"), "devices.columns", this._user);
+    // "Durum" sütunu: Çevrimiçi yeşil, Kapalı kırmızı (bkz. ui.table.StatusRenderer).
+    // İpucu: satırın "Son görülme" hücresi (kullanıcı isteği 2026-11-10).
+    this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "status"),
+      new ankamon.ui.table.StatusRenderer(2 + this.__columns.findIndex(c => c.id === "seen")));
+    // "Oturum" sütunu: ekran kilitliyse "(kilitli)" ifadesi kırmızı+kalın (bkz. ui.table.SessionRenderer).
+    this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "session"),
+      new ankamon.ui.table.SessionRenderer());
+    // Hücre ipuçları: sütunun görevi ve verinin kaynağı (kullanıcı isteği 2026-11-12; bkz. ui.network.AssetCellHints).
+    // Özel çiziciler (Durum, Oturum) atandıktan SONRA: onların kendi ipucu açıklamanın üstünde kalır.
+    ankamon.ui.network.AssetCellHints.apply(this.__columns, ankamon.ui.network.AssetCellHints.DEVICES, {
+      sensors: row => {
+        const device = this.__devices && this.__devices.get(row[0]);
+        return device && device.sensors_at ? "Son sensör verisi: " + ankamon.util.Format.ago(device.sensors_at) : null;
+      }
+    });
+    ankamon.page.Base.setCellHints(this.__table, this.__columns);
+    // İşaretler Ekranlar kutucuklarına yansır — bkz. __updateActionState.
+    this.__table.getTableModel().addListener("dataChanged", this.__updateActionState, this);
+    // Ekranlar kutucukları listenin O ANKİ satır sırasıyla dizilir (sütun başlığıyla sıralama dahil) — bkz. __syncShownOrder.
+    // Başlıkla sıralama dataChanged değil metaDataChanged yayar (qx Simple.sortByColumn).
+    this.__table.getTableModel().addListener("dataChanged", this.__syncShownOrder, this);
+    this.__table.getTableModel().addListener("metaDataChanged", this.__syncShownOrder, this);
+    // Satır menüsünün simgeli karşılığı; liste ve ekran görünümünün üstünde (bkz. ui.devices.ActionBar).
+    this.__actionBar = new ankamon.ui.devices.ActionBar((device, devices) => this.__rowMenu(device, devices, this.__barSessionOps()),
+      () => this._checkedIds(this.__table).map(id => this.__devices && this.__devices.get(id)).filter(Boolean),
+      { getAll: () => (this.__devices ? [...this.__devices.values()] : []) });
+    this.add(this.__actionBar);
+    this.__table.addListener("cellDbltap", e => {
+      if (this._can("devices.manage")) {
+        const id = this.__table.getTableModel().getValue(0, e.getRow());
+        this.__edit(this.__devices.get(id));
+      }
+    });
+    // Satır sağ menüsü: ağaçtaki cihaz düğümüyle aynı menü (Web terminal / Komut çalıştır / Kapat / WoL)
+    // + bu sayfaya özgü kayıt işlemleri (Düzenle / Sil) — bkz. __rowMenu. Sağ tıklanan satır onay
+    // kutusuyla işaretli ÇOKLU seçimin bir parçasıysa, "Web terminal" o seçimin TÜMÜ için açılır.
+    this.__table.addListener("cellContextmenu", e => {
+      if (e.getRow() === null) {
+        return;
+      }
+      const id = this.__table.getTableModel().getValue(0, e.getRow());
+      const device = this.__devices.get(id);
+      if (!device) {
+        this.__table.setContextMenu(null);
+        return;
+      }
+      const checkedIds = this._checkedIds(this.__table);
+      const devices = checkedIds.includes(id) && checkedIds.length > 1
+        ? checkedIds.map(cid => this.__devices.get(cid)).filter(Boolean)
+        : [device];
+      this.__table.setContextMenu(this.__rowMenu(device, devices));
+    });
+
+    // Süzgeç kutuları artık her sütunun kendi başlık hücresinin içinde (bkz. Base.js
+    // _addColumnFilters) — ayrı bir satır/widget olarak sayfaya eklenmesi gerekmez.
+    this.__filterFields = this._addColumnFilters(this.__table, this.__columns, this.__apply,
+      { rows: () => (this.__rows || []).map(r => r.cells), persist: true });
+
+    // Tek ekran, iki görünüm (sekme yok, kullanıcı isteği): grid'deki cihazların canlı ekran önizlemeleri (varsayılan) ya da
+    // "Liste" seçiliyken grid (araç çubuğunun başındaki görünüm bölümü). Sağ menü işlemleri işaretli cihazlara ikisinden de uygulanır. "screen" yetkisi yoksa yalnız grid.
+    this.__views = new qx.ui.container.Stack();
+    const listPage = new qx.ui.container.Composite(new qx.ui.layout.VBox(8)).set({ padding: [8, 8, 0, 8] });
+    listPage.add(this.__table, { flex: 1 });
+    this.__note = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true, wrap: true, visibility: "excluded" });
+    listPage.add(this.__note);
+    this.__views.add(listPage);
+    this.__listPage = listPage;
+    if (this._can("screen")) {
+      this.__views.add(this.__createScreensPage());
+      this.__showListView(this.__createViewControls());
+    }
+    this.add(this.__views, { flex: 1 });
+
+    // Sayfa açık kalsa bile kendiliğinden tazelenir (bkz. sınıf başı not — worker zinciriyle birlikte).
+    this.__timer = new qx.event.Timer(ankamon.page.Devices.REFRESH_MS);
+    this.__timer.addListener("interval", this.refresh, this);
+    this.__timer.start();
+
+    this.__updateActionState(); // başlangıçta hiç satır işaretli değil: ilgili düğmeler devre dışı.
+
+    // Ctrl/⌘+A sayfa düzeyinde (kullanıcı isteği, 2026-11-05): odak tabloda ya da Ekranlar iframe'inde değilken
+    // (ör. araç çubuğuna tıkladıktan sonra) tarayıcının kendi "tümünü seç"i Ekranlar alanını mavi saydam kutuyla
+    // kaplıyordu. Görünen (süzülmüş) bütün cihazlar işaretlenir; Ekranlar'da işaretler kutucukların seçim
+    // çerçevesine yansır (bkz. __pushSelection). Tablo odaktaysa Base'in kendi Ctrl+A'sı, iframe odaktaysa
+    // screen/index.html'inki çalışır (ikisi de aç/kapa).
+    this.__onSelectAllKey = e => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== "a" || !this.isSeeable()) {
+        return;
+      }
+      const el = document.activeElement;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT|IFRAME)$/.test(el.tagName))) {
+        return;
+      }
+      const focused = qx.ui.core.FocusHandler.getInstance().getFocusedWidget();
+      for (let w = focused; w; w = w.getLayoutParent()) {
+        if (w === this.__table || w instanceof qx.ui.window.Window) {
+          return;   // tablonun kendi işleyicisi / başka bir pencere (ör. terminal)
+        }
+      }
+      e.preventDefault();
+      const rows = this.__table.getTableModel().getRowCount();
+      const all = rows > 0 && this._checkedIds(this.__table).length === rows;
+      this._checkAll(this.__table, !all);
+      if (this.__views.getSelection()[0] === this.__listPage) {
+        if (all) {
+          this.__table.getSelectionModel().resetSelection();
+        } else if (rows) {
+          this.__table.getSelectionModel().setSelectionInterval(0, rows - 1);
+        }
+      }
+    };
+    window.addEventListener("keydown", this.__onSelectAllKey, true);
+  },
+
+  statics: {
+    /** Cihaz ekle/düzenle MAC biçimi (DevicesApi::validatedDeviceFields ile aynı): de:ad:de:ad:de:ad. */
+    MAC_RE: /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i,
+
+    /** Alt bardaki göstergeler (sağ menüdeki sırayla) — anahtarlar screen/index.html Tile.setStats ile aynı. */
+    STATS_ITEMS: [
+      ["net", "Ağ arabirimleri"], ["cpu", "İşlemci kullanımı"], ["temp", "İşlemci sıcaklığı"], ["mem", "Bellek (RAM)"],
+      ["disk_temp", "Disk sıcaklığı (HDD)"], ["fan", "Fan hızı"], ["battery", "CMOS pili"]
+    ],
+
+    /** Oturum yoklamasının ağ kartı bilgisi (netifs) bu kadar saniyeden eskiyse "Kablo" logdan kanıta bakar. */
+    CABLE_FRESH_S: 300,
+
+    /**
+     * "Kablo" sütununun metni: cihaz yerel ağa KABLOLU kartıyla bağlı mı (internet değil; Wi-Fi ile de bağlı
+     * olabilir). Asıl kaynak oturum yoklaması (30 sn, aynı SSH turu — bkz. worker executor/netif.py): kablolu
+     * kartta kablo sinyali (carrier) + NetworkManager "bağlı" (100) + IPv4 → "Bağlı"; sinyal var ama bağlantı
+     * yoksa "Bağlantı yok"; sinyal yoksa "Takılı değil"; kablolu kart yoksa "Kart yok". Yoklama eskiyse
+     * (CABLE_FRESH_S) logdan kanıt: son 2 dk'da cihazın IP'sinden log geldi ve o IP'nin MAC'i kablolu kartınki
+     * (DevicesApi cable_log) → "Bağlı (log)". Kapalı cihazda boş (bilinmiyor).
+     */
+    /** "Durum" sütunu: ağda canlı (DevicesApi alive — Varlıklar'la aynı ölçü) → "Çevrimiçi", değilse "Kapalı". SSH erişimi
+     * ayrı "Yönetilebilir" sütununda (device.online) — bkz. bellek smart-devices-online-vs-manageable. */
+    /** "Yönetilebilir" sütunu (DevicesApi manageable / ssh_login_failing). */
+    manageableText(device) {
+      if (device.manageable ?? device.online) {
+        return "Evet";
+      }
+      return device.ssh_login_failing ? "Hayır (parola)" : "Hayır";
+    },
+
+    statusText(device) {
+      return (device.alive ?? device.online) ? "Çevrimiçi" : "Kapalı";
+    },
+
+    /**
+     * "Wi-Fi" sütunu (ui.FactsView.wifiStatus kuralı). Bağlı/bağlı değil ve ağ adı, oturum yoklaması tazeyse
+     * (netifs, 30 sn — CABLE_FRESH_S) ondan alınır; donanım bilgisi (facts) yalnız ilk tanınmada/Bilgi kartında
+     * toplandığından günlerce eski kalabiliyor (bağlı görünüp bağlı olmayan cihaz). Bağlıysa "Bağlı (Ağ adı)".
+     */
+    wifiText(device) {
+      const f = device.facts || {};
+      const fresh = device.netifs && device.session_checked_at &&
+        Date.now() / 1000 - device.session_checked_at < ankamon.page.Devices.CABLE_FRESH_S;
+      const live = fresh && (device.netifs.ifaces || []).find(i => i.kind === "wifi");
+      const merged = live ? Object.assign({}, f, live.state === 100
+        ? { wifi_state: "connected", wifi_ssid: live.ssid || live.connection || "" }
+        : { wifi_state: "disconnected" }) : f;
+      return (ankamon.ui.FactsView.wifiStatus(merged) || { text: "" }).text;
+    },
+
+    cableText(device) {
+      const wired = ((device.netifs && device.netifs.ifaces) || []).filter(i => i.kind === "ethernet");
+      if (!device.online) {
+        return "";
+      }
+      const fresh = device.netifs && device.session_checked_at &&
+        Date.now() / 1000 - device.session_checked_at < ankamon.page.Devices.CABLE_FRESH_S;
+      if (fresh) {
+        if (!wired.length) {
+          return "Kart yok";
+        }
+        if (wired.some(i => i.carrier && i.state === 100 && (i.ipv4 || []).length)) {
+          return "Bağlı";
+        }
+        return wired.some(i => i.carrier) ? "Bağlantı yok" : "Takılı değil";
+      }
+      return device.cable_log ? "Bağlı (log)" : "";
+    },
+
+    /**
+     * "Oturum" sütununun metni: çevrimdışı ya da henüz yoklanmamış cihazda boş (bilinmiyor), oturum
+     * yoksa "Oturum kapalı", varsa kullanıcı adı — oturum kilitliyse (dm-tool lock) "(kilitli)" ekiyle.
+     * Ankamon ekran kilidi (Ekran ▸ Kilitle) ayrıca " / Kilitli" ile eklenir (bkz. worker executor/screenlock.py).
+     */
+    sessionText(device) {
+      if (!device.online || !device.session_checked_at) {
+        return "";
+      }
+      let text = "Oturum kapalı";
+      if (device.session_username) {
+        text = device.session_locked ? `${device.session_username} (kilitli)` : device.session_username;
+      }
+      const names = { keyboard: "Klavye", mouse: "Fare", touch: "Dokunmatik" };
+      const input = (device.input_locks || []).map(d => names[d] || d).join("+");
+      return (device.screen_locked ? `${text} / Kilitli` : text) + (input ? ` / ${input} kilitli` : "");
+    },
+
+    // Kilit teyidinden sonra kutucuk akışının yenilenmesi için en uzun bekleme (bkz. __refreshTile).
+    TILE_REFRESH_MS: 8000,
+    // "Kapanıyor…" yazısı (bkz. __sessionOps shutdownSent) cihaz bu süre içinde kapanmadıysa kalkar.
+    SHUTDOWN_NOTE_MS: 3 * 60 * 1000,
+
+    // Ekran görünümü kapandıktan (Liste ya da başka sayfa) bu kadar sonra önizleme akışları duraklar
+    // (kutucuklar son görüntüleriyle kalır — bkz. __pausePreview).
+    SCREENS_STOP_MS: 10000,
+
+    // "online" artık API'de canlı hesaplanıyor (bkz. sınıf başı not); bu süre doğrudan algılama
+    // gecikmesine eklenir, o yüzden eskisinden (20000) küçültüldü.
+    REFRESH_MS: 5000
+  },
+
+  destruct() {
+    if (this.__timer) {
+      this.__timer.stop();
+      this.__timer.dispose();
+    }
+    if (this.__screensTimer) {
+      this.__screensTimer.stop();
+      this.__screensTimer.dispose();
+    }
+    if (this.__onMessage) {
+      window.removeEventListener("message", this.__onMessage);
+    }
+    if (this.__onSelectAllKey) {
+      window.removeEventListener("keydown", this.__onSelectAllKey, true);
+    }
+    if (this.__sliderThemeListener) {
+      qx.theme.manager.Meta.getInstance().removeListenerById(this.__sliderThemeListener);
+    }
+    if (this.__onScreenWindows) {
+      qx.event.message.Bus.unsubscribe(ankamon.ui.DeviceOps.SCREEN_WINDOWS, this.__onScreenWindows, this);
+    }
+    if (this.__onChatWindows) {
+      qx.event.message.Bus.unsubscribe(ankamon.ui.chat.Window.CHANGED, this.__onChatWindows, this);
+    }
+    if (this.__onWifiRadio) {
+      qx.event.message.Bus.unsubscribe(ankamon.ui.devices.WifiMonitor.RADIO_CHANGED, this.__onWifiRadio, this);
+    }
+  },
+
+  members: {
+    __timer: null,
+    __table: null,
+    __note: null,
+    __columns: null,
+    __filterFields: null,
+    __views: null,
+    __viewButtons: null,
+    __viewReady: false,
+    __listPage: null,
+    __actionBar: null,
+    __onSelectAllKey: null,
+
+    /** Ekran görünümündeyken araç çubuğu da sağ menü gibi sonucu kutucuklarda gösterir. */
+    __barSessionOps() {
+      const screens = this.__screensPage && this.__views.getSelection()[0] === this.__screensPage;
+      return screens ? this.__sessionOps() : null;
+    },
+
+    /**
+     * Shell OPEN_PAGE (Genel bakış kartları): liste görünümüne geçer ve Durum süzgecini verilen
+     * metne ("Çevrimiçi" | "Kapalı" | "" = hepsi) ayarlar; diğer sütun süzgeçleri temizlenir.
+     * Süzgeç kutuları başlık ilk çizildiğinde oluşur (bkz. Base._addColumnFilters) — henüz yoksa
+     * kısa aralıklarla yeniden denenir.
+     */
+    openWith(opts, tries = 0) {
+      if (!("status" in opts)) {
+        return;
+      }
+      if (this.__viewButtons) {
+        this.__viewButtons.get("list").setValue(true);
+      }
+      const fields = this.__filterFields || {};
+      if (!fields.status) {
+        if (tries < 20) {
+          qx.event.Timer.once(() => this.openWith(opts, tries + 1), this, 100);
+        }
+        return;
+      }
+      Object.entries(fields).forEach(([id, field]) => field.setValue(id === "status" ? opts.status : ""));
+    },
+    __devices: null,
+    __rows: null,
+    __screensPage: null,
+    __screenView: null,
+    __frame: null,
+    __screensTimer: null,
+    __screensHiddenAt: null,
+    __screensRunning: false,
+    __previewKey: null,
+    __previewMenu: null,
+    __onMessage: null,
+    __screenRes: null,
+    __sizeLabel: null,
+    __autoSize: false,
+    __fitting: false,
+    __fitReset: false,
+    __fitResizeId: null,
+    __shownDevices: null,
+    __whoamiState: null,
+    __liveQueue: null,
+    __applyingPreview: false,
+    __metrics: null,
+
+    async _refresh() {
+      const F = ankamon.util.Format;
+      const [devices, metrics] = await Promise.all([
+        ankamon.io.Api.get("/devices"),
+        ankamon.io.Api.get("/metrics/latest")
+      ]);
+      // Kendiliğinden tazelemede kullanıcının o anki işaretlemeleri kaybolmasın. İstek SONRASI okunur: önce okununca
+      // istek sürerken yapılan işaretleme (fare, Ctrl+A) yanıt gelince eski listeyle geri alınıyordu (2026-11-05).
+      const wasChecked = this.__table ? new Set(this._checkedIds(this.__table)) : new Set();
+      this.__devices = new Map(devices.devices.map(b => [b.id, b]));
+      this.__metrics = metrics.latest || {};
+      ankamon.ui.DeviceOps.syncScreenLocks(devices.devices);
+      const unit = (v, suffix) => v === null || v === undefined ? "" : v + suffix;
+      const mbit = v => v === null || v === undefined ? "" : v.toFixed(v < 10 ? 2 : 1);   // birim sütun başlığında
+      // cells[0]=kimlik, cells[1]=onay kutusu, cells[2..]=sütunlar.
+      this.__rows = devices.devices.map(device => {
+        const m = metrics.latest[device.id] || {};
+        return {
+          device,
+          cells: [
+            device.id, wasChecked.has(device.id),
+            ankamon.page.Devices.statusText(device),
+            ankamon.page.Devices.manageableText(device),
+            device.label || device.hostname || device.ip,
+            device.hostname, device.ip, device.mac, device.wifi_mac || "", F.etap(device.etap, device.facts.cpu_model), ankamon.ui.devices.Platforms.label(ankamon.ui.devices.Platforms.familyOf(device)) + (device.os_name ? " — " + device.os_name : ""),
+            ankamon.page.Devices.sessionText(device),
+            ankamon.page.Devices.wifiText(device),
+            ankamon.page.Devices.cableText(device),
+            device.facts.disk_total_bytes ? F.bytes(device.facts.disk_total_bytes) : "",
+            device.facts.mem_installed_bytes || device.facts.mem_total_bytes ? ankamon.ui.FactsView.ramText(device.facts, false) : "",
+            device.facts.bios_version || "", device.facts.kernel_version || "", device.facts.motherboard_model || "",
+            device.facts.cpu_model || "", device.facts.cpu_phys_cores || "",
+            F.percent(m.cpu_percent), F.percent(m.mem_percent), F.percent(m.disk_percent),
+            mbit(m.net_rx_mbit), mbit(m.net_tx_mbit),
+            unit(m.cpu_temp, " °C"), unit(m.case_temp, " °C"), unit(m.disk_temp, " °C"),
+            unit(m.fan_rpm, " RPM"), m.battery_v === null || m.battery_v === undefined ? "" : m.battery_v.toFixed(2) + " V",
+            device.sensors_at ? "Var" : "Yok",
+            F.ago(device.last_seen_at), F.ago(device.last_log_at)
+          ]
+        };
+      });
+      this.__apply();
+      this.__actionBar.refresh();
+      this.__note.setValue(devices.devices.length ? "" :
+        "Henüz kayıtlı cihaz yok. Cihazlar log göndermeye başladığında kendiliğinden listelenir; elle de ekleyebilirsiniz.");
+      // Boş not yer kaplamasın: tablo pencerenin altına kadar uzansın (kullanıcı isteği).
+      this.__note.setVisibility(devices.devices.length ? "excluded" : "visible");
+    },
+
+    /** Her sütunun altındaki metin kutularını (Excel tarzı sütun filtresi) uygular. */
+    __apply() {
+      // Eklenti kancası: Durum kutusuna yazılan metni bir eklenti üstlenebilir (bkz. ankamon.ext.Extensions).
+      const status = this.__filterFields && this.__filterFields.status;
+      if (status && ankamon.ext.Extensions.handle("devices.statusFilter", (status.getValue() || "").trim(), this)) {
+        status.setValue("");
+        return;
+      }
+      if (!this.__rows) {
+        return;
+      }
+      // cells[0] kimlik, cells[1] onay kutusu; sütun i'nin değeri cells[i + 2]'dedir.
+      const colFilters = this.__columns
+        // Süzgeç kutusu başlık hücresi ilk çizildiğinde oluşur (bkz. Base._addColumnFilters); henüz
+        // çizilmemiş (ekran dışı/gizli) sütunda yoktur — süzgeçsiz sayılır.
+        .map((column, index) => ({ index: index + 2, text: ((this.__filterFields[column.id] || { getValue: () => "" }).getValue() || "").toLowerCase().trim() }))
+        .filter(f => f.text);
+
+      const shown = this.__rows.filter(({ cells }) =>
+        colFilters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
+      // Sıralı listede setData önce sırasız veriyle dataChanged, sonra yeniden sıralayıp metaDataChanged yayar
+      // (Base.keepSortOnReload): aradaki sırasız sıra kutucuklara gitmesin — her tazelemede kutucuklar iki kez
+      // yer değiştiriyor, tam ekrandaki kutucuk DOM'da taşınınca tam ekrandan düşüyordu. Sıra bir kez, sonda eşitlenir.
+      this.__settingRows = true;
+      try {
+        this.__table.getTableModel().setData(this.__inScreenOrder(shown).map(r => r.cells));
+      } finally {
+        this.__settingRows = false;
+      }
+      this.__syncShownOrder();
+    },
+
+    /**
+     * Listenin sütunla sıralanmamış (varsayılan) sırası: kutucukların sürükle-bırakla kaydedilen sırası
+     * (bkz. __screenOrder, AuthApi::screenOrder) — o sıradakiler önce, sıralanmamışlar (yeni cihaz) doğal
+     * sırayla sona. Sütun başlığıyla sıralanınca o sıra geçerlidir (Base.keepSortOnReload).
+     */
+    __inScreenOrder(rows) {
+      const order = this.__screenOrder || (this._user && this._user.screen_order) || [];
+      const rank = new Map(order.map((id, i) => [id, i]));
+      const ranked = rows.filter(r => rank.has(r.device.id)).sort((a, b) => rank.get(a.device.id) - rank.get(b.device.id));
+      return ranked.concat(rows.filter(r => !rank.has(r.device.id)));
+    },
+
+    /** Gösterilen cihazlar, tablonun o anki satır sırasıyla; Ekranlar kutucukları aynı sırada çizilir. */
+    __syncShownOrder() {
+      if (!this.__rows || this.__settingRows) {
+        return;
+      }
+      const byId = new Map(this.__rows.map(r => [r.device.id, r.device]));
+      const model = this.__table.getTableModel();
+      const shown = [];
+      for (let i = 0; i < model.getRowCount(); i++) {
+        const device = byId.get(model.getValue(0, i));
+        if (device) {
+          shown.push(device);
+        }
+      }
+      this.__shownDevices = shown;
+      this.__pushPreview();
+    },
+
+    /**
+     * Ekran görünümü: grid'de o an listelenen (süzülmüş) cihazların canlı ekran önizlemeleri.
+     * Önizlemeler /screen/ sayfasının gömülü kipidir (spec.embed, q=thumb — küçük ve düşük kare hızlı;
+     * komut loguna yazılmaz, bkz. ekran köprüsü nolog). Görünüm kapanınca (Liste işaretlendi ya da
+     * başka bir sayfa) SCREENS_STOP_MS sonra akışlar duraklatılır (yük tasarrufu; bkz. __pausePreview) —
+     * iframe ve kutucuklar son görüntüleriyle yerinde kalır, yeniden kurulmaz; dönülünce akışlar sürer.
+     * Kutucuklar alttaki slider'la topluca, kenarlarından sürükleyerek tek tek boyutlandırılır.
+     * Kutucuk sağ menüsü grid satırınınkiyle AYNI (__rowMenu); "Kullanıcılar ▸ Oturumları sorgula" (bkz.
+     * __openPreviewMenu, DeviceOps.menu) — SSH ile anlık sorgu sonucu (bkz. __whoamiState, worker/ankamon/executor/
+     * whoami.py) sol altta gösterilir (bkz. __previewList, docker/rootfs/screen'de Tile.setWhoami).
+     * "Oturum aç"/"Oturumu kapat" da önizlemeden açılınca iş penceresi açmaz; ilerleme ve sonuç aynı
+     * yerde görünür (bkz. __sessionJob). Eskiden device_sessions'ın (log tabanlı)
+     * kaydı otomatik gösteriliyordu; bazen yanlış/bayat çıktığı bildirildiğinden kaldırıldı — artık
+     * yalnız kullanıcı isteğiyle, anlık sorgulanır.
+     *
+     * Kutucuklar tıklanınca seçilir (Shift ile aralık, Ctrl ile tekli ekleme, boş alana basılı
+     * tutup sürükleyerek dikdörtgenle çoklu seçim — hepsi iframe içinde, bkz. docker/rootfs/
+     * screen/index.html). Çoklu seçimde sağ menünün toplu etki gösteren maddeleri (bkz. __rowMenu/
+     * DeviceOps.menu) seçili TÜM cihazlara uygulanır. Kutucuklar sürükle-bırakla yeniden sıralanabilir;
+     * yeni sıra "tm-reorder" ile buraya iletilip kullanıcı başına kalıcı kaydedilir (bkz.
+     * __saveScreenOrder, AuthApi::screenOrder) — __previewList bu sırayı uygular.
+     */
+    __createScreensPage() {
+      const page = new qx.ui.container.Composite(new qx.ui.layout.VBox());
+      // qx.ui.embed.Iframe yerine düz <iframe> (Html bileşeni): Iframe her pointerdown'da üstüne saydam
+      // bir "blocker" koyuyor ve sekme düğmesine tıklandıktan sonra bu katman açık kalıp kutucuklara
+      // tıklama/sağ tığı yutuyordu (ölçüldü). Html bileşeninde böyle bir katman yok.
+      this.__frame = new qx.ui.embed.Html("").set({ overflowX: "hidden", overflowY: "hidden" });
+      page.add(this.__frame, { flex: 1 });
+      this.__screenRes = new Map(); // cihaz id → ekran genişliği (px), bkz. "tm-res"
+      page.add(this.__createSizeRow());
+      this.__screensPage = page;
+      this.__screenOrder = (this._user && this._user.screen_order) || [];
+
+      this.__onMessage = e => {
+        const el = this.__iframeEl();
+        if (!el || e.source !== el.contentWindow || e.origin !== window.location.origin || !e.data) {
+          return;
+        }
+        if (e.data.type === "tm-ready") {
+          this.__previewKey = null; // sayfa yeni yüklendi: güncel listeyi yeniden gönder
+          this.__pushPreview();
+          this.__pushSize(false);
+          if (this.__autoSize) {
+            this.__requestFit(false);
+          }
+          if (!this.__fitResizeId) {
+            // Varsayılan boyuttayken pencere/kenar çubuğu genişliği değişince satırdaki ekran sayısı korunur.
+            this.__fitResizeId = this.__frame.addListener("resize", () => this.__autoSize && this.__requestFit(false));
+          }
+          this.__pushView();
+          if (this.__screensPaused) {
+            this.__pausePreview(true);
+          }
+          this.__pushSelection();
+          this.__pushPopped();
+          this.__pushChat();
+        } else if (e.data.type === "tm-select") {
+          this.__checkFromPreview(e.data.ids || []);
+        } else if (e.data.type === "tm-click") {
+          qx.ui.menu.Manager.getInstance().hideAll();
+        } else if (e.data.type === "tm-menu") {
+          this.__openPreviewMenu(e.data.id, e.data.x, e.data.y, e.data.ids);
+        } else if (e.data.type === "tm-statsmenu") {
+          this.__openStatsMenu(e.data.id, e.data.x, e.data.y, e.data.ids);
+        } else if (e.data.type === "tm-show") {
+          // Kutucuğun ekran alanına çift tıklama = sağ menüdeki "Ekranı göster" (yalnız o cihaz).
+          const device = this.__devices.get(e.data.id);
+          if (device && device.online && this._can("screen")) {
+            ankamon.ui.DeviceOps.screen([device], this._user);
+          }
+        } else if (e.data.type === "tm-manage") {
+          // Kutucuktaki "🖱 Müdahale" = sağ menüdeki "Ekranı yönet": pencere büyütülmüş açılır (kullanıcı isteği).
+          const device = this.__devices.get(e.data.id);
+          if (device && device.online && this._can("screen") && this._can("screen.control")) {
+            ankamon.ui.DeviceOps.screen([device], this._user, true);
+          }
+        } else if (e.data.type === "tm-wake") {
+          // Güç tasarrufundaki kutucuğa basıldı = sağ menü Ekran ▸ Uyandır (yalnız o cihaz).
+          const device = this.__devices.get(e.data.id);
+          if (device && device.online && this._can("screen")) {
+            this.__sessionOps().wake([device]);
+          }
+        } else if (e.data.type === "tm-reorder") {
+          this.__saveScreenOrder(e.data.order || []);
+        } else if (e.data.type === "tm-live") {
+          this.__queueLiveWhoami(e.data.id);
+        } else if (e.data.type === "tm-refreshed") {
+          this.__tileRefreshed(e.data.id);
+        } else if (e.data.type === "tm-fit") {
+          this.__applyFit(e.data.px);
+        } else if (e.data.type === "tm-res") {
+          // Cihazın ekran çözünürlüğü (VNC çerçeve boyutu): slider'ın yanındaki % değeri buna göre.
+          this.__screenRes.set(e.data.id, e.data.w);
+          this.__updateSizeLabel();
+        }
+      };
+      window.addEventListener("message", this.__onMessage);
+      // Ayrı pencerede açık ekranlar (DeviceOps.screen): o cihazların önizlemesi durur, yerine not yazar.
+      this.__onScreenWindows = () => this.__pushPopped();
+      qx.event.message.Bus.subscribe(ankamon.ui.DeviceOps.SCREEN_WINDOWS, this.__onScreenWindows, this);
+      // Sohbet açık cihazın kutucuğu yüksek çözünürlükte akar: cihazdaki sohbet penceresi okunur.
+      this.__onChatWindows = () => this.__pushChat();
+      qx.event.message.Bus.subscribe(ankamon.ui.chat.Window.CHANGED, this.__onChatWindows, this);
+      // Wi-Fi Monitör bir cihazın kartını açtı/eski durumuna döndürdü: Wi-Fi sütunu anında güncellensin (kullanıcı isteği).
+      // Aynı anda birçok cihazdan gelebilir — tek tazelemede toplanır.
+      this.__onWifiRadio = () => {
+        if (!this.__wifiRefreshQueued) {
+          this.__wifiRefreshQueued = true;
+          qx.event.Timer.once(() => {
+            this.__wifiRefreshQueued = false;
+            this._refresh().catch(() => {});
+          }, this, 300);
+        }
+      };
+      qx.event.message.Bus.subscribe(ankamon.ui.devices.WifiMonitor.RADIO_CHANGED, this.__onWifiRadio, this);
+
+      // Görünürlük yoklaması: hem görünüm değişimini hem Shell'deki sayfa değişimini yakalar.
+      this.__screensTimer = new qx.event.Timer(1000);
+      this.__screensTimer.addListener("interval", this.__checkScreens, this);
+      this.__screensTimer.start();
+      return page;
+    },
+
+    /**
+     * Araç çubuğunun başındaki görünüm bölümü (bkz. ui.devices.ActionBar.addViewControls):
+     *  - Ekranlar | Liste: iki durumlu; ekran kutucukları ya da grid (seçim kullanıcı başına kalıcı).
+     *  - Sensörler (her açılışta açık): kutucukların altındaki CPU/RAM/HDD/fan/pil barı.
+     *  - Başarım: kutucuğun ekran alanında htop'un üst panelleri, saniyelik (bkz. screen/index.html Tile.syncPerf,
+     *    worker/ankamon/screen/perf.py — yalnız açıkken ve görünen cihazlar için SSH açılır; seçim tarayıcıda kalıcı).
+     * Sensörler ve Başarım kutucuklara ait olduğundan Liste'deyken devre dışıdır.
+     */
+    __createViewControls() {
+      this.__screenView = this.__loadScreenView();
+      // Varsayılan görünüm Liste (kullanıcı isteği 2026-11-12); kullanıcı Ekranlar'ı seçtiyse o hatırlanır.
+      const list = (this._user.ui_prefs || {})["devices.listView"] !== false;
+      this.__viewButtons = this.__actionBar.addViewControls([
+        // Sıra (kullanıcı isteği 2026-11-12): Liste · Ekranlar · Sensörler · Başarım.
+        { id: "list", label: "Liste", icon: "list", group: true, tip: "Cihazları tablo olarak gösterir" },
+        { id: "screens", label: "Ekranlar", icon: "layoutGrid", group: true, tip: "Cihazların canlı ekran kutucukları" },
+        { id: "stats", label: "Sensörler", icon: "temperature", tip: "Kutucukların altında işlemci, bellek, disk sıcaklığı, fan ve pil voltajı barı" },
+        { id: "perf", label: "Başarım", icon: "gauge", tip: "Ekran alanında cihazın anlık işlemci çekirdekleri, bellek, görevler ve yük (htop gibi, saniyelik)" }
+      ], (id, on) => {
+        if (!this.__viewReady) {
+          return;     // açılışta kayıtlı seçim uygulanıyor: yeniden kaydedilmez
+        }
+        if (id === "list") {
+          this.__showListView(on);
+          ankamon.page.Base.savePref(this._user, "devices.listView", on);
+        } else if (id === "stats" || id === "perf") {
+          this.__screenView[id] = on;
+          this.__saveScreenView();
+          this.__pushView();
+        }
+      });
+      this.__viewButtons.get("stats").setValue(this.__screenView.stats);
+      this.__viewButtons.get("perf").setValue(this.__screenView.perf);
+      this.__viewButtons.get(list ? "list" : "screens").setValue(true);
+      this.__viewReady = true;
+      return list;
+    },
+
+    /** Liste / ekran görünümü arasında geçer; kutucuğa ait düğmeler Liste'de devre dışı. */
+    __showListView(list) {
+      this.__views.setSelection([list ? this.__listPage : this.__screensPage]);
+      ["stats", "perf"].forEach(id => this.__viewButtons.get(id).setEnabled(!list));
+    },
+
+    __loadScreenView() {
+      const view = { stats: true, perf: false };
+      try {
+        Object.assign(view, JSON.parse(localStorage.getItem("ankamon.devices.screenView") || "{}"));
+      } catch (e) {
+        // localStorage erişilemiyor ya da bozuk — varsayılana düş.
+      }
+      // Donanım barı her açılışta basılı başlar (kullanıcı isteği: varsayılan etkin) — kapatılması
+      // yalnız o oturum için geçerlidir; Başarım seçimi kalıcıdır.
+      return { stats: true, perf: view.perf === true };
+    },
+
+    __saveScreenView() {
+      try {
+        localStorage.setItem("ankamon.devices.screenView", JSON.stringify(this.__screenView));
+      } catch (e) {
+        // sorun değil — yalnız kalıcılık kaybolur.
+      }
+    },
+
+    __pushView() {
+      const el = this.__iframeEl();
+      if (el && el.contentWindow && this.__screenView) {
+        el.contentWindow.postMessage(Object.assign({ type: "tm-view" }, this.__screenView), window.location.origin);
+      }
+    },
+
+    /** Ekran görünümünün altındaki, önizleme kutucuklarının boyutunu ayarlayan slider satırı. */
+    __createSizeRow() {
+      const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({
+        padding: [2, 8]
+      });
+      const caption = new qx.ui.basic.Label("Boyut:").set({ font: "small", textColor: "app-muted" });
+      row.add(caption);
+      // İnce ve narin (kullanıcı isteği): temanın kalın slider'ı yerine 2 px'lik ray + küçük yuvarlak tutamaç.
+      // Renkler etkin temadan (ray app-border, tutamaç temanın seçim rengi); tema değişince yeniden boyanır.
+      const slider = new qx.ui.form.Slider().set({
+        minimum: 140, maximum: 640, singleStep: 10, value: this.__loadTileSize() || 300, width: 200,
+        height: 12, maxHeight: 12, allowGrowY: false, alignY: "middle", decorator: null, padding: 0,
+        toolTipText: "Bütün kutucukları aynı boyuta getirir (tek tek boyut: kutucuğun kenarından sürükleyin)"
+      });
+      const knob = slider.getChildControl("knob").set({
+        width: 12, height: 12, minWidth: 12, minHeight: 12, maxHeight: 12, decorator: null, alignY: "middle"
+      });
+      const paint = () => {
+        const mgr = qx.theme.manager.Color.getInstance();
+        const pick = (names, fallback) => {
+          const name = names.find(n => mgr.isDynamic(n));
+          return name ? mgr.resolve(name) : fallback;
+        };
+        const line = pick(["app-border"], "#c8c8c8");
+        const accent = pick(["primary", "background-selected", "selected-start", "table-row-background-selected"], "#0067c0");
+        slider.getContentElement().setStyle("background", `linear-gradient(transparent 5px, ${line} 5px, ${line} 7px, transparent 7px)`);
+        knob.getContentElement().setStyles({ background: accent, borderRadius: "50%" });
+      };
+      paint();
+      this.__sliderThemeListener = qx.theme.manager.Meta.getInstance().addListener("changeTheme", () => qx.event.Timer.once(paint, this, 0));
+      this.__sizeSlider = slider;
+      this.__autoSize = !this.__loadTileSize();
+      slider.addListener("changeValue", e => {
+        if (this.__fitting) {
+          return;     // varsayılan boyut uygulanıyor: kaydedilmez, gönderimi __applyFit yapar
+        }
+        const v = e.getData();
+        this.__autoSize = false;
+        this.__tileSize = v;
+        this.__saveTileSize(v);
+        this.__pushSize(true);
+        this.__updateSizeLabel();
+      });
+      this.__tileSize = slider.getValue();
+      row.add(slider);
+      this.__sizeLabel = new qx.ui.basic.Label("").set({ font: "small", textColor: "app-muted", minWidth: 36 });
+      row.add(this.__sizeLabel);
+      // Çift tık: hepsi varsayılan boyuta (satırdaki ekran sayısı ekran çözünürlüğünden), tek tek boyutlar silinir.
+      [caption, this.__sizeLabel].forEach(label => label.addListener("dblclick", () => this.__resetTileSize()));
+      caption.setToolTipText(`Çift tıklayın: hepsi varsayılan boyuta (satırda ${this.__defaultColumns()} ekran)`);
+      this.__updateSizeLabel();
+      // Yardım: önizleme ve veri toplama bağlantıları — paylaşılan yayın, müdahale, kullanıcı başına bağlantılar (bkz. ui.devices.ScreenFeedHelp).
+      row.add(new qx.ui.core.Spacer(), { flex: 1 });
+      const help = new qx.ui.form.Button("?").set({
+        width: 26, minWidth: 26, padding: [1, 0], font: "bold",
+        toolTipText: "Ekranlar ve veri toplama: cihazlara hangi bağlantılar açılır, kullanıcı sayısı yükü artırır mı?"
+      });
+      help.addListener("execute", () => ankamon.ui.devices.ScreenFeedHelp.open());
+      row.add(help);
+      return row;
+    },
+
+    /** Varsayılan boyutta satırdaki ekran sayısı: kullanıcının ekran genişliğinden (1920 → 5, 1366 → 4, 2560 → 7). */
+    __defaultColumns() {
+      return Math.min(8, Math.max(2, Math.round(window.screen.width / 384)));
+    },
+
+    __resetTileSize() {
+      this.__autoSize = true;
+      try {
+        localStorage.removeItem("ankamon.devices.screenTileSize");
+      } catch (e) {
+        // sorun değil
+      }
+      this.__requestFit(true);
+    },
+
+    /** Genişliği iframe ölçer (kaydırma çubuğu, boşluklar onda); yanıt "tm-fit" ile __applyFit'e gelir. */
+    __requestFit(reset) {
+      this.__fitReset = this.__fitReset || reset;
+      const el = this.__iframeEl();
+      if (el && el.contentWindow) {
+        el.contentWindow.postMessage({ type: "tm-fit", cols: this.__defaultColumns() }, window.location.origin);
+      }
+    },
+
+    __applyFit(px) {
+      const value = Math.min(640, Math.max(140, Math.floor(px)));
+      const reset = this.__fitReset;
+      this.__fitReset = false;
+      if (!this.__autoSize || (value === this.__tileSize && !reset)) {
+        return;
+      }
+      this.__fitting = true;
+      try {
+        this.__sizeSlider.setValue(value);
+      } finally {
+        this.__fitting = false;
+      }
+      this.__tileSize = value;
+      this.__pushSize(reset);
+      this.__updateSizeLabel();
+    },
+
+    /**
+     * Slider'ın yanındaki % değeri: kutucuk genişliğinin cihaz ekranının gerçek genişliğine oranı (ör. 1920
+     * px'lik ekran 300 px'lik kutucukta %16). Cihazların çözünürlüğü önizleme bağlanınca öğrenilir
+     * ("tm-res"); farklı çözünürlükte cihazlar varsa en yaygın olanınki, hiç bilinmiyorsa 1920 esas alınır.
+     */
+    __updateSizeLabel() {
+      if (!this.__sizeLabel) {
+        return;
+      }
+      const counts = new Map();
+      this.__screenRes.forEach(w => counts.set(w, (counts.get(w) || 0) + 1));
+      let width = 1920;
+      let best = 0;
+      counts.forEach((n, w) => {
+        if (n > best) {
+          best = n;
+          width = w;
+        }
+      });
+      const pct = Math.max(1, Math.round(this.__tileSize * 100 / width));
+      this.__sizeLabel.setValue("%" + pct);
+      this.__sizeLabel.setToolTipText(`Kutucuk genişliği ${this.__tileSize} px, cihaz ekranı ${width} px genişlikte (%${pct} oranında)` +
+        (this.__autoSize ? " · varsayılan boyut" : ` · çift tıklayın: varsayılan boyut (satırda ${this.__defaultColumns()} ekran)`));
+    },
+
+    __loadTileSize() {
+      try {
+        const v = parseInt(localStorage.getItem("ankamon.devices.screenTileSize"), 10);
+        if (v && v >= 140 && v <= 640) {
+          return v;
+        }
+      } catch (e) {
+        // localStorage erişilemiyor olabilir — varsayılana düş.
+      }
+      return null;    // kayıt yok: varsayılan boyut (bkz. __defaultColumns)
+    },
+
+    __saveTileSize(v) {
+      try {
+        localStorage.setItem("ankamon.devices.screenTileSize", String(v));
+      } catch (e) {
+        // sorun değil — yalnız kalıcılık kaybolur.
+      }
+    },
+
+    /**
+     * Kutucuk seçimi ile grid onay kutuları TEK seçimdir (kullanıcı isteği): araç çubuğundaki
+     * Tümünü işaretle / İşaretleri kaldır / Sil / Komut çalıştır / Kapat / Uyandır, Ekranlar
+     * sekmesinde seçili kutucuklara da uygulansın. iframe'de seçim değişince ("tm-select") grid
+     * işaretleri ona eşitlenir; grid işaretleri değişince (tablo modelinin dataChanged'i — bkz.
+     * constructor) __pushSelection kutucuklara yansıtır. Döngü olmaz: iframe, üst sayfadan gelen
+     * seçimi geri bildirmez (bkz. screen/index.html setSelected fromParent).
+     */
+    __checkFromPreview(ids) {
+      const want = new Set(ids);
+      const tm = this.__table.getTableModel();
+      this.__applyingPreview = true;
+      try {
+        for (let row = 0; row < tm.getRowCount(); row++) {
+          const on = want.has(tm.getValue(0, row));
+          if (!!tm.getValue(1, row) !== on) {
+            tm.setValue(1, row, on);
+          }
+        }
+      } finally {
+        this.__applyingPreview = false;
+      }
+      this.__updateActionState();
+    },
+
+    /** Grid'deki işaretli cihazları önizleme kutucuklarına seçili olarak bildirir (bkz. __checkFromPreview). */
+    __pushSelection() {
+      if (this.__applyingPreview || !this.__screensRunning) {
+        return;
+      }
+      const el = this.__iframeEl();
+      if (el && el.contentWindow) {
+        el.contentWindow.postMessage({ type: "tm-selection", ids: this._checkedIds(this.__table) },
+          window.location.origin);
+      }
+    },
+
+    /** Ekran penceresi açık cihazları iframe'e bildirir (kutucuk akışı keser, "Ayrı pencerede izleniyor"). */
+    __pushPopped() {
+      const el = this.__iframeEl();
+      if (el && el.contentWindow) {
+        // frames: kapanan pencerelerin son kareleri, kutucuk "Bağlanıyor…" yerine onları gösterir (bkz. Tile.setLastFrame).
+        el.contentWindow.postMessage({ type: "tm-popped", ids: ankamon.ui.DeviceOps.screenWindowIds(),
+          frames: ankamon.ui.DeviceOps.takeLastFrames() }, window.location.origin);
+      }
+    },
+
+    __pushChat() {
+      const el = this.__iframeEl();
+      if (el && el.contentWindow) {
+        el.contentWindow.postMessage({ type: "tm-chat", ids: ankamon.ui.chat.Window.openIds() }, window.location.origin);
+      }
+    },
+
+    /**
+     * Önizleme kutucuklarının ortak boyutunu (CSS değişkeni --tile-min) iframe'e bildirir. reset: slider
+     * oynatıldı — kenardan tek tek verilmiş boyutlar silinir, hepsi aynı boyuta gelir (bkz. screen setTileSize).
+     */
+    __pushSize(reset) {
+      const el = this.__iframeEl();
+      if (el && el.contentWindow) {
+        el.contentWindow.postMessage({ type: "tm-size", px: this.__tileSize, reset: !!reset }, window.location.origin);
+      }
+    },
+
+    /**
+     * Kutucukların sürükle-bırakla değiştirilen sırasını kullanıcı başına kalıcı kaydeder (bkz.
+     * AuthApi::screenOrder, nav_order ile aynı desen). __previewList bu sırayı bir dahaki
+     * __pushPreview'da uygular.
+     */
+    async __saveScreenOrder(shownOrder) {
+      // iframe yalnız GÖSTERİLEN (süzülmüş) kutucukların sırasını bilir; süzgeçle gizli cihazların
+      // önceki kayıtlı sırası kaybolmasın diye onlar sona eklenir.
+      const shown = new Set(shownOrder);
+      const order = shownOrder.concat((this.__screenOrder || []).filter(id => !shown.has(id)));
+      this.__screenOrder = order;
+      // Liste ile kutucuklar hep aynı sırada: sütunla sıralı liste sürüklenen sıraya geçer (sıralama kalkar).
+      const model = this.__table.getTableModel();
+      if (model.getSortColumnIndex() >= 0) {
+        model.clearSorting();
+      }
+      this.__apply();
+      try {
+        await ankamon.io.Api.put("/auth/screen-order", { order });
+      } catch (e) {
+        // sessizce yok sayılır — sıradaki sürükleme yine gönderir, kalıcılık kaybı önemsiz.
+      }
+    },
+
+    __iframeEl() {
+      const dom = this.__frame && this.__frame.getContentElement().getDomElement();
+      return dom ? dom.querySelector("iframe") : null;
+    },
+
+    __checkScreens() {
+      // Stack seçili olmayan görünümü "hidden" yapar ve isSeeable() bunu yakalamaz; Shell sayfa
+      // değiştirince ise üst kapsayıcı "excluded" olur ve onu isSeeable() yakalar — ikisine de bakılır.
+      const page = this.__screensPage;
+      const seen = page.getVisibility() === "visible" && page.isSeeable() && !document.hidden;
+      if (seen) {
+        this.__screensHiddenAt = null;
+        if (!this.__screensRunning) {
+          this.__startPreview();
+        } else if (this.__screensPaused) {
+          this.__pausePreview(false);
+        }
+      } else if (this.__screensRunning && !this.__screensPaused) {
+        const now = Date.now();
+        if (this.__screensHiddenAt === null) {
+          this.__screensHiddenAt = now;
+        } else if (now - this.__screensHiddenAt >= ankamon.page.Devices.SCREENS_STOP_MS) {
+          this.__pausePreview(true);
+        }
+      }
+    },
+
+    /**
+     * Ekranlar uzun süre görünmeyince akışlar durur ama önizleme sayfası (iframe) kaldırılmaz (kullanıcı
+     * isteği: sekme hiçbir zaman yeniden kurulmasın): kutucuklar son görüntüleriyle yerinde kalır; cihaz
+     * listesi/oturum/durum/sensör güncellemeleri gizliyken de iletilir. Görününce akışlar kaldığı yerden sürer.
+     */
+    __pausePreview(paused) {
+      this.__screensPaused = paused;
+      const el = this.__iframeEl();
+      if (el && el.contentWindow) {
+        el.contentWindow.postMessage({ type: "tm-pause", paused }, window.location.origin);
+      }
+    },
+
+    __screensPaused: false,
+
+    /** __apply'ın setData'sı sürerken true: ara (sırasız) model olayları kutucuk sırasına yansımaz (bkz. __syncShownOrder). */
+    __settingRows: false,
+
+    /** Wi-Fi Monitör'ün radyo değişikliği bildirimiyle sıraya alınmış tek tazeleme (bkz. __onWifiRadio). */
+    __wifiRefreshQueued: false,
+
+    /**
+     * O an GÖSTERİLEN (süzülmüş) cihazlar, listenin satır sırasıyla (bkz. __syncShownOrder): liste
+     * sütunla sıralıysa o sıra, değilse kutucukların sürükle-bırak sırası (__inScreenOrder).
+     */
+    __orderedShown() {
+      return this.__shownDevices || [];
+    },
+
+    __previewList() {
+      const whoami = this.__whoamiState || new Map();
+      const metrics = this.__metrics || {};
+      return this.__orderedShown().map(b => {
+        // WoL yazısı (bkz. __sessionOps wolSent) cihaz açılınca kalkar; "Kapanıyor…" (shutdownSent) cihaz kapanınca
+        // ya da kapanmadıysa SHUTDOWN_NOTE_MS sonra.
+        const w = whoami.get(b.id);
+        if (w && ((w.wol && b.online) || (w.off && (!b.online || Date.now() - w.off > ankamon.page.Devices.SHUTDOWN_NOTE_MS)))) {
+          whoami.delete(b.id);
+        }
+        // Kutucuğun alt barı (bkz. screen/index.html Tile.setStats): grid'in İşlemci/Bellek/sensör
+        // sütunlarıyla aynı son ölçümler — yalnız çevrimiçi cihazda (eski ölçüm kapalı cihazda yanıltır).
+        const m = b.online ? metrics[b.id] : null;
+        return {
+          id: b.id, name: b.label || b.hostname || b.ip || ("#" + b.id), online: !!b.online, alive: !!(b.alive ?? b.online),
+          whoami: whoami.get(b.id) || null,
+          // "Oturumu açık kullanıcı yok (23 dk)": oturumsuz durumun başladığı an (epoch sn; bkz. DevicesApi
+          // no_session_since) — kutucuk süreyi kendisi sayar.
+          noSessionSince: b.online ? b.no_session_since || null : null,
+          refresh: (this.__tileRefresh && this.__tileRefresh.get(b.id)) || 0,
+          // Monitör DPMS ile kapalı (bkz. 025_device_display_state.sql): kutucukta "Ekran güç tasarrufu kipinde".
+          powersave: !!b.online && ["Off", "Standby", "Suspend"].includes(b.display_state),
+          // Alt bardaki ağ simgeleri ve güç tasarrufu yazısının altındaki TiHA otomatik kapatma geri sayımı
+          // (bkz. migration 026, worker executor/netif.py + autoshutdown.py) — yalnız çevrimiçi cihazda.
+          net: b.online ? b.netifs || null : null,
+          autoshutdown: b.online ? b.autoshutdown || null : null,
+          hide: this.__statsHidden()[b.id] || [],
+          hw: this.__hwSummary(b.facts),
+          stats: m ? {
+            cpu: m.cpu_percent ?? null, mem: m.mem_percent ?? null, temp: m.cpu_temp ?? m.temp_max ?? null,
+            disk_temp: m.disk_temp ?? null, fan: m.fan_rpm ?? null, battery: m.battery_v ?? null
+          } : null
+        };
+      });
+    },
+
+    /**
+     * Ekranlar "Başarım" görünümünün üstündeki donanım satırı: işlemci modeli (çekirdek/iş parçacığı,
+     * en yüksek hız), RAM ve sistem diski — Bilgi kartının topladığı facts'ten (bkz. worker
+     * executor/hwfacts.py); henüz toplanmamışsa null. Örn. "Intel Core i3-4000M · 2 çekirdek / 4 iş
+     * parçacığı @ 2.40 GHz · RAM 7.2 GB · Disk 238.5 GB SSD (SAMSUNG MZ7TE256HMHP-000FH)".
+     */
+    __hwSummary(f) {
+      if (!f || !f.cpu_model) {
+        return null;
+      }
+      const gb = bytes => (bytes / 1073741824).toFixed(1) + " GB";
+      const model = String(f.cpu_model).replace(/\((R|TM|tm)\)/g, "").replace(/\s+@.*$/, "")
+        .replace(/\s+(CPU|APU)\b.*$/, "").replace(/\s+/g, " ").trim();
+      const phys = f.cpu_phys_cores, threads = f.cpu_cores;
+      let cpu = model;
+      if (phys && threads && phys !== threads) {
+        cpu += ` · ${phys} çekirdek / ${threads} iş parçacığı`;
+      } else if (threads || phys) {
+        cpu += ` · ${threads || phys} çekirdek`;
+      }
+      if (f.cpu_max_mhz) {
+        cpu += ` @ ${(f.cpu_max_mhz / 1000).toFixed(2)} GHz`;
+      }
+      const parts = [cpu];
+      // Takılı bellek (SMBIOS) — MemTotal değil: 8 GB modül işletim sisteminde ~7.2 GB görünür.
+      if (f.mem_installed_bytes || f.mem_total_bytes) {
+        parts.push("RAM " + ankamon.ui.FactsView.ramText(f));
+      }
+      if (f.disk_total_bytes) {
+        const kind = f.disk_rotational === 0 ? " SSD" : f.disk_rotational === 1 ? " HDD" : "";
+        parts.push(`Disk ${gb(f.disk_total_bytes)}${kind}` + (f.disk_model ? ` (${f.disk_model})` : ""));
+      }
+      return parts.join(" · ");
+    },
+
+    __startPreview() {
+      const control = this._user.is_admin || this._user.features.includes("screen.control");
+      const spec = { devices: this.__previewList(), q: "thumb", control, embed: true };
+      this.__screensRunning = true;
+      this.__previewKey = JSON.stringify(spec.devices);
+      const url = "/screen/#" + btoa(unescape(encodeURIComponent(JSON.stringify(spec))));
+      // "allow=fullscreen": kutucuktaki tam ekran düğmesi iframe içinden ancak bu izinle çalışır.
+      this.__frame.setHtml(`<iframe src="${url}" allow="fullscreen" allowfullscreen ` +
+        `style="border:0;width:100%;height:100%;display:block"></iframe>`);
+    },
+
+    /** Grid'in cihaz listesi (süzgeç/yenileme) değiştiyse önizleme sayfasına bildirir; yalnız fark varsa. */
+    __pushPreview() {
+      if (!this.__frame || !this.__screensRunning) {
+        return;
+      }
+      const list = this.__previewList();
+      const key = JSON.stringify(list);
+      const el = this.__iframeEl();
+      if (key === this.__previewKey || !el || !el.contentWindow) {
+        return;
+      }
+      this.__previewKey = key;
+      // Sayfa henüz yükleniyorsa mesaj kaybolabilir; sayfa hazır olunca "tm-ready" ile yeniden ister.
+      el.contentWindow.postMessage({ type: "tm-devices", devices: list }, window.location.origin);
+    },
+
+    /**
+     * Önizleme kutucuğunun sağ menüsü — grid satırınınkiyle AYNI (__rowMenu); yalnız "Kullanıcılar" altındaki
+     * Oturum aç / Oturumu kapat / Oturumları sorgula burada sessionOps ile iş penceresi yerine kutucuk
+     * durumuna yönlendirilir (bkz. __sessionOps). Çoklu seçim: iframe'de Shift/Ctrl ile seçilenler (bkz.
+     * docker/rootfs/screen/index.html "tm-menu").
+     * @param ids {Array?} iframe'deki o anki çoklu seçim (sağ tıklanan dahil); verilmezse/tek
+     *   elemanlıysa yalnız bu tek cihaz — bkz. DeviceOps.menu devices parametresiyle aynı desen.
+     */
+    __openPreviewMenu(id, x, y, ids) {
+      this.__openPreviewMenuAt(id, x, y, ids, this.__iframeEl());
+    },
+
+    /**
+     * Önizleme kutucuğunun sağ menüsü, konum verilen iframe öğesine GÖRE hesaplanır (x/y iframe içi
+     * koordinat) — menü içeriği grid satırıyla AYNI (__rowMenu).
+     */
+    __openPreviewMenuAt(id, x, y, ids, el) {
+      const device = this.__devices && this.__devices.get(id);
+      if (!device) {
+        return;
+      }
+      const devices = ids && ids.length > 1 ? ids.map(i => this.__devices.get(i)).filter(Boolean) : [device];
+      const menu = this.__rowMenu(device, devices, this.__sessionOps());
+      if (!menu) {
+        return; // hiç yetki yok: boş menü açılmaz
+      }
+      if (this.__previewMenu) {
+        const old = this.__previewMenu;
+        qx.event.Timer.once(() => old.destroy(), null, 0);
+      }
+      this.__previewMenu = menu;
+      if (!el) {
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      menu.openAtPoint({ left: Math.round(rect.left + x), top: Math.round(rect.top + y) });
+    },
+
+    /** Bu kullanıcının cihaz başına gizlediği göstergeler: {"<cihaz id>": ["fan", …]} (users.ui_prefs["screens.stats"]). */
+    __statsHidden() {
+      return ((this._user && this._user.ui_prefs) || {})["screens.stats"] || {};
+    },
+
+    /**
+     * Kutucuğun alt barına sağ tık (bkz. screen/index.html "tm-statsmenu"): hangi göstergelerin görüneceği.
+     * İşaretler sağ tıklanan cihazın durumunu gösterir; değişiklik o an seçili TÜM kutucuklara uygulanır
+     * (seçim dışına sağ tıklanınca seçim o kutucuğa iner). Seçim kullanıcının tercihi olarak sunucuda saklanır
+     * (AuthApi::prefs, "screens.stats") — sekmeye her girişte ve başka tarayıcıda da aynı görünür.
+     */
+    __openStatsMenu(id, x, y, ids) {
+      const targets = (ids && ids.length ? ids : [id]).map(String);
+      const hiddenOf = bid => new Set(this.__statsHidden()[bid] || []);
+      const current = hiddenOf(String(id));
+      const menu = new qx.ui.menu.Menu();
+      menu.add(new qx.ui.menu.Button(targets.length > 1 ? `Göstergeler — seçili ${targets.length} cihaz` : "Göstergeler").set({ enabled: false }));
+      menu.add(new qx.ui.menu.Separator());
+      const apply = mutate => {
+        const map = Object.assign({}, this.__statsHidden());
+        targets.forEach(bid => {
+          const set = hiddenOf(bid);
+          mutate(set);
+          if (set.size) {
+            map[bid] = [...set];
+          } else {
+            delete map[bid];
+          }
+        });
+        const prefs = this._user.ui_prefs || (this._user.ui_prefs = {});
+        prefs["screens.stats"] = map;
+        ankamon.io.Api.put("/auth/prefs", { key: "screens.stats", value: map }).catch(e => ankamon.ui.Dialog.error(e));
+        this.__pushPreview();
+      };
+      ankamon.page.Devices.STATS_ITEMS.forEach(([key, label]) => {
+        const box = new qx.ui.menu.CheckBox(label).set({ value: !current.has(key) });
+        box.addListener("changeValue", e => apply(set => (e.getData() ? set.delete(key) : set.add(key))));
+        menu.add(box);
+      });
+      menu.add(new qx.ui.menu.Separator());
+      const all = new qx.ui.menu.Button("Tümünü göster");
+      all.addListener("execute", () => apply(set => set.clear()));
+      menu.add(all);
+      if (this.__previewMenu) {
+        const old = this.__previewMenu;
+        qx.event.Timer.once(() => old.destroy(), null, 0);
+      }
+      this.__previewMenu = menu;
+      const el = this.__iframeEl();
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        menu.openAtPoint({ left: Math.round(rect.left + x), top: Math.round(rect.top + y) });
+      }
+    },
+
+    /** "Oturumları sorgula": seçili cihazlarda o an oturum açmış kullanıcıyı paralel sorgular;
+     * eşzamanlılık worker'da yüke göre dinamik (bkz. whoami.dynamic_concurrency). */
+    __startWhoamiQuery(deviceIds, quiet = false) {
+      if (quiet) {
+        // Kendiliğinden sorgu (kutucuk canlıya geçti) "Kapanıyor…" yazan cihazı atlar (bkz. __sessionOps shutdownSent).
+        deviceIds = deviceIds.filter(id => !((this.__whoamiState && this.__whoamiState.get(id)) || {}).off);
+      }
+      this.__sessionJob(deviceIds, { type: "whoami" }, () => "Oturum sorgulanıyor…",
+        t => (t.status === "ok" ? { status: "ok", text: t.output } : { status: "error", text: "Sorgulanamadı" }), quiet);
+    },
+
+    /**
+     * Ekranlar kutucuğu "Bağlanıyor…"dan canlıya geçti ("tm-live", bkz. screen/index.html connect): o cihazın
+     * oturumu kendiliğinden sorgulanır. Aynı anda bağlanan kutucuklar 1,5 sn içinde TEK işte toplanır; zaten
+     * sorgulanan/işlem süren cihaz atlanır; hata penceresi açılmaz (kutucukta "Başlatılamadı" görünür).
+     */
+    __queueLiveWhoami(id) {
+      const device = this.__devices.get(id);
+      const st = this.__whoamiState && this.__whoamiState.get(id);
+      // "Kapanıyor…" (bkz. __sessionOps shutdownSent) kapanana dek kalır: kendiliğinden oturum sorgusu üstüne yazmaz.
+      if (!device || !device.online || !this._can("screen") || (st && (st.status === "querying" || st.off))) {
+        return;
+      }
+      if (!this.__liveQueue) {
+        this.__liveQueue = new Set();
+        qx.event.Timer.once(() => {
+          const ids = [...this.__liveQueue];
+          this.__liveQueue = null;
+          this.__startWhoamiQuery(ids, true);
+        }, this, 1500);
+      }
+      this.__liveQueue.add(id);
+    },
+
+    /**
+     * DeviceOps.menu'ye verilen önizleme işleyicileri: "Oturum aç"/"Oturumu kapat" onaydan sonra iş
+     * penceresi açmadan çalışır; kutucuğun sol altında "x oturumu açılıyor/kapatılıyor…", bitince
+     * kullanıcı adı (ya da "Oturumu açık kullanıcı yok") görünür.
+     */
+    __sessionOps() {
+      const known = id => {
+        const st = this.__whoamiState && this.__whoamiState.get(id);
+        return st && st.status === "ok" && st.text ? st.text : "";
+      };
+      return {
+        // Bilgisayarı aç (WoL): görev başlayınca kapalı kutucuğun kullanıcı adı alanında "SS:DD:sn Magic paket
+        // gönderildi" (kullanıcı isteği). Cihaz çevrimiçi olunca kalkar (bkz. __previewList).
+        wolSent: devices => {
+          if (!this.__whoamiState) {
+            this.__whoamiState = new Map();
+          }
+          const at = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          devices.forEach(b => this.__whoamiState.set(b.id, { status: "ok", text: `${at} Magic paket gönderildi`, wol: true }));
+          this.__pushPreview();
+        },
+        // Bilgisayarı kapat: komut cihaza ulaşınca (iş hedefi "ok" — "Kapatma komutu verildi.") kutucuğun sol altında
+        // "Kapanıyor…" (kullanıcı isteği 2026-11-10); ulaşamazsa kutucuk olduğu gibi kalır (hata çıktı penceresinde).
+        // Cihaz kapanınca kalkar (bkz. __previewList).
+        shutdownSent: (jobId, devices) => {
+          if (!this.__whoamiState) {
+            this.__whoamiState = new Map();
+          }
+          const before = new Map(devices.map(b => [b.id, this.__whoamiState.get(b.id)]));
+          this.__pollSession(jobId, new Set(devices.map(b => b.id)),
+            t => (t.status === "ok" ? { status: "ok", text: "Kapanıyor…", off: Date.now() } : before.get(t.device_id)));
+        },
+        query: devices => this.__startWhoamiQuery(devices.map(b => b.id)),
+        login: (devices, acc) => this.__sessionJob(devices.map(b => b.id), { type: "login", username: acc.name },
+          () => `${acc.name} oturumu açılıyor…`,
+          t => (t.status === "ok" ? { status: "ok", text: acc.name } : { status: "error", text: "Oturum açılamadı" })),
+        logout: devices => this.__sessionJob(devices.map(b => b.id), { type: "logout" },
+          id => (known(id) ? `${known(id)} oturumu kapatılıyor…` : "Oturum kapatılıyor…"),
+          t => (t.status === "ok" ? { status: "ok", text: "" } : { status: "error", text: "Oturum kapatılamadı" })),
+        // Ekran ▸ Uyandır: kutucukta geçici "Ekran uyandırılıyor…"; bitince önceki oturum bilgisi geri gelir
+        // (uyandırma oturumu değiştirmez), hata olursa "Uyandırılamadı".
+        wake: devices => {
+          const before = new Map(devices.map(b => [b.id, this.__whoamiState && this.__whoamiState.get(b.id)]));
+          this.__sessionJob(devices.map(b => b.id), { type: "wake" }, () => "Ekran uyandırılıyor…",
+            t => {
+              if (t.status !== "ok") {
+                return { status: "error", text: "Uyandırılamadı" };
+              }
+              // "Güç tasarrufu" yazısı cihaz listesinin bir sonraki tazelenmesini beklemeden kalksın.
+              const device = this.__devices.get(t.device_id);
+              if (device) {
+                device.display_state = "On";
+              }
+              return before.get(t.device_id) || { status: "ok", text: known(t.device_id) };
+            });
+        },
+        // Ekran ▸ Uyut: Uyandır'ın eşi; başarılıysa kutucuk hemen "güç tasarrufu" yazısına geçer.
+        sleep: devices => {
+          const before = new Map(devices.map(b => [b.id, this.__whoamiState && this.__whoamiState.get(b.id)]));
+          this.__sessionJob(devices.map(b => b.id), { type: "sleep" }, () => "Ekran uyutuluyor…",
+            t => {
+              if (t.status !== "ok") {
+                return { status: "error", text: "Uyutulamadı" };
+              }
+              const device = this.__devices.get(t.device_id);
+              if (device) {
+                device.display_state = "Off";
+              }
+              return before.get(t.device_id) || { status: "ok", text: known(t.device_id) };
+            });
+        },
+        // Ekran ▸ Kilitle / Kilidi aç: cihaz işi teyit edene dek kutucukta "Kilitleniyor…"; teyitten sonra akış
+        // yeniden kurulur (kilit görseli görünür), yeni görüntü gelince önceki oturum bilgisi geri döner (ekran
+        // kilidi oturumu değiştirmez). Grid'in "Oturum" hücresi tazelemeyi beklemeden "/ Kilitli" alır/bırakır.
+        screenLock: (devices, on) => {
+          const before = new Map(devices.map(b => [b.id, this.__whoamiState && this.__whoamiState.get(b.id)]));
+          const pending = on ? "Kilitleniyor…" : "Kilit açılıyor…";
+          this.__sessionJob(devices.map(b => b.id), { type: on ? "screen_lock" : "screen_unlock" }, () => pending,
+            t => {
+              if (t.status !== "ok") {
+                return { status: "error", text: on ? "Kilitlenemedi" : "Kilit açılamadı" };
+              }
+              const device = this.__devices.get(t.device_id);
+              if (device) {
+                device.screen_locked = on;
+                if (on) {
+                  device.display_state = "On"; // kilitleme ekranı uyandırır: "güç tasarrufu" örtüsü kilidi kapatmasın
+                }
+              }
+              this.__refreshTile(t.device_id, () => {
+                const prev = before.get(t.device_id);
+                if (prev) {
+                  this.__whoamiState.set(t.device_id, prev);
+                } else {
+                  this.__whoamiState.delete(t.device_id);
+                }
+                this.__pushPreview();
+              });
+              return { status: "querying", text: pending };
+            });
+        },
+        // Kilitte oturum açık kalır: kutucukta kullanıcı adı "(kilitli)" ile görünür (çıktının ilk satırı).
+        lock: devices => this.__sessionJob(devices.map(b => b.id), { type: "lock" },
+          id => (known(id) ? `${known(id)} oturumu kilitleniyor…` : "Oturum kilitleniyor…"),
+          t => {
+            const user = ((t.output || "").split("\n")[0] || "").trim();
+            return t.status === "ok" ? { status: "ok", text: user ? `${user} (kilitli)` : "" } : { status: "error", text: "Kilitlenemedi" };
+          })
+      };
+    },
+
+    /**
+     * Kutucuğun akışını yeniden kurdurur (bkz. screen/index.html Tile.refreshStream); yeni görüntü gelince
+     * ("tm-refreshed") ya da en geç TILE_REFRESH_MS sonra done() çağrılır — kutucuk o an görünmüyor, akış
+     * kurulamıyor olsa da yazı takılı kalmaz.
+     */
+    __refreshTile(id, done) {
+      this.__tileRefresh = this.__tileRefresh || new Map();
+      this.__tileRefreshDone = this.__tileRefreshDone || new Map();
+      this.__tileRefresh.set(id, (this.__tileRefresh.get(id) || 0) + 1);
+      this.__tileRefreshDone.set(id, done);
+      qx.event.Timer.once(() => {
+        if (this.__tileRefreshDone.get(id) === done) {
+          this.__tileRefreshed(id);
+        }
+      }, this, ankamon.page.Devices.TILE_REFRESH_MS);
+    },
+
+    __tileRefreshed(id) {
+      const done = this.__tileRefreshDone && this.__tileRefreshDone.get(id);
+      if (done) {
+        this.__tileRefreshDone.delete(id);
+        done();
+      }
+    },
+
+    /**
+     * Cihaz başına tek satırlık sonuç üreten bir görevi (whoami/login/logout) kuyruğa alır; cihazlar
+     * hemen `pendingText(id)` durumuna geçer, sonuçlar __pollSession ile bitirdikçe `resultOf(target)`
+     * ile kutucuklara yansır (bkz. __whoamiState, __previewList).
+     */
+    async __sessionJob(deviceIds, body, pendingText, resultOf, quiet = false) {
+      if (!deviceIds.length) {
+        return;
+      }
+      if (!this.__whoamiState) {
+        this.__whoamiState = new Map();
+      }
+      deviceIds.forEach(id => this.__whoamiState.set(id, { status: "querying", text: pendingText(id) }));
+      this.__pushPreview();
+      let res;
+      try {
+        res = await ankamon.io.Api.post("/jobs", Object.assign({ device_ids: deviceIds }, body));
+      } catch (e) {
+        deviceIds.forEach(id => this.__whoamiState.set(id, { status: "error", text: "Başlatılamadı" }));
+        this.__pushPreview();
+        if (!quiet) {
+          ankamon.ui.Dialog.error(e);
+        }
+        return;
+      }
+      this.__pollSession(res.id, new Set(deviceIds), resultOf);
+    },
+
+    /** /api/jobs/{id}'yi kısa aralıkla okur; bitiren her cihazın sonucunu ANINDA (en yavaşı
+     * beklemeden) yansıtır — hepsi bitince kendiliğinden durur (bkz. ui.Jobs'taki aynı desen). */
+    __pollSession(jobId, pending, resultOf) {
+      ankamon.io.Api.get(`/jobs/${jobId}`).then(res => {
+        let changed = false;
+        ((res.job && res.job.targets) || []).forEach(t => {
+          if (!pending.has(t.device_id) || ["queued", "running"].includes(t.status)) {
+            return;
+          }
+          pending.delete(t.device_id);
+          const state = resultOf(t);
+          const cur = this.__whoamiState.get(t.device_id);
+          if (cur && cur.off && !(state && state.off)) {
+            return; // kapatma komutu ulaştı: öncesinde başlamış bir sorgunun sonucu "Kapanıyor…"yu silmesin
+          }
+          if (state) {
+            this.__whoamiState.set(t.device_id, state);
+          } else {
+            this.__whoamiState.delete(t.device_id);
+          }
+          changed = true;
+        });
+        if (changed) {
+          this.__pushPreview();
+        }
+        if (pending.size) {
+          qx.event.Timer.once(() => this.__pollSession(jobId, pending, resultOf), this, 800);
+        }
+      }).catch(() => {
+        // Ağ/istek hatası: kalanları hata say, kullanıcıyı sonsuza dek "sürüyor" durumunda bırakma.
+        pending.forEach(id => this.__whoamiState.set(id, { status: "error", text: "Sonuç alınamadı" }));
+        this.__pushPreview();
+      });
+    },
+
+    /**
+     * Grid'deki işaretleri Ekranlar kutucuklarına yansıtır (bkz. __pushSelection). Tablo modelinin
+     * "dataChanged" olayına bağlıdır (onay kutusu tıklaması, Tümünü işaretle/kaldır, süzgeç/yenileme).
+     */
+    __updateActionState() {
+      if (this.__applyingPreview) {
+        return; // __checkFromPreview satır satır işaretlerken her satırda değil, sonunda bir kez
+      }
+      this.__pushSelection();
+      if (this.__actionBar) {
+        this.__actionBar.refresh();
+      }
+    },
+
+    /** Cihaz ekle / Düzenle penceresi — ortak (bkz. ui.DeviceOps.editDevice; Bakım ▸ Ahenk sağ menüsü de kullanır). */
+    __edit(device) {
+      ankamon.ui.DeviceOps.editDevice(device, () => this.refresh(), this._user);
+    },
+
+    /**
+     * Satır sağ menüsü: DeviceOps.menu() çevrimiçi/çevrimdışına göre Komut çalıştır / Ekran / … ve
+     * yan yana Bilgisayarı aç (WoL) + Bilgisayarı kapat ekler (bkz. ui.DeviceOps) — burada bu sayfaya
+     * özgü kayıt işlemleri (Düzenle / Sil), Logları göster (Loglar sayfasını bu cihaza süzülmüş
+     * açar — bkz. ui.Shell.OPEN_LOGS) ve hemen altında Bilgi kartı eklenir.
+     */
+    __rowMenu(device, devices = [device], sessionOps = null) {
+      const menu = ankamon.ui.DeviceOps.menu(device, this._user, devices, sessionOps) || new qx.ui.menu.Menu();
+      const ICON = ankamon.ui.Shell.ICON;
+      const add = (icon, label, handler) => menu.add(ankamon.ui.DeviceOps.menuButton(icon, label, handler.bind(this)));
+      // Eklentilerin maddeleri (bkz. ankamon.ext.Extensions.addDeviceMenu): ortak işlemlerin ardında, kendi bölümünde.
+      // parent verilen madde o çekirdek grubunun alt menüsüne (ör. Komut çalıştır ▸ TiHA); grup yoksa kendi bölümüne.
+      const own = ankamon.ext.Extensions.deviceMenuItems(device, devices, this._user).filter(item => {
+        const parent = item.getUserData("ankamon.menuParent");
+        const host = parent && menu.getChildren().find(c => c instanceof qx.ui.menu.Button && c.getMenu()
+          && c.getUserData("ankamon.menuKey") === parent);
+        if (host) {
+          host.getMenu().add(item);
+        }
+        return !host;
+      });
+      if (own.length) {
+        if (menu.getChildren().length) {
+          menu.add(new qx.ui.menu.Separator());
+        }
+        own.forEach(item => menu.add(item));
+      }
+      // Bilgi kartı: ortak (bkz. DeviceOps.logsAndInfo). "Logları göster" burada yok (kullanıcı isteği 2026-11-11):
+      // Bilgisayar ayrıntıları penceresindeki "Loglar" düğmesinde.
+      const extra = ankamon.ui.DeviceOps.logsAndInfo(device, this._user, devices, { noLogs: true }).map(item => () => menu.add(item));
+      // Bilgisayarı aç (WoL) artık DeviceOps.menu'de "Bilgisayarı kapat"ın hemen yanında (kullanıcı
+      // isteği: ikisi komşu); çevrimiçi cihazda orada devre dışı görünür.
+      if (this._can("devices.manage")) {
+        // Çoklu seçimde toplu düzenleme (ui.network.DeviceBulkEdit — kullanıcı isteği 2026-11-10).
+        extra.push(() => add(ICON.edit, "Düzenle" + (devices.length > 1 ? ` (${devices.length} cihaz)` : ""), () => (devices.length > 1
+          ? ankamon.ui.network.DeviceBulkEdit.open({ devices, user: this._user, onSaved: () => this.refresh() })
+          : this.__edit(device))));
+        extra.push(() => add(ICON.delete, "Sil" + (devices.length > 1 ? ` (${devices.length} cihaz)` : ""),
+          () => this.__delete(devices)));
+      }
+      if (extra.length) {
+        if (menu.getChildren().length) {
+          menu.add(new qx.ui.menu.Separator());
+        }
+        extra.forEach(fn => fn());
+      }
+      // "Tümünü işaretle / İşaretleri kaldır" sağ menüden kalktı (kullanıcı isteği 2026-11-11): başlıktaki onay kutusu
+      // görünen satırların hepsini işaretler/kaldırır. Elle cihaz ekleme kalır.
+      if (this._can("devices.manage")) {
+        menu.add(new qx.ui.menu.Separator());
+        add(ICON.add || "＋", "Cihaz ekle…", () => this.__edit(null));
+      }
+      // İşletim sistemine göre (kullanıcı isteği 2026-11-12): seçili cihazların hiçbirinde uygulaması olmayan madde devre
+      // dışı + ipucu (araç çubuğu aynı maddeleri kullanır) — bkz. ui.devices.Platforms, platforms/README.md.
+      return ankamon.ui.devices.Platforms.decorate(menu, devices);
+    },
+
+    /**
+     * Bir ya da daha fazla cihazı; loglarını ve sensör geçmişini de dahil ederek TAMAMEN siler
+     * (toolbar "Sil" düğmesi işaretli tüm cihazları, satır sağ menüsü tek cihazı [device] olarak
+     * gönderir) — bkz. backend DevicesApi::delete (logs + metrics). Silinen cihaz engellenmez: hâlâ
+     * log gönderiyorsa worker kaydı kendiliğinden yeniden açar.
+     *
+     * İlerleme penceresi her cihaz için ayrı bir satırla açılır ve kayıtlar SIRAYLA (paralel değil)
+     * silinir; her DELETE sonucu geldikçe o satır anlık "⏳ siliniyor…" → "✓/✕ ..." olarak güncellenir
+     * — sessizce yalnız listeyi yenileyip tek bir özet göstermek yerine.
+     */
+    async __delete(devices) {
+      const esc = v => qx.bom.String.escape(String(v ?? "—"));
+      const name = b => b.label || b.hostname || b.ip || ("#" + b.id);
+      const question = devices.length === 1
+        ? `<b>${esc(name(devices[0]))}</b> kaydı, logları ve sensör geçmişiyle birlikte TAMAMEN silinsin mi? Bu işlem geri alınamaz.`
+        : `Seçili <b>${devices.length}</b> cihaz kaydı, logları ve sensör geçmişiyle birlikte TAMAMEN silinsin mi?<br>` +
+          `${devices.map(b => esc(name(b))).join(", ")}<br>Bu işlem geri alınamaz.`;
+      const sure = await ankamon.ui.Dialog.confirm(question, "Sil");
+      if (!sure) {
+        return;
+      }
+
+      const win = ankamon.ui.Dialog.window("Siliniyor…", 480);
+      const rowLabels = new Map();
+      devices.forEach(device => {
+        const label = new qx.ui.basic.Label(`⏳ <b>${esc(name(device))}</b> siliniyor…`).set({ rich: true, wrap: true });
+        win.add(label);
+        rowLabels.set(device.id, label);
+      });
+      win.open();
+
+      let ok = 0;
+      let failed = 0;
+      for (const device of devices) {
+        try {
+          const r = await ankamon.io.Api.del("/devices/" + device.id);
+          ok++;
+          rowLabels.get(device.id).setValue(
+            `✓ <b>${esc(name(device))}</b> silindi — ${r.logs_deleted ?? 0} log kaydı, ` +
+            `${r.metrics_deleted ?? 0} sensör ölçümü temizlendi.`);
+        } catch (e) {
+          failed++;
+          rowLabels.get(device.id).setValue(`✕ <b>${esc(name(device))}</b> silinemedi — Hata: ${esc(e.message || e)}`);
+        }
+        this.refresh();
+      }
+
+      win.add(new qx.ui.basic.Label(
+        failed
+          ? (ok ? `${ok} kayıt silindi, ${failed} kayıt silinemedi.` : `${failed} kayıt silinemedi.`)
+          : `${ok} kayıt, logları ve sensör geçmişiyle birlikte tamamen silindi.`
+      ).set({ rich: true, wrap: true, font: "bold" }));
+      const close = new qx.ui.form.Button("Tamam");
+      close.addListener("execute", () => win.close());
+      ankamon.ui.Dialog.buttons(win, [close]);
+    }
+  }
+});

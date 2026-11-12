@@ -78,8 +78,8 @@ qx.Class.define("ankamon.ui.network.AssetCellHints", {
         "Yok: veri gelmedi (program kurulu değil, cihaz kapalı ya da yönetilen bir cihaz değil)."
     },
 
-    /** Ağ ▸ Akıllı Tahtalar (page.Boards) — Varlıklar'ın akıllı tahta alt kümesi. */
-    BOARDS: {
+    /** Ağ ▸ Akıllı Tahtalar (page.Devices) — Varlıklar'ın akıllı tahta alt kümesi. */
+    DEVICES: {
       status: "Cihaz şu an ağda mı? Varlıklar'daki durumla aynıdır: ağ taraması cihazı görüyorsa ya da SSH yanıt " +
         "veriyorsa 'Çevrimiçi', görülmüyorsa 'Kapalı'.",
       manageable: "Ankamon bu cihazı uzaktan yönetebiliyor mu? Ankamon cihaza SSH ile yönetici (root) olarak bağlanmayı " +

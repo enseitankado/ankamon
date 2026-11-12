@@ -53,7 +53,7 @@ import tornado.websocket
 from psycopg.types.json import Jsonb
 
 from .. import activity, db
-from ..executor.jobs import _board_access
+from ..executor.jobs import _device_access
 from . import audio, chat, perf, remote, shared_feed, taskmgr, wifi
 
 log = logging.getLogger("ankamon.screen")
@@ -74,27 +74,27 @@ _SSH_OPTS = [
 _streams = 0
 
 
-def _lookup(board_id: int):
+def _lookup(device_id: int):
     """Cihaz adresi + SSH erişimi."""
     with db.connect() as conn:
-        board = conn.execute(
-            "SELECT host(ip) AS ip, coalesce(nullif(label, ''), hostname, host(ip)) AS name FROM boards WHERE id = %s",
-            (board_id,),
+        device = conn.execute(
+            "SELECT host(ip) AS ip, coalesce(nullif(label, ''), hostname, host(ip)) AS name FROM devices WHERE id = %s",
+            (device_id,),
         ).fetchone()
-        if not board or not board["ip"]:
+        if not device or not device["ip"]:
             return None
-        ssh_user, password = _board_access(conn)
-        return board, ssh_user, password
+        ssh_user, password = _device_access(conn)
+        return device, ssh_user, password
 
 
-def _record(board_id: int, name: str, user: str, control: bool) -> None:
+def _record(device_id: int, name: str, user: str, control: bool) -> None:
     """Başarıyla açılan tek cihaz izleme/müdahale oturumunu komut loglarına ve etkinlik günlüğüne yazar."""
     what = "ekran yönetimi (fare/klavye) oturumu açıldı" if control else "ekran izleme oturumu açıldı"
     with db.connect() as conn:
         conn.execute(
-            "INSERT INTO command_log (board_id, board_name, username, source, command, status)"
+            "INSERT INTO command_log (device_id, device_name, username, source, command, status)"
             " VALUES (%s, %s, %s, 'screen', %s, 'ok')",
-            (board_id, name, user, what),
+            (device_id, name, user, what),
         )
         activity.record(conn, f"{'Ekran yönetimi' if control else 'Ekran izleme'}: {user} → {name}",
                         "warn" if control else "info")
@@ -104,7 +104,7 @@ VNC_ACTION = "vnc-install"          # actions/vnc-install — "Ekran istemcisini
 VNC_RETRY_AFTER_FAIL_MIN = 10       # başarısız otomatik kurulum bu kadar dakika yeniden denenmez
 
 
-def _autoinstall(board_id: int, name: str, username: str) -> tuple[int, str]:
+def _autoinstall(device_id: int, name: str, username: str) -> tuple[int, str]:
     """Cihazda x11vnc yok (4004): ayar açıksa kurulumu arka plan görevi olarak başlatır.
 
     Döner: (4006, "job <id>") kurulum sürüyor/başlatıldı · (4007, "job <id>") son
@@ -118,13 +118,13 @@ def _autoinstall(board_id: int, name: str, username: str) -> tuple[int, str]:
         if row is not None and row["value"] is False:
             return 4004, "x11vnc"
         with conn.transaction():
-            conn.execute("SELECT pg_advisory_xact_lock(hashtext('screen.vnc-install'), %s)", (board_id,))
+            conn.execute("SELECT pg_advisory_xact_lock(hashtext('screen.vnc-install'), %s)", (device_id,))
             last = conn.execute(
                 """SELECT j.id, t.status, j.finished_at > now() - make_interval(mins => %s) AS recent
                    FROM jobs j JOIN job_targets t ON t.job_id = j.id
-                   WHERE j.type = 'action' AND j.params->>'action' = %s AND t.board_id = %s
+                   WHERE j.type = 'action' AND j.params->>'action' = %s AND t.device_id = %s
                    ORDER BY j.id DESC LIMIT 1""",
-                (VNC_RETRY_AFTER_FAIL_MIN, VNC_ACTION, board_id)).fetchone()
+                (VNC_RETRY_AFTER_FAIL_MIN, VNC_ACTION, device_id)).fetchone()
             if last and last["status"] in ("queued", "running"):
                 return 4006, f"job {last['id']}"
             if last and last["status"] in ("failed", "unreachable") and last["recent"]:
@@ -135,7 +135,7 @@ def _autoinstall(board_id: int, name: str, username: str) -> tuple[int, str]:
                    VALUES ('action', 'Ekran istemcisini (x11vnc) kur — otomatik', %s, %s) RETURNING id""",
                 (Jsonb({"action": VNC_ACTION, "values": {}, "auto": True}), user["id"] if user else None),
             ).fetchone()["id"]
-            conn.execute("INSERT INTO job_targets (job_id, board_id) VALUES (%s, %s)", (job_id, board_id))
+            conn.execute("INSERT INTO job_targets (job_id, device_id) VALUES (%s, %s)", (job_id, device_id))
             conn.execute("SELECT pg_notify('ankamon_jobs', %s)", (str(job_id),))
             activity.record(conn, f"Ekranlar: {name} cihazında x11vnc yok — ekran istemcisi otomatik kuruluyor")
     log.info("%s: x11vnc yok, otomatik kurulum görevi #%s başlatıldı", name, job_id)
@@ -152,7 +152,7 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
     feed: shared_feed.ScreenFeed | None = None
     writer: asyncio.StreamWriter | None = None
 
-    async def open(self, board_id: str):
+    async def open(self, device_id: str):
         self.set_nodelay(True)
         profile = self.get_argument("q", "view")
         if profile not in remote.PROFILES:
@@ -164,33 +164,33 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
             return
         if control:
             profile = "view"
-        found = await asyncio.to_thread(_lookup, int(board_id))
+        found = await asyncio.to_thread(_lookup, int(device_id))
         if found is None:
-            self.close(4001, "board")
+            self.close(4001, "device")
             return
-        board, ssh_user, password = found
+        device, ssh_user, password = found
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
-        target = f"{ssh_user}@{board['ip']}"
+        target = f"{ssh_user}@{device['ip']}"
         # Önizleme kutucukları (onlarca cihaz) günlüğü doldurmasın; yalnız tek cihaz izlemesi ve
         # müdahale yazılır — ve yalnız ekran paylaşımı gerçekten başladıysa (başarısız denemeler değil).
         # nolog=1: Cihazlar sayfasının "Ekranlar" önizleme sekmesi (kullanıcı isteği: önizleme komut
         # loguna yansımaz — oradan tam ekrana büyütülen kutucuk da). Müdahale her durumda yazılır.
         nolog = self.get_argument("nolog", "0") == "1"
         if control:
-            await self._open_private(int(board_id), board, user, env, target)
+            await self._open_private(int(device_id), device, user, env, target)
             return
 
         async def opener(feed):
             # Yeni yayın eşzamanlı akış sınırına sayılır (kendisi zaten listede).
             if _streams + shared_feed.active_count() - 1 >= MAX_STREAMS:
                 raise shared_feed.FeedRefused(4029, "limit")
-            port, dim = await self._start_remote(int(board_id), board, user, env, target, profile, False)
+            port, dim = await self._start_remote(int(device_id), device, user, env, target, profile, False)
             await feed.start(port, remote.PROFILES[profile]["wait"], dim,
                              ["sshpass", "-e", "ssh", *_SSH_OPTS, "-W", f"127.0.0.1:{port}", target], env)
 
         try:
-            feed = await shared_feed.join(int(board_id), profile, self.get_argument("fresh", "0") == "1",
-                                          board["name"], opener)
+            feed = await shared_feed.join(int(device_id), profile, self.get_argument("fresh", "0") == "1",
+                                          device["name"], opener)
         except shared_feed.FeedRefused as e:
             self.close(e.code, e.reason)
             return
@@ -206,10 +206,10 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
             return
         feed.track(self.writer)
         if profile == "view" and not nolog:
-            await asyncio.to_thread(_record, int(board_id), board["name"], user, False)
-        asyncio.ensure_future(self._pump_shared(reader, board["name"]))
+            await asyncio.to_thread(_record, int(device_id), device["name"], user, False)
+        asyncio.ensure_future(self._pump_shared(reader, device["name"]))
 
-    async def _start_remote(self, board_id: int, board: dict, user: str, env: dict, target: str,
+    async def _start_remote(self, device_id: int, device: dict, user: str, env: dict, target: str,
                             profile: str, control: bool) -> tuple[int, str | None]:
         """Cihazda x11vnc'yi 127.0.0.1'inde başlatır; (port, gerçek çözünürlük) döner. Hata: FeedRefused."""
         start = await asyncio.create_subprocess_exec(
@@ -229,13 +229,13 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
             code, reason = self._close_reason(start.returncode or 4, err_text)
             if code == 4004:
                 # Cihaz ağda ve SSH çalışıyor ama x11vnc yok: ayara göre arka planda kur (bkz. _autoinstall).
-                code, reason = await asyncio.to_thread(_autoinstall, board_id, board["name"], user)
+                code, reason = await asyncio.to_thread(_autoinstall, device_id, device["name"], user)
             else:
-                log.info("%s: ekran paylaşımı başlatılamadı (çıkış %s): %s", board["name"], start.returncode, err_text[-200:])
+                log.info("%s: ekran paylaşımı başlatılamadı (çıkış %s): %s", device["name"], start.returncode, err_text[-200:])
             raise shared_feed.FeedRefused(code, reason)
         return port, remote.parse_dim(text)
 
-    async def _open_private(self, board_id: int, board: dict, user: str, env: dict, target: str):
+    async def _open_private(self, device_id: int, device: dict, user: str, env: dict, target: str):
         """Müdahale: yalnız bu kullanıcının bağlantısı (girdi kabul eden x11vnc + kendi SSH tüneli)."""
         global _streams
         if _streams + shared_feed.active_count() >= MAX_STREAMS:
@@ -244,20 +244,20 @@ class ScreenSocket(tornado.websocket.WebSocketHandler):
         _streams += 1
         self.counted = True
         try:
-            port, _dim = await self._start_remote(board_id, board, user, env, target, "view", True)
+            port, _dim = await self._start_remote(device_id, device, user, env, target, "view", True)
         except shared_feed.FeedRefused as e:
             self.close(e.code, e.reason)
             return
         if self.ws_connection is None:  # tarayıcı bu arada kapattı; x11vnc -timeout ile kendisi biter
             return
-        await asyncio.to_thread(_record, board_id, board["name"], user, True)
+        await asyncio.to_thread(_record, device_id, device["name"], user, True)
         # Standart SSH tüneli: stdin/stdout doğrudan x11vnc'nin TCP bağlantısıdır.
         self.proc = await asyncio.create_subprocess_exec(
             "sshpass", "-e", "ssh", *_SSH_OPTS, "-W", f"127.0.0.1:{port}", target,
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        asyncio.ensure_future(self._pump(board["name"]))
+        asyncio.ensure_future(self._pump(device["name"]))
 
     async def _pump_shared(self, reader: asyncio.StreamReader, name: str):
         """Çoğaltıcı → WebSocket. Yayın biterse tarayıcı 4010 ile hemen yeniden bağlanır (yeni yayın kurulur);

@@ -87,9 +87,9 @@ name=$(python3 -c __FULLSCREEN__ "${before:-0}" 2>&1) && echo "Açıldı ($U otu
 """
 
 
-def open_site(board: dict, user: str, password: str, url: str) -> dict:
+def open_site(device: dict, user: str, password: str, url: str) -> dict:
     """Döner: {"status", "rc", "output"} (bkz. accounts._ssh)."""
     if not URL_RE.match(url or ""):
         return {"status": "failed", "rc": None, "output": "Geçersiz adres."}
     script = _SCRIPT.replace("__URL__", shlex.quote(url)).replace("__FULLSCREEN__", shlex.quote(_FULLSCREEN))
-    return _ssh(board, user, password, script, timeout=40)
+    return _ssh(device, user, password, script, timeout=40)

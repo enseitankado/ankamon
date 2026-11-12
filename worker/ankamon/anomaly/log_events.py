@@ -38,9 +38,9 @@ from __future__ import annotations
 import datetime
 from types import SimpleNamespace
 
-BOARDS = """
+DEVICES = """
 SELECT id, lower(hostname) AS host, host(ip) AS ip, COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name
-FROM boards WHERE hostname IS NOT NULL AND hostname <> ''
+FROM devices WHERE hostname IS NOT NULL AND hostname <> ''
 """
 
 KNOWN = """
@@ -50,15 +50,15 @@ ORDER BY started_at
 """
 
 
-def boards_by_host(conn) -> dict:
-    return {r["host"]: r for r in conn.execute(BOARDS).fetchall()}
+def devices_by_host(conn) -> dict:
+    return {r["host"]: r for r in conn.execute(DEVICES).fetchall()}
 
 
-def board_fields(boards: dict, host: str) -> dict:
+def device_fields(devices: dict, host: str) -> dict:
     """Kayıt alanları: cihaz kayıtlıysa onun kimliği ve adı, değilse logdaki ad."""
-    board = boards.get((host or "").lower())
-    return {"host": (host or "").lower(), "board_id": board["id"] if board else None,
-            "board_name": board["name"] if board else host}
+    device = devices.get((host or "").lower())
+    return {"host": (host or "").lower(), "device_id": device["id"] if device else None,
+            "device_name": device["name"] if device else host}
 
 
 def episodes(rows: list, gap: datetime.timedelta) -> list[list]:
@@ -105,7 +105,7 @@ def event_rule(kind: str, query: str, *, gap: datetime.timedelta, min_count: int
 
     def detect(conn, since):
         now = conn.execute("SELECT now() AS now").fetchone()["now"]
-        boards = boards_by_host(conn)
+        devices = devices_by_host(conn)
         rows = conn.execute(query, dict(params or {}, since=since)).fetchall()
         groups: dict = {}
         for r in rows:
@@ -128,7 +128,7 @@ def event_rule(kind: str, query: str, *, gap: datetime.timedelta, min_count: int
                 last = ep[-1]["at"]
                 ongoing = now - last <= gap
                 message, extra = text(ep, count)
-                found.append(dict(board_fields(boards, host), started_at=start,
+                found.append(dict(device_fields(devices, host), started_at=start,
                                   ended_at=None if ongoing else last,
                                   detail=dict(extra, text=message, count=count, key=key)))
         return found, scopes

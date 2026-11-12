@@ -1,5 +1,5 @@
 {
-  "_comment": "Cihaz işlevlerinin işletim sistemi ailesine göre tanımı (kullanıcı isteği 2026-11-12) — TEK KAYNAK: ön yüz (ui.boards.Platforms, GET /api/platforms), PHP (ActionsApi) ve worker (ankamon/platforms.py) bu dosyayı okur. Ayrıntı: platforms/README.md.",
+  "_comment": "Cihaz işlevlerinin işletim sistemi ailesine göre tanımı (kullanıcı isteği 2026-11-12) — TEK KAYNAK: ön yüz (ui.devices.Platforms, GET /api/platforms), PHP (ActionsApi) ve worker (ankamon/platforms.py) bu dosyayı okur. Ayrıntı: platforms/README.md.",
   "families": {
     "linux": {
       "label": "Linux",

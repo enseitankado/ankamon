@@ -148,7 +148,7 @@ qx.Class.define("ankamon.io.Api", {
       return this.request("PUT", path, body);
     },
 
-    /** @param body {Object?} toplu silme gibi durumlarda (ör. /board-sessions) gövdeyle kimlik listesi gönderilir. */
+    /** @param body {Object?} toplu silme gibi durumlarda (ör. /device-sessions) gövdeyle kimlik listesi gönderilir. */
     del(path, body) {
       return this.request("DELETE", path, body);
     }

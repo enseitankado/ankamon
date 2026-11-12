@@ -77,12 +77,12 @@ final class NetworkApi
         ];
     }
 
-    /** ?network=<id> (0/boş: tüm ağlar), ?board=<id> (yalnız o cihazın cihaz satırı — Bilgisayar ayrıntıları penceresi).
+    /** ?network=<id> (0/boş: tüm ağlar), ?device=<id> (yalnız o cihazın cihaz satırı — Bilgisayar ayrıntıları penceresi).
      * Her cihaz kendi servis listesiyle döner. */
     public function devices(Request $request): array
     {
         $network = $request->queryInt('network', 0, 0, PHP_INT_MAX);
-        $board = $request->queryInt('board', 0, 0, PHP_INT_MAX);
+        $deviceFilter = $request->queryInt('device', 0, 0, PHP_INT_MAX);
         $state = $this->state();
         $devices = Db::all(
             "SELECT d.id, d.network_id, n.cidr::text AS network, d.mac::text AS mac, host(d.ip) AS ip, d.hostname,
@@ -104,7 +104,7 @@ final class NetworkApi
                     d.shares_requested_at IS NOT NULL AS shares_requested, d.shares_auth,
                     extract(epoch FROM d.activity_at)::bigint AS activity_at, d.activity_pps,
                     extract(epoch FROM d.flow_at)::bigint AS flow_at, d.flow_pps, d.flow_kbps, d.flow_proto,
-                    b.id AS board_id, COALESCE(NULLIF(b.label, ''), b.hostname) AS board_name,
+                    b.id AS device_id, COALESCE(NULLIF(b.label, ''), b.hostname) AS device_name,
                     -- Keşif: satır listeye nasıl girdi (scan|syslog|manual|self). Taramayla açılmış ama cihaz daha önce
                     -- Cihazlar'a loglarından (syslog) ya da elle (manual) girmişse o ilk yol.
                     CASE WHEN d.source = 'scan' AND b.source IN ('syslog', 'manual') AND b.created_at < d.first_seen_at
@@ -126,15 +126,15 @@ final class NetworkApi
                               FROM net_shares sh WHERE sh.device_id = d.id), '[]') AS shares
              FROM net_devices d
              JOIN net_networks n ON n.id = d.network_id
-             -- Cihaz bir cihaza ait mi: kablolu MAC (boards.mac) ya da Wi-Fi kartının MAC'i (boards.wifi_mac, göç 043);
+             -- Cihaz bir cihaza ait mi: kablolu MAC (devices.mac) ya da Wi-Fi kartının MAC'i (devices.wifi_mac, göç 043);
              -- aynı adres iki kayıtta varsa kablolu eşleşme önce.
-             LEFT JOIN boards b ON b.id = (SELECT x.id FROM boards x WHERE x.mac = d.mac OR x.wifi_mac = d.mac
+             LEFT JOIN devices b ON b.id = (SELECT x.id FROM devices x WHERE x.mac = d.mac OR x.wifi_mac = d.mac
                                            ORDER BY (x.mac = d.mac) IS TRUE DESC, x.id LIMIT 1)
              -- MAC ↔ takma ad kaydı (göç 016; okul envanterinden): grid'in Takma ad sütunu.
              LEFT JOIN net_known_aliases k ON k.mac = d.mac
              WHERE (? = 0 OR d.network_id = ?) AND (? = 0 OR b.id = ?)
              ORDER BY d.online DESC, d.last_seen_at DESC NULLS LAST, d.ip NULLS LAST, d.mac",
-            [$network, $network, $board, $board]
+            [$network, $network, $deviceFilter, $deviceFilter]
         );
         foreach ($devices as &$device) {
             $device['services'] = json_decode((string) $device['services'], true) ?: [];
@@ -142,10 +142,10 @@ final class NetworkApi
             $device['discoveries'] = json_decode((string) $device['discoveries'], true) ?: [];
         }
         unset($device);
-        // Sensörler sütunu: bağlı cihaz kaydına son 24 saatte sensör verisi geldi mi (bkz. Core\BoardSensors::lastSeenAll).
-        $sensors = \Ankamon\Core\BoardSensors::lastSeenAll();
+        // Sensörler sütunu: bağlı cihaz kaydına son 24 saatte sensör verisi geldi mi (bkz. Core\DeviceSensors::lastSeenAll).
+        $sensors = \Ankamon\Core\DeviceSensors::lastSeenAll();
         foreach ($devices as &$device) {
-            $device['sensors_at'] = $device['board_id'] !== null ? ($sensors[(int) $device['board_id']] ?? null) : null;
+            $device['sensors_at'] = $device['device_id'] !== null ? ($sensors[(int) $device['device_id']] ?? null) : null;
         }
         unset($device);
         // ETAP faz bilgisi (bkz. migration 018, worker netscan/etap_phase.py); yoksa null.

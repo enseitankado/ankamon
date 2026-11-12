@@ -28,34 +28,34 @@
 /**
  * "Yedekle/Geri al" (sağ menü → Dosyalar): iki sekmeli pencere — "Yedekle" (seçilen cihazlardan seçilen hesapların
  * ev dizini + hesap bilgisi + PIN anahtarı, tar.gz) ve "Geri al" (yedek dosyasından hesabı yeniden oluşturma).
- * Sekmeler yetkiye göre: boards.backup / boards.restore. İşler görev penceresinde yürür (bkz. ui.Jobs).
+ * Sekmeler yetkiye göre: devices.backup / devices.restore. İşler görev penceresinde yürür (bkz. ui.Jobs).
  */
 qx.Class.define("ankamon.ui.homebackup.Window", {
   extend: qx.ui.window.Window,
 
   statics: {
     /**
-     * @param boards {Array} sağ menünün uygulandığı cihazlar (çoklu seçim) — iki sekmede de işaretli gelir
+     * @param devices {Array} sağ menünün uygulandığı cihazlar (çoklu seçim) — iki sekmede de işaretli gelir
      * @param user {Map} oturum sahibi
      */
-    async open(boards, user) {
+    async open(devices, user) {
       const name = b => b.label || b.hostname || b.ip || "#" + b.id;
-      let all = boards.filter(b => b.online).map(b => ({ id: b.id, name: name(b) }));
+      let all = devices.filter(b => b.online).map(b => ({ id: b.id, name: name(b) }));
       try {
-        const res = await ankamon.io.Api.get("/boards");
-        const online = res.boards.filter(b => b.online).map(b => ({ id: b.id, name: name(b) }));
+        const res = await ankamon.io.Api.get("/devices");
+        const online = res.devices.filter(b => b.online).map(b => ({ id: b.id, name: name(b) }));
         all = online.concat(all.filter(b => !online.some(o => o.id === b.id)));
       } catch (e) {
         // Cihaz listesi okunamadı: yalnız seçili cihazlar sunulur.
       }
       all.sort((a, b) => a.name.localeCompare(b.name, "tr", { numeric: true }));
-      const win = new ankamon.ui.homebackup.Window(all, boards.filter(b => b.online).map(b => b.id), user);
+      const win = new ankamon.ui.homebackup.Window(all, devices.filter(b => b.online).map(b => b.id), user);
       qx.core.Init.getApplication().getRoot().add(win);
       win.open();
     }
   },
 
-  construct(boards, selected, user) {
+  construct(devices, selected, user) {
     super("Yedekle/Geri al");
     const root = qx.core.Init.getApplication().getRoot();
     const bounds = root.getBounds() || { width: 1280, height: 760 };
@@ -72,11 +72,11 @@ qx.Class.define("ankamon.ui.homebackup.Window", {
       page.add(panel);
       tabs.add(page);
     };
-    if (can("boards.backup")) {
-      addTab("Yedekle", new ankamon.ui.homebackup.BackupPanel(boards, selected));
+    if (can("devices.backup")) {
+      addTab("Yedekle", new ankamon.ui.homebackup.BackupPanel(devices, selected));
     }
-    if (can("boards.restore")) {
-      addTab("Geri al", new ankamon.ui.homebackup.RestorePanel(boards, selected));
+    if (can("devices.restore")) {
+      addTab("Geri al", new ankamon.ui.homebackup.RestorePanel(devices, selected));
     }
     this.add(tabs);
     this.addListenerOnce("appear", () => this.center());

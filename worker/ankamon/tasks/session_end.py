@@ -25,7 +25,7 @@
 
 """Cihaz oturumlarının "cihaz çevrimdışı oldu" ('offline') kapanışlarını netleştirir (göç 023).
 
-Kapanış mesajı gelmeden cihaz çevrimdışı olunca oturum 'offline' kapatılır (bkz. board_sessions.py) —
+Kapanış mesajı gelmeden cihaz çevrimdışı olunca oturum 'offline' kapatılır (bkz. device_sessions.py) —
 ama bu tek etiket çok farklı durumları topluyordu (kullanıcı isteği). Cihaz yeniden erişilebilir olunca
 SSH ile kendi açılış günlüğüne (journalctl, kalıcı) bakılır; oturumun açık olduğu açılışın nasıl bittiği:
 
@@ -52,7 +52,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from ..executor import ansible
-from ..executor.jobs import _board_access
+from ..executor.jobs import _device_access
 
 log = logging.getLogger(__name__)
 
@@ -92,11 +92,11 @@ _DETAIL_GENERIC = ("Cihaz kapatıldı (menüden ya da komutla)",)   # eski kayı
 
 def attribute_shutdowns(conn) -> None:
     conn.execute(f"""
-        UPDATE board_sessions s SET end_detail = COALESCE(
+        UPDATE device_sessions s SET end_detail = COALESCE(
             'Cihaz Ankamon''dan kapatıldı (' || (
                 SELECT a.username FROM audit_log a
                 WHERE a.action = 'job.create' AND a.detail->>'action' = 'shutdown'
-                  AND a.detail->'boards' @> to_jsonb(s.board_id)
+                  AND a.detail->'devices' @> to_jsonb(s.device_id)
                   AND a.time BETWEEN s.ended_at - interval '{_REMOTE_WINDOW}' AND s.ended_at + interval '1 minute'
                 ORDER BY a.time DESC LIMIT 1) || ')',
             'Cihaz kullanıcı tarafından kapatıldı')
@@ -107,8 +107,8 @@ def attribute_shutdowns(conn) -> None:
 
 def _check_offline(conn) -> None:
     rows = conn.execute(f"""
-        SELECT s.id, s.board_id, extract(epoch FROM s.started_at)::bigint AS started, host(b.ip) AS ip
-        FROM board_sessions s JOIN boards b ON b.id = s.board_id
+        SELECT s.id, s.device_id, extract(epoch FROM s.started_at)::bigint AS started, host(b.ip) AS ip
+        FROM device_sessions s JOIN devices b ON b.id = s.device_id
         WHERE s.end_reason = 'offline' AND s.end_checked_at IS NULL
           AND b.online AND b.ssh_ok AND b.ip IS NOT NULL
           AND s.started_at > now() - interval '{_LOOKBACK_DAYS} days'
@@ -116,18 +116,18 @@ def _check_offline(conn) -> None:
     """).fetchall()
     if not rows:
         return
-    user, password = _board_access(conn)
+    user, password = _device_access(conn)
     if not password:
         return
-    hosts = {r["board_id"]: r["ip"] for r in rows}
+    hosts = {r["device_id"]: r["ip"] for r in rows}
     results = ansible.run([{"id": i, "ip": ip} for i, ip in hosts.items()], user, password, body=SCRIPT, timeout=90)
     for r in rows:
-        res = results.get(r["board_id"]) or {}
+        res = results.get(r["device_id"]) or {}
         if res.get("status") != "ok":
             continue  # bir sonraki turda yeniden denenir (cihaz erişilebilirken)
         reason, detail, end = classify(r["started"], *parse(res.get("output", "")))
         conn.execute(
-            """UPDATE board_sessions SET end_reason = COALESCE(%s, end_reason), end_detail = %s,
+            """UPDATE device_sessions SET end_reason = COALESCE(%s, end_reason), end_detail = %s,
                       ended_at = COALESCE(to_timestamp(%s), ended_at), end_checked_at = now()
                WHERE id = %s""",
             (reason, detail, end, r["id"]))

@@ -36,7 +36,7 @@ use Ankamon\Core\Request;
 
 /**
  * Ankamon'un KENDİ kullanıcılarının oturum geçmişi (login_sessions, göç 019) — cihazlardaki kullanıcı
- * oturumları (board_sessions, "sessions.*" yetkileri) DEĞİL. Kullanıcılar ▸ Oturumlar sekmesi ve alt
+ * oturumları (device_sessions, "sessions.*" yetkileri) DEĞİL. Kullanıcılar ▸ Oturumlar sekmesi ve alt
  * çubuktaki "oturum açmış kullanıcılar" göstergesi kullanır. Ayrıntı 'logins' yetkisi ister; alt çubuk
  * sayısı her oturum sahibine açıktır (bkz. active()).
  */
@@ -69,13 +69,13 @@ final class LoginSessionsApi
                  SELECT d.mac, 1 AS pr, d.last_seen_at AS seen FROM net_devices d
                   WHERE d.ip = CASE WHEN ls.ip ~ '^[0-9.]+$' THEN ls.ip::inet END
                  UNION ALL
-                 SELECT b.mac, 2, b.last_seen_at FROM boards b
+                 SELECT b.mac, 2, b.last_seen_at FROM devices b
                   WHERE b.ip = CASE WHEN ls.ip ~ '^[0-9.]+$' THEN ls.ip::inet END AND b.mac IS NOT NULL
                ) m ORDER BY m.pr, m.seen DESC NULLS LAST LIMIT 1
              ) pc ON true
              LEFT JOIN LATERAL (
                SELECT coalesce(
-                 (SELECT nullif(b.label, '') FROM boards b WHERE (b.mac = pc.mac OR b.wifi_mac = pc.mac) AND b.label <> ''
+                 (SELECT nullif(b.label, '') FROM devices b WHERE (b.mac = pc.mac OR b.wifi_mac = pc.mac) AND b.label <> ''
                    ORDER BY (b.mac = pc.mac) IS TRUE DESC LIMIT 1),
                  (SELECT nullif(d.label, '') FROM net_devices d WHERE d.mac = pc.mac AND d.label <> ''
                    ORDER BY d.last_seen_at DESC NULLS LAST LIMIT 1),

@@ -44,13 +44,13 @@ final class MetricsInfoApi
     private const TARGETS = '/data/telegraf/targets.conf';
     private const TELEGRAF_CONF = '/etc/ankamon/telegraf.conf';
     private const RESHAPE = '/etc/ankamon/reshape.star';
-    private const BOARD_STATUS = '/opt/ankamon/worker/ankamon/tasks/board_status.py';
+    private const DEVICE_STATUS = '/opt/ankamon/worker/ankamon/tasks/device_status.py';
     private const DASHBOARDS = '/etc/ankamon/grafana/dashboards';
 
     public function info(): array
     {
-        $boards = self::boards();
-        $rows10 = array_sum(array_column($boards, 'rows_10m'));
+        $devices = self::devices();
+        $rows10 = array_sum(array_column($devices, 'rows_10m'));
         $layers = self::layers();
         $raw = $layers['raw'];
         // Sıkıştırılmamış (son ~2 gün) chunk'ların gerçek bayt/satırı; satır sayısı pg_class istatistiğinden
@@ -70,11 +70,11 @@ final class MetricsInfoApi
             'collection' => self::collection(),
             'filter' => self::filter(),
             'series' => Db::all(
-                "SELECT t.name, count(*) AS series, count(DISTINCT t.board_id) AS boards
-                 FROM metrics_tag t JOIN boards b ON b.id::text = t.board_id
+                "SELECT t.name, count(*) AS series, count(DISTINCT t.device_id) AS devices
+                 FROM metrics_tag t JOIN devices b ON b.id::text = t.device_id
                  GROUP BY t.name ORDER BY t.name"
             ),
-            'boards' => $boards,
+            'devices' => $devices,
             'rate' => [
                 'rows_10m' => $rows10,
                 'rows_per_day' => $perDay,
@@ -95,8 +95,8 @@ final class MetricsInfoApi
     {
         $conf = (string) @file_get_contents(self::TELEGRAF_CONF);
         $targets = (string) @file_get_contents(self::TARGETS);
-        $status = (string) @file_get_contents(self::BOARD_STATUS);
-        preg_match_all('/board_id = "(\d+)"/', $targets, $ids);
+        $status = (string) @file_get_contents(self::DEVICE_STATUS);
+        preg_match_all('/device_id = "(\d+)"/', $targets, $ids);
         $agent = fn(string $key) => preg_match('/^\s*' . $key . '\s*=\s*"?([^"\n]+)"?/m', $conf, $m) ? trim($m[1]) : null;
         $py = fn(string $key) => preg_match('/^' . $key . '\s*=\s*([\d.]+)/m', $status, $m) ? (float) $m[1] : null;
         $timeout = preg_match('/timeout = "([^"]+)"/', $targets, $m) ? $m[1] : null;
@@ -138,22 +138,22 @@ final class MetricsInfoApi
     }
 
     /** Cihaz başına: durum, seri sayısı ve son 10 dakikada gerçekten yazılan satır (ölçülen). */
-    private static function boards(): array
+    private static function devices(): array
     {
         $recent = [];
         foreach (Db::all(
-            "SELECT t.board_id, count(*) AS n, extract(epoch FROM max(m.time))::bigint AS last
+            "SELECT t.device_id, count(*) AS n, extract(epoch FROM max(m.time))::bigint AS last
              FROM metrics m JOIN metrics_tag t USING (tag_id)
-             WHERE m.time > now() - interval '10 minutes' GROUP BY t.board_id"
+             WHERE m.time > now() - interval '10 minutes' GROUP BY t.device_id"
         ) as $r) {
-            $recent[$r['board_id']] = $r;
+            $recent[$r['device_id']] = $r;
         }
-        $series = array_column(Db::all('SELECT board_id, count(*) AS n FROM metrics_tag GROUP BY board_id'), 'n', 'board_id');
+        $series = array_column(Db::all('SELECT device_id, count(*) AS n FROM metrics_tag GROUP BY device_id'), 'n', 'device_id');
         $out = [];
         foreach (Db::all(
             "SELECT id, COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name, host(ip) AS ip, exporter_port,
                     online, exporter_ok, monitor_enabled
-             FROM boards ORDER BY name"
+             FROM devices ORDER BY name"
         ) as $b) {
             $key = (string) $b['id'];
             $out[] = $b + [

@@ -504,7 +504,7 @@ qx.Class.define("ankamon.page.Base", {
      * @param columns {Array} [{id, label, width?}] — width verilmeyen sütunlar esner
      * @param opts {Map} {checkable: true} verilirse, kimlikten hemen sonra tıklanabilir bir
      *   onay kutusu sütunu eklenir (satır başı çoklu seçim); bkz. _checkedIds/_checkAll.
-     *   {storageKey: "ör. boards.columns"} verilirse: genişlikler içeriğe göre otomatik ayarlanır,
+     *   {storageKey: "ör. devices.columns"} verilirse: genişlikler içeriğe göre otomatik ayarlanır,
      *   kullanıcının elle ayarladığı genişlikler ve gizlenen sütunlar sunucuda saklanır, tablonun
      *   yerleşik sütun menüsü (sağ üstte) açılır — bkz. __setupColumnPrefs.
      *   {prefsKey: "ör. logs.columns"}: genişlikler OLDUĞU gibi (width/esnek) kalır; yalnız sütun sırası
@@ -801,7 +801,7 @@ qx.Class.define("ankamon.page.Base", {
      * etiketi (sondaki "(3)" gibi sayaç hariç). Kayıtlı sekme artık yoksa (yetki değişti) ilk sekme kalır.
      * Sayfanın kendi changeSelection dinleyicisinden ÖNCE çağrılmalı: geri yükleme onu tetiklemesin.
      * @param tabs {qx.ui.tabview.TabView} sekmeleri eklenmiş görünüm
-     * @param name {String} sayfaya özgü kısa ad, ör. "boards"
+     * @param name {String} sayfaya özgü kısa ad, ör. "devices"
      */
     _rememberTab(tabs, name) {
       const key = "tab." + name;

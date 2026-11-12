@@ -141,9 +141,9 @@ qx.Class.define("ankamon.ui.taskmgr.UsersTab", {
       const STATE = { active: "Etkin", online: "Bağlı (arka planda)", closing: "Kapanıyor" };
       links.forEach(link => {
         const m = link.getModel();
-        const board = link.getDisplay();
+        const device = link.getDisplay();
         // Arama: çok cihazda bilgisayar adı ya da kullanıcı adı (tek cihazda eskisi gibi süzülmez).
-        const users = !this._win.isMulti() || !q || this._win.boardMatches(link, q) ? m.users
+        const users = !this._win.isMulti() || !q || this._win.deviceMatches(link, q) ? m.users
           : m.users.filter(u => String(u.user).toLowerCase().includes(q));
         sessions += users.length;
         const byUid = new Map();
@@ -162,11 +162,11 @@ qx.Class.define("ankamon.ui.taskmgr.UsersTab", {
           const where = u.self ? "Ankamon bağlantısı (bu pencere)"
             : [u.type === "x11" ? "Masaüstü" : u.type, u.display || u.tty, u.remote ? "uzak: " + u.host : ""].filter(Boolean).join(" · ");
           rows.push([key, label, STATE[u.state] || u.state, `#${u.id} ${where}`, Math.round(sum(list, "cpu") * 10) / 10,
-            sum(list, "mem"), sum(list, "disk"), sum(list, "net"), board]);
+            sum(list, "mem"), sum(list, "disk"), sum(list, "net"), device]);
           if (open) {
             list.slice().sort((a, b) => b.cpu - a.cpu || b.mem - a.mem).slice(0, 60).forEach(p =>
               rows.push([this._rowId(link, "p:" + u.id + ":" + p.pid), `<span style="display:inline-block;width:40px"></span>${F.esc(p.name)} <span style="opacity:.6">${p.pid}</span>`,
-                F.state(p.state, p.eco), "", p.cpu, p.mem, p.disk, p.net, board]));
+                F.state(p.state, p.eco), "", p.cpu, p.mem, p.disk, p.net, device]));
           }
         });
       });

@@ -160,21 +160,21 @@ class PerfSocket(tornado.websocket.WebSocketHandler):
         self._lookup = lookup
         self._ssh_opts = ssh_opts
 
-    async def open(self, board_id: str):
+    async def open(self, device_id: str):
         global _streams
         if _streams >= MAX_STREAMS:
             self.close(4029, "limit")
             return
         _streams += 1
         self.counted = True
-        found = await asyncio.to_thread(self._lookup, int(board_id))
+        found = await asyncio.to_thread(self._lookup, int(device_id))
         if found is None:
-            self.close(4001, "board")
+            self.close(4001, "device")
             return
-        board, ssh_user, password = found
+        device, ssh_user, password = found
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
         self.proc = await asyncio.create_subprocess_exec(
-            "sshpass", "-e", "ssh", *self._ssh_opts, f"{ssh_user}@{board['ip']}", _REMOTE_LOOP,
+            "sshpass", "-e", "ssh", *self._ssh_opts, f"{ssh_user}@{device['ip']}", _REMOTE_LOOP,
             stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
             env=env,
         )

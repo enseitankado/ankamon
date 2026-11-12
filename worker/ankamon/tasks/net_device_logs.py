@@ -6,7 +6,7 @@
 Her turda (TICK_SECONDS) son birkaç dakikanın logları kaynak IP'ye göre toplanır ve aynı IP'deki cihaz(lar)a yazılır;
 worker başladıktan sonraki ilk turda geriye doğru BACKFILL kadar bakılır (sıkıştırılmış eski bölümler pahalı — ötesi
 tutulmaz). Arayüz sorgusu böylece logs tablosuna dokunmaz (bkz. backend NetworkApi::devices). Cihaza bağlı cihazda
-API ayrıca boards.last_log_at'e de bakar (cihaz logu bilgisayar adıyla eşleşir, IP değişse de).
+API ayrıca devices.last_log_at'e de bakar (cihaz logu bilgisayar adıyla eşleşir, IP değişse de).
 """
 
 import logging

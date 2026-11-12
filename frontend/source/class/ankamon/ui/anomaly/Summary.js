@@ -45,7 +45,7 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
     // Cihaz ve Anomali her zaman hazır listeli (kullanıcı isteği): satır azken (her cihazın birkaç türü)
     // otomatik karar "değer sayısı satır sayısına yakın" diye listeyi gizliyordu (bkz. Base.choicesSuitable).
     this.__columns = [
-      { id: "board", label: "Cihaz", width: 200, choices: true, hint: "Bulgunun görüldüğü cihaz. Satırı seçin: aşağıda yalnız onun kayıtları" },
+      { id: "device", label: "Cihaz", width: 200, choices: true, hint: "Bulgunun görüldüğü cihaz. Satırı seçin: aşağıda yalnız onun kayıtları" },
       { id: "kind", label: "Anomali", width: 140, choices: true, hint: "Bulgu türü (sürekli izleme denetimi); ayrıntısı Yardım ▸ Denetim türleri'nde" },
       { id: "count", label: "Sayı", width: 70, hint: "Seçili rapor döneminde bu bulgunun kaç kez başladığı" },
       { id: "total", label: "Toplam süre", width: 130, hint: "Dönem içinde toplam sürdüğü zaman (dönem başından önce başlayan kaydın yalnız dönem içindeki kısmı sayılır)" },
@@ -57,7 +57,7 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
     // Hücre ipuçları: değerin ne anlama geldiği, satırın kendi sayılarıyla.
     const F = ankamon.util.Format;
     const hints = {
-      board: g => `${g.board}: bu dönemde ${g.count} kez "${g.kind}". Seçin: aşağıda yalnız bu kayıtlar`,
+      device: g => `${g.device}: bu dönemde ${g.count} kez "${g.kind}". Seçin: aşağıda yalnız bu kayıtlar`,
       kind: g => `${g.kind}${g.desc ? ": " + g.desc : ""}`,
       count: g => `Seçili dönemde ${g.count} kez başladı`,
       total: g => `Dönem içinde toplam ${F.span(g.total)} sürdü (dönem başından önce başlayan kaydın yalnız dönem içi kısmı sayılır)`,
@@ -109,7 +109,7 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
       const groups = {};
       anomalies.forEach(a => {
         const key = a.host + "\u0000" + a.kind;
-        const g = groups[key] || (groups[key] = { board: a.board, kind: a.kindLabel, desc: a.kindDesc || "", count: 0, total: 0, longest: 0, lastAt: 0, open: false });
+        const g = groups[key] || (groups[key] = { device: a.device, kind: a.kindLabel, desc: a.kindDesc || "", count: 0, total: 0, longest: 0, lastAt: 0, open: false });
         const seconds = Math.max(0, (a.ended_at || now) - Math.max(a.started_at, from));
         g.count++;
         g.total += seconds;
@@ -122,16 +122,16 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
         .sort((x, y) => groups[y].total - groups[x].total)
         .map(key => {
           const g = this.__raw[key] = groups[key];
-          return [key, g.board, g.kind, g.count, F.span(g.total), F.span(g.longest),
+          return [key, g.device, g.kind, g.count, F.span(g.total), F.span(g.longest),
             F.dateTime(g.lastAt * 1000), g.open ? "Sürüyor" : ""];
         });
       this.__apply();
     },
 
     /** Cihaz süzgecini verilen adla doldurur (Durum'dan çift tık). */
-    filterBoard(board) {
+    filterDevice(device) {
       this.__table.getSelectionModel().resetSelection();
-      this.__filterFields.board.setValue(board || "");
+      this.__filterFields.device.setValue(device || "");
       this.__apply();
     },
 

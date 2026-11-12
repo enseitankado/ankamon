@@ -70,15 +70,15 @@ _ACTION_TITLE = {
 _sessions = 0
 
 
-def _audit(username: str, ip: str, board: dict, cmd: dict, res: dict) -> None:
+def _audit(username: str, ip: str, device: dict, cmd: dict, res: dict) -> None:
     detail = {k: v for k, v in cmd.items() if k not in ("id", "op")}
-    detail.update({"board_id": board["id"], "ok": bool(res.get("ok")), "msg": res.get("msg")})
+    detail.update({"device_id": device["id"], "ok": bool(res.get("ok")), "msg": res.get("msg")})
     try:
         with db.connect() as conn:
             conn.execute(
                 "INSERT INTO audit_log (user_id, username, action, target, detail, ip)"
                 " VALUES ((SELECT id FROM users WHERE username = %s), %s, %s, %s, %s::jsonb, %s)",
-                (username, username, "taskmgr." + cmd["op"], f"{board['name']}: {_ACTION_TITLE.get(cmd['op'], cmd['op'])}",
+                (username, username, "taskmgr." + cmd["op"], f"{device['name']}: {_ACTION_TITLE.get(cmd['op'], cmd['op'])}",
                  json.dumps(detail, ensure_ascii=False), ip),
             )
     except Exception:  # noqa: BLE001 — kayıt hatası işlemi bozmasın
@@ -88,7 +88,7 @@ def _audit(username: str, ip: str, board: dict, cmd: dict, res: dict) -> None:
 class TaskMgrSocket(tornado.websocket.WebSocketHandler):
     proc: asyncio.subprocess.Process | None = None
     counted = False
-    board: dict | None = None
+    device: dict | None = None
     pending: dict
 
     def initialize(self, lookup, ssh_opts):
@@ -99,7 +99,7 @@ class TaskMgrSocket(tornado.websocket.WebSocketHandler):
     def get_compression_options(self):
         return {}  # permessage-deflate: çerçeveler (JSON, ~25 KB/sn) iyi sıkışır
 
-    async def open(self, board_id: str):
+    async def open(self, device_id: str):
         global _sessions
         if _sessions >= MAX_SESSIONS:
             self.close(4029, "limit")
@@ -108,19 +108,19 @@ class TaskMgrSocket(tornado.websocket.WebSocketHandler):
         self.counted = True
         self.user = self.request.headers.get("X-Auth-User", "") or "?"
         self.client_ip = self.request.remote_ip
-        found = await asyncio.to_thread(self._lookup, int(board_id))
+        found = await asyncio.to_thread(self._lookup, int(device_id))
         if found is None:
-            self.close(4001, "board")
+            self.close(4001, "device")
             return
-        board, ssh_user, password = found
-        self.board = {"id": int(board_id), "name": board["name"], "ip": board["ip"]}
+        device, ssh_user, password = found
+        self.device = {"id": int(device_id), "name": device["name"], "ip": device["ip"]}
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
         self.proc = await asyncio.create_subprocess_exec(
-            "sshpass", "-e", "ssh", *self._ssh_opts, f"{ssh_user}@{board['ip']}", _REMOTE,
+            "sshpass", "-e", "ssh", *self._ssh_opts, f"{ssh_user}@{device['ip']}", _REMOTE,
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             env=env, limit=8 * 1024 * 1024,
         )
-        log.info("görev yöneticisi açıldı: %s → %s", self.user, board["name"])
+        log.info("görev yöneticisi açıldı: %s → %s", self.user, device["name"])
         asyncio.ensure_future(self._pump())
 
     async def _pump(self):
@@ -140,7 +140,7 @@ class TaskMgrSocket(tornado.websocket.WebSocketHandler):
                         res = {}
                     cmd = self.pending.pop(res.get("id"), None)
                     if cmd and cmd.get("op") in _WRITE_OPS:
-                        await asyncio.to_thread(_audit, self.user, self.client_ip, self.board, cmd, res)
+                        await asyncio.to_thread(_audit, self.user, self.client_ip, self.device, cmd, res)
                 await self.write_message(line)
         except tornado.websocket.WebSocketClosedError:
             pass
@@ -181,5 +181,5 @@ class TaskMgrSocket(tornado.websocket.WebSocketHandler):
         proc = self.proc
         if proc and proc.returncode is None:
             proc.kill()  # SSH kapanınca cihazdaki ajanın stdin'i kapanır, ajan çıkar
-        if self.board:
-            log.info("görev yöneticisi kapandı: %s → %s", self.user, self.board["name"])
+        if self.device:
+            log.info("görev yöneticisi kapandı: %s → %s", self.user, self.device["name"])

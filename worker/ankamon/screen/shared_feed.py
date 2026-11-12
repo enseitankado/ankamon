@@ -199,12 +199,12 @@ def active_count() -> int:
     return len(_feeds)
 
 
-async def join(board_id: int, profile: str, fresh: bool, name: str, opener) -> ScreenFeed:
+async def join(device_id: int, profile: str, fresh: bool, name: str, opener) -> ScreenFeed:
     """Yayına izleyici olarak katılır (yoksa kurar). opener(feed): yayını başlatan eşyordam (bkz. __main__).
 
     Hata: FeedRefused. Dönen yayından ayrılırken leave() çağrılmalı.
     """
-    key = (board_id, profile)
+    key = (device_id, profile)
     feed = _feeds.get(key)
     old = None
     if feed is not None and fresh and feed.ready.done():

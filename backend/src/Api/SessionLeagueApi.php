@@ -37,8 +37,8 @@ use DateTimeImmutable;
 
 /**
  * Oturumlar ▸ Şampiyonlar Ligi: cihazlarda en uzun süre oturum açık tutan kullanıcılar (by=users) ya da en uzun süre
- * oturumlu kalan cihazlar (by=boards) — bugün, bu hafta, bu ay, bu dönem ve bu eğitim-öğretim yılı için ayrı sıralama.
- * Kaynak board_sessions DEĞİL, worker'ın ondan türettiği session_league_parts (oturumun gün parçaları; bkz.
+ * oturumlu kalan cihazlar (by=devices) — bugün, bu hafta, bu ay, bu dönem ve bu eğitim-öğretim yılı için ayrı sıralama.
+ * Kaynak device_sessions DEĞİL, worker'ın ondan türettiği session_league_parts (oturumun gün parçaları; bkz.
  * db/migrations/039_session_league.sql, worker tasks/session_league.py): oturum kayıtları ya da loglar silinse de
  * sıralama korunur. Günler veritabanının saat diliminde (TZ) yerel gündür; dönem/yıl sınırları Settings
  * 'school_calendar'dan. Lig dışı bırakılan kullanıcı/cihazlar (league_exclusions, league 'session' — bkz.
@@ -53,13 +53,13 @@ final class SessionLeagueApi
     public function index(Request $request): array
     {
         $limit = $request->queryInt('limit', 10, 1, 50);
-        $by = $request->query('by') === 'boards' ? 'boards' : 'users';
+        $by = $request->query('by') === 'devices' ? 'devices' : 'users';
         $withOut = $request->query('with_excluded') === '1';
-        $leagueOut = LeagueExclusionsApi::leagueExcludedValues('session', $by === 'boards' ? 'board' : 'user');
+        $leagueOut = LeagueExclusionsApi::leagueExcludedValues('session', $by === 'devices' ? 'device' : 'user');
         $today = new DateTimeImmutable((string) Db::value('SELECT current_date::text'));
         $periods = [];
         foreach (self::leaguePeriods($today, Settings::get('school_calendar')) as $period) {
-            if ($by === 'boards') {
+            if ($by === 'devices') {
                 $period['title'] = str_replace('şampiyonu', 'şampiyon cihazı', $period['title']);
             }
             $periods[] = $period + self::leagueStandings($by, $period['from'], $period['to'], $limit, $leagueOut, $withOut);
@@ -109,7 +109,7 @@ final class SessionLeagueApi
     }
 
     /**
-     * [from, to) aralığında kullanıcı (by=users) ya da cihaz (by=boards) başına toplam açık oturum süresi (çoktan aza,
+     * [from, to) aralığında kullanıcı (by=users) ya da cihaz (by=devices) başına toplam açık oturum süresi (çoktan aza,
      * ilk $limit), etkin gün, oturum sayısı; kullanıcıda cihaz sayısı ve en çok kullandığı cihaz (takma adıyla),
      * cihazda kullanıcı sayısı ve en çok kullanan kullanıcı. Ayrıca katılımcı sayısı, toplam süre ve dönemde süresi
      * olan lig dışı sayısı (excluded_count). Lig dışılar $withOut değilse ne sıralamaya ne toplamlara girer.
@@ -120,10 +120,10 @@ final class SessionLeagueApi
         // Gruplama anahtarı ve "en çok" eşi: kullanıcının en çok kullandığı cihaz / cihazı en çok kullanan kullanıcı.
         $key = $users ? 'username' : 'host';
         $outMatch = $users ? 'lower(username)' : 'host';
-        $count = $users ? 'count(DISTINCT host) AS boards' : 'count(DISTINCT username) AS users, max(board_id) AS board_id';
+        $count = $users ? 'count(DISTINCT host) AS devices' : 'count(DISTINCT username) AS users, max(device_id) AS device_id';
         $top = $users
             ? "SELECT DISTINCT ON (p.username) p.username AS k, COALESCE(NULLIF(b.label, ''), p.host) AS top
-               FROM parts p LEFT JOIN boards b ON b.id = p.board_id
+               FROM parts p LEFT JOIN devices b ON b.id = p.device_id
                WHERE p.username IN (SELECT username FROM ranked)
                GROUP BY p.username, p.host, b.label ORDER BY p.username, sum(p.seconds) DESC"
             : "SELECT DISTINCT ON (p.host) p.host AS k, COALESCE(NULLIF(n.full_name, ''), p.username) AS top
@@ -131,10 +131,10 @@ final class SessionLeagueApi
                WHERE p.host IN (SELECT host FROM ranked)
                GROUP BY p.host, p.username, n.full_name ORDER BY p.host, sum(p.seconds) DESC";
         $select = $users
-            ? 'SELECT r.*, n.full_name, t.top AS board FROM ranked r
+            ? 'SELECT r.*, n.full_name, t.top AS device FROM ranked r
                LEFT JOIN session_league_names n ON n.username = r.username LEFT JOIN top t ON t.k = r.username'
-            : "SELECT r.*, COALESCE(NULLIF(b.label, ''), r.host) AS board, t.top AS top_user FROM ranked r
-               LEFT JOIN boards b ON b.id = r.board_id LEFT JOIN top t ON t.k = r.host";
+            : "SELECT r.*, COALESCE(NULLIF(b.label, ''), r.host) AS device, t.top AS top_user FROM ranked r
+               LEFT JOIN devices b ON b.id = r.device_id LEFT JOIN top t ON t.k = r.host";
         $rows = Db::all(
             "WITH parts AS (
                  SELECT p.* FROM session_league_parts p
@@ -170,12 +170,12 @@ final class SessionLeagueApi
                 'seconds' => (int) $r['seconds'],
                 'days' => (int) $r['days'],
                 'sessions' => (int) $r['sessions'],
-                'boards' => (int) $r['boards'],
-                'board' => $r['board'],
+                'devices' => (int) $r['devices'],
+                'device' => $r['device'],
                 'excluded' => (bool) $r['excluded'],
             ] : [
                 'host' => $r['host'],
-                'board' => $r['board'],
+                'device' => $r['device'],
                 'seconds' => (int) $r['seconds'],
                 'days' => (int) $r['days'],
                 'sessions' => (int) $r['sessions'],

@@ -53,7 +53,7 @@ qx.Class.define("ankamon.ui.anomaly.Records", {
     split.getChildControl("splitter").set({ height: Status.SPLITTER, minHeight: Status.SPLITTER, maxHeight: Status.SPLITTER });
     this.add(split, { flex: 1 });
 
-    this.__summary = new ankamon.ui.anomaly.Summary(page, (board, kind) => this.__history.filterBoardKind(board, kind));
+    this.__summary = new ankamon.ui.anomaly.Summary(page, (device, kind) => this.__history.filterDeviceKind(device, kind));
     this.__summary.setPaddingBottom(Status.PANE_GAP);
     split.add(this.__summary, 1);
     this.__history = new ankamon.ui.anomaly.History(page);
@@ -72,9 +72,9 @@ qx.Class.define("ankamon.ui.anomaly.Records", {
     },
 
     /** Durum'dan çift tık: özet de kayıtlar da o cihaza süzülür. */
-    showBoard(board) {
-      this.__summary.filterBoard(board);
-      this.__history.filterBoardKind(board, null);
+    showDevice(device) {
+      this.__summary.filterDevice(device);
+      this.__history.filterDeviceKind(device, null);
     }
   }
 });

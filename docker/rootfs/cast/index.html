@@ -12,8 +12,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 <link rel="icon" href="data:,">
 <!--
   Ekran yansıtma: bu bilgisayarın ekranını (ya da bir pencereyi/sekmeyi) seçili cihazlarda tam ekran gösterir.
-  Adres: /cast/#<base64(JSON {boards:[{id,name,online}], quality?, audio?})> — bilgi URL fragmanında taşınır
-  (bkz. ui/BoardOps.cast). quality ("text"|"video"|"low") verilirse (Cihazlar/Ekranlar sağ menüsü "Ekranımı
+  Adres: /cast/#<base64(JSON {devices:[{id,name,online}], quality?, audio?})> — bilgi URL fragmanında taşınır
+  (bkz. ui/DeviceOps.cast). quality ("text"|"video"|"low") verilirse (Cihazlar/Ekranlar sağ menüsü "Ekranımı
   yansıt ▸ <kalite>") ayar satırı yerine seçilen ayarların özeti görünür ve paylaşım kendiliğinden başlar.
   Akış:
     1) getDisplayMedia → RTCPeerConnection → WHIP: POST /cast/mtx/<yayın>/whip (nginx → MediaMTX, "cast" yetkisi).
@@ -119,7 +119,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     <span class="stats" id="volstate"></span>
   </div>
   <video id="preview" muted playsinline autoplay></video>
-  <ul id="boards"></ul>
+  <ul id="devices"></ul>
   <div class="usage-title" title="Bant genişliği: sunucunun o cihaza gönderdiği yayın (MediaMTX). Oynatıcı: cihazdaki mpv sürecinin payı (cihazın tüm çekirdekleri = %100). Saniyelik.">
     Canlı tüketim (cihaz başına)</div>
   <table id="usage">
@@ -145,11 +145,11 @@ const QUALITY = {
   low:   { width: 1280, height: 720,  fps: 10, bitrate: 900_000,   hint: "detail" },
 };
 
-let spec = { boards: [] };
+let spec = { devices: [] };
 try {
   spec = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1)))));
 } catch { /* boş/bozuk fragman: aşağıda uyarılır */ }
-const boards = (spec.boards || []).map(b => ({ ...b, state: b.online === false ? "off" : "idle", msg: "" }));
+const devices = (spec.devices || []).map(b => ({ ...b, state: b.online === false ? "off" : "idle", msg: "" }));
 
 let media = null;       // MediaStream (ekran)
 let pc = null;          // RTCPeerConnection
@@ -183,8 +183,8 @@ function setState(text, isLive = false) {
 }
 
 function render() {
-  const ul = $("boards");
-  ul.replaceChildren(...boards.map(b => {
+  const ul = $("devices");
+  ul.replaceChildren(...devices.map(b => {
     const li = document.createElement("li");
     li.className = { busy: "busy", ok: "ok", fail: "fail", off: "off" }[b.state] || "";
     const dot = Object.assign(document.createElement("span"), { className: "dot" });
@@ -202,7 +202,7 @@ function render() {
     }
     return li;
   }));
-  $("start").disabled = live || !boards.some(b => b.state !== "off");
+  $("start").disabled = live || !devices.some(b => b.state !== "off");
   $("stop").disabled = !live;
   $("switch").disabled = !live;
   $("quality").disabled = live;
@@ -331,7 +331,7 @@ async function pollJob(id, targets, okText) {
     let job;
     try { ({ job } = await api("GET", "/jobs/" + id)); } catch { continue; }
     for (const t of job.targets || []) {
-      const b = targets.find(x => x.id === t.board_id);
+      const b = targets.find(x => x.id === t.device_id);
       if (!b || t.status === "queued" || t.status === "running") continue;
       b.state = t.status === "ok" ? "ok" : "fail";
       const lines = String(t.output || "").trim().split("\n").filter(Boolean);
@@ -349,7 +349,7 @@ async function castTo(targets) {
   render();
   try {
     const { id } = await api("POST", "/jobs", {
-      type: "cast_start", board_ids: targets.map(b => b.id), stream, audio: media.getAudioTracks().length > 0,
+      type: "cast_start", device_ids: targets.map(b => b.id), stream, audio: media.getAudioTracks().length > 0,
       volume: startVolume(),
     });
     await pollJob(id, targets, lines =>
@@ -370,12 +370,12 @@ function startVolume() {
 
 let volJob = 0;
 async function applyVolume(level) {
-  const targets = boards.filter(b => b.state === "ok");
+  const targets = devices.filter(b => b.state === "ok");
   if (!targets.length) return;
   const mine = ++volJob;
   $("volstate").textContent = "uygulanıyor…";
   try {
-    const { id } = await api("POST", "/jobs", { type: "cast_volume", board_ids: targets.map(b => b.id), volume: level });
+    const { id } = await api("POST", "/jobs", { type: "cast_volume", device_ids: targets.map(b => b.id), volume: level });
     for (let i = 0; i < 30 && mine === volJob; i++) {
       await new Promise(r => setTimeout(r, 700));
       const { job } = await api("GET", "/jobs/" + id).catch(() => ({ job: null }));
@@ -385,7 +385,7 @@ async function applyVolume(level) {
       if (mine === volJob) {
         $("volstate").textContent = ok === total ? `${total} cihaza uygulandı` : `${ok}/${total} cihaza uygulandı`;
         $("volstate").title = (job.targets || []).filter(t => t.status !== "ok")
-          .map(t => `${boards.find(b => b.id === t.board_id)?.name || t.board_id}: ${String(t.output || "").trim().split("\n").pop()}`).join("\n");
+          .map(t => `${devices.find(b => b.id === t.device_id)?.name || t.device_id}: ${String(t.output || "").trim().split("\n").pop()}`).join("\n");
       }
       return;
     }
@@ -430,7 +430,7 @@ async function start() {
   setState("● YAYINDA", true);
   startStats();
   startUsage();
-  await castTo(boards);
+  await castTo(devices);
 }
 
 async function switchSource() {
@@ -495,15 +495,15 @@ function closePerf(id) {
 }
 
 async function pollUsage() {
-  const casting = boards.filter(b => b.state === "ok" || b.state === "busy");
-  boards.forEach(b => (casting.includes(b) ? openPerf(b) : closePerf(b.id)));
+  const casting = devices.filter(b => b.state === "ok" || b.state === "busy");
+  devices.forEach(b => (casting.includes(b) ? openPerf(b) : closePerf(b.id)));
   try {
     const data = await api("GET", `/cast/stats?stream=${encodeURIComponent(stream)}`);
     const seen = new Set();
     for (const r of data.readers || []) {
-      if (r.board_id == null) continue;
-      seen.add(r.board_id);
-      const u = usageOf(r.board_id);
+      if (r.device_id == null) continue;
+      seen.add(r.device_id);
+      const u = usageOf(r.device_id);
       const prev = u.rx;
       const mbps = prev && data.ts > prev.ts && r.bytes_sent >= prev.bytes
         ? ((r.bytes_sent - prev.bytes) * 8) / ((data.ts - prev.ts) * 1000) : prev?.mbps ?? null;
@@ -586,14 +586,14 @@ async function teardown() {
 async function stop() {
   if (!live) return;
   live = false;
-  const targets = boards.filter(b => b.state === "ok" || b.state === "busy" || b.state === "fail");
+  const targets = devices.filter(b => b.state === "ok" || b.state === "busy" || b.state === "fail");
   await teardown();
   setState("Durduruluyor…");
   targets.forEach(b => { b.state = "busy"; b.msg = "Durduruluyor…"; });
   render();
   if (targets.length) {
     try {
-      const { id } = await api("POST", "/jobs", { type: "cast_stop", board_ids: targets.map(b => b.id) });
+      const { id } = await api("POST", "/jobs", { type: "cast_stop", device_ids: targets.map(b => b.id) });
       await pollJob(id, targets, () => "Durduruldu");
     } catch { /* cihazdaki oynatıcı yayın bitince zaten kapanır */ }
   }
@@ -610,12 +610,12 @@ window.addEventListener("beforeunload", e => { if (live) e.preventDefault(); });
 window.addEventListener("pagehide", () => {
   if (!live) return;
   live = false;
-  const ids = boards.filter(b => b.state !== "off" && b.state !== "idle").map(b => b.id);
+  const ids = devices.filter(b => b.state !== "off" && b.state !== "idle").map(b => b.id);
   if (whipUrl) fetch(whipUrl, { method: "DELETE", credentials: "same-origin", keepalive: true }).catch(() => {});
-  if (ids.length) api("POST", "/jobs", { type: "cast_stop", board_ids: ids }).catch(() => {});
+  if (ids.length) api("POST", "/jobs", { type: "cast_stop", device_ids: ids }).catch(() => {});
 });
 
-if (!boards.length) showError("Cihaz seçilmemiş. Cihazlar sayfasında cihazları işaretleyip “Yansıt”ı kullanın.");
+if (!devices.length) showError("Cihaz seçilmemiş. Cihazlar sayfasında cihazları işaretleyip “Yansıt”ı kullanın.");
 
 // Ön ayar (sağ menü "Ekranımı yansıt ▸ <kalite>", ses menüdeki onay kutusundan): ayarlar sorulmaz, özetlenir.
 // getDisplayMedia bir kullanıcı hareketi (transient activation) ister ve menüdeki tıklama window.open ile
@@ -639,7 +639,7 @@ if (preset) {
     Object.assign(volume, { hidden: true }));
 }
 render();
-if (preset && boards.some(b => b.state !== "off")) {
+if (preset && devices.some(b => b.state !== "off")) {
   $("start").classList.add("big");
   $("start").focus();
   if (navigator.userActivation?.isActive) {

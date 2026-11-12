@@ -28,7 +28,7 @@
 Sağ menü "Yedekle/Geri al" ▸ Geri al (bkz. frontend ui/homebackup): dosya files servisine akışla yüklenir
 (new_upload/upload_summary), "restore_home" görevi runner'da cihazları SIRAYLA işler (restore_home).
 
-Yüklenen dosyaya GÜVENİLMEZ: "boards.restore" yetkili biri elle hazırlanmış arşivle cihazda root yetkisi
+Yüklenen dosyaya GÜVENİLMEZ: "devices.restore" yetkili biri elle hazırlanmış arşivle cihazda root yetkisi
 kazanmaya çalışabilir. Bu yüzden hesap bilgisinin her alanı kalıba göre doğrulanır (_validate_meta — parola özeti
 chpasswd satırına, adlar komut argümanına gider) ve arşivin bütün üyeleri cihaza gönderilmeden taranır
 (_scan_members: ev dizini dışına yol, aygıt dosyası, setuid/setgid dosya reddedilir). tar'ın --xattrs'ı açarken yalnız
@@ -361,13 +361,13 @@ say("I", "Yeni hesap hazır." if created else "Var olan hesabın üzerine yazıl
 """
 
 
-def restore_home(board: dict, user: str, password: str, archive: str, meta: dict, overwrite: bool, events) -> dict:
+def restore_home(device: dict, user: str, password: str, archive: str, meta: dict, overwrite: bool, events) -> dict:
     """Tek cihaza geri alır; olaylar `events`'e. Döner: {"status", "rc", "output"} (job_targets için)."""
-    if not board.get("ip"):
+    if not device.get("ip"):
         events.add("fail", "Cihazın IP adresi yok.")
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     name = meta["username"]
-    target = f"{user}@{board['ip']}"
+    target = f"{user}@{device['ip']}"
     events.add("info", f"Bağlanılıyor: {target} — {name} hesabı geri alınacak")
     header = {"meta": meta, "overwrite": overwrite, "meta_name": HOME_BACKUP_META,
               "privileged": sorted(HOME_RESTORE_PRIVILEGED)}

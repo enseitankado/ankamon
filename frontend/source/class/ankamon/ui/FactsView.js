@@ -82,7 +82,7 @@ qx.Class.define("ankamon.ui.FactsView", {
       return f.mem_total_bytes ? ankamon.util.Format.bytes(f.mem_total_bytes) : "";
     },
 
-    /** boards.facts.wifi_monitor bu kadar saniyeden eskiyse "Monitör modu" gösterilmez (sürekli izlemede tur ~35 sn). */
+    /** devices.facts.wifi_monitor bu kadar saniyeden eskiyse "Monitör modu" gösterilmez (sürekli izlemede tur ~35 sn). */
     WIFI_MONITOR_FRESH_S: 120,
 
     /**
@@ -124,10 +124,10 @@ qx.Class.define("ankamon.ui.FactsView", {
       return `<span style="color:${color};font-weight:bold">●</span> ${qx.bom.String.escape(text)}`;
     },
 
-    // Sensör göstergeleri (bkz. backend Core/BoardSensors.php): [anahtar, etiket, birim, ondalık, uyarı, kritik, alt eşik mi].
+    // Sensör göstergeleri (bkz. backend Core/DeviceSensors.php): [anahtar, etiket, birim, ondalık, uyarı, kritik, alt eşik mi].
     __SENSORS: [
       ["cpu_temp", "İşlemci sıcaklığı", "°C", 0, 70, 85, false],
-      ["board_temp", "Anakart sıcaklığı", "°C", 0, 50, 60, false],
+      ["device_temp", "Anakart sıcaklığı", "°C", 0, 50, 60, false],
       ["acpi_temp", "Kasa içi (ACPI)", "°C", 0, 50, 60, false],
       ["disk_temp", "Disk sıcaklığı", "°C", 0, 50, 60, false],
       ["fan_rpm", "İşlemci fanı", "RPM", 0, null, null, false],

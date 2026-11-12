@@ -30,7 +30,7 @@ declare(strict_types=1);
 
 namespace Ankamon\Api;
 
-use Ankamon\Core\BoardSensors;
+use Ankamon\Core\DeviceSensors;
 use Ankamon\Core\Db;
 use Ankamon\Core\Request;
 
@@ -51,22 +51,22 @@ final class MetricsApi
         $rows = Db::all(
             "SELECT b.id, COALESCE(NULLIF(b.label, ''), NULLIF(b.hostname, ''), host(b.ip)) AS name, b.online,
                     EXISTS (SELECT 1 FROM metrics m JOIN metrics_tag t USING (tag_id)
-                            WHERE t.board_id = b.id::text AND m.time > now() - interval '7 days') AS has_data,
-                    EXISTS (SELECT 1 FROM metrics_tag t WHERE t.board_id = b.id::text
-                            AND (t.name = 'node_hwmon_fan_rpm' OR t.chip ~ '(it87|nct6|f71)')) AS has_board_sensors,
+                            WHERE t.device_id = b.id::text AND m.time > now() - interval '7 days') AS has_data,
+                    EXISTS (SELECT 1 FROM metrics_tag t WHERE t.device_id = b.id::text
+                            AND (t.name = 'node_hwmon_fan_rpm' OR t.chip ~ '(it87|nct6|f71)')) AS has_device_sensors,
                     EXISTS (SELECT 1 FROM job_targets jt JOIN jobs j ON j.id = jt.job_id
-                            WHERE jt.board_id = b.id AND jt.status = 'ok' AND j.type = 'action'
+                            WHERE jt.device_id = b.id AND jt.status = 'ok' AND j.type = 'action'
                               AND (j.params->>'action' = 'sensors-superio'
                                    OR (j.params->>'action' = 'node-exporter'
                                        AND jt.output LIKE '%[Super I/O]%'))) AS superio_done
-             FROM boards b ORDER BY name");
-        return ['boards' => $rows];
+             FROM devices b ORDER BY name");
+        return ['devices' => $rows];
     }
 
     public function latest(): array
     {
         $rows = Db::all(
-            "SELECT board_id,
+            "SELECT device_id,
                     last(value, time) FILTER (WHERE name = 'node_load1') AS load1,
                     last(value, time) FILTER (WHERE name = 'node_memory_MemTotal_bytes') AS mem_total,
                     last(value, time) FILTER (WHERE name = 'node_memory_MemAvailable_bytes') AS mem_available,
@@ -76,58 +76,58 @@ final class MetricsApi
                     max(value) FILTER (WHERE name IN ('node_hwmon_temp_celsius', 'node_thermal_zone_temp')) AS temp_max,
                     extract(epoch FROM max(time))::bigint AS time
              FROM v_metrics
-             WHERE time > now() - interval '5 minutes' AND board_id IS NOT NULL
-             GROUP BY board_id"
+             WHERE time > now() - interval '5 minutes' AND device_id IS NOT NULL
+             GROUP BY device_id"
         );
         // İşlemci kullanımı sayaçtan türetilir: boşta geçen sürenin pencere içindeki artış hızı.
         $cpu = Db::all(
-            "SELECT board_id, 1 - avg(idle_rate) AS cpu
-             FROM (SELECT board_id, cpu,
+            "SELECT device_id, 1 - avg(idle_rate) AS cpu
+             FROM (SELECT device_id, cpu,
                           (max(value) - min(value)) / NULLIF(extract(epoch FROM max(time) - min(time)), 0) AS idle_rate
                    FROM v_metrics
                    WHERE time > now() - interval '5 minutes' AND name = 'node_cpu_seconds_total' AND mode = 'idle'
-                   GROUP BY board_id, cpu) per_cpu
-             GROUP BY board_id"
+                   GROUP BY device_id, cpu) per_cpu
+             GROUP BY device_id"
         );
-        $cpuByBoard = array_column($cpu, 'cpu', 'board_id');
+        $cpuByDevice = array_column($cpu, 'cpu', 'device_id');
         // Ağ trafiği: arayüz başına SON iki örnek arasındaki bayt artışı (tarama aralığı, varsayılan 60 sn),
         // tüm fiziksel arayüzlerin (kablolu + Wi-Fi; lo/docker vb. reshape.star'da elenir) toplamı.
         // Sayaç sıfırlanmışsa (yeniden başlatma) o aralık eksi çıkar ve sayılmaz.
         $net = Db::all(
-            "SELECT board_id,
+            "SELECT device_id,
                     sum(rate) FILTER (WHERE name = 'node_network_receive_bytes_total') * 8 / 1e6 AS rx_mbit,
                     sum(rate) FILTER (WHERE name = 'node_network_transmit_bytes_total') * 8 / 1e6 AS tx_mbit
-             FROM (SELECT DISTINCT ON (board_id, name, device) board_id, name,
+             FROM (SELECT DISTINCT ON (device_id, name, device) device_id, name,
                           (value - prev_value) / NULLIF(extract(epoch FROM time - prev_time), 0) AS rate
-                   FROM (SELECT board_id, name, device, time, value,
+                   FROM (SELECT device_id, name, device, time, value,
                                 lag(value) OVER w AS prev_value, lag(time) OVER w AS prev_time
                          FROM v_metrics
                          WHERE time > now() - interval '5 minutes'
                            AND name IN ('node_network_receive_bytes_total', 'node_network_transmit_bytes_total')
-                         WINDOW w AS (PARTITION BY board_id, name, device ORDER BY time)) samples
+                         WINDOW w AS (PARTITION BY device_id, name, device ORDER BY time)) samples
                    WHERE prev_value IS NOT NULL
-                   ORDER BY board_id, name, device, time DESC) last_interval
+                   ORDER BY device_id, name, device, time DESC) last_interval
              WHERE rate >= 0
-             GROUP BY board_id"
+             GROUP BY device_id"
         );
-        $netByBoard = array_column($net, null, 'board_id');
-        $sensors = BoardSensors::latestAll();
+        $netByDevice = array_column($net, null, 'device_id');
+        $sensors = DeviceSensors::latestAll();
 
         $latest = [];
         foreach ($rows as $row) {
-            $id = (int) $row['board_id'];
+            $id = (int) $row['device_id'];
             $latest[$id] = [
                 'time' => $row['time'],
                 'load1' => self::num($row['load1'], 2),
-                'cpu_percent' => isset($cpuByBoard[$id]) ? self::num(max(0, min(1, (float) $cpuByBoard[$id])) * 100, 1) : null,
+                'cpu_percent' => isset($cpuByDevice[$id]) ? self::num(max(0, min(1, (float) $cpuByDevice[$id])) * 100, 1) : null,
                 'mem_percent' => self::usedPercent($row['mem_total'], $row['mem_available']),
                 'disk_percent' => self::usedPercent($row['disk_size'], $row['disk_available']),
-                'net_rx_mbit' => self::num($netByBoard[$id]['rx_mbit'] ?? null, 3),
-                'net_tx_mbit' => self::num($netByBoard[$id]['tx_mbit'] ?? null, 3),
+                'net_rx_mbit' => self::num($netByDevice[$id]['rx_mbit'] ?? null, 3),
+                'net_tx_mbit' => self::num($netByDevice[$id]['tx_mbit'] ?? null, 3),
                 'temp_max' => self::num($row['temp_max'], 1),
-                // Ayrık göstergeler (bkz. Core\BoardSensors). Kasa: anakart sensörü varsa o, yoksa ACPI.
+                // Ayrık göstergeler (bkz. Core\DeviceSensors). Kasa: anakart sensörü varsa o, yoksa ACPI.
                 'cpu_temp' => self::num($sensors[$id]['cpu_temp'] ?? $row['temp_max'], 1),
-                'case_temp' => self::num($sensors[$id]['board_temp'] ?? $sensors[$id]['acpi_temp'] ?? null, 1),
+                'case_temp' => self::num($sensors[$id]['device_temp'] ?? $sensors[$id]['acpi_temp'] ?? null, 1),
                 'disk_temp' => self::num($sensors[$id]['disk_temp'] ?? null, 0),
                 'fan_rpm' => self::num($sensors[$id]['fan_rpm'] ?? null, 0),
                 'battery_v' => self::num($sensors[$id]['battery_v'] ?? null, 2),
@@ -140,7 +140,7 @@ final class MetricsApi
     /** Bilgi kartı: tek cihazın sensörleri, saklanan geçmişteki en düşük/en yüksek değerleriyle. */
     public function sensors(Request $request): array
     {
-        return ['sensors' => BoardSensors::withRange((int) $request->arg('id')) ?: new \stdClass()];
+        return ['sensors' => DeviceSensors::withRange((int) $request->arg('id')) ?: new \stdClass()];
     }
 
     private static function num(mixed $value, int $digits): ?float

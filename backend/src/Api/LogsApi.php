@@ -54,11 +54,11 @@ final class LogsApi
             $where[] = 'received_at < ?::timestamptz';
             $params[] = self::logQueryTimeBound($before, 'now');
         }
-        if ($boardId = $request->query('board_id')) {
-            $board = Db::one('SELECT hostname, host(ip) AS ip FROM boards WHERE id = ?', [(int) $boardId])
+        if ($deviceId = $request->query('device_id')) {
+            $device = Db::one('SELECT hostname, host(ip) AS ip FROM devices WHERE id = ?', [(int) $deviceId])
                 ?? throw ApiError::notFound('Cihaz bulunamadı.');
             $where[] = '(host = ? OR from_ip = ?)';
-            array_push($params, (string) $board['hostname'], (string) $board['ip']);
+            array_push($params, (string) $device['hostname'], (string) $device['ip']);
         }
         if ($host = $request->query('host')) {
             $where[] = 'host = ?';

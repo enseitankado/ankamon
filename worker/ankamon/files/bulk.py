@@ -276,7 +276,7 @@ def _ssh_error(rc: int, err: str) -> RemoteError:
     return RemoteError(lines[-1][:300] if lines else f"İşlem başarısız (çıkış {rc}).")
 
 
-def board_users(access: dict) -> list[dict]:
+def device_users(access: dict) -> list[dict]:
     out = _ssh(access, _USERS, timeout=40).decode("utf-8", "replace")
     users = []
     for line in out.splitlines():
@@ -356,8 +356,8 @@ def _event(job: dict, level: str, text: str) -> None:
 
 def public(job: dict) -> dict:
     out = {k: v for k, v in job.items() if not k.startswith("_")}
-    out["bytes"] = sum(b["bytes"] for b in job["boards"])
-    out["total"] = sum(b["total"] for b in job["boards"])
+    out["bytes"] = sum(b["bytes"] for b in job["devices"])
+    out["total"] = sum(b["total"] for b in job["devices"])
     return out
 
 
@@ -474,16 +474,16 @@ def _pack_upload(up: dict) -> tuple[str, list[str]]:
 
 # ---------------------------------------------------------------- iş yürütme
 
-def _new_job(kind: str, owner: str, boards: list[dict], options: dict) -> dict:
+def _new_job(kind: str, owner: str, devices: list[dict], options: dict) -> dict:
     job_id = next(_ids)
     path = os.path.join(STAGE, f"{kind[0]}-{job_id}-{secrets.token_hex(4)}")
     os.makedirs(path, mode=0o700, exist_ok=True)
     job = {
         "id": job_id, "kind": kind, "owner": owner, "state": "running", "started": time.time(),
         "finished": None, "limit": 0, "running": 0, "options": options, "events": [], "delivered": None,
-        "boards": [{"id": b["id"], "name": b["name"], "state": "queued", "message": "Sırada", "bytes": 0,
-                    "total": 0, "targets": []} for b in boards],
-        "_access": {b["id"]: b for b in boards}, "_dir": path, "_cancel": False, "_procs": set(),
+        "devices": [{"id": b["id"], "name": b["name"], "state": "queued", "message": "Sırada", "bytes": 0,
+                    "total": 0, "targets": []} for b in devices],
+        "_access": {b["id"]: b for b in devices}, "_dir": path, "_cancel": False, "_procs": set(),
     }
     jobs[job_id] = job
     return job
@@ -502,7 +502,7 @@ def cancel(job_id: int, owner: str) -> bool:
             job["_relay"]["cond"].notify_all()   # kaynak bekleyenler hemen çıksın
     if job.get("_tag"):
         # SSH bağlantısı kesilince cihazdaki curl/tar sürebilir: bu işin süreçleri cihazda da durdurulur.
-        running = [job["_access"][b["id"]] for b in job["boards"] if b["state"] == "running"]
+        running = [job["_access"][b["id"]] for b in job["devices"] if b["state"] == "running"]
         for access in running:
             _POOL.submit(_kill_remote, access, job["_tag"])
     _event(job, "warn", "İptal edildi; yürüyen aktarımlar durduruldu.")
@@ -531,7 +531,7 @@ async def _schedule(job: dict, work, on_done) -> None:
     """Cihaz işlerini kaynak durumuna göre değişen bir sınırla paralel yürütür."""
     import asyncio
     loop = asyncio.get_running_loop()
-    pending = [b for b in job["boards"] if b["state"] == "queued"]
+    pending = [b for b in job["devices"] if b["state"] == "queued"]
     running: set = set()
     try:
         while pending or running:
@@ -549,8 +549,8 @@ async def _schedule(job: dict, work, on_done) -> None:
                 pending = []
             if running:
                 _, running = await asyncio.wait(running, timeout=1, return_when=asyncio.FIRST_COMPLETED)
-        failed = sum(1 for b in job["boards"] if b["state"] == "failed")
-        partial = sum(1 for b in job["boards"] if b["state"] == "partial")
+        failed = sum(1 for b in job["devices"] if b["state"] == "failed")
+        partial = sum(1 for b in job["devices"] if b["state"] == "partial")
         if job["_cancel"]:
             job["state"] = "cancelled"
         else:
@@ -574,13 +574,13 @@ async def _schedule(job: dict, work, on_done) -> None:
 
 def _summary(job: dict) -> str:
     counts = {}
-    for b in job["boards"]:
+    for b in job["devices"]:
         counts[b["state"]] = counts.get(b["state"], 0) + 1
     names = {"done": "başarılı", "partial": "kısmen", "failed": "başarısız", "skipped": "atlandı",
              "cancelled": "iptal"}
     parts = [f"{counts[s]} {names[s]}" for s in names if counts.get(s)]
     verb = "Dağıtma" if job["kind"] == "distribute" else ("Önizleme" if job["options"].get("dry") else "Toplama")
-    return f"{verb} bitti: {len(job['boards'])} cihaz — " + ", ".join(parts) + "."
+    return f"{verb} bitti: {len(job['devices'])} cihaz — " + ", ".join(parts) + "."
 
 
 def _guard(job: dict, row: dict, work) -> None:
@@ -625,7 +625,7 @@ def _finish_row(job: dict, row: dict, noun: str) -> None:
 def _resolve(job: dict, row: dict, access: dict) -> list[dict] | None:
     opts = job["options"]
     row["message"] = "Kullanıcılar okunuyor…"
-    users = board_users(access) if opts["location"]["kind"] != "abs" else []
+    users = device_users(access) if opts["location"]["kind"] != "abs" else []
     targets = _targets(users, opts["users"], opts["location"])
     if not targets:
         why = ("oturumu açık kullanıcı yok" if opts["users"]["logged"] and not opts["users"]["names"]
@@ -660,12 +660,12 @@ def prepare_distribute(owner: str, token: str) -> dict:
     return {"token": token, "archive": archive, "names": names}
 
 
-def start_distribute(owner: str, prepared: dict, boards: list[dict], users: dict, location: dict,
+def start_distribute(owner: str, prepared: dict, devices: list[dict], users: dict, location: dict,
                      conflict: str, on_done, relay: bool = True) -> int:
     """relay: köprü kipi — sunucu arşivi yalnız birkaç cihaza gönderir, diğerleri arşivi almış
-    cihazlardan SFTP ile çeker (bkz. _distribute_board, _relay_seeds)."""
+    cihazlardan SFTP ile çeker (bkz. _distribute_device, _relay_seeds)."""
     import asyncio
-    if not boards:
+    if not devices:
         raise RemoteError("Cihaz seçilmedi.")
     up = uploads.pop(prepared["token"], None)
     names = prepared["names"]
@@ -673,8 +673,8 @@ def start_distribute(owner: str, prepared: dict, boards: list[dict], users: dict
                "conflict": "skip" if conflict == "skip" else "overwrite", "names": names,
                "size": os.path.getsize(prepared["archive"])}
     seeds = _relay_seeds()
-    options["relay"] = bool(relay) and len(boards) > seeds
-    job = _new_job("distribute", owner, boards, options)
+    options["relay"] = bool(relay) and len(devices) > seeds
+    job = _new_job("distribute", owner, devices, options)
     job["_tag"] = secrets.token_hex(8)   # cihazdaki geçici dosya adlarında: iptalde yalnız bu işin süreçleri durur
     os.replace(prepared["archive"], os.path.join(job["_dir"], "files.tar"))
     if up:
@@ -687,12 +687,12 @@ def start_distribute(owner: str, prepared: dict, boards: list[dict], users: dict
         "path": f"/var/tmp/ankamon-relay-{job['_tag']}.tar",
         "kept": [],              # arşivi sakladığı için iş sonunda temizlenecek cihazlar
     }
-    _event(job, "info", f"{len(names)} öğe {len(boards)} cihaza dağıtılıyor; konum: {options['location_text']}"
+    _event(job, "info", f"{len(names)} öğe {len(devices)} cihaza dağıtılıyor; konum: {options['location_text']}"
                         + (", var olanlar atlanır" if options["conflict"] == "skip" else ", aynı adlıların üzerine yazılır")
                         + (f"; köprü kipi: sunucu en çok {seeds} cihaza gönderir, diğerleri arşivi almış cihazlardan çeker."
                            if options["relay"] else "."))
     job["_on_done"] = _relay_cleanup_wrap(job, on_done)
-    asyncio.ensure_future(_schedule(job, _distribute_board, job["_on_done"]))
+    asyncio.ensure_future(_schedule(job, _distribute_device, job["_on_done"]))
     return job["id"]
 
 
@@ -705,7 +705,7 @@ def resume(job_id: int, owner: str) -> bool:
         return False
     if not os.path.exists(os.path.join(job["_dir"], "files.tar")):
         raise RemoteError("Dağıtılacak arşiv artık sunucuda yok (süresi dolmuş); dosyaları yeniden seçin.")
-    rows = [b for b in job["boards"] if b["state"] in ("cancelled", "queued")]
+    rows = [b for b in job["devices"] if b["state"] in ("cancelled", "queued")]
     if not rows:
         return False
     for b in rows:
@@ -717,7 +717,7 @@ def resume(job_id: int, owner: str) -> bool:
         r.update(direct=0, sources=[], kept=[])   # önceki köprü arşivleri iş sonunda silindi
     job.update(_cancel=False, state="running", finished=None, _procs=set())
     _event(job, "info", f"Sürdürülüyor: {len(rows)} cihaz yeniden sıraya alındı.")
-    asyncio.ensure_future(_schedule(job, _distribute_board, job["_on_done"]))
+    asyncio.ensure_future(_schedule(job, _distribute_device, job["_on_done"]))
     return True
 
 
@@ -726,13 +726,13 @@ _REVERT = 'while [ $# -ge 2 ]; do d=$1; n=$2; shift 2; rm -rf -- "$d/$n" && prin
 
 def revert(job_id: int, owner: str) -> dict:
     """Bitmiş/iptal edilmiş dağıtmanın hedeflerde YENİ oluşturduğu öğeleri siler (önceden var olan aynı adlı
-    öğelere dokunmaz — bkz. _DISTRIBUTE "NEW" satırları). Döner: {boards, removed, failed}."""
+    öğelere dokunmaz — bkz. _DISTRIBUTE "NEW" satırları). Döner: {devices, removed, failed}."""
     job = jobs.get(job_id)
     if not job or job["owner"] != owner or job["kind"] != "distribute" or job["state"] == "running":
         raise RemoteError("Geri alınacak dağıtma bulunamadı ya da hâlâ sürüyor.")
     names = set(job["options"]["names"])
     work = []
-    for b in job["boards"]:
+    for b in job["devices"]:
         args = []
         for t in b["targets"]:
             for n in t.get("created") or []:
@@ -762,7 +762,7 @@ def revert(job_id: int, owner: str) -> dict:
                         t["message"] = f"Geri alındı: {len(t['created'])} öğe silindi"
                         t["created"] = []
                 _event(job, "info", f"{b['name']}: kopyalanan {n} öğe hedeften silindi.")
-    return {"boards": len(work), "removed": removed, "failed": failed}
+    return {"devices": len(work), "removed": removed, "failed": failed}
 
 
 RELAY_PER_SOURCE = 2   # bir köprü cihazın aynı anda kaynak olduğu en çok cihaz
@@ -820,7 +820,7 @@ def _relay_cleanup_wrap(job: dict, on_done):
     return done
 
 
-def _distribute_board(job: dict, row: dict, access: dict) -> None:
+def _distribute_device(job: dict, row: dict, access: dict) -> None:
     targets = _resolve(job, row, access)
     if targets is None or job["_cancel"]:
         return
@@ -934,14 +934,14 @@ def _distribute_run(job: dict, row: dict, access: dict, targets: list[dict], src
 
 # ---- toplama
 
-def start_collect(owner: str, boards: list[dict], users: dict, location: dict, patterns: list[str],
+def start_collect(owner: str, devices: list[dict], users: dict, location: dict, patterns: list[str],
                   move: bool, on_done, excludes: list[str] = (), deep: bool = False, skip_hidden: bool = False,
                   dry: bool = False) -> int:
     """patterns: adı eşleşenler (boşsa tümü); excludes: adı eşleşenler hiç alınmaz (ör. *.desktop);
     deep: alt klasörlerin içindeki dosyalar da (desen dosya adına uygulanır, klasör yapısı korunur);
     skip_hidden: nokta ile başlayan dosya/klasörler alınmaz; dry: önizleme — yalnız sayılır, aktarılmaz."""
     import asyncio
-    if not boards:
+    if not devices:
         raise RemoteError("Cihaz seçilmedi.")
     clean = lambda items: [p.strip() for p in items if isinstance(p, str) and p.strip()][:50]
     patterns, excludes = clean(patterns), clean(excludes)
@@ -949,12 +949,12 @@ def start_collect(owner: str, boards: list[dict], users: dict, location: dict, p
                "patterns": patterns, "excludes": excludes, "deep": bool(deep), "skip_hidden": bool(skip_hidden),
                "move": bool(move) and not dry, "dry": bool(dry)}
     options["what_text"] = what_text(options)
-    job = _new_job("collect", owner, boards, options)
+    job = _new_job("collect", owner, devices, options)
     os.makedirs(os.path.join(job["_dir"], "data"), exist_ok=True)
     _event(job, "info", ("ÖNİZLEME (hiçbir şey aktarılmaz): " if dry else "")
-                        + f"{len(boards)} cihazda, konum: {options['location_text']} — {options['what_text']}"
+                        + f"{len(devices)} cihazda, konum: {options['location_text']} — {options['what_text']}"
                         + (" — TAŞIMA: alınan öğeler cihazdan silinecek." if options["move"] else "."))
-    asyncio.ensure_future(_schedule(job, _collect_board, on_done))
+    asyncio.ensure_future(_schedule(job, _collect_device, on_done))
     return job["id"]
 
 
@@ -981,7 +981,7 @@ def _wanted(rel: str, opts: dict) -> bool:
     return _match(name, opts["patterns"])
 
 
-def _collect_board(job: dict, row: dict, access: dict) -> None:
+def _collect_device(job: dict, row: dict, access: dict) -> None:
     global _reserved
     targets = _resolve(job, row, access)
     if targets is None or job["_cancel"]:
@@ -1167,14 +1167,14 @@ def archive_name(job: dict) -> str:
     "B Blok - Arge 2_Masaüstü_2026-10-22_13.45". Cihaz: verisi alınan cihazın takma adı (yoksa bilgisayar
     adı); birden çoksa ilki + "+N cihaz". Ana ad: toplamda tek üst düzey öğe alındıysa onun adı, değilse
     konumun adı (Masaüstü, Belgeler…; alt/mutlak yolda son bileşen). Saatte ":" yok (Windows dosya adı)."""
-    boards = [b["name"] for b in job["boards"] if any(t["state"] == "ok" for t in b["targets"])] or \
-        [b["name"] for b in job["boards"]]
-    who = boards[0] + (f" +{len(boards) - 1} cihaz" if len(boards) > 1 else "")
+    devices = [b["name"] for b in job["devices"] if any(t["state"] == "ok" for t in b["targets"])] or \
+        [b["name"] for b in job["devices"]]
+    who = devices[0] + (f" +{len(devices) - 1} cihaz" if len(devices) > 1 else "")
     tops = set()
     root = os.path.join(job["_dir"], "data")
-    for board_dir in (os.listdir(root) if os.path.isdir(root) else []):
-        for user_dir in os.listdir(os.path.join(root, board_dir)):
-            path = os.path.join(root, board_dir, user_dir)
+    for device_dir in (os.listdir(root) if os.path.isdir(root) else []):
+        for user_dir in os.listdir(os.path.join(root, device_dir)):
+            path = os.path.join(root, device_dir, user_dir)
             if os.path.isdir(path):
                 tops.update(os.listdir(path))
     loc = job["options"]["location"]

@@ -27,24 +27,24 @@
 
 /**
  * Yedekle sekmesi: cihazlar × hesaplar. Hesap listesi seçili cihazların birleşimidir (önbellekli, bkz.
- * BoardOps.accountsOf); bir hesap bazı cihazlarda yoksa o cihazlarda atlanır. Görev: "backup_home" (bkz. worker
+ * DeviceOps.accountsOf); bir hesap bazı cihazlarda yoksa o cihazlarda atlanır. Görev: "backup_home" (bkz. worker
  * executor/backup.py); canlı rapor, ilerleme ve sırayla indirme görev penceresinde (bkz. ui.Jobs).
  */
 qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
   extend: qx.ui.container.Composite,
 
   /**
-   * @param boards {Array} [{id, name}] çevrim içi cihazlar
+   * @param devices {Array} [{id, name}] çevrim içi cihazlar
    * @param selected {Array} başta işaretli cihaz kimlikleri
    */
-  construct(boards, selected) {
+  construct(devices, selected) {
     super(new qx.ui.layout.VBox(10));
-    this.__boards = boards;
+    this.__devices = devices;
     const body = new qx.ui.container.Composite(new qx.ui.layout.HBox(10));
 
     const step1 = ankamon.ui.StepBox.create(1, "Cihazları seç");
-    this.__boardList = new ankamon.ui.homebackup.CheckColumn();
-    step1.add(this.__boardList, { flex: 1 });
+    this.__deviceList = new ankamon.ui.homebackup.CheckColumn();
+    step1.add(this.__deviceList, { flex: 1 });
     body.add(step1, { flex: 1 });
 
     const step2 = ankamon.ui.StepBox.create(2, "Hesapları seç", "seçili cihazlardaki hesaplar");
@@ -66,35 +66,35 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
     head.add(this.__start);
     this.add(step3);
 
-    this.__boardList.addListener("changeChecked", () => this.__loadAccounts());
+    this.__deviceList.addListener("changeChecked", () => this.__loadAccounts());
     this.__accountList.addListener("changeChecked", () => this.__update());
-    this.__boardList.setItems(boards.map(b => ({ value: b.id, label: b.name, checked: selected.includes(b.id) })), "Çevrim içi cihaz yok.");
+    this.__deviceList.setItems(devices.map(b => ({ value: b.id, label: b.name, checked: selected.includes(b.id) })), "Çevrim içi cihaz yok.");
   },
 
   members: {
-    __boards: null,
-    __boardList: null,
+    __devices: null,
+    __deviceList: null,
     __accountList: null,
     __note: null,
     __start: null,
     __loadSeq: 0,
 
-    __chosenBoards() {
-      const ids = this.__boardList.getChecked();
-      return this.__boards.filter(b => ids.includes(b.id));
+    __chosenDevices() {
+      const ids = this.__deviceList.getChecked();
+      return this.__devices.filter(b => ids.includes(b.id));
     },
 
     async __loadAccounts() {
       const seq = ++this.__loadSeq;
-      const boards = this.__chosenBoards();
+      const devices = this.__chosenDevices();
       this.__update();
-      if (!boards.length) {
+      if (!devices.length) {
         this.__note.setValue("");
         this.__accountList.setItems([], "Önce cihaz seçin.");
         return;
       }
       this.__note.setValue("Hesaplar yükleniyor…");
-      const results = await Promise.allSettled(boards.map(b => ankamon.ui.BoardOps.accountsOf(b)));
+      const results = await Promise.allSettled(devices.map(b => ankamon.ui.DeviceOps.accountsOf(b)));
       if (seq !== this.__loadSeq || this.isDisposed()) {
         return; // bu arada cihaz seçimi değişti: yeni yükleme sonucu geçerli
       }
@@ -102,7 +102,7 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
       const failed = [];
       results.forEach((res, i) => {
         if (res.status !== "fulfilled") {
-          failed.push(boards[i].name);
+          failed.push(devices[i].name);
           return;
         }
         res.value.forEach(acc => {
@@ -111,7 +111,7 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
           union.set(acc.name, row);
         });
       });
-      const reached = boards.length - failed.length;
+      const reached = devices.length - failed.length;
       const show = sizes => {
         const items = [...union.values()]
           .sort((a, b) => ((sizes && sizes[b.acc.name]) || 0) - ((sizes && sizes[a.acc.name]) || 0) ||
@@ -132,7 +132,7 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
       const failNote = failed.length ? "Hesapları alınamayan cihazlar: " + qx.bom.String.escape(failed.join(", ")) : "";
       let sizes = null;
       try {
-        sizes = union.size ? await this.__homeSizes(boards.filter(b => !failed.includes(b.name))) : {};
+        sizes = union.size ? await this.__homeSizes(devices.filter(b => !failed.includes(b.name))) : {};
       } catch (e) {
         // boyutlar okunamazsa liste yine kullanılabilir
       }
@@ -150,8 +150,8 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
      * Birden çok cihazda hesap başına toplam: yedeğin kaplayacağı alan.
      * @return {Map} {hesap: MB}
      */
-    async __homeSizes(boards) {
-      const id = (await ankamon.io.Api.post("/jobs", { type: "home_sizes", board_ids: boards.map(b => b.id) })).id;
+    async __homeSizes(devices) {
+      const id = (await ankamon.io.Api.post("/jobs", { type: "home_sizes", device_ids: devices.map(b => b.id) })).id;
       for (let i = 0; i < 300; i++) {
         const res = await ankamon.io.Api.get(`/jobs/${id}`);
         const targets = (res.job && res.job.targets) || [];
@@ -168,18 +168,18 @@ qx.Class.define("ankamon.ui.homebackup.BackupPanel", {
     },
 
     __update() {
-      const boards = this.__boardList.getChecked().length;
+      const devices = this.__deviceList.getChecked().length;
       const accounts = this.__accountList.getChecked().length;
-      this.__start.setEnabled(boards > 0 && accounts > 0);
-      this.__start.setLabel(boards && accounts ? `Yedekle (${boards} cihaz, ${accounts} hesap)` : "Yedekle");
+      this.__start.setEnabled(devices > 0 && accounts > 0);
+      this.__start.setLabel(devices && accounts ? `Yedekle (${devices} cihaz, ${accounts} hesap)` : "Yedekle");
     },
 
     __run() {
-      const boards = this.__boardList.getChecked();
+      const devices = this.__deviceList.getChecked();
       const usernames = this.__accountList.getChecked();
       ankamon.ui.Jobs.show(
-        ankamon.io.Api.post("/jobs", { type: "backup_home", usernames, board_ids: boards }).then(res => res.id),
-        `Yedekle — ${usernames.length === 1 ? usernames[0] : usernames.length + " hesap"}` + (boards.length > 1 ? ` (${boards.length} cihaz)` : ""),
+        ankamon.io.Api.post("/jobs", { type: "backup_home", usernames, device_ids: devices }).then(res => res.id),
+        `Yedekle — ${usernames.length === 1 ? usernames[0] : usernames.length + " hesap"}` + (devices.length > 1 ? ` (${devices.length} cihaz)` : ""),
         { progress: true, downloads: (jobId, name) => `/api/home-backups/${jobId}?file=${encodeURIComponent(name)}` });
     }
   }

@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Şampiyonlar Ligi verisi: board_sessions → session_league_parts (oturumun gün parçaları) ve
+"""Şampiyonlar Ligi verisi: device_sessions → session_league_parts (oturumun gün parçaları) ve
 "accounts" iş çıktılarından → session_league_names (hesapların ad soyadı). Bkz. db/migrations/039_session_league.sql.
 
 Artımlı ve tekrar çalıştırmaya dayanıklı: her turda yalnız parçası olmayan, açık ya da parçası hesaplandıktan sonra
@@ -46,23 +46,23 @@ _NAMES_CURSOR = "session_league.names"
 # Parçası güncel olmayan oturumlar: hiç parçası yok, açık (süre "şu ana kadar" büyüyor) ya da parçası hesaplandığından
 # beri kapanış anı (session_end sonradan netleştirir) veya cihazı (sonradan cihaza bağlanan oturum) değişmiş.
 _STALE_SESSIONS = """
-    SELECT s.id FROM board_sessions s
+    SELECT s.id FROM device_sessions s
     WHERE s.ended_at IS NULL
        OR NOT EXISTS (SELECT 1 FROM session_league_parts p
                       WHERE p.session_id = s.id
                         AND p.src_ended_at IS NOT DISTINCT FROM s.ended_at
-                        AND p.board_id IS NOT DISTINCT FROM s.board_id)
+                        AND p.device_id IS NOT DISTINCT FROM s.device_id)
 """
 
 # Her oturum en az bir satır üretir (süresi 0 olsa da) — yoksa her turda yeniden "parçasız" görünürdü.
 _WRITE_PARTS = """
-    INSERT INTO session_league_parts (session_id, day, username, host, board_id, seconds, src_ended_at)
-    SELECT s.id, g.day, s.username, s.host, s.board_id,
+    INSERT INTO session_league_parts (session_id, day, username, host, device_id, seconds, src_ended_at)
+    SELECT s.id, g.day, s.username, s.host, s.device_id,
            GREATEST(0, round(extract(epoch FROM
                LEAST(COALESCE(s.ended_at, now()), (g.day + 1)::timestamptz)
                - GREATEST(s.started_at, g.day::timestamptz))))::integer,
            s.ended_at
-    FROM board_sessions s
+    FROM device_sessions s
     CROSS JOIN LATERAL (
         SELECT d::date AS day
         FROM generate_series(s.started_at::date::timestamp,

@@ -44,17 +44,17 @@ BUCKET = datetime.timedelta(minutes=5)
 WINDOW = datetime.timedelta(hours=1)
 
 _SAMPLES = """
-SELECT t.board_id, m.time, min(m.value) AS v
+SELECT t.device_id, m.time, min(m.value) AS v
 FROM metrics_5m m JOIN metrics_tag t USING (tag_id)
-WHERE t.name = 'node_hwmon_in_volts' AND t.board_id <> '' AND m.time >= %s AND m.value > %s
-GROUP BY t.board_id, m.time
-ORDER BY t.board_id, m.time
+WHERE t.name = 'node_hwmon_in_volts' AND t.device_id <> '' AND m.time >= %s AND m.value > %s
+GROUP BY t.device_id, m.time
+ORDER BY t.device_id, m.time
 """
 
-_BOARDS = """
-SELECT id::text AS board_id, id, lower(COALESCE(NULLIF(hostname, ''), host(ip))) AS host,
+_DEVICES = """
+SELECT id::text AS device_id, id, lower(COALESCE(NULLIF(hostname, ''), host(ip))) AS host,
        COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name
-FROM boards
+FROM devices
 """
 
 _KNOWN = """
@@ -89,29 +89,29 @@ def _islands(rows: list, limit: float) -> list[dict]:
 
 
 def detect(conn, since):
-    boards = {r["board_id"]: r for r in conn.execute(_BOARDS).fetchall() if r["host"]}
+    devices = {r["device_id"]: r for r in conn.execute(_DEVICES).fetchall() if r["host"]}
     samples: dict[str, list] = {}
     for r in conn.execute(_SAMPLES, (since, NO_READING_V)).fetchall():
-        if r["board_id"] in boards:
-            samples.setdefault(r["board_id"], []).append(r)
+        if r["device_id"] in devices:
+            samples.setdefault(r["device_id"], []).append(r)
     known: dict[str, list] = {}
     for r in conn.execute(_KNOWN, (KIND, since - GAP)).fetchall():
         known.setdefault(r["host"], []).append(r)
 
     found, scopes = [], []
-    for board_id, rows in samples.items():
-        board = boards[board_id]
-        scopes.append((board["host"], rows[0]["time"], rows[-1]["time"]))
+    for device_id, rows in samples.items():
+        device = devices[device_id]
+        scopes.append((device["host"], rows[0]["time"], rows[-1]["time"]))
         for iv in _islands(rows, LIMIT_V):
             start, low, continued = iv["started_at"], iv["low_min"], False
-            for r in known.get(board["host"], []):
+            for r in known.get(device["host"], []):
                 if r["started_at"] < start and (r["ended_at"] is None or r["ended_at"] >= start - GAP):
                     start, continued = r["started_at"], True
                     low = min(low, float((r["detail"] or {}).get("min_v") or low))
                     break
             if iv["buckets"] < MIN_BUCKETS and not continued:
                 continue
-            found.append({"host": board["host"], "board_id": board["id"], "board_name": board["name"],
+            found.append({"host": device["host"], "device_id": device["id"], "device_name": device["name"],
                           "started_at": start, "ended_at": None if iv["open"] else iv["last_at"] + BUCKET,
                           "detail": {"min_v": round(low, 2), "limit_v": LIMIT_V,
                                      "text": f"En düşük {_tr(low)} V — eşik {_tr(LIMIT_V)} V (yeni pil ~3 V)"}})

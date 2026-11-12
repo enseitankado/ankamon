@@ -26,11 +26,11 @@
 """Cihazın donanım/sistem bilgisini (disk, RAM, işlemci, wifi, ağ, ekran, işletim sistemi…) SSH ile toplar.
 
 İki yol bu modülü paylaşır:
-  - board_identity.py: cihaz ilk kez tanınırken (MAC öğrenilirken) aynı SSH turunda bir kez toplar.
+  - device_identity.py: cihaz ilk kez tanınırken (MAC öğrenilirken) aynı SSH turunda bir kez toplar.
   - runner "facts" görev türü (Cihazlar/Ekranlar sağ menüsü "Bilgi kartı"): istenince CANLI toplar;
-    aynı cihaza CACHE_SECONDS içinde tekrar bağlanmaz, boards.facts'teki son değeri döner.
+    aynı cihaza CACHE_SECONDS içinde tekrar bağlanmaz, devices.facts'teki son değeri döner.
 
-Sonuç boards.facts (jsonb) içinde _FIELDS'in değerleri + hw_collected_at (unix saniye) olarak saklanır.
+Sonuç devices.facts (jsonb) içinde _FIELDS'in değerleri + hw_collected_at (unix saniye) olarak saklanır.
 Durum bilgileri (boş disk, wifi bağlantısı, açık kalma süresi, sıcaklık) toplandığı ANA aittir —
 kart bunları toplanma zamanıyla birlikte gösterir.
 """
@@ -53,7 +53,7 @@ CACHE_SECONDS = 3600  # "Bilgi kartı" aynı cihaza bu süre içinde tekrar bağ
 #   komutlar LC_ALL=C ile çalışır.
 # - lsblk -e 1,2,7,11: ram/floppy/loop/sr hariç; zram (RAM'de sıkıştırılmış takas, ETAP'ta varsayılan)
 #   dinamik majör numaralı olduğundan ADINDAN ayıklanır — yoksa disk kapasitesine eklenir.
-# - Satır başına bir "ANAHTAR=değer"; board_identity.py bu betiğin önüne kendi HOSTNAME/MAC satırlarını
+# - Satır başına bir "ANAHTAR=değer"; device_identity.py bu betiğin önüne kendi HOSTNAME/MAC satırlarını
 #   ekler — buradaki anahtarlar onlarla çakışmamalı.
 SCRIPT = r"""
 export LC_ALL=C
@@ -322,7 +322,7 @@ _SMART_FIELDS = [
     "smart_failing",         # eşiğin altına düşmüş öznitelik adları (virgüllü) ya da None
 ]
 # Çok değerli/yapılı alanlar (bkz. _disk_layout, _firmware_boot, _uefi_vars). Cihaz başına ~10-15 KB:
-# Cihazlar listesi (backend BoardsApi::COLUMNS) bunları facts'ten çıkarır, yalnız Bilgi kartı ("facts"
+# Cihazlar listesi (backend DevicesApi::COLUMNS) bunları facts'ten çıkarır, yalnız Bilgi kartı ("facts"
 # görevinin çıktısı) taşır.
 _DETAIL_FIELDS = ["disk_layout", "firmware_boot", "uefi_vars"]
 _ALL_FIELDS = list(_FIELDS.values()) + _SMART_FIELDS + _DETAIL_FIELDS
@@ -657,13 +657,13 @@ _SSH_OPTS = [
 ]
 
 
-def query(board: dict, user: str, password: str, timeout: int = 25) -> dict:
+def query(device: dict, user: str, password: str, timeout: int = 25) -> dict:
     """Tek cihaza bağlanıp donanım bilgisini okur (whoami.query ile aynı hafif ssh+sshpass deseni —
     tek, sabit betik olduğundan ansible gerekmez). Döner: {"status","rc","output"} — başarılıysa
     output, ayrıştırılmış facts'in JSON metni (job_targets.output, frontend bunu ayrıştırır)."""
-    if not board.get("ip"):
+    if not device.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
-    target = f"{user}@{board['ip']}"
+    target = f"{user}@{device['ip']}"
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", f"ConnectTimeout={min(timeout, 8)}", target, SCRIPT]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     try:
@@ -679,10 +679,10 @@ def query(board: dict, user: str, password: str, timeout: int = 25) -> dict:
     return {"status": "ok", "rc": 0, "output": json.dumps(facts, ensure_ascii=False)}
 
 
-def cached(conn, board_id: int, cutoff_ts: int) -> dict | None:
-    """boards.facts'te CACHE_SECONDS içinde toplanmış donanım bilgisi varsa döner, yoksa None
+def cached(conn, device_id: int, cutoff_ts: int) -> dict | None:
+    """devices.facts'te CACHE_SECONDS içinde toplanmış donanım bilgisi varsa döner, yoksa None
     (hiç toplanmamış ya da bayatlamış — çağıran bu durumda query() ile canlı toplar)."""
-    row = conn.execute("SELECT facts FROM boards WHERE id = %s", (board_id,)).fetchone()
+    row = conn.execute("SELECT facts FROM devices WHERE id = %s", (device_id,)).fetchone()
     facts = (row or {}).get("facts") or {}
     collected_at = facts.get("hw_collected_at")
     # Alanlardan biri hiç yoksa kayıt eski bir sürümle toplanmıştır: bayat sayılır, canlı toplanır.
@@ -691,28 +691,28 @@ def cached(conn, board_id: int, cutoff_ts: int) -> dict | None:
     return {field: facts.get(field) for field in _ALL_FIELDS}
 
 
-def store(conn, board_id: int, facts: dict, ts: int) -> None:
-    """Toplanan facts'i boards.facts'e (mevcut diğer anahtarları — ör. identity_failed_at — KORUYARAK)
+def store(conn, device_id: int, facts: dict, ts: int) -> None:
+    """Toplanan facts'i devices.facts'e (mevcut diğer anahtarları — ör. identity_failed_at — KORUYARAK)
     yazar. Yalnız _FIELDS alanları yazılır; eski sürümden kalan, artık toplanmayan anahtar yoktur."""
     data = {field: facts.get(field) for field in _ALL_FIELDS}
     data["hw_collected_at"] = ts
-    # Wi-Fi kartının kalıcı MAC'i Cihazlar ▸ Kablosuz MAC'e de (boards.wifi_mac, göç 043; rastgele adres yazılmaz).
-    conn.execute("UPDATE boards SET facts = facts || %s::jsonb, wifi_mac = COALESCE(%s::macaddr, wifi_mac) WHERE id = %s",
-                 (json.dumps(data, ensure_ascii=False), netif.permanent_mac(data.get("wifi_mac")), board_id))
+    # Wi-Fi kartının kalıcı MAC'i Cihazlar ▸ Kablosuz MAC'e de (devices.wifi_mac, göç 043; rastgele adres yazılmaz).
+    conn.execute("UPDATE devices SET facts = facts || %s::jsonb, wifi_mac = COALESCE(%s::macaddr, wifi_mac) WHERE id = %s",
+                 (json.dumps(data, ensure_ascii=False), netif.permanent_mac(data.get("wifi_mac")), device_id))
 
 
 # Wi-Fi radyosunu değiştiren hazır işlemler (actions/<id>) → işlemden sonraki radyo durumu.
 WIFI_ACTIONS = {"wifi-on": "enabled", "wifi-off": "disabled"}
 
 
-def mark_wifi_radio(conn, board_id: int, radio: str) -> None:
-    """wifi-on/wifi-off işlemi bir cihazda başarıyla bitince boards.facts'teki Wi-Fi durumunu hemen
+def mark_wifi_radio(conn, device_id: int, radio: str) -> None:
+    """wifi-on/wifi-off işlemi bir cihazda başarıyla bitince devices.facts'teki Wi-Fi durumunu hemen
     günceller: grid ve önbellekli "Bilgi kartı" bir sonraki tam toplamaya (CACHE_SECONDS) kadar eski
     durumu göstermesin. Kapatınca bağlantı bilgileri de silinir; açınca bağlantı birkaç saniye sonra
     kurulacağından durum bilinmiyor (None) sayılır. Kartı olmayan cihazda (wifi_iface yok) dokunulmaz."""
     conn.execute(
-        """UPDATE boards SET facts = facts || jsonb_build_object(
+        """UPDATE devices SET facts = facts || jsonb_build_object(
                'wifi_radio', %s::text, 'wifi_state', %s::text, 'wifi_ssid', NULL, 'wifi_signal', NULL,
                'wifi_freq', NULL, 'wifi_ip', NULL)
            WHERE id = %s AND facts->>'wifi_iface' IS NOT NULL""",
-        (radio, "unavailable" if radio == "disabled" else None, board_id))
+        (radio, "unavailable" if radio == "disabled" else None, device_id))

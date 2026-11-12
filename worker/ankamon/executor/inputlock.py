@@ -36,7 +36,7 @@ Kilitler birbirinden bağımsızdır, birkaçı birlikte tutulabilir:
 
 Kurulum: /var/lib/ankamon-input/{lock.py, keyboard|mouse|touch (bayrak dosyaları), log} ve
 /etc/systemd/system/ankamon-input-lock.service; son kilit açılınca hepsi silinir. Oturum yoklaması SCRIPT'teki "I"
-satırıyla durumu okur (boards.input_locks — göç 036).
+satırıyla durumu okur (devices.input_locks — göç 036).
 """
 
 from __future__ import annotations
@@ -239,13 +239,13 @@ echo "I $left"
 _TITLES = {"keyboard": "Klavye", "mouse": "Fare", "touch": "Dokunmatik"}
 
 
-def apply(board: dict, user: str, password: str, device: str, lock: bool) -> dict:
+def apply(device: dict, user: str, password: str, input_device: str, lock: bool) -> dict:
     """Döner: {"status", "rc", "output"} (bkz. accounts._ssh); output'un son satırı "I <süren kilitler>"."""
-    if device not in DEVICES:
+    if input_device not in DEVICES:
         return {"status": "failed", "rc": None, "output": "Geçersiz aygıt."}
     script = _LOCK.replace("__DAEMON__", _DAEMON) if lock else _UNLOCK
-    script = script.replace("__DEVICE__", device).replace("__TITLE__", _TITLES[device])
-    return _ssh(board, user, password, script, timeout=30)
+    script = script.replace("__DEVICE__", input_device).replace("__TITLE__", _TITLES[input_device])
+    return _ssh(device, user, password, script, timeout=30)
 
 
 def parse(output: str) -> list[str]:
@@ -256,5 +256,5 @@ def parse(output: str) -> list[str]:
     return []
 
 
-def store(conn, board_id: int, locks: list[str]) -> None:
-    conn.execute("UPDATE boards SET input_locks = %s WHERE id = %s", (locks, board_id))
+def store(conn, device_id: int, locks: list[str]) -> None:
+    conn.execute("UPDATE devices SET input_locks = %s WHERE id = %s", (locks, device_id))

@@ -55,28 +55,28 @@ _DISK_TAGS = """t.name IN ('smartmon_temperature_celsius_raw_value', 'smartmon_a
 _VALID = "{a}.value > 0 AND {a}.value <= 120"
 
 _BASELINES = """
-SELECT board_id, avg(v) AS avg, count(*) AS hours FROM (
-    SELECT t.board_id, h.time, max(h.value) AS v
+SELECT device_id, avg(v) AS avg, count(*) AS hours FROM (
+    SELECT t.device_id, h.time, max(h.value) AS v
     FROM metrics_1h h JOIN metrics_tag t USING (tag_id)
-    WHERE {tags} AND t.board_id = ANY(%(boards)s) AND h.time >= %(from)s AND {valid}
-    GROUP BY t.board_id, h.time
-) per_hour GROUP BY board_id HAVING count(*) >= %(min_hours)s
+    WHERE {tags} AND t.device_id = ANY(%(devices)s) AND h.time >= %(from)s AND {valid}
+    GROUP BY t.device_id, h.time
+) per_hour GROUP BY device_id HAVING count(*) >= %(min_hours)s
 """
 
 _SAMPLES = """
 WITH s AS (
-    SELECT t.board_id, m.time, max(m.value) AS v
+    SELECT t.device_id, m.time, max(m.value) AS v
     FROM metrics_5m m JOIN metrics_tag t USING (tag_id)
-    WHERE {tags} AND t.board_id = ANY(%(boards)s) AND m.time >= %(since)s AND {valid}
-    GROUP BY t.board_id, m.time
+    WHERE {tags} AND t.device_id = ANY(%(devices)s) AND m.time >= %(since)s AND {valid}
+    GROUP BY t.device_id, m.time
 )
-SELECT board_id, time, v FROM s ORDER BY board_id, time
+SELECT device_id, time, v FROM s ORDER BY device_id, time
 """
 
-_BOARDS = """
-SELECT id::text AS board_id, id, lower(COALESCE(NULLIF(hostname, ''), host(ip))) AS host,
+_DEVICES = """
+SELECT id::text AS device_id, id, lower(COALESCE(NULLIF(hostname, ''), host(ip))) AS host,
        COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name
-FROM boards
+FROM devices
 """
 
 _KNOWN = """
@@ -94,11 +94,11 @@ def _text(peak: float, avg: float) -> str:
     return f"En yüksek {_tr(peak)} °C — ortalaması {_tr(avg)} °C, eşik {_tr(avg * RATIO)} °C"
 
 
-def _baselines(conn, tags: str, boards: list[str]) -> dict:
+def _baselines(conn, tags: str, devices: list[str]) -> dict:
     now = conn.execute("SELECT now() AS now").fetchone()["now"]
     rows = conn.execute(_BASELINES.format(tags=tags, valid=_VALID.format(a="h")),
-                        {"boards": boards, "from": now - BASE_WINDOW, "min_hours": BASE_MIN_HOURS}).fetchall()
-    return {r["board_id"]: float(r["avg"]) for r in rows}
+                        {"devices": devices, "from": now - BASE_WINDOW, "min_hours": BASE_MIN_HOURS}).fetchall()
+    return {r["device_id"]: float(r["avg"]) for r in rows}
 
 
 def _islands(rows: list, limit: float) -> list[dict]:
@@ -123,14 +123,14 @@ def _islands(rows: list, limit: float) -> list[dict]:
 
 def _detect(conn, since, kind: str, tags: str):
     now = conn.execute("SELECT now() AS now").fetchone()["now"]
-    boards = {r["board_id"]: r for r in conn.execute(_BOARDS).fetchall() if r["host"]}
-    averages = _baselines(conn, tags, list(boards))
+    devices = {r["device_id"]: r for r in conn.execute(_DEVICES).fetchall() if r["host"]}
+    averages = _baselines(conn, tags, list(devices))
     if not averages:
         return [], []
     samples: dict[str, list] = {}
     for r in conn.execute(_SAMPLES.format(tags=tags, valid=_VALID.format(a="m")),
-                          {"boards": list(averages), "since": since}).fetchall():
-        samples.setdefault(r["board_id"], []).append(r)
+                          {"devices": list(averages), "since": since}).fetchall():
+        samples.setdefault(r["device_id"], []).append(r)
 
     # Pencerenin başında kesilmiş aralık, kayıtlı anomalinin devamıdır: başlangıcı ve tepesi kayıttan korunur.
     known: dict[str, list] = {}
@@ -138,13 +138,13 @@ def _detect(conn, since, kind: str, tags: str):
         known.setdefault(r["host"], []).append(r)
 
     found, scopes = [], []
-    for board_id, rows in samples.items():
-        board = boards[board_id]
-        avg = averages[board_id]
-        scopes.append((board["host"], rows[0]["time"], rows[-1]["time"]))
+    for device_id, rows in samples.items():
+        device = devices[device_id]
+        avg = averages[device_id]
+        scopes.append((device["host"], rows[0]["time"], rows[-1]["time"]))
         for iv in _islands(rows, avg * RATIO):
             start, peak = iv["started_at"], iv["peak"]
-            for r in known.get(board["host"], []):
+            for r in known.get(device["host"], []):
                 if r["started_at"] < start and (r["ended_at"] is None or r["ended_at"] >= start - GAP):
                     start = r["started_at"]
                     peak = max(peak, float((r["detail"] or {}).get("peak_c") or 0))
@@ -153,7 +153,7 @@ def _detect(conn, since, kind: str, tags: str):
             end = now if ongoing else iv["last_at"] + BUCKET
             if end - start < THRESHOLD:
                 continue
-            found.append({"host": board["host"], "board_id": board["id"], "board_name": board["name"],
+            found.append({"host": device["host"], "device_id": device["id"], "device_name": device["name"],
                           "started_at": start, "ended_at": None if ongoing else end,
                           "detail": {"peak_c": round(peak, 1), "average_c": round(avg, 1),
                                      "limit_c": round(avg * RATIO, 1), "text": _text(peak, avg)}})
@@ -167,8 +167,8 @@ def _evaluate(values: dict, ctx: dict, kind_name: str, tags: str) -> dict:
         current = None
     if current is None or current <= 0:
         return {"anomaly": None, "summary": f"{kind_name} sıcaklığı okunamadı", "detail": {}}
-    board_id = str(ctx["board"]["board_id"])
-    avg = _baselines(ctx["conn"], tags, [board_id]).get(board_id)
+    device_id = str(ctx["device"]["device_id"])
+    avg = _baselines(ctx["conn"], tags, [device_id]).get(device_id)
     if avg is None:
         return {"anomaly": None, "summary": f"Şu an {_tr(current)} °C; karşılaştırma için en az "
                                             f"{BASE_MIN_HOURS} saatlik ölçüm geçmişi gerekli",

@@ -44,27 +44,27 @@ final class LoginStatusApi
 {
     public function status(): array
     {
-        $boards = Db::one(
-            "SELECT count(*) AS total, count(*) FILTER (WHERE online) AS online FROM boards"
+        $devices = Db::one(
+            "SELECT count(*) AS total, count(*) FILTER (WHERE online) AS online FROM devices"
         );
         $urgent = Db::one(
-            "SELECT count(*) FILTER (WHERE level = 'bad') AS boards, max(finished_at) AS last
+            "SELECT count(*) FILTER (WHERE level = 'bad') AS devices, max(finished_at) AS last
              FROM (
-                 SELECT DISTINCT ON (t.board_id) t.board_id,
+                 SELECT DISTINCT ON (t.device_id) t.device_id,
                         CASE WHEN t.output ~ '^\\s*\\{' THEN t.output::jsonb->>'level' END AS level,
                         extract(epoch FROM j.finished_at)::bigint AS finished_at
                  FROM job_targets t JOIN jobs j ON j.id = t.job_id
-                 JOIN boards b ON b.id = t.board_id
+                 JOIN devices b ON b.id = t.device_id
                  WHERE j.type = 'diagnose' AND t.status = 'ok' AND COALESCE((j.params->>'auto')::boolean, false)
-                 ORDER BY t.board_id, j.id DESC
+                 ORDER BY t.device_id, j.id DESC
              ) last_scan"
         );
-        $total = (int) $boards['total'];
-        $online = (int) $boards['online'];
+        $total = (int) $devices['total'];
+        $online = (int) $devices['online'];
         return [
             'online' => $online,
             'offline' => $total - $online,
-            'urgent' => (int) $urgent['boards'],
+            'urgent' => (int) $urgent['devices'],
             'scanned_at' => $urgent['last'] !== null ? (int) $urgent['last'] : null,
         ];
     }

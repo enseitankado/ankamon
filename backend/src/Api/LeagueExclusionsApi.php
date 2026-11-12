@@ -46,7 +46,7 @@ use DateTimeImmutable;
 final class LeagueExclusionsApi
 {
     /** Lig → dışlanabilen türler. */
-    private const LEAGUE_EXCLUSION_KINDS = ['session' => ['user', 'board'], 'break' => ['user', 'board']];
+    private const LEAGUE_EXCLUSION_KINDS = ['session' => ['user', 'device'], 'break' => ['user', 'device']];
 
     /** Ligin o türden dışlanan değerleri (kullanıcı adı küçük harf / cihaz host adı). */
     public static function leagueExcludedValues(string $league, string $kind): array
@@ -91,10 +91,10 @@ final class LeagueExclusionsApi
             }
             $rows = Db::all(
                 "WITH t AS (SELECT host, sum(seconds)::bigint AS seconds FROM ($source) s GROUP BY host),
-                      hosts AS (SELECT host FROM t UNION SELECT hostname FROM boards WHERE hostname IS NOT NULL AND hostname <> '')
+                      hosts AS (SELECT host FROM t UNION SELECT hostname FROM devices WHERE hostname IS NOT NULL AND hostname <> '')
                  SELECT h.host AS value, NULLIF(b.label, '') AS label, COALESCE(t.seconds, 0)::bigint AS seconds
                  FROM hosts h LEFT JOIN t ON t.host = h.host
-                 LEFT JOIN LATERAL (SELECT label FROM boards WHERE hostname = h.host ORDER BY id LIMIT 1) b ON true
+                 LEFT JOIN LATERAL (SELECT label FROM devices WHERE hostname = h.host ORDER BY id LIMIT 1) b ON true
                  ORDER BY seconds DESC, COALESCE(NULLIF(b.label, ''), h.host)",
                 $params
             );

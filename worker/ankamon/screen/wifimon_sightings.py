@@ -49,7 +49,7 @@ def _stable(row: dict) -> bool:
     return bool(row.get("addr")) and (row["kind"] in ("wifi", "client") or not row.get("random"))
 
 
-def record_and_annotate(board_id: int, rows: list[dict]) -> None:
+def record_and_annotate(device_id: int, rows: list[dict]) -> None:
     """Satırları geçmişe yazar; her satıra first_seen (epoch sn) ve seen_days ekler (kalıcı olmayan adreste None)."""
     global _last_prune
     for row in rows:
@@ -61,14 +61,14 @@ def record_and_annotate(board_id: int, rows: list[dict]) -> None:
         with db.connect() as conn:
             # Tek sorgu; aynı adres bir taramada iki kez gelirse (ör. aynı BSSID iki satırda) ilki yazılır.
             got = conn.execute(
-                """INSERT INTO wifimon_sightings AS s (board_id, kind, addr, name)
+                """INSERT INTO wifimon_sightings AS s (device_id, kind, addr, name)
                    SELECT DISTINCT ON (k, a) %s, k, a, n FROM unnest(%s::text[], %s::text[], %s::text[]) AS u(k, a, n)
-                   ON CONFLICT (board_id, kind, addr) DO UPDATE SET
+                   ON CONFLICT (device_id, kind, addr) DO UPDATE SET
                      name = CASE WHEN EXCLUDED.name <> '' THEN EXCLUDED.name ELSE s.name END,
                      seen_days = s.seen_days + CASE WHEN s.last_seen::date < now()::date THEN 1 ELSE 0 END,
                      last_seen = now()
                    RETURNING kind, addr, extract(epoch FROM first_seen)::bigint AS first_seen, seen_days""",
-                (board_id, [r["kind"] for r in stable], [r["addr"].upper() for r in stable],
+                (device_id, [r["kind"] for r in stable], [r["addr"].upper() for r in stable],
                  [r.get("name") or "" for r in stable])).fetchall()
             if time.time() - _last_prune > 3600:
                 _last_prune = time.time()

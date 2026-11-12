@@ -32,10 +32,10 @@
  * çalıştır, Görevi sonlandır, Verimlilik modu, Görünüm (güncelleme hızı, her zaman üstte).
  *
  * Çoklu cihaz (kullanıcı isteği: seçili her cihaz için ayrı pencere değil, tek pencerede süzme ile): pencere seçili
- * cihazların HER BİRİ için bir canlı bağ (ui.taskmgr.TaskBoardLink: cihaza tek SSH + ajan, kendi modeli) tutar.
+ * cihazların HER BİRİ için bir canlı bağ (ui.taskmgr.TaskDeviceLink: cihaza tek SSH + ajan, kendi modeli) tutar.
  * Tablo sekmelerinde bütün cihazların satırları tek tabloda, "Bilgisayar" sütunuyla ("takma ad [bilgisayar adı]");
  * satır kimlikleri cihazla birleşiktir ("<cihaz id>:<kimlik>") ve satır işlemleri satırın cihazına gider.
- * Üstteki "Bilgisayar" süzgeci (ui.taskmgr.TaskBoardPicker, çoklu seçim) ve arama kutusu (bilgisayar adını da
+ * Üstteki "Bilgisayar" süzgeci (ui.taskmgr.TaskDevicePicker, çoklu seçim) ve arama kutusu (bilgisayar adını da
  * arar) birlikte süzer; Performans sekmesinde cihaz seçici vardır. Tek cihazda görünüm eskisi gibidir (Bilgisayar
  * sütunu ve süzgeci yok). Pencere kapanınca ya da sayfa yenilenince BÜTÜN WebSocket'ler kapanır → SSH'ler ve
  * cihazlardaki ajanlar sonlanır. Çok cihazda tablo tazelemesi birleştirilir (güncelleme aralığında bir kez).
@@ -54,11 +54,11 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
     /**
      * Sağ menüden / araç çubuğundan: verilen cihazların (çevrim içi olanlar) hepsiyle TEK pencere. Aynı cihaz
      * kümesi için açık pencere varsa öne getirilir.
-     * @param boards {Array|Map} cihaz(lar) {id, label, hostname, ip}
+     * @param devices {Array|Map} cihaz(lar) {id, label, hostname, ip}
      */
-    open(boards, user) {
+    open(devices, user) {
       const self = ankamon.ui.taskmgr.Window;
-      const list = (Array.isArray(boards) ? boards : [boards]).filter(Boolean);
+      const list = (Array.isArray(devices) ? devices : [devices]).filter(Boolean);
       if (!list.length) {
         return null;
       }
@@ -80,16 +80,16 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
     }
   },
 
-  construct(boards, user) {
+  construct(devices, user) {
     super("Görev Yöneticisi");
     const seen = new Set();
-    const list = (Array.isArray(boards) ? boards : [boards]).filter(b => b && !seen.has(b.id) && seen.add(b.id));
+    const list = (Array.isArray(devices) ? devices : [devices]).filter(b => b && !seen.has(b.id) && seen.add(b.id));
     this.__user = user;
     this.__settings = Object.assign({ interval: 1, startTab: "processes", onTop: false, memPct: false },
       (user.ui_prefs || {})[ankamon.ui.taskmgr.Window.PREF] || {});
     this.__chosen = new Set();
     // Cihaz başına bağ; sıra: "Bilgisayar" adına göre (doğal sıralama: A1-2 < A1-10).
-    this.__links = list.map(b => new ankamon.ui.taskmgr.TaskBoardLink(b))
+    this.__links = list.map(b => new ankamon.ui.taskmgr.TaskDeviceLink(b))
       .sort((a, b) => a.getDisplay().localeCompare(b.getDisplay(), "tr", { numeric: true }));
     this.__linkById = new Map(this.__links.map(l => [l.getId(), l]));
     this.__multi = this.__links.length > 1;
@@ -111,7 +111,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
     this.__search.addListener("changeValue", () => this.__refresh());
     bar.add(this.__search);
     if (this.__multi) {
-      this.__picker = new ankamon.ui.taskmgr.TaskBoardPicker(this);
+      this.__picker = new ankamon.ui.taskmgr.TaskDevicePicker(this);
       bar.add(this.__picker);
     }
     bar.add(new qx.ui.core.Spacer(), { flex: 1 });
@@ -260,16 +260,16 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
       return this.__links.filter(l => !this.__chosen.size || this.__chosen.has(l.getId()));
     },
 
-    hasBoardFilter() {
+    hasDeviceFilter() {
       return this.__chosen.size > 0;
     },
 
-    isBoardChosen(id) {
+    isDeviceChosen(id) {
       return this.__chosen.has(Number(id));
     },
 
     /** "Bilgisayar" süzgeci: seçili cihaz kimlikleri (boş → hepsi). */
-    setBoardFilter(ids) {
+    setDeviceFilter(ids) {
       this.__chosen = new Set((ids || []).map(Number).filter(id => this.__linkById.has(id)));
       if (this.__picker) {
         this.__picker.sync();
@@ -290,7 +290,7 @@ qx.Class.define("ankamon.ui.taskmgr.Window", {
      * Arama metni cihazın "Bilgisayar" adıyla eşleşiyor mu (yalnız çok cihazda): eşleşirse o cihazın bütün
      * satırları gösterilir (satırın kendi alanları ayrıca aranmaz).
      */
-    boardMatches(link, q) {
+    deviceMatches(link, q) {
       return this.__multi && !!q && link.getDisplay().toLowerCase().includes(q);
     },
 

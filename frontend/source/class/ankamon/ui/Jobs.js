@@ -64,7 +64,7 @@ qx.Class.define("ankamon.ui.Jobs", {
      *   worker/ankamon/executor/backup.py); {downloads: url(jobId, name)} — "file" olaylarındaki dosyalar
      *   indirme listesine eklenir ve DOWNLOAD_GAP_MS aralıklarla sırayla otomatik indirilir;
      *   {intro: "metin"} — çıktı kutusunun EN BAŞINDA (her görünümde, cihaz seçiminden bağımsız) duran
-     *   sabit açıklama, ör. Uyandır'da "cihaz açılmazsa neden" bilgisi (bkz. BoardOps.WOL_INTRO);
+     *   sabit açıklama, ör. Uyandır'da "cihaz açılmazsa neden" bilgisi (bkz. DeviceOps.WOL_INTRO);
      *   {footer: widget} — pencerenin en altına eklenir, ör. Uyandır'da "Bu pencereyi bir daha gösterme".
      */
     async show(jobOrPromise, caption, opts = {}) {
@@ -125,19 +125,19 @@ qx.Class.define("ankamon.ui.Jobs", {
 
       const icon = ankamon.ui.Jobs.STATUS_ICON;
       const F = ankamon.util.Format;
-      const lines = new Map();   // board_id (null = genel) → [satır]
-      const items = new Map();   // board_id → ListItem
+      const lines = new Map();   // device_id (null = genel) → [satır]
+      const items = new Map();   // device_id → ListItem
       const all = new qx.ui.form.ListItem("Tümü");
-      all.setUserData("board", "all");
+      all.setUserData("device", "all");
       list.add(all);
       let selected = "all";
       let after = 0;
       let names = new Map();
-      let lastAllBoard; // "Tümü" görünümünde en son eklenen cihaz — aralara boş satır koymak için
+      let lastAllDevice; // "Tümü" görünümünde en son eklenen cihaz — aralara boş satır koymak için
       let doneNotified = false; // opts.onDone yalnız bir kez
       const finished = new Set();  // bitiş satırı ("ok"/"fail" olayı) gelmiş cihazlar — ayraç kararı için
-      const percent = new Map();   // board_id → son "progress" yüzdesi
-      const files = [];            // [{board, name, size, note, url, auto, started}]
+      const percent = new Map();   // device_id → son "progress" yüzdesi
+      const files = [];            // [{device, name, size, note, url, auto, started}]
       const queue = [];            // otomatik indirilecekler (sırayla, aralıklı)
       let pumping = false;
       const renderDownloads = () => {
@@ -145,7 +145,7 @@ qx.Class.define("ankamon.ui.Jobs", {
         downloads.setVisibility(files.length ? "visible" : "excluded");
         downloads.setValue("<b>İndirilecek yedekler</b> (otomatik başlamazsa adına tıklayın):<br>" + files.map(f =>
           `${f.started ? "⬇" : f.auto ? "⏳" : "▫"} <a href="${esc(f.url)}" download="${esc(f.name)}">${esc(f.name)}</a> ` +
-          `(${F.bytes(f.size)}) — ${esc(f.board)}` + (f.note ? ` <i>· ${esc(f.note)}</i>` : "")).join("<br>"));
+          `(${F.bytes(f.size)}) — ${esc(f.device)}` + (f.note ? ` <i>· ${esc(f.note)}</i>` : "")).join("<br>"));
       };
       const pump = () => {
         if (pumping || stop) {
@@ -208,7 +208,7 @@ qx.Class.define("ankamon.ui.Jobs", {
       };
       list.addListener("changeSelection", e => {
         const item = e.getData()[0];
-        selected = item ? item.getUserData("board") : "all";
+        selected = item ? item.getUserData("device") : "all";
         render();
       });
 
@@ -227,29 +227,29 @@ qx.Class.define("ankamon.ui.Jobs", {
         if (stop) {
           return;
         }
-        names = new Map(res.targets.map(t => [t.board_id, t.board]));
+        names = new Map(res.targets.map(t => [t.device_id, t.device]));
         // Cihaz listesi + durum simgeleri.
         res.targets.forEach(t => {
-          let item = items.get(t.board_id);
+          let item = items.get(t.device_id);
           if (!item) {
             item = new qx.ui.form.ListItem("");
-            item.setUserData("board", t.board_id);
-            items.set(t.board_id, item);
+            item.setUserData("device", t.device_id);
+            items.set(t.device_id, item);
             list.add(item);
           }
           const code = t.exit_code === null || t.exit_code === undefined ? "" : ` (${t.exit_code})`;
-          const pct = t.status === "running" && percent.has(t.board_id) ? ` — %${percent.get(t.board_id)}` : "";
+          const pct = t.status === "running" && percent.has(t.device_id) ? ` — %${percent.get(t.device_id)}` : "";
           const color = ankamon.ui.Jobs.STATUS_COLOR[t.status] || "inherit";
           item.setRich(true);
           const mark = t.status === "running" ? ankamon.ui.JobSpinner.html() : (icon[t.status] || "•");
           item.setLabel(`<span style="color:${color}${t.status === "running" ? ";font-weight:600" : ""}">` +
-            `${mark} ${qx.bom.String.escape(t.board)}${code}${pct}</span>`);
+            `${mark} ${qx.bom.String.escape(t.device)}${code}${pct}</span>`);
         });
         // Grup sırası: çalışanlar üstte, sonra sıradakiler, en altta bitenler (her grupta ad sırası).
         const rank = st => ankamon.ui.Jobs.STATUS_RANK[st] ?? 2;
-        const order = res.targets.slice().sort((a, b) => rank(a.status) - rank(b.status) || a.board.localeCompare(b.board, "tr"));
+        const order = res.targets.slice().sort((a, b) => rank(a.status) - rank(b.status) || a.device.localeCompare(b.device, "tr"));
         order.forEach((t, i) => {
-          const item = items.get(t.board_id);
+          const item = items.get(t.device_id);
           if (list.indexOf(item) !== i + 1) {
             list.addAt(item, i + 1); // 0: "Tümü"
           }
@@ -258,13 +258,13 @@ qx.Class.define("ankamon.ui.Jobs", {
         const single = res.targets.length <= 1;
         list.setVisibility(single ? "excluded" : "visible");
         if (single && res.targets.length === 1 && selected === "all") {
-          selected = res.targets[0].board_id;
+          selected = res.targets[0].device_id;
         }
 
         let changed = false;
         res.events.forEach(ev => {
           after = Math.max(after, ev.id);
-          const key = ev.board_id === null ? null : ev.board_id;
+          const key = ev.device_id === null ? null : ev.device_id;
           const name = key === null ? "Görev" : (names.get(key) || "#" + key);
           // Makine olayları (yedekleme): metin olarak gösterilmez, çubuğu/indirme listesini besler.
           if (ev.kind === "progress" || ev.kind === "file") {
@@ -279,7 +279,7 @@ qx.Class.define("ankamon.ui.Jobs", {
             } else if (downloads) {
               // auto:false (ör. ev yedeğinin .tar.gz'si — Windows kopyası .zip otomatik iner) yalnız listelenir.
               const f = {
-                board: name, name: data.name, size: data.size, note: data.note || "",
+                device: name, name: data.name, size: data.size, note: data.note || "",
                 url: opts.downloads(jobId, data.name), auto: data.auto !== false, started: false
               };
               files.push(f);
@@ -294,14 +294,14 @@ qx.Class.define("ankamon.ui.Jobs", {
           if (!lines.has("all")) {
             lines.set("all", []);
           }
-          if (key !== null && lastAllBoard !== undefined && key !== lastAllBoard && finished.has(lastAllBoard)) {
+          if (key !== null && lastAllDevice !== undefined && key !== lastAllDevice && finished.has(lastAllDevice)) {
             lines.get("all").push(""); // önceki cihaz bitti, sıradakine geçildi: ayraç boş satır
           }
           if (key !== null && (ev.kind === "ok" || ev.kind === "fail")) {
             finished.add(key); // cihazın son satırı (bkz. runner stream.run: "Bitti"/"Bağlanılamadı")
           }
           if (key !== null) {
-            lastAllBoard = key;
+            lastAllDevice = key;
           }
           lines.get("all").push(fmt(ev, `[${name}] `));
           if (key !== null) {
@@ -321,7 +321,7 @@ qx.Class.define("ankamon.ui.Jobs", {
         if (bar && res.targets.length) {
           // Toplam: biten cihaz %100, çalışan cihaz kendi yüzdesiyle, bekleyen %0 — eşit ağırlıklı.
           const sum = res.targets.reduce((acc, t) =>
-            acc + (["queued", "running"].includes(t.status) ? (percent.get(t.board_id) || 0) : 100), 0);
+            acc + (["queued", "running"].includes(t.status) ? (percent.get(t.device_id) || 0) : 100), 0);
           const total = running ? Math.floor(sum / res.targets.length) : 100;
           bar.setValue(total);
           barLabel.setValue(`Toplam: %${total}`);

@@ -40,7 +40,7 @@ qx.Class.define("ankamon.ui.taskmgr.ProcessesTab", {
 
   statics: {
     GROUPS: [["apps", "Uygulamalar"], ["bg", "Arka plan işlemleri"], ["sys", "Sistem işlemleri"]],
-    COL: { name: 1, status: 2, cpu: 3, mem: 4, disk: 5, net: 6, power: 7, pid: 8, proc: 9, user: 10, cmd: 11, board: 12 }
+    COL: { name: 1, status: 2, cpu: 3, mem: 4, disk: 5, net: 6, power: 7, pid: 8, proc: 9, user: 10, cmd: 11, device: 12 }
   },
 
   construct(win) {
@@ -215,7 +215,7 @@ qx.Class.define("ankamon.ui.taskmgr.ProcessesTab", {
       const groups = { apps: [], bg: [], sys: [] };
       links.forEach(link => {
         const m = link.getModel();
-        const whole = this._win.boardMatches(link, q);
+        const whole = this._win.deviceMatches(link, q);
         const match = p => whole || !q || p.name.toLowerCase().includes(q) || String(p.pid) === q ||
           (p.cmd || "").toLowerCase().includes(q) || (m.windows.get(p.pid) || []).some(w => w.title.toLowerCase().includes(q));
         const sessionUid = m.session && m.session.uid;
@@ -243,17 +243,17 @@ qx.Class.define("ankamon.ui.taskmgr.ProcessesTab", {
           link.getDisplay()];
       };
       const plain = v => String(v ?? "").replace(/<[^>]+>/g, "");
-      const boardCol = S.COL.board;
-      const byBoard = (a, b) => String(a[boardCol]).localeCompare(String(b[boardCol]), "tr", { numeric: true });
+      const deviceCol = S.COL.device;
+      const byDevice = (a, b) => String(a[deviceCol]).localeCompare(String(b[deviceCol]), "tr", { numeric: true });
       const order = (a, b) => {
         if (!this.__sort) {
-          return plain(a[1]).localeCompare(plain(b[1]), "tr") || byBoard(a, b);
+          return plain(a[1]).localeCompare(plain(b[1]), "tr") || byDevice(a, b);
         }
         const i = this.__sort.col;
         const x = a[i] ?? "";
         const y = b[i] ?? "";
         const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "tr", { numeric: true });
-        return (this.__sort.asc ? c : -c) || (i === boardCol ? plain(a[1]).localeCompare(plain(b[1]), "tr") : byBoard(a, b));
+        return (this.__sort.asc ? c : -c) || (i === deviceCol ? plain(a[1]).localeCompare(plain(b[1]), "tr") : byDevice(a, b));
       };
       const rows = [];
       S.GROUPS.forEach(([g, title]) => {
@@ -293,7 +293,7 @@ qx.Class.define("ankamon.ui.taskmgr.ProcessesTab", {
       const names = ["id", "Ad", "Durum", `CPU ${F.pct(avg(m => m.totals.cpu), 0)}`,
         `Bellek ${F.pct(avg(m => (100 * m.totals.memUsed) / (m.memTotal || 1)), 0)}`, `Disk ${F.pct(avg(m => m.totals.diskBusy), 0)}`,
         `Ağ ${F.pct(avg(m => m.totals.netPct), 0)}`, "Güç kullanımı", "PID", "İşlem adı", "Kullanıcı", "Komut satırı",
-        ankamon.ui.taskmgr.Tab.BOARD_COLUMN.label];
+        ankamon.ui.taskmgr.Tab.DEVICE_COLUMN.label];
       const cur = names.map((n, i) => this.__tm.getColumnName(i));
       if (cur.join("|") !== names.join("|")) {
         this.__tm.setColumnNamesByIndex(names);

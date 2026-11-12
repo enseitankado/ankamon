@@ -24,14 +24,14 @@ varsayımı kaldıran TANIMDIR (kullanıcı isteği 2026-11-12):
 
 Cihazın ailesi şu sırayla belirlenir (SQL `device_os_family(id)`, göç 052 — PHP ve worker aynı fonksiyonu kullanır):
 
-1. **Elle seçim** — Düzenle ▸ İşletim sistemi (`boards.os_family`),
+1. **Elle seçim** — Düzenle ▸ İşletim sistemi (`devices.os_family`),
 2. **SSH ile toplanan bilgi** — `facts.os_name` (ör. "Pardus ETAP GNU/Linux 23"),
 3. **Ağ taraması tahmini** — Varlıklar'daki `os_guess` (nmap; ör. "Microsoft Windows 10 1709 - 21H2"),
 4. hiçbiri yoksa `default_family` (`linux` — Akıllı Tahtalar bugüne dek ETAP'tı).
 
 ## 2. İşlev kataloğu — `catalog.json`
 
-Her işlev: `id`, `title`, `menu` (sağ menü / araç çubuğu madde adları — `BoardOps.menuButton` anahtarı, cihaz sayısı eki
+Her işlev: `id`, `title`, `menu` (sağ menü / araç çubuğu madde adları — `DeviceOps.menuButton` anahtarı, cihaz sayısı eki
 olmadan), `jobs` (worker görev türleri) ve `impl` (aile → uygulamanın kısa tanımı). `impl`'de adı olmayan aile o işlevi
 **desteklemez**. Katalogda hiç geçmeyen menü maddesi / görev türü `unknown_function_families` ailelerinde (Linux) çalışır —
 eklentilerin eski maddeleri böylece güvenle Linux'ta kalır; eklenti, maddesinin `ankamon.menuKey`'ini katalogdaki bir işleve
@@ -47,11 +47,11 @@ Yeni bir aile için bir işlevi uygulamak:
 
 ## 3. Uygulama noktaları
 
-- `db/migrations/052_device_os_family.sql` — `boards.os_family`, `device_os_family()`, `device_os_source()`.
-- `backend` — `BoardsApi` her cihaza `os_family`, `os_source`, `os_name` ekler; `GET /api/platforms` kataloğu verir;
+- `db/migrations/052_device_os_family.sql` — `devices.os_family`, `device_os_family()`, `device_os_source()`.
+- `backend` — `DevicesApi` her cihaza `os_family`, `os_source`, `os_name` ekler; `GET /api/platforms` kataloğu verir;
   `ActionsApi` işlem başına `platforms`.
 - `worker/ankamon/platforms.py` — katalog okuma, hedeflerin ailesi, destek denetimi; `runner` desteklenmeyen hedefi
   `skipped` yazar, komut/işlemde aileye göre betik + kabuk seçer (`runner/stream.py` `shell`).
-- `frontend ankamon.ui.boards.Platforms` — sağ menü ve araç çubuğu maddelerini seçili cihazların ailesine göre süzer:
+- `frontend ankamon.ui.devices.Platforms` — sağ menü ve araç çubuğu maddelerini seçili cihazların ailesine göre süzer:
   hiçbir cihaz desteklemiyorsa madde devre dışı (ipucu hangi ailede tanımsız olduğunu söyler), kısmen destekliyorsa yalnız
   destekleyen cihazlara uygulanır.

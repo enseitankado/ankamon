@@ -44,13 +44,13 @@ qx.Class.define("ankamon.ui.sessions.LeagueExclusions", {
     /** Lig (league, kind) → pencere başlığı ve aday türünün adı. */
     LEAGUE_EXCLUSION_TEXTS: {
       "session/user": { title: "Kullanım sıralaması — sıralama dışı kullanıcılar", noun: "kullanıcı" },
-      "session/board": { title: "Kullanım sıralaması — sıralama dışı cihazlar", noun: "cihaz" },
-      "break/board": { title: "Teneffüsler — sıralama dışı cihazlar", noun: "cihaz" },
+      "session/device": { title: "Kullanım sıralaması — sıralama dışı cihazlar", noun: "cihaz" },
+      "break/device": { title: "Teneffüsler — sıralama dışı cihazlar", noun: "cihaz" },
       "break/user": { title: "Teneffüsler — sıralama dışı kullanıcılar", noun: "kullanıcı" }
     },
 
     /**
-     * Düğme satırına kontrolleri ekler. opts: league ('session' | 'break'), kind() → 'user' | 'board' (o anki
+     * Düğme satırına kontrolleri ekler. opts: league ('session' | 'break'), kind() → 'user' | 'device' (o anki
      * görünüm), onChange() (görünüm yeniden yüklenmeli), page (yetki: _can). Dönen nesnenin withExcluded() o anki
      * kutu değerini, setInfo(excluded) düğme etiketini (dışlanan sayısı) verir.
      */
@@ -81,7 +81,7 @@ qx.Class.define("ankamon.ui.sessions.LeagueExclusions", {
 
     /**
      * Lig kartındaki satırın (kürsü basamağı ya da çubuk satırı) sağ menü kimliği: HTML öznitelikleri. attachRowMenu()
-     * sağ tıklanan öğeden yukarı çıkarak bu öznitelikleri arar. @param kind {String} 'user' | 'board'
+     * sağ tıklanan öğeden yukarı çıkarak bu öznitelikleri arar. @param kind {String} 'user' | 'device'
      * @param value {String} kullanıcı adı / cihaz host adı (league_exclusions.value) @param name {String} görünen ad
      */
     rowAttrs(kind, value, name, excluded) {
@@ -115,7 +115,7 @@ qx.Class.define("ankamon.ui.sessions.LeagueExclusions", {
         const name = el.getAttribute("data-lg-name") || value;
         const isOut = el.getAttribute("data-lg-out") === "1";
         const allowed = !!(opts.page && opts.page._can("leagues.exclude"));
-        const ops = ankamon.ui.BoardOps;
+        const ops = ankamon.ui.DeviceOps;
         const menu = new qx.ui.menu.Menu();
         const toggle = ops.menuButton(isOut ? "↺" : "⊘", isOut ? `Sıralamaya geri al: ${name}` : `Sıralama dışı bırak: ${name}`,
           () => Ex.setExcluded(opts.league, kind, value, !isOut).then(() => opts.onChange(),

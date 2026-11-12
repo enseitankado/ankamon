@@ -38,7 +38,7 @@ use Ankamon\Core\Storage;
 
 /**
  * GET /api/storage/export — Disk kullanımı sekmelerinde "İndir" (kullanıcı isteği 2026-11-12): bir satırın kapsamındaki
- * veriyi dosya olarak verir. Kapsam parametreleri o sekmenin silme isteğiyle AYNIDIR (board, all, name, ids, kind,
+ * veriyi dosya olarak verir. Kapsam parametreleri o sekmenin silme isteğiyle AYNIDIR (device, all, name, ids, kind,
  * names — bkz. frontend ui.DiskUsage specs, LogStatsApi/MetricStatsApi/JobStatsApi/... delete): silinecek ne ise
  * indirilen de odur. Biçimler:
  *  - veritabanı satırları (loglar, sensör ölçümleri, sohbet, oturum hareketleri, ntfy): gzip'li CSV — sunucu tarafı
@@ -60,19 +60,19 @@ final class StorageExportApi
         $mode = (string) $request->query('mode', '');
         set_time_limit(0);
         Audit::log($user, $request, 'storage.export', $mode, array_filter([
-            'board' => $request->query('board'), 'all' => $request->query('all'), 'name' => $request->query('name'),
+            'device' => $request->query('device'), 'all' => $request->query('all'), 'name' => $request->query('name'),
             'ids' => $request->query('ids'), 'kind' => $request->query('kind'), 'names' => $request->query('names'),
         ], static fn($v) => $v !== null));
         match ($mode) {
             'system', 'command' => $this->logs($request, $mode),
             'metrics' => $this->metrics($request),
             'jobs', 'diagnose' => $this->jobs($request, $mode),
-            'chat' => $this->named($request, 'sohbet', 'chat_messages', 'board_name',
-                'sent_at, board_name, session_username, direction, author, body', 'sent_at'),
-            'movements' => $this->named($request, 'oturum-hareketleri', 'session_activity', 'board_name',
-                'at, board_name, username, kind, summary, detail, source', 'at'),
+            'chat' => $this->named($request, 'sohbet', 'chat_messages', 'device_name',
+                'sent_at, device_name, session_username, direction, author, body', 'sent_at'),
+            'movements' => $this->named($request, 'oturum-hareketleri', 'session_activity', 'device_name',
+                'at, device_name, username, kind, summary, detail, source', 'at'),
             'ntfy' => $this->named($request, 'ntfy', 'ntfy_messages', 'rule_name',
-                'sent_at, rule_name, topic, title, body, board_id, kind, status, error', 'sent_at'),
+                'sent_at, rule_name, topic, title, body, device_id, kind, status, error', 'sent_at'),
             'screenshots' => $this->screenshots($request),
             'backups' => $this->rootExport('backups', self::backupNames($request)),
             'queue' => $this->rootExport('logqueue', self::queueNames($request)),
@@ -81,35 +81,35 @@ final class StorageExportApi
         exit;
     }
 
-    /** Sistem / komut logları; board = id | "unmatched" | yok (tümü) — LogStatsApi::delete ile aynı kapsam. */
+    /** Sistem / komut logları; device = id | "unmatched" | yok (tümü) — LogStatsApi::delete ile aynı kapsam. */
     private function logs(Request $request, string $type): void
     {
-        $board = $request->query('board');
+        $device = $request->query('device');
         $where = [];
         $params = [];
         $scope = 'tum-cihazlar';
         if ($type === 'command') {
-            if ($board === 'unmatched') {
-                $where[] = 'board_id IS NULL';
+            if ($device === 'unmatched') {
+                $where[] = 'device_id IS NULL';
                 $scope = 'eslesmeyen';
-            } elseif ($board !== null) {
-                $where[] = 'board_id = ?';
-                $params[] = (int) $board;
-                $scope = self::boardSlug((int) $board);
+            } elseif ($device !== null) {
+                $where[] = 'device_id = ?';
+                $params[] = (int) $device;
+                $scope = self::deviceSlug((int) $device);
             }
-            $sql = 'SELECT time, board_name, username, source, command, exit_code, status FROM command_log'
+            $sql = 'SELECT time, device_name, username, source, command, exit_code, status FROM command_log'
                 . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY time';
             $header = ['zaman', 'cihaz', 'kullanici', 'kaynak', 'komut', 'cikis_kodu', 'durum'];
         } else {
-            if ($board === 'unmatched') {
-                $where[] = 'NOT EXISTS (SELECT 1 FROM boards b WHERE lower(b.hostname) = lower(logs.host) OR host(b.ip) = logs.from_ip)';
+            if ($device === 'unmatched') {
+                $where[] = 'NOT EXISTS (SELECT 1 FROM devices b WHERE lower(b.hostname) = lower(logs.host) OR host(b.ip) = logs.from_ip)';
                 $scope = 'eslesmeyen';
-            } elseif ($board !== null) {
-                $b = Db::one('SELECT hostname, host(ip) AS ip FROM boards WHERE id = ?', [(int) $board])
+            } elseif ($device !== null) {
+                $b = Db::one('SELECT hostname, host(ip) AS ip FROM devices WHERE id = ?', [(int) $device])
                     ?? throw ApiError::notFound('Cihaz bulunamadı.');
                 $where[] = '(lower(host) = lower(?) OR from_ip = ?)';
                 array_push($params, (string) $b['hostname'], (string) $b['ip']);
-                $scope = self::boardSlug((int) $board);
+                $scope = self::deviceSlug((int) $device);
             }
             $sql = 'SELECT received_at, device_time, host, from_ip, facility, severity, program, message FROM logs'
                 . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY received_at';
@@ -118,24 +118,24 @@ final class StorageExportApi
         $this->csv(($type === 'command' ? 'komut-loglari-' : 'sistem-loglari-') . $scope, $header, $sql, $params);
     }
 
-    /** Ham sensör ölçümleri (özetler değil); board = id | "unmatched" | yok — MetricStatsApi::delete ile aynı kapsam. */
+    /** Ham sensör ölçümleri (özetler değil); device = id | "unmatched" | yok — MetricStatsApi::delete ile aynı kapsam. */
     private function metrics(Request $request): void
     {
-        $board = $request->query('board');
+        $device = $request->query('device');
         $where = '';
         $params = [];
         $scope = 'tum-cihazlar';
-        if ($board === 'unmatched') {
-            $where = " WHERE NULLIF(t.board_id, '') IS NULL OR NOT EXISTS (SELECT 1 FROM boards b WHERE b.id::text = t.board_id)";
+        if ($device === 'unmatched') {
+            $where = " WHERE NULLIF(t.device_id, '') IS NULL OR NOT EXISTS (SELECT 1 FROM devices b WHERE b.id::text = t.device_id)";
             $scope = 'eslesmeyen';
-        } elseif ($board !== null) {
-            $where = ' WHERE t.board_id = ?';
-            $params[] = (string) (int) $board;
-            $scope = self::boardSlug((int) $board);
+        } elseif ($device !== null) {
+            $where = ' WHERE t.device_id = ?';
+            $params[] = (string) (int) $device;
+            $scope = self::deviceSlug((int) $device);
         }
         $this->csv('sensor-verileri-' . $scope,
             ['zaman', 'cihaz_id', 'olcum', 'cpu', 'mode', 'device', 'mountpoint', 'fstype', 'chip', 'sensor', 'type', 'zone', 'deger'],
-            "SELECT m.time, t.board_id, t.name, t.cpu, t.mode, t.device, t.mountpoint, t.fstype, t.chip, t.sensor, t.type, t.zone, m.value
+            "SELECT m.time, t.device_id, t.name, t.cpu, t.mode, t.device, t.mountpoint, t.fstype, t.chip, t.sensor, t.type, t.zone, m.value
              FROM metrics m JOIN metrics_tag t USING (tag_id)$where ORDER BY m.time",
             $params);
     }
@@ -184,9 +184,9 @@ final class StorageExportApi
                              WHERE j.$scopeSql AND j.id = ANY(?::bigint[]) ORDER BY j.id", [$list]);
             foreach ($jobs as $job) {
                 $job['params'] = json_decode((string) $job['params'], true);
-                $job['targets'] = Db::all('SELECT t.board_id, b.hostname, b.label, t.status, t.exit_code, t.started_at, t.finished_at, t.output
-                                           FROM job_targets t LEFT JOIN boards b ON b.id = t.board_id WHERE t.job_id = ? ORDER BY t.board_id', [$job['id']]);
-                $job['events'] = Db::all('SELECT time, board_id, kind, text FROM job_events WHERE job_id = ? ORDER BY id', [$job['id']]);
+                $job['targets'] = Db::all('SELECT t.device_id, b.hostname, b.label, t.status, t.exit_code, t.started_at, t.finished_at, t.output
+                                           FROM job_targets t LEFT JOIN devices b ON b.id = t.device_id WHERE t.job_id = ? ORDER BY t.device_id', [$job['id']]);
+                $job['events'] = Db::all('SELECT time, device_id, kind, text FROM job_events WHERE job_id = ? ORDER BY id', [$job['id']]);
                 self::write($gz, json_encode($job, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) . "\n");
             }
         }
@@ -204,7 +204,7 @@ final class StorageExportApi
             if ($name === '') {
                 throw ApiError::badRequest('İndirilecek kapsam seçilmedi.');
             }
-            $files = array_column(Db::all('SELECT file FROM screenshots WHERE board_name = ? ORDER BY taken_at', [$name]), 'file');
+            $files = array_column(Db::all('SELECT file FROM screenshots WHERE device_name = ? ORDER BY taken_at', [$name]), 'file');
             $scope = self::slug($name);
         }
         // Yalnız dizin içindeki düz göreli yollar (kayıt bozuksa dışarı çıkılamasın).
@@ -352,9 +352,9 @@ final class StorageExportApi
         return array_values(array_unique(array_filter(array_map('intval', explode(',', (string) $request->query('ids', ''))))));
     }
 
-    private static function boardSlug(int $id): string
+    private static function deviceSlug(int $id): string
     {
-        $b = Db::one("SELECT COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name FROM boards WHERE id = ?", [$id]);
+        $b = Db::one("SELECT COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name FROM devices WHERE id = ?", [$id]);
         return self::slug($b['name'] ?? "cihaz-$id");
     }
 

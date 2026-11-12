@@ -54,14 +54,14 @@ qx.Class.define("ankamon.ui.taskmgr.Connection", {
     }
   },
 
-  construct(boardId) {
+  construct(deviceId) {
     super();
-    this.__boardId = boardId;
+    this.__deviceId = deviceId;
     this.__pending = new Map();
   },
 
   members: {
-    __boardId: null,
+    __deviceId: null,
     __ws: null,
     __seq: 0,
     __pending: null,
@@ -70,7 +70,7 @@ qx.Class.define("ankamon.ui.taskmgr.Connection", {
     open() {
       this.__closing = false;
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(`${proto}//${location.host}/screen/ws/taskmgr/${this.__boardId}`);
+      const ws = new WebSocket(`${proto}//${location.host}/screen/ws/taskmgr/${this.__deviceId}`);
       this.__ws = ws;
       ws.onopen = () => this.fireEvent("opened");
       ws.onmessage = e => {

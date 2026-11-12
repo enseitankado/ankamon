@@ -42,7 +42,7 @@ final class ChatApi
     public function messages(Request $request): array
     {
         return ['messages' => Db::all(
-            "SELECT id, board_id, board_name, session_username, direction, author, body,
+            "SELECT id, device_id, device_name, session_username, direction, author, body,
                     extract(epoch FROM sent_at)::bigint AS sent_at
              FROM chat_messages ORDER BY sent_at DESC, id DESC LIMIT 5000"
         )];
@@ -52,23 +52,23 @@ final class ChatApi
     public function stats(Request $request): array
     {
         $bytes = Storage::relationBytes('chat_messages');
-        $boards = Db::all(
-            "SELECT board_name AS name, count(*) AS n,
+        $devices = Db::all(
+            "SELECT device_name AS name, count(*) AS n,
                     (extract(epoch FROM min(sent_at)) * 1000)::bigint AS first,
                     (extract(epoch FROM max(sent_at)) * 1000)::bigint AS last
-             FROM chat_messages GROUP BY board_name ORDER BY n DESC"
+             FROM chat_messages GROUP BY device_name ORDER BY n DESC"
         );
-        $total = array_sum(array_column($boards, 'n'));
-        foreach ($boards as &$board) {
-            $board['est_bytes'] = Storage::share($bytes, (int) $board['n'], $total);
+        $total = array_sum(array_column($devices, 'n'));
+        foreach ($devices as &$device) {
+            $device['est_bytes'] = Storage::share($bytes, (int) $device['n'], $total);
         }
-        unset($board);
+        unset($device);
         return [
-            'boards' => $boards,
+            'devices' => $devices,
             'total' => [
                 'n' => $total, 'bytes' => $bytes,
-                'first' => $boards ? min(array_column($boards, 'first')) : null,
-                'last' => $boards ? max(array_column($boards, 'last')) : null,
+                'first' => $devices ? min(array_column($devices, 'first')) : null,
+                'last' => $devices ? max(array_column($devices, 'last')) : null,
             ],
             'disk' => Storage::diskSpace(),
         ];
@@ -85,7 +85,7 @@ final class ChatApi
             if ($scope === '') {
                 throw ApiError::badRequest('Silinecek kapsam seçilmedi.');
             }
-            $deleted = Db::exec('DELETE FROM chat_messages WHERE board_name = ?', [$scope]);
+            $deleted = Db::exec('DELETE FROM chat_messages WHERE device_name = ?', [$scope]);
         }
         Audit::log($user, $request, 'chat.delete', $scope, ['deleted' => $deleted]);
         return ['ok' => true, 'deleted' => $deleted];

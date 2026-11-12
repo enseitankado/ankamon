@@ -27,13 +27,13 @@
 
 /**
  * Oturumlar: cihazlarda greeter (lightdm) ile oturum açan gerçek kullanıcıların açma/kapama
- * kayıtları — worker/ankamon/tasks/board_sessions.py'nin logs'tan çıkardığı veri (bkz.
- * db/migrations/007_board_sessions.sql) — ve Ankamon üzerinden cihazlara açılan web terminal
+ * kayıtları — worker/ankamon/tasks/device_sessions.py'nin logs'tan çıkardığı veri (bkz.
+ * db/migrations/007_device_sessions.sql) — ve Ankamon üzerinden cihazlara açılan web terminal
  * oturumları (kullanıcı adı orada Ankamon kullanıcısıdır — bkz. db/migrations/011_webshell_sessions.sql).
  * Ankamon'un kendi arayüz kullanıcılarıyla (page.Users, sol menüdeki "Kullanıcılar") KARIŞTIRILMASIN
  * diye ağaçta "Oturumlar" adıyla ayrı bir yaprak — bkz. ui.Shell.PAGES.
  *
- * İki sekme, tek veri: sayfa /board-sessions'ı kısa aralıkla çeker ve iki sekmeye de verir.
+ * İki sekme, tek veri: sayfa /device-sessions'ı kısa aralıkla çeker ve iki sekmeye de verir.
  *  - "Oturumlar" (ui.sessions.List): tüm kayıtların süzülebilir grid'i.
  *  - "Zaman çizelgesi" (ui.sessions.Users): kullanıcı/cihaz bazında zaman çizelgesi ve özet. Grid'de
  *    sağ tık → "Oturum geçmişi" buraya, o kullanıcı seçili olarak geçer (showUserHistory).
@@ -63,7 +63,7 @@ qx.Class.define("ankamon.page.Sessions", {
     this.add(this.__tabs, { flex: 1 });
 
     // Oturum açma/kapama worker'da "anında" (hızlı döngü) işlendiğinden, sayfa da kısa aralıkla
-    // kendiliğinden tazelenir — bkz. page.Boards'taki aynı desen.
+    // kendiliğinden tazelenir — bkz. page.Devices'taki aynı desen.
     this.__timer = new qx.event.Timer(ankamon.page.Sessions.REFRESH_MS);
     this.__timer.addListener("interval", this.refresh, this);
     this.__timer.start();
@@ -88,21 +88,21 @@ qx.Class.define("ankamon.page.Sessions", {
     __movements: null,
 
     async _refresh() {
-      const data = await ankamon.io.Api.get("/board-sessions");
+      const data = await ankamon.io.Api.get("/device-sessions");
       this.__list.setData(data.sessions);
       this.__users.setData(data.sessions);
     },
 
     /**
-     * Shell.OPEN_PAGE {page: "sessions", board: {id, name}} — Cihazlar/Ekranlar sağ menüsü "Oturum geçmişi":
+     * Shell.OPEN_PAGE {page: "sessions", device: {id, name}} — Cihazlar/Ekranlar sağ menüsü "Oturum geçmişi":
      * Kullanıcılar sekmesi (zaman çizelgesi) o cihaza süzülmüş açılır (kullanıcı isteği).
      */
     openWith(data) {
       if (data && data.movements) {
         this.showMovements(data.movements);
-      } else if (data && data.board) {
+      } else if (data && data.device) {
         this.__tabs.setSelection([this.__users]);
-        this.__users.showBoard(data.board);
+        this.__users.showDevice(data.device);
       } else if (data && data.tab) {
         this.selectTab(data.tab); // sol menü / bağlantı: {tab} o sekme (bkz. ui.Shell.__openPage)
       }

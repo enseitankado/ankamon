@@ -44,18 +44,18 @@ qx.Class.define("ankamon.ui.chat.Window", {
       return [...this.__open.keys()];
     },
 
-    /** @param board {Map} en az {id, label|hostname|ip} */
-    open(board) {
-      const existing = this.__open.get(board.id);
+    /** @param device {Map} en az {id, label|hostname|ip} */
+    open(device) {
+      const existing = this.__open.get(device.id);
       if (existing) {
         existing.open();
         existing.focus();
         return existing;
       }
-      const win = new ankamon.ui.chat.Window(board);
-      this.__open.set(board.id, win);
+      const win = new ankamon.ui.chat.Window(device);
+      this.__open.set(device.id, win);
       win.addListener("close", () => {
-        this.__open.delete(board.id);
+        this.__open.delete(device.id);
         qx.event.message.Bus.dispatchByName(this.CHANGED, this.openIds());
       });
       qx.core.Init.getApplication().getRoot().add(win);
@@ -65,9 +65,9 @@ qx.Class.define("ankamon.ui.chat.Window", {
     }
   },
 
-  construct(board) {
-    super("Sohbet — " + (board.label || board.hostname || board.ip || "#" + board.id));
-    this.__board = board;
+  construct(device) {
+    super("Sohbet — " + (device.label || device.hostname || device.ip || "#" + device.id));
+    this.__device = device;
     this.__seen = new Set();
     this.set({ width: 480, height: 480, contentPadding: 10, layout: new qx.ui.layout.VBox(8) });
 
@@ -107,7 +107,7 @@ qx.Class.define("ankamon.ui.chat.Window", {
   },
 
   members: {
-    __board: null,
+    __device: null,
     __status: null,
     __log: null,
     __scroll: null,
@@ -119,7 +119,7 @@ qx.Class.define("ankamon.ui.chat.Window", {
 
     __connect() {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = this.__ws = new WebSocket(`${proto}//${location.host}/screen/ws/chat/${this.__board.id}`);
+      const ws = this.__ws = new WebSocket(`${proto}//${location.host}/screen/ws/chat/${this.__device.id}`);
       ws.addEventListener("open", () => this.__setReady(true));
       ws.addEventListener("message", e => this.__onMessage(JSON.parse(e.data)));
       ws.addEventListener("close", e => {

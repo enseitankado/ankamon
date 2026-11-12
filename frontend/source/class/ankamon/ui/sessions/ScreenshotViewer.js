@@ -43,7 +43,7 @@ qx.Class.define("ankamon.ui.sessions.ScreenshotViewer", {
       const esc = qx.bom.String.escape;
       const root = qx.core.Init.getApplication().getRoot();
       const bounds = root.getBounds() || { width: 1280, height: 800 };
-      const win = new qx.ui.window.Window(`Ekran görüntüsü — ${shot.board_name}`).set({
+      const win = new qx.ui.window.Window(`Ekran görüntüsü — ${shot.device_name}`).set({
         modal: true, contentPadding: 0, layout: new qx.ui.layout.VBox(),
         width: Math.min(1024, bounds.width - 40), height: Math.min(700, bounds.height - 40)
       });
@@ -53,7 +53,7 @@ qx.Class.define("ankamon.ui.sessions.ScreenshotViewer", {
       const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ padding: [6, 10] });
       const who = shot.session_username ? "oturum: " + esc(shot.session_username) : "oturum yok";
       bar.add(new qx.ui.basic.Label(
-        `<b>${esc(shot.board_name)}</b> · ${who} ·${F.dateTime(shot.taken_at * 1000)} · çeken: ${esc(shot.taken_by)} · ${F.bytes(shot.bytes)}`
+        `<b>${esc(shot.device_name)}</b> · ${who} ·${F.dateTime(shot.taken_at * 1000)} · çeken: ${esc(shot.taken_by)} · ${F.bytes(shot.bytes)}`
       ).set({ rich: true, alignY: "middle", selectable: true }), { flex: 1 });
       const stretch = new qx.ui.form.CheckBox("Yay").set({ value: true, alignY: "middle", toolTipText: "Görüntüyü pencereye sığdır; kaldırınca özgün boyut" });
       bar.add(stretch);

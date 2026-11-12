@@ -33,7 +33,7 @@ namespace Ankamon\Core;
 /**
  * Yol tablosunu (config/routes.php) isteğe eşler ve yetkiyi denetler.
  *
- * Yol satırı: [METOD, '/api/boards/{id}', [Sınıf::class, 'metot'], erişim]
+ * Yol satırı: [METOD, '/api/devices/{id}', [Sınıf::class, 'metot'], erişim]
  * Erişim: 'public' | 'user' (oturum yeter) | 'admin' | bir özellik anahtarı (ör. 'logs').
  */
 final class Router
@@ -46,9 +46,12 @@ final class Router
     public function dispatch(Request $request): mixed
     {
         $pathMatched = false;
+        // Eski uç adları (terim geçişi 2026-11-12): /api/boards…, /api/board-… → /api/devices…, /api/device-… — eklentiler
+        // ve açık kalmış eski sekmeler bozulmasın.
+        $path = (string) preg_replace('#^/api/board(?=s?(/|-|$))#', '/api/device', $request->path);
         foreach ($this->routes as [$method, $pattern, $handler, $access]) {
             $regex = '#^' . preg_replace('#\{(\w+)\}#', '(?P<$1>\d+)', $pattern) . '$#';
-            if (!preg_match($regex, $request->path, $matches)) {
+            if (!preg_match($regex, $path, $matches)) {
                 continue;
             }
             $pathMatched = true;
@@ -79,7 +82,7 @@ final class Router
         if ($access === 'admin' && !$user['is_admin']) {
             throw ApiError::forbidden();
         }
-        if (!in_array($access, ['user', 'admin'], true) && !Auth::can($user, $access)) {
+        if (!in_array($access, ['user', 'admin'], true) && !Auth::can($user, Auth::feature($access))) {
             throw ApiError::forbidden();
         }
         return $user;

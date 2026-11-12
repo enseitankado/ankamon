@@ -39,7 +39,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from ..executor import session_probe, whoami
-from ..executor.jobs import _board_access
+from ..executor.jobs import _device_access
 
 log = logging.getLogger(__name__)
 
@@ -53,21 +53,21 @@ def run(conn) -> None:
     if now - _last < INTERVAL_SECONDS:
         return
     _last = now
-    boards = conn.execute(
+    devices = conn.execute(
         # Sensör toplaması kapalı cihazlar da (monitor_enabled): başarılı root girişi «Yönetilebilir»in tek ölçütü
-        # (BoardsApi manageable — kullanıcı isteği 2026-11-10); SSH portu kapalı cihaza girilemez, yoklanmaz.
-        "SELECT id AS board_id, host(ip) AS ip FROM boards WHERE online AND ip IS NOT NULL"
+        # (DevicesApi manageable — kullanıcı isteği 2026-11-10); SSH portu kapalı cihaza girilemez, yoklanmaz.
+        "SELECT id AS device_id, host(ip) AS ip FROM devices WHERE online AND ip IS NOT NULL"
     ).fetchall()
-    if not boards:
+    if not devices:
         return
-    user, password = _board_access(conn)
+    user, password = _device_access(conn)
     if not password:
         return
-    n = max(1, min(whoami.dynamic_concurrency(), len(boards)))
+    n = max(1, min(whoami.dynamic_concurrency(), len(devices)))
     with ThreadPoolExecutor(max_workers=n) as pool:
-        results = list(pool.map(lambda b: (b["board_id"], session_probe.probe(dict(b), user, password)), boards))
-    for board_id, res in results:
+        results = list(pool.map(lambda b: (b["device_id"], session_probe.probe(dict(b), user, password)), devices))
+    for device_id, res in results:
         if res["ok"]:
-            session_probe.store(conn, board_id, res["user"], res["locked"])
-            session_probe.store_display(conn, board_id, res["display"])
-            session_probe.store_extras(conn, board_id, res)
+            session_probe.store(conn, device_id, res["user"], res["locked"])
+            session_probe.store_display(conn, device_id, res["display"])
+            session_probe.store_extras(conn, device_id, res)

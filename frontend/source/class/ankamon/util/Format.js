@@ -41,7 +41,7 @@ qx.Class.define("ankamon.util.Format", {
       unreachable: "Ulaşılamadı"
     },
 
-    // Cihaz oturumlarının nasıl kapandığı (bkz. worker/ankamon/tasks/board_sessions.py).
+    // Cihaz oturumlarının nasıl kapandığı (bkz. worker/ankamon/tasks/device_sessions.py).
     SESSION_END_REASON: {
       logout: "Çıkış yapıldı",
       offline: "Bağlantı kesildi (cihaz çevrimdışı oldu)",
@@ -78,8 +78,8 @@ qx.Class.define("ankamon.util.Format", {
      * "(tahmin)": faz eşlemesi çıkarım (doğrulanmadı) ya da yalnız MAC önekinden (donanım okunmadı).
      * Faz 2'de marka yerine işlemci üreticisi yazılır (kullanıcı isteği): "Faz 2 - Intel" / "Faz 2 - AMD" —
      * Faz 2 cihazlarının Intel ve AMD sürümleri ayrı bakım/sürücü ister. Kaynak önce cihazın okunan
-     * işlemcisi (cpu: boards.facts.cpu_model), yoksa faz kaydındaki işlemci; ikisi de yoksa marka.
-     * @param info {Map|null} boards.etap / net_devices.etap
+     * işlemcisi (cpu: devices.facts.cpu_model), yoksa faz kaydındaki işlemci; ikisi de yoksa marka.
+     * @param info {Map|null} devices.etap / net_devices.etap
      * @param cpu {String?} okunan işlemci adı
      */
     etap(info, cpu) {

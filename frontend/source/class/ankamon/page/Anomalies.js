@@ -36,7 +36,7 @@
  *     (worker/ankamon/executor/diagnose.py).
  *
  * Sekmeler (bu sırayla; her biri yalnız kendi yetkisiyle):
- *  - "Durum" (ui.health.Status): her cihazın şu anki sağlığı, iki yolun bulguları tek tabloda (GET /api/board-health).
+ *  - "Durum" (ui.health.Status): her cihazın şu anki sağlığı, iki yolun bulguları tek tabloda (GET /api/device-health).
  *  - "Denetle" (ui.anomaly.Scan; kimlik "reports"): eski "Denetle" ve "Tara" sekmeleri tek sekmede (kullanıcı isteği
  *    2026-11-12) — cihazları ve denetimleri seçip o an tarama (anlık yoklama + tam SSH denetimi), altta sonuçlar: SSH
  *    denetim raporları (gömülü page.Diagnose — rapor seçici, "Şimdi tara", grid, bulgular) ve anlık yoklama tablosu.
@@ -191,7 +191,7 @@ qx.Class.define("ankamon.page.Anomalies", {
     },
 
     async _refresh() {
-      const tasks = [ankamon.io.Api.get("/board-health")];
+      const tasks = [ankamon.io.Api.get("/device-health")];
       if (this.__history) {
         const days = this.__days;
         const to = Math.floor(Date.now() / 1000);
@@ -243,17 +243,17 @@ qx.Class.define("ankamon.page.Anomalies", {
      */
     openFinding(f) {
       if (f.path === "watch" && this.__history) {
-        this.showBoard(f.board);
+        this.showDevice(f.device);
       } else if (f.path === "ssh" && this.__reportsPage) {
         this.__tabs.setSelection([this.__scan]);
-        this.__scan.showReport(f.board);
+        this.__scan.showReport(f.device);
       }
     },
 
     /** Durum'dan → o cihazın Geçmiş'i (çift tık). */
-    showBoard(board) {
+    showDevice(device) {
       this.__tabs.setSelection([this.__history]);
-      this.__history.showBoard(board);
+      this.__history.showDevice(device);
     },
 
     /** Denetle sekmesinde SSH denetim raporlarını gösterir (eski bağlantılar için). */

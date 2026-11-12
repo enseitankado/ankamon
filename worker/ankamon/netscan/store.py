@@ -43,8 +43,8 @@ MISSES_BEFORE_OFFLINE = 2
 # (MAC'iyle sınıflandırılmış, elle cihaz seçilmiş ya da Cihazlar'da kayıtlı). Ayrıntılı taramalar (servis, paylaşım,
 # etkinlik, ad) idari ağdaki sıradan bilgisayarlara yapılmaz ama cihazlar hangi ağda olursa olsun taranır
 # (kullanıcı isteği 2026-11-09: cihazlar bütün ağ bağdaştırıcılarından algılanır).
-_BOARD_NET = ("(" + netroles.board_net_sql("n") + f" OR d.type_auto = '{classify.BOARD}' OR d.device_type = '{classify.BOARD}'"
-              " OR EXISTS (SELECT 1 FROM boards bb WHERE bb.mac = d.mac OR bb.wifi_mac = d.mac))")
+_DEVICE_NET = ("(" + netroles.device_net_sql("n") + f" OR d.type_auto = '{classify.DEVICE}' OR d.device_type = '{classify.DEVICE}'"
+              " OR EXISTS (SELECT 1 FROM devices bb WHERE bb.mac = d.mac OR bb.wifi_mac = d.mac))")
 
 
 def bump(conn) -> None:
@@ -84,12 +84,12 @@ def sync_networks(conn, detected: list[dict]) -> list[dict]:
         bump(conn)
     # Cihaz keşfi (ARP) bütün bağlı ağlarda — taraması açık olanlar (Ağ sayfasındaki ağ başına anahtar): cihazlar
     # hangi bağdaştırıcıdan olursa olsun bulunsun (kullanıcı isteği 2026-11-09).
-    return _scannable(detected, netroles.roles(conn), board_only=False)
+    return _scannable(detected, netroles.roles(conn), device_only=False)
 
 
-def _scannable(detected: list[dict], role: dict, board_only: bool = True) -> list[dict]:
-    """Taranacak ağlar: taraması açık olanlar; board_only ise yalnız cihaz ağı (bkz. netroles). Arabirim role göre."""
-    nets = [n for n in detected if n["scan_enabled"] and (not board_only or netroles.is_board_net(n["ifaces"], role))]
+def _scannable(detected: list[dict], role: dict, device_only: bool = True) -> list[dict]:
+    """Taranacak ağlar: taraması açık olanlar; device_only ise yalnız cihaz ağı (bkz. netroles). Arabirim role göre."""
+    nets = [n for n in detected if n["scan_enabled"] and (not device_only or netroles.is_device_net(n["ifaces"], role))]
     for n in nets:
         n["iface"] = netroles.scan_iface(n, role)
     return nets
@@ -104,12 +104,12 @@ def scannable(conn, detected: list[dict]) -> list[dict]:
     return _scannable(detected, netroles.roles(conn))
 
 
-def _boards(conn) -> dict[str, dict]:
-    """MAC → cihaz. boards.mac kablolu kartın MAC'i; Wi-Fi kartının kalıcı MAC'i (wifi_mac, göç 043) de aynı
+def _devices(conn) -> dict[str, dict]:
+    """MAC → cihaz. devices.mac kablolu kartın MAC'i; Wi-Fi kartının kalıcı MAC'i (wifi_mac, göç 043) de aynı
     cihaza düşer — cihaz ağa Wi-Fi ile de çıkabilir. Aynı adres iki cihazda varsa kablolu eşleşme kazanır."""
     rows = conn.execute(
         "SELECT mac::text AS mac, wifi_mac::text AS wifi_mac, coalesce(nullif(label, ''), hostname, '') AS name,"
-        " hostname, coalesce(facts->>'motherboard_model', '') AS model FROM boards"
+        " hostname, coalesce(facts->>'motherboard_model', '') AS model FROM devices"
         " WHERE mac IS NOT NULL OR wifi_mac IS NOT NULL"
     ).fetchall()
     out = {r["wifi_mac"]: r for r in rows if r["wifi_mac"]}
@@ -126,7 +126,7 @@ def known_ips(conn, network_id: int) -> list[str]:
 
 def apply_sweep(conn, net: dict, found: dict[str, str]) -> int:
     """Tek ağın varlık taraması sonucunu işler. {mac: ip}. Değişen (yeni/durum/IP/ad) cihaz sayısını döner."""
-    boards = _boards(conn)
+    devices = _devices(conn)
     existing = {r["mac"]: r for r in conn.execute(
         "SELECT id, mac::text AS mac, host(ip) AS ip, online, misses, source, hostname, type_auto"
         " FROM net_devices WHERE network_id = %s", (net["id"],)).fetchall()}
@@ -146,17 +146,17 @@ def apply_sweep(conn, net: dict, found: dict[str, str]) -> int:
     changes = 0
     for mac in new:
         ip = found[mac]
-        board = boards.get(mac)
+        device = devices.get(mac)
         vendor = oui.vendor(mac)
-        kind = classify.guess_type(vendor=vendor, mac_random=oui.is_random(mac), is_board=bool(board) or _etap_board(mac),
+        kind = classify.guess_type(vendor=vendor, mac_random=oui.is_random(mac), is_device=bool(device) or _etap_device(mac),
                                    is_gateway=ip == net.get("gateway"), is_self=mac in self_macs, scan=None)
-        hostname = names.get(mac) or (board["hostname"] if board else "") or ""
+        hostname = names.get(mac) or (device["hostname"] if device else "") or ""
         conn.execute(
             """INSERT INTO net_devices (network_id, mac, ip, hostname, vendor, type_auto, model_auto, source,
                    online, first_seen_at, last_seen_at, state_changed_at)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, true, now(), now(), now())
                ON CONFLICT (network_id, mac) DO NOTHING""",
-            (net["id"], mac, ip, hostname, vendor, kind, board["model"] if board else "",
+            (net["id"], mac, ip, hostname, vendor, kind, device["model"] if device else "",
              "self" if mac in self_macs else "scan"),
         )
         changes += 1
@@ -168,7 +168,7 @@ def apply_sweep(conn, net: dict, found: dict[str, str]) -> int:
     for mac, dev in existing.items():
         if mac in found:
             ip = found[mac]
-            board = boards.get(mac)
+            device = devices.get(mac)
             sets = ["last_seen_at = now()", "misses = 0"]
             args: list = []
             changed = False
@@ -180,13 +180,13 @@ def apply_sweep(conn, net: dict, found: dict[str, str]) -> int:
                 args.append(ip)
                 changed = True
             # Sonradan Ankamon'a cihaz olarak kaydedilen cihaz: türü/modeli cihazdan gelsin.
-            if board and dev["type_auto"] != classify.BOARD:
+            if device and dev["type_auto"] != classify.DEVICE:
                 sets += ["type_auto = %s", "model_auto = %s"]
-                args += [classify.BOARD, board["model"]]
+                args += [classify.DEVICE, device["model"]]
                 changed = True
-            if not dev["hostname"] and board and board["hostname"]:
+            if not dev["hostname"] and device and device["hostname"]:
                 sets.append("hostname = %s")
-                args.append(board["hostname"])
+                args.append(device["hostname"])
                 changed = True
             conn.execute(f"UPDATE net_devices SET {', '.join(sets)} WHERE id = %s", (*args, dev["id"]))
             changes += changed
@@ -209,12 +209,12 @@ def fill_labels(conn) -> int:
 
     Kaynak önceliği: Cihazlar'daki takma ad, sonra net_known_aliases (MAC'e göre bilinen adlar, ör. eski
     envanterden). Ağ grid'i (net_devices) MAC ile eşleşir — cihaz kaydında MAC yoksa IP ile; Cihazlar
-    grid'i (boards) bilinen adlardan MAC ile dolar. Elle girilmiş ad asla ezilmez (yalnız boş olanlar);
+    grid'i (devices) bilinen adlardan MAC ile dolar. Elle girilmiş ad asla ezilmez (yalnız boş olanlar);
     bilinen adın notu, cihazın notu boşsa ona yazılır.
     """
     rows = conn.execute(
         """UPDATE net_devices d SET label = b.label
-           FROM boards b
+           FROM devices b
            WHERE d.label = '' AND coalesce(b.label, '') <> ''
              AND (d.mac = b.mac OR d.mac = b.wifi_mac OR (b.mac IS NULL AND b.ip IS NOT NULL AND d.ip = b.ip))
            RETURNING d.label"""
@@ -227,7 +227,7 @@ def fill_labels(conn) -> int:
            RETURNING d.label"""
     ).fetchall()
     rows += conn.execute(
-        """UPDATE boards b SET label = k.label, updated_at = now()
+        """UPDATE devices b SET label = k.label, updated_at = now()
            FROM net_known_aliases k
            WHERE b.mac = k.mac AND coalesce(b.label, '') = ''
            RETURNING b.label"""
@@ -238,24 +238,24 @@ def fill_labels(conn) -> int:
     return len(rows)
 
 
-def boards_from_devices(conn) -> int:
+def devices_from_devices(conn) -> int:
     """Ağ ▸ Akıllı Tahtalar satırları Ağ ▸ Varlıklar'dan beslenir (kullanıcı isteği 2026-11-09): Varlıklar'da varlık türü
     "Akıllı tahta" olan (elle seçilmiş ya da tarayıcının tahmini — MAC öneki) ama Cihazlar'da kaydı olmayan her cihaz
     için cihaz kaydı açılır (source 'scan'; takma ad, bilgisayar adı ve IP cihazdan). Kayıt yalnız AÇILIR: türü sonradan
     değişen cihazın cihaz kaydı silinmez (geçmişi/oturumları var), Akıllı Tahtalar listesinden gizlenir (bkz. backend
-    BoardsApi LISTED); tür geri alınınca yeniden görünür.
+    DevicesApi LISTED); tür geri alınınca yeniden görünür.
 
     Önce sahiplenme: MAC'i boş eski bir kayıt (loglardan açılmış — yalnız bilgisayar adı/IP bilinir) aynı cihazsa
     (bilgisayar adı büyük/küçük harf duyarsız ya da IP eşleşir) yeni kayıt AÇILMAZ, MAC o kayda yazılır. Kullanıcı bildirimi
     2026-11-10: "A1-1" (etap-973494, MAC'siz) varken aynı cihaz için ikinci kayıt ("A Blok - 10C") açılmıştı."""
     adopted = conn.execute(
-        f"""UPDATE boards b SET mac = d.mac, updated_at = now()
+        f"""UPDATE devices b SET mac = d.mac, updated_at = now()
             FROM (SELECT DISTINCT ON (d.mac) d.mac, d.ip, d.hostname FROM net_devices d
-                  WHERE COALESCE(NULLIF(d.device_type, ''), d.type_auto) = '{classify.BOARD}' AND d.source <> 'self'
-                    AND NOT EXISTS (SELECT 1 FROM boards x WHERE x.mac = d.mac OR x.wifi_mac = d.mac)
+                  WHERE COALESCE(NULLIF(d.device_type, ''), d.type_auto) = '{classify.DEVICE}' AND d.source <> 'self'
+                    AND NOT EXISTS (SELECT 1 FROM devices x WHERE x.mac = d.mac OR x.wifi_mac = d.mac)
                   ORDER BY d.mac, d.online DESC, d.last_seen_at DESC NULLS LAST) d
             WHERE b.mac IS NULL AND b.id = (
-                SELECT y.id FROM boards y
+                SELECT y.id FROM devices y
                 WHERE y.mac IS NULL AND ((d.hostname <> '' AND lower(y.hostname) = lower(d.hostname)) OR y.ip = d.ip)
                 ORDER BY (d.hostname <> '' AND lower(y.hostname) = lower(d.hostname)) DESC, y.id LIMIT 1)
             RETURNING b.id, b.mac::text AS mac"""
@@ -263,11 +263,11 @@ def boards_from_devices(conn) -> int:
     for r in adopted:
         activity.record(conn, f"Cihaz kaydına MAC eklendi (ağ envanterinden): #{r['id']} {r['mac']}")
     rows = conn.execute(
-        f"""INSERT INTO boards (mac, ip, label, hostname, source)
+        f"""INSERT INTO devices (mac, ip, label, hostname, source)
             SELECT DISTINCT ON (d.mac) d.mac, d.ip, COALESCE(NULLIF(d.label, ''), k.label, ''), NULLIF(d.hostname, ''), 'scan'
             FROM net_devices d LEFT JOIN net_known_aliases k ON k.mac = d.mac
-            WHERE COALESCE(NULLIF(d.device_type, ''), d.type_auto) = '{classify.BOARD}' AND d.source <> 'self'
-              AND NOT EXISTS (SELECT 1 FROM boards b WHERE b.mac = d.mac OR b.wifi_mac = d.mac)
+            WHERE COALESCE(NULLIF(d.device_type, ''), d.type_auto) = '{classify.DEVICE}' AND d.source <> 'self'
+              AND NOT EXISTS (SELECT 1 FROM devices b WHERE b.mac = d.mac OR b.wifi_mac = d.mac)
             ORDER BY d.mac, d.online DESC, d.last_seen_at DESC NULLS LAST
             RETURNING id, host(ip) AS ip, mac::text AS mac"""
     ).fetchall()
@@ -277,7 +277,7 @@ def boards_from_devices(conn) -> int:
     # cihazın sonradan öğrenilen adını alır (kullanıcı bildirimi 2026-11-11: Cihazlar listesinde "Bilgisayar adı" boş,
     # Bilgisayar ayrıntılarında dolu). NetBIOS adı büyük harfle gelir (ETAP-8AB221): cihaz adları gibi küçük harfe çevrilir.
     named = conn.execute(
-        """UPDATE boards b SET hostname = CASE WHEN d.hostname = upper(d.hostname) THEN lower(d.hostname) ELSE d.hostname END,
+        """UPDATE devices b SET hostname = CASE WHEN d.hostname = upper(d.hostname) THEN lower(d.hostname) ELSE d.hostname END,
                   updated_at = now()
            FROM (SELECT DISTINCT ON (mac) mac, hostname FROM net_devices WHERE COALESCE(hostname, '') <> ''
                  ORDER BY mac, online DESC, last_seen_at DESC NULLS LAST) d
@@ -289,13 +289,13 @@ def boards_from_devices(conn) -> int:
     return len(rows)
 
 
-def device_ips_from_boards(conn) -> int:
+def device_ips_from_devices(conn) -> int:
     """Varlıklar'daki cihazın IP'si en güncel keşiften (kullanıcı isteği 2026-11-09): cihazın IP'si tarayıcıdan sonra
-    loglarından (gönderenin MAC'i cihazınkiyle eşleşerek — bkz. tasks/boards_from_logs) değiştiyse ve yeni adres
-    cihazın ağındaysa cihaz satırı da o adrese geçer. Tersi (tarama → cihaz) fill_board_ips'te."""
+    loglarından (gönderenin MAC'i cihazınkiyle eşleşerek — bkz. tasks/devices_from_logs) değiştiyse ve yeni adres
+    cihazın ağındaysa cihaz satırı da o adrese geçer. Tersi (tarama → cihaz) fill_device_ips'te."""
     rows = conn.execute(
         """UPDATE net_devices d SET ip = b.ip
-           FROM boards b, net_networks n
+           FROM devices b, net_networks n
            WHERE n.id = d.network_id AND b.mac = d.mac AND b.ip IS NOT NULL AND b.ip << n.cidr
              AND d.ip IS DISTINCT FROM b.ip AND b.last_log_at > COALESCE(d.last_seen_at, 'epoch'::timestamptz)
            RETURNING d.id"""
@@ -305,23 +305,23 @@ def device_ips_from_boards(conn) -> int:
     return len(rows)
 
 
-def fill_board_ips(conn) -> int:
+def fill_device_ips(conn) -> int:
     """Cihazların IP'si, ağ taramasının o MAC için bulduğu adresle (hangi ağda olursa olsun):
       - IP'si olmayan cihaz (Cihaz ekle'de yalnız MAC girilmiş): bilinen herhangi bir adres;
       - IP'si değişmiş cihaz (DHCP — kullanıcı bildirimi 2026-11-09: Arge 1 yeni adres alınca kapalı görünüyordu):
         tarama MAC'i 15 dk içinde çevrim içi gördüyse o adres.
-    Önce kablolu MAC (boards.mac), o çevrim içi değilse Wi-Fi kartının MAC'i (boards.wifi_mac). MAC ARP ile görülür,
+    Önce kablolu MAC (devices.mac), o çevrim içi değilse Wi-Fi kartının MAC'i (devices.wifi_mac). MAC ARP ile görülür,
     sahte kaynak adresiyle değiştirilemez."""
     fresh = "d.online AND d.last_seen_at > now() - interval '15 minutes'"
     rows = conn.execute(
-        f"""UPDATE boards b SET ip = d.ip, updated_at = now()
+        f"""UPDATE devices b SET ip = d.ip, updated_at = now()
            FROM (SELECT DISTINCT ON (mac) mac, ip, online, last_seen_at FROM net_devices
                  WHERE ip IS NOT NULL ORDER BY mac, online DESC, last_seen_at DESC NULLS LAST) d
            WHERE b.mac = d.mac AND (b.ip IS NULL OR ({fresh} AND b.ip IS DISTINCT FROM d.ip))
            RETURNING b.id"""
     ).fetchall()
     rows += conn.execute(
-        f"""UPDATE boards b SET ip = d.ip, updated_at = now()
+        f"""UPDATE devices b SET ip = d.ip, updated_at = now()
            FROM (SELECT DISTINCT ON (mac) mac, ip, online, last_seen_at FROM net_devices
                  WHERE ip IS NOT NULL ORDER BY mac, online DESC, last_seen_at DESC NULLS LAST) d
            WHERE b.wifi_mac = d.mac AND (b.ip IS NULL OR ({fresh} AND b.ip IS DISTINCT FROM d.ip))
@@ -334,7 +334,7 @@ def fill_board_ips(conn) -> int:
     return len(rows)
 
 
-def _etap_board(mac: str) -> bool:
+def _etap_device(mac: str) -> bool:
     """MAC, ETAP faz veritabanında bilinen bir akıllı tahta modeline mi düşüyor (bkz. etap_phase)."""
     info = etap_phase.lookup(mac)
     return bool(info and info["cihaz"])
@@ -356,16 +356,16 @@ def update_etap(conn) -> int:
     """
     changed = 0
     for row in conn.execute(
-            "SELECT id, mac::text AS mac, facts->>'motherboard_model' AS mb, etap FROM boards").fetchall():
+            "SELECT id, mac::text AS mac, facts->>'motherboard_model' AS mb, etap FROM devices").fetchall():
         value = _etap_value(etap_phase.resolve(row["mac"], row["mb"]))
         if value != row["etap"]:
-            conn.execute("UPDATE boards SET etap = %s WHERE id = %s", (Jsonb(value) if value else None, row["id"]))
+            conn.execute("UPDATE devices SET etap = %s WHERE id = %s", (Jsonb(value) if value else None, row["id"]))
             changed += 1
     for dev in conn.execute(
             """SELECT d.id, d.mac::text AS mac, d.etap, d.type_auto, d.model_auto,
                       b.facts->>'motherboard_model' AS mb
-               FROM net_devices d LEFT JOIN boards b ON b.id = (
-                   SELECT x.id FROM boards x WHERE x.mac = d.mac OR x.wifi_mac = d.mac
+               FROM net_devices d LEFT JOIN devices b ON b.id = (
+                   SELECT x.id FROM devices x WHERE x.mac = d.mac OR x.wifi_mac = d.mac
                    ORDER BY (x.mac = d.mac) IS TRUE DESC, x.id LIMIT 1)""").fetchall():
         value = _etap_value(etap_phase.resolve(dev["mac"], dev["mb"]))
         sets, args = [], []
@@ -373,9 +373,9 @@ def update_etap(conn) -> int:
             sets.append("etap = %s")
             args.append(Jsonb(value) if value else None)
         if value and value["cihaz"]:
-            if dev["type_auto"] != classify.BOARD:
+            if dev["type_auto"] != classify.DEVICE:
                 sets.append("type_auto = %s")
-                args.append(classify.BOARD)
+                args.append(classify.DEVICE)
             if not dev["model_auto"]:
                 sets.append("model_auto = %s")
                 args.append(value["ad"])
@@ -396,7 +396,7 @@ def next_service_target(conn, rescan_hours: int, requested_only: bool) -> dict |
         f"""SELECT d.id, host(d.ip) AS ip, d.mac::text AS mac, d.vendor, d.hostname, d.network_id,
                   host(n.gateway) AS gateway
            FROM net_devices d JOIN net_networks n ON n.id = d.network_id
-           WHERE d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND {_BOARD_NET}
+           WHERE d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND {_DEVICE_NET}
              AND {cond}
            ORDER BY d.services_requested_at DESC NULLS LAST, d.services_scanned_at NULLS FIRST, d.id
            LIMIT 1""",
@@ -411,13 +411,13 @@ def apply_services(conn, dev: dict, scan: dict | None) -> None:
                      " WHERE id = %s", (dev["id"],))
         bump(conn)
         return
-    board = _boards(conn).get(dev["mac"])
+    device = _devices(conn).get(dev["mac"])
     kind = classify.guess_type(vendor=dev["vendor"], mac_random=oui.is_random(dev["mac"]),
-                               is_board=bool(board) or _etap_board(dev["mac"]),
+                               is_device=bool(device) or _etap_device(dev["mac"]),
                                is_gateway=dev["ip"] == dev.get("gateway"), is_self=False, scan=scan)
-    model = classify.guess_model(scan, board["model"] if board else "")
+    model = classify.guess_model(scan, device["model"] if device else "")
     # İşletim sistemi: bu taramada bulunamazsa önceki tahmin korunur (yenisi gelene kadar hatırlanır — bkz. osguess).
-    os_name = osguess.guess(scan, is_board=bool(board) or _etap_board(dev["mac"]))
+    os_name = osguess.guess(scan, is_device=bool(device) or _etap_device(dev["mac"]))
     with conn.transaction():
         conn.execute(
             "DELETE FROM net_services WHERE device_id = %s AND NOT (proto || '/' || port = ANY(%s))",
@@ -455,7 +455,7 @@ def service_queue(conn, rescan_hours: int) -> tuple[int, int]:
                                    OR d.services_scanned_at < now() - make_interval(hours => %s)) AS pending,
                   count(*) AS total
            FROM net_devices d JOIN net_networks n ON n.id = d.network_id
-           WHERE d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND {_BOARD_NET}""",
+           WHERE d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND {_DEVICE_NET}""",
         (rescan_hours,),
     ).fetchone()
     return row["pending"], row["total"]
@@ -463,7 +463,7 @@ def service_queue(conn, rescan_hours: int) -> tuple[int, int]:
 
 # ---------------------------------------------------------------- SMB/NetBIOS paylaşımları (ayrı kanal)
 # Aday cihaz: çevrim içi, taranabilir ağda, net_services'te 139 ya da 445 portu AÇIK (NetBIOS/SMB) olan.
-_SHARE_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND " + _BOARD_NET +
+_SHARE_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND " + _DEVICE_NET +
                " AND EXISTS (SELECT 1 FROM net_services s WHERE s.device_id = d.id AND s.port IN (139, 445))")
 
 
@@ -480,7 +480,7 @@ def next_shares_target(conn, rescan_hours: int, requested_only: bool) -> dict | 
         " OR d.shares_scanned_at < now() - make_interval(hours => %s))")
     return conn.execute(
         f"""SELECT d.id, host(d.ip) AS ip, d.mac::text AS mac, d.hostname,
-                  EXISTS (SELECT 1 FROM boards b WHERE b.mac = d.mac OR b.wifi_mac = d.mac OR b.ip = d.ip) AS is_board
+                  EXISTS (SELECT 1 FROM devices b WHERE b.mac = d.mac OR b.wifi_mac = d.mac OR b.ip = d.ip) AS is_device
            FROM net_devices d JOIN net_networks n ON n.id = d.network_id
            WHERE {_SHARE_CAND} AND {cond}
            ORDER BY d.shares_requested_at DESC NULLS LAST, d.shares_scanned_at NULLS FIRST, d.id
@@ -527,7 +527,7 @@ def apply_shares(conn, dev: dict, result: dict) -> None:
 
 
 # Ağ etkinliği (IP ID örneklemesi) yalnız Windows'ta güvenilirdir (bkz. activity.py); os_guess ile süzülür.
-_ACTIVITY_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND " + _BOARD_NET +
+_ACTIVITY_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND " + _DEVICE_NET +
                   " AND d.os_guess ILIKE '%%windows%%'")
 
 
@@ -570,7 +570,7 @@ def apply_flows(conn, results: dict) -> None:
     bump(conn)
 
 
-_HOSTNAME_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND " + _BOARD_NET +
+_HOSTNAME_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND " + _DEVICE_NET +
                   " AND (d.hostname IS NULL OR d.hostname = '')")
 
 

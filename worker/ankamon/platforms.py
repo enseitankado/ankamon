@@ -26,7 +26,7 @@
 """İşletim sistemine göre işlev seçimi (kullanıcı isteği 2026-11-12; tanım: platforms/catalog.json, platforms/README.md).
 
 Hedef cihazın ailesi (linux | windows | macos | other) SQL ``device_os_family(id)`` ile belirlenir (göç 052 — PHP
-BoardsApi ile aynı ölçüt); bilinmiyorsa kataloğun ``default_family``'si. Bir görev türü kataloğun hangi işlevine bağlıysa
+DevicesApi ile aynı ölçüt); bilinmiyorsa kataloğun ``default_family``'si. Bir görev türü kataloğun hangi işlevine bağlıysa
 (``functions[].jobs``) o işlevin ``impl``'inde adı olan aileler desteklenir; katalogda olmayan görev türü
 ``unknown_function_families``'de (Linux) çalışır. Hazır işlemde ayrıca o ailenin betiği bulunmalıdır
 (``families[aile].script`` — run.sh / run.ps1 / run.macos.sh).
@@ -73,14 +73,14 @@ def label(family: str | None) -> str:
     return fam["label"] if fam else (family or "bilinmiyor")
 
 
-def families(conn, board_ids: list[int]) -> dict[int, str]:
+def families(conn, device_ids: list[int]) -> dict[int, str]:
     """Kart başına aile; bilinmeyene ``default_family``."""
-    if not board_ids:
+    if not device_ids:
         return {}
     default = catalog().get("default_family", "linux")
-    rows = conn.execute("SELECT id, device_os_family(id) AS family FROM boards WHERE id = ANY(%s)", (list(board_ids),)).fetchall()
+    rows = conn.execute("SELECT id, device_os_family(id) AS family FROM devices WHERE id = ANY(%s)", (list(device_ids),)).fetchall()
     found = {r["id"]: (r["family"] or default) for r in rows}
-    return {bid: found.get(bid, default) for bid in board_ids}
+    return {bid: found.get(bid, default) for bid in device_ids}
 
 
 def function_for_job(job_type: str) -> dict | None:

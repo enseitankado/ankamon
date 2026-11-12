@@ -71,14 +71,14 @@ def _parse(text: str) -> dict[str, dict]:
     return sections
 
 
-def run(conn, board: dict, kinds: list[str], user: str, password: str, timeout: int = 20) -> dict:
+def run(conn, device: dict, kinds: list[str], user: str, password: str, timeout: int = 20) -> dict:
     """Tek cihazı tarar. Döner: {"status": ok|unreachable|failed, "rc", "output": JSON metin}.
     conn yalnız evaluate'in okuması için (iş parçacığına özgü bağlantı verilmeli)."""
     kinds = [k for k in kinds if k in SCANNABLE]
-    if not board.get("ip"):
+    if not device.get("ip"):
         return {"status": "unreachable", "rc": None, "output": "Cihazın IP adresi yok."}
     cmd = ["sshpass", "-e", "ssh", *_SSH_OPTS, "-o", f"ConnectTimeout={min(timeout, 8)}",
-           f"{user}@{board['ip']}", "sh -s"]
+           f"{user}@{device['ip']}", "sh -s"]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
     t0 = time.time()
     try:
@@ -92,7 +92,7 @@ def run(conn, board: dict, kinds: list[str], user: str, password: str, timeout: 
         msg = "SSH parolası reddedildi." if proc.returncode == 5 else (err or "Cihaza bağlanılamadı.")
         return {"status": "unreachable", "rc": proc.returncode, "output": msg}
     sections = _parse(proc.stdout.decode("utf-8", "replace"))
-    ctx = {"t0": t0, "t1": t1, "board": board, "conn": conn}
+    ctx = {"t0": t0, "t1": t1, "device": device, "conn": conn}
     results = {}
     for kind in kinds:
         try:

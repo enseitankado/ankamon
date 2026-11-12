@@ -47,7 +47,7 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
       bar.add(widget);
       return widget;
     };
-    this.__board = labeled("Bilgisayar:", new qx.ui.form.SelectBox().set({ width: 220 }));
+    this.__device = labeled("Bilgisayar:", new qx.ui.form.SelectBox().set({ width: 220 }));
     this.__user = labeled("Kullanıcı:", new qx.ui.form.SelectBox().set({ width: 190 }));
     this.__period = labeled("Dönem:", new qx.ui.form.SelectBox().set({ width: 130 }));
     [[1, "Son 24 saat"], [7, "Son 7 gün"], [30, "Son 30 gün"], [90, "Son 90 gün"], [0, "Tümü"]].forEach(([days, label]) =>
@@ -55,9 +55,9 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
     this.__period.setSelection([this.__period.getSelectables(true)[1]]);
     this.__text = labeled("Ara:", new qx.ui.form.TextField().set({ width: 180, placeholder: "olay ya da log metni" }));
     this.__text.addListener("changeValue", () => this.load());
-    this.__add(this.__board, "", "Tüm bilgisayarlar");
+    this.__add(this.__device, "", "Tüm bilgisayarlar");
     this.__add(this.__user, "", "Tüm kullanıcılar");
-    [this.__board, this.__user, this.__period].forEach(box => box.addListener("changeSelection", () => !this.__quiet && this.load()));
+    [this.__device, this.__user, this.__period].forEach(box => box.addListener("changeSelection", () => !this.__quiet && this.load()));
     const refresh = new qx.ui.form.Button("Yenile");
     refresh.addListener("execute", () => this.load());
     bar.add(refresh);
@@ -77,7 +77,7 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
 
     this.__columns = [
       { id: "time", label: "Zaman", width: 150 },
-      { id: "board", label: "Bilgisayar", width: 190, choices: true },
+      { id: "device", label: "Bilgisayar", width: 190, choices: true },
       { id: "user", label: "Kullanıcı", width: 140, choices: true },
       { id: "kind", label: "Tür", width: 90, choices: true },
       { id: "summary", label: "Olay" },
@@ -97,7 +97,7 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
   },
 
   members: {
-    __board: null,
+    __device: null,
     __user: null,
     __period: null,
     __text: null,
@@ -129,7 +129,7 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
     },
 
     /**
-     * Süzülmüş açar. @param f {Map} {session?: {id, label}, board_id?, board_name?, username?, days?}: verilmeyen süzgeç "tümü" olur.
+     * Süzülmüş açar. @param f {Map} {session?: {id, label}, device_id?, device_name?, username?, days?}: verilmeyen süzgeç "tümü" olur.
      */
     applyFilter(f) {
       this.__quiet = true;
@@ -138,13 +138,13 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
       if (f.session) {
         this.__scopeLabel.setValue("Yalnız bu oturum: <b>" + qx.bom.String.escape(f.session.label) + "</b>");
       }
-      if (f.board_id && !this.__board.getSelectables(true).some(i => i.getModel() === String(f.board_id))) {
-        this.__add(this.__board, String(f.board_id), f.board_name || "#" + f.board_id);
+      if (f.device_id && !this.__device.getSelectables(true).some(i => i.getModel() === String(f.device_id))) {
+        this.__add(this.__device, String(f.device_id), f.device_name || "#" + f.device_id);
       }
       if (f.username && !this.__user.getSelectables(true).some(i => i.getModel() === f.username)) {
         this.__add(this.__user, f.username, f.username === "-" ? "(oturumsuz)" : f.username);
       }
-      this.__select(this.__board, f.board_id ? String(f.board_id) : "");
+      this.__select(this.__device, f.device_id ? String(f.device_id) : "");
       this.__select(this.__user, f.username || "");
       // Geçmiş bir oturum ya da kişi: dönem kısıtı sonucu boş göstermesin.
       this.__select(this.__period, f.days === undefined ? 0 : f.days);
@@ -170,8 +170,8 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
       const seq = ++this.__seq;
       const days = this.__value(this.__period);
       const q = {};
-      if (this.__value(this.__board)) {
-        q.board_id = this.__value(this.__board);
+      if (this.__value(this.__device)) {
+        q.device_id = this.__value(this.__device);
       }
       if (this.__value(this.__user)) {
         q.username = this.__value(this.__user);
@@ -195,11 +195,11 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
       if (seq !== this.__seq || this.isDisposed()) {
         return;
       }
-      this.__fill(this.__board, data.boards.filter(b => b.board_id).map(b => [String(b.board_id), b.board_name]), "Tüm bilgisayarlar");
+      this.__fill(this.__device, data.devices.filter(b => b.device_id).map(b => [String(b.device_id), b.device_name]), "Tüm bilgisayarlar");
       this.__fill(this.__user, [["-", "(oturumsuz)"]].concat(data.users.map(u => [u, u])), "Tüm kullanıcılar");
       const F = ankamon.util.Format;
       const K = ankamon.ui.sessions.Movements.KINDS;
-      this.__rows = data.events.map(e => [e.id, F.dateTime(e.at * 1000), e.board_name, e.username || "", K[e.kind] || e.kind, e.summary, e.detail || ""]);
+      this.__rows = data.events.map(e => [e.id, F.dateTime(e.at * 1000), e.device_name, e.username || "", K[e.kind] || e.kind, e.summary, e.detail || ""]);
       this.__apply();
       this.__status.setValue(`${data.events.length} olay` + (data.limited ? " (en yeni kayıtlar; daraltmak için süzgeç kullanın)" : "") +
         ". Cihaz logları her uygulama açılışını kaydetmez: yalnız logda ya da sensörde izi olan hareketler listelenir; " +

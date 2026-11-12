@@ -26,7 +26,7 @@
 
 """ankamon ETAP faz veritabanını (maskelenmiş MAC önekleri → anakart modeli) üretir.
 
-Girdi: ETAP arka ucundan alınmış tahta envanteri (all_boards.json[.gz] + motherboard_catalog.json) —
+Girdi: ETAP arka ucundan alınmış tahta envanteri (all_devices.json[.gz] + motherboard_catalog.json) —
 okul adları ve tam MAC'ler içerdiğinden DEPOYA GİRMEZ; bu betik yalnız yerelde çalıştırılır.
 Çıktı (depoya girer): worker/ankamon/netscan/etap_prefixes.tsv — her satır
     <hex önek>\t<model anahtarı>\t<öneğin altındaki envanter tahtası sayısı>
@@ -71,7 +71,7 @@ def model_key(vendor: str, name: str) -> str:
 def load(data_dir: str) -> list[tuple[str, str]]:
     cat = {r["id"]: model_key(r["vendor"], r["name"])
            for r in json.load(open(os.path.join(data_dir, "motherboard_catalog.json")))["data"]}
-    path = os.path.join(data_dir, "all_boards.json.gz")
+    path = os.path.join(data_dir, "all_devices.json.gz")
     opener = gzip.open if os.path.exists(path) else open
     path = path if os.path.exists(path) else path[:-3]
     rec = re.compile(rb'"mac_id":"([0-9A-Fa-f:]{17})".{0,4000}?"motherboard_id":(\d+|null)')

@@ -18,15 +18,15 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     var __spec = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1)))));
     if (__spec.embed) {
       document.documentElement.classList.add("embed");
-    } else if ((__spec.boards || []).length === 1) {
+    } else if ((__spec.devices || []).length === 1) {
       document.documentElement.classList.add("single");
     }
   } catch (e) { /* boş/bozuk fragman: modül betiği asıl ayrıştırmayı yine yapacak */ }
 </script>
 <!--
   Canlı cihaz ekranı (salt izleme). Tek cihaz (q=view) ya da çoklu önizleme kutucukları (q=thumb).
-  Adres: /screen/#<base64(JSON {boards:[{id,name,online,whoami?}], q})> — bilgi URL fragmanında taşınır,
-  sunucuya gitmez. `whoami` varsa (bkz. Boards.js __whoamiState — "Oturumları sorgula", "Oturum aç"/"Oturumu kapat"
+  Adres: /screen/#<base64(JSON {devices:[{id,name,online,whoami?}], q})> — bilgi URL fragmanında taşınır,
+  sunucuya gitmez. `whoami` varsa (bkz. Devices.js __whoamiState — "Oturumları sorgula", "Oturum aç"/"Oturumu kapat"
   sağ menülerinin tetiklediği SSH işleri) önizlemede sol altta sürmekte olan iş ("… açılıyor…") ya da
   sonuç gösterilir (bkz. Tile.setWhoami).
   Her kutucuk /screen/ws/<id> WebSocket'ine bağlanır; ekran köprüsü cihazda x11vnc'yi SSH ile başlatır.
@@ -72,7 +72,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   .tile .msg a { pointer-events: auto; color: #6af; }
   .tile.live .msg { display: none; }
   /* Ekran güç tasarrufunda: cihazın monitörü DPMS ile kapalı (üst sayfadan "powersave" — periyodik SSH
-     yoklaması, bkz. Boards.js __previewList) ya da bağlı görüntü tümüyle siyah (bkz. Tile.checkBlank).
+     yoklaması, bkz. Devices.js __previewList) ya da bağlı görüntü tümüyle siyah (bkz. Tile.checkBlank).
      DPMS'te x11vnc son görüntüyü vermeye devam eder: yazı koyu zeminle görüntünün üstünde; zemin arkadaki
      görüntüyü yalnız hafifçe belli edecek kadar saydam (kullanıcı isteği). Uyandırmak için sağ menü Ekran ▸ Uyandır;
      gömülü kipte DPMS'teki kutucuğun ekran alanına basmak da uyandırır (bkz. Tile.wake). */
@@ -145,10 +145,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   .tile:fullscreen { background: #000; }
   .tile:fullscreen .view { flex: 1; aspect-ratio: auto; }
   .tile.offline .msg { color: #888; }
-  /* Ekranı ayrı pencerede açık cihaz (Boards.js "tm-popped"): önizleme akışı durur, yerine bu not. */
+  /* Ekranı ayrı pencerede açık cihaz (Devices.js "tm-popped"): önizleme akışı durur, yerine bu not. */
   .tile.popped .msg { color: #8cf; font-size: 14px; font-weight: 600; }
   /* Önizlemede (q=thumb) oturum durumu — "Oturumları sorgula" sonucu ve "Oturum aç"/"Oturumu kapat"
-     ilerlemesi; sol alt köşe, siyah zemin beyaz yazı. Bkz. Tile.setWhoami / Boards.js __whoamiState. */
+     ilerlemesi; sol alt köşe, siyah zemin beyaz yazı. Bkz. Tile.setWhoami / Devices.js __whoamiState. */
   /* Birden fazla oturum varsa adlar oturum açma sırasıyla virgülle gelir ("ali, veli" — bkz. worker
      executor/whoami.py); sığmazsa en çok iki satıra sarılır, fazlası "…" ile kesilir. */
   .tile .whoami { position: absolute; left: 4px; bottom: 4px; max-width: calc(100% - 8px); overflow: hidden;
@@ -166,7 +166,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   @media (prefers-reduced-motion: reduce) { .tile .whoami.querying::before { animation-duration: 2.4s; } }
   .tile .whoami.error { background: rgba(140, 20, 20, .75); }
   /* Alt bar (yalnız Ekranlar sekmesi — gömülü kip): üst başlık çubuğunun aynısı; cihazın son
-     işlemci/bellek kullanımı ve işlemci sıcaklığı (bkz. Tile.setStats, Boards.js __previewList).
+     işlemci/bellek kullanımı ve işlemci sıcaklığı (bkz. Tile.setStats, Devices.js __previewList).
      Eşik aşılınca değer turuncu/kırmızı olur. */
   .tile .stats { display: none; }
   html.embed .tile .stats { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 0 10px; align-items: center; padding: 2px 8px;
@@ -205,7 +205,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   .tile .perf .k { color: #58a6ff; }
   .tile .perf .hi { color: #f85149; font-weight: 600; }
   .tile .perf .wait { grid-column: 1 / -1; opacity: .7; }
-  /* Donanım satırı (işlemci/RAM/disk — Boards.js __hwSummary): göstergelerin üstünde, en çok 2 satır. */
+  /* Donanım satırı (işlemci/RAM/disk — Devices.js __hwSummary): göstergelerin üstünde, en çok 2 satır. */
   /* Alt iç boşluk YOK: overflow iç boşluğu kırpmaz, 3. satırın üst kenarı orada görünürdü. */
   .tile .perf .hw { grid-column: 1 / -1; margin-bottom: .45em; border-bottom: 1px solid #3a4250;
     color: #d2a8ff; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
@@ -246,24 +246,24 @@ const MESSAGES = {
 };
 const FINAL = new Set([4001, 4003, 4004, 4029, 4030]);   // kendiliğinden yeniden denenmez
 
-let spec = { boards: [], q: "view" };
+let spec = { devices: [], q: "view" };
 try {
   spec = Object.assign(spec, JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1))))));
 } catch (e) { /* boş/bozuk fragman */ }
 const embed = !!spec.embed;   // Cihazlar sayfasının "Ekranlar" sekmesi: liste üst sayfadan güncellenir
 // Ekranlar araç çubuğunun aç/kapa düğmeleri (üst sayfadan "tm-view"): alt donanım barı, başarım görünümü.
 const view = { stats: true, perf: false };
-const single = !embed && spec.boards.length === 1;
+const single = !embed && spec.devices.length === 1;
 // Sınıflar normalde baştaki senkron betikte zaten eklenir (FOUC önleme); burada tekrar eklemek
 // zararsız (idempotent) ve hash'in o betikte beklenmedik şekilde ayrıştırılamadığı bir durum için güvence.
 if (single) document.documentElement.classList.add("single");
 if (embed) document.documentElement.classList.add("embed");
 document.getElementById("count").textContent =
-  spec.boards.length + " cihaz" + (spec.q === "thumb" ? " · önizleme" : "") + " · çift tıkla: tam ekran";
+  spec.devices.length + " cihaz" + (spec.q === "thumb" ? " · önizleme" : "") + " · çift tıkla: tam ekran";
 
 const grid = document.getElementById("grid");
 if (!embed) {
-  const cols = Math.max(1, Math.ceil(Math.sqrt(spec.boards.length)));
+  const cols = Math.max(1, Math.ceil(Math.sqrt(spec.devices.length)));
   grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
   grid.style.gridAutoRows = `minmax(0, 1fr)`;
 }
@@ -277,10 +277,10 @@ const SPEAKER_OFF = "<svg viewBox='0 0 24 24' width='18' height='18' fill='curre
 const SPEAKER_ON = "<svg viewBox='0 0 24 24' width='18' height='18' fill='currentColor' aria-hidden='true'><path d='M3 9v6h4l5 5V4L7 9H3z'/><path d='M15 8.5a5 5 0 0 1 0 7M17.5 6a8.5 8.5 0 0 1 0 12' stroke='currentColor' stroke-width='2' fill='none' stroke-linecap='round'/></svg>";
 
 class Tile {
-  constructor(board) {
-    this.board = board;
+  constructor(device) {
+    this.device = device;
     this.base = spec.q in PROFILE ? spec.q : "view";
-    this.q = chatting.has(board.id) ? "chat" : this.base;
+    this.q = chatting.has(device.id) ? "chat" : this.base;
     this.isFs = false;        // kutucuk tam ekranda
     this.wanted = false;      // görünür + sekme açık + cihaz çevrimiçi (ilk refreshWanted bağlar)
     this.inView = true;       // kutucuk görünür alanda (IntersectionObserver)
@@ -288,7 +288,7 @@ class Tile {
     this.timer = null;
     this.el = document.createElement("div");
     this.el.className = "tile";
-    this.el._boardId = board.id;   // orderedIds() DOM sırasını buradan okur
+    this.el._deviceId = device.id;   // orderedIds() DOM sırasını buradan okur
     this.control = false;     // fare/klavye ile müdahale (yalnız "screen.control" yetkisiyle; sunucu da denetler)
     this.el.innerHTML = `<div class="title"><span class="dot"></span><span class="name"></span>
       ${embed ? "" : `<button class="snd" title="Cihazın sesini bu bilgisayara aktar (kapalı)">${SPEAKER_OFF}</button>`}
@@ -296,7 +296,7 @@ class Tile {
       ${spec.control ? '<button class="ctl" title="Fare ve klavye ile cihazı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
       <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div><div class="sleep"><div>Ekran güç tasarrufu kipinde<div class="sd"></div>${embed ? '<div class="wk">Uyandırmak için tıklayın</div>' : ""}</div></div>
       <div class="whoami" hidden></div></div><div class="stats"></div>`;
-    this.el.querySelector(".name").textContent = board.name || ("#" + board.id);
+    this.el.querySelector(".name").textContent = device.name || ("#" + device.id);
     this.view = this.el.querySelector(".view");
     this.msg = this.el.querySelector(".msg");
     this.whoamiEl = this.el.querySelector(".whoami");
@@ -306,24 +306,24 @@ class Tile {
     this.perfIn = this.el.querySelector(".perf .in");
     this.perfWs = null;
     this.perfTimer = null;
-    this.refreshNonce = board.refresh || 0;
-    this.setWhoami(board.whoami);
-    this.setStats(board.stats);
-    this.el.classList.toggle("powersave", !!board.powersave);
+    this.refreshNonce = device.refresh || 0;
+    this.setWhoami(device.whoami);
+    this.setStats(device.stats);
+    this.el.classList.toggle("powersave", !!device.powersave);
     this.tickShutdown();
     this.el.querySelector("button.fs").addEventListener("click", () => toggleFullscreen(single ? document.documentElement : this.el));
     const snd = this.el.querySelector("button.snd");
     if (snd) snd.addEventListener("click", () => this.setAudio(!this.audioWs));
-    this.locks = board.locks || [];
+    this.locks = device.locks || [];
     this.el.querySelectorAll("button.lk").forEach(btn => btn.addEventListener("click", () => this.toggleLock(btn)));
     this.showLocks();
     const ctl = this.el.querySelector("button.ctl");
     // Müdahale tam ekranda yapılır (kullanıcı isteği): Ekranlar sekmesinde (gömülü) kutucuğun kendisi değil,
-    // o cihazın "Ekranı yönet" penceresi büyütülmüş açılır (üst sayfa — bkz. Boards.js "tm-manage"); ekran
-    // penceresinin içinde açılınca pencere büyütülür (bkz. BoardOps.screen "tm-maximize").
+    // o cihazın "Ekranı yönet" penceresi büyütülmüş açılır (üst sayfa — bkz. Devices.js "tm-manage"); ekran
+    // penceresinin içinde açılınca pencere büyütülür (bkz. DeviceOps.screen "tm-maximize").
     if (ctl) ctl.addEventListener("click", () => {
       if (embed) {
-        window.parent.postMessage({ type: "tm-manage", id: this.board.id }, location.origin);
+        window.parent.postMessage({ type: "tm-manage", id: this.device.id }, location.origin);
         return;
       }
       this.setControl(!this.control);
@@ -337,7 +337,7 @@ class Tile {
     }
     // Müdahale kipinde çift tıklama cihaza gider; tam ekran yalnız ⛶ düğmesiyle.
     // Gömülü kipte (Ekranlar sekmesi) ekran alanına çift tıklama sağ menüdeki "Ekranı göster" ile aynı
-    // işi yapar (kullanıcı isteği; üst sayfa açar — bkz. Boards.js "tm-show"); başlık çubuğuna çift
+    // işi yapar (kullanıcı isteği; üst sayfa açar — bkz. Devices.js "tm-show"); başlık çubuğuna çift
     // tıklama ve tam ekrandayken çift tıklama tam ekranı aç/kapatır. Ekran alanındaki çift tıklama
     // tarayıcının "dblclick"i ile YAKALANAMAZ: noVNC tuvalde basılınca bütün sayfayı kaplayan bir
     // yakalama katmanı açıyor, "dblclick" kutucuğa değil BODY'ye düşüyor (ölçüldü) — bu yüzden aşağıdaki
@@ -352,14 +352,14 @@ class Tile {
       const now = Date.now();
       if (now - (this.viewDownAt || 0) < 400) {
         this.viewDownAt = 0;
-        window.parent.postMessage({ type: "tm-show", id: this.board.id }, location.origin);
+        window.parent.postMessage({ type: "tm-show", id: this.device.id }, location.origin);
       } else {
         this.viewDownAt = now;
       }
     }, true);
     // Gömülü kipte sağ tık, Cihazlar grid'inin satır menüsüyle AYNI menüyü açar: menü üst sayfada
-    // (qooxdoo, Boards.__rowMenu) kurulur — burada yalnız cihaz kimliği, o anki çoklu seçim ve konum
-    // iletilir (bkz. Boards.__openPreviewMenu). Müdahale kipinde sağ tık cihaza gider.
+    // (qooxdoo, Devices.__rowMenu) kurulur — burada yalnız cihaz kimliği, o anki çoklu seçim ve konum
+    // iletilir (bkz. Devices.__openPreviewMenu). Müdahale kipinde sağ tık cihaza gider.
     if (embed) {
       // Yakalama aşamasında dinlenir: noVNC tuvali olayı kendisi durdurduğu için kabarcıklanma aşamasına ulaşmıyor.
       this.el.addEventListener("contextmenu", e => {
@@ -368,11 +368,11 @@ class Tile {
         e.stopPropagation();
         // Seçim dışı bir kutucuğa sağ tıklanırsa (çoğu dosya yöneticisindeki gibi) seçim ona
         // sıfırlanır; zaten seçimin bir parçasıysa (Shift/Ctrl ile yapılmış) seçim KORUNUR.
-        if (!selected.has(this.board.id)) setSelected([this.board.id]);
-        // Alt barda sağ tık: hangi göstergelerin görüneceği (bkz. Boards.__openStatsMenu); başka yerde cihaz menüsü.
+        if (!selected.has(this.device.id)) setSelected([this.device.id]);
+        // Alt barda sağ tık: hangi göstergelerin görüneceği (bkz. Devices.__openStatsMenu); başka yerde cihaz menüsü.
         const type = e.target.closest && e.target.closest(".stats") ? "tm-statsmenu" : "tm-menu";
         window.parent.postMessage(
-          { type, id: this.board.id, ids: [...selected], x: e.clientX, y: e.clientY }, location.origin);
+          { type, id: this.device.id, ids: [...selected], x: e.clientX, y: e.clientY }, location.origin);
       }, true);
       // Basınca seçilir (görüntü alanı dahil — müdahale kipinde değilse): düz basış bu kutucuğu TEK
       // seçili yapar; Ctrl/⌘ tekli ekler/çıkarır; Shift, son seçilenden buna kadarki (görünür DOM
@@ -384,7 +384,7 @@ class Tile {
       this.makeResizable();
       this.el.addEventListener("pointerdown", e => {
         if (e.button !== 0 || this.control || e.target.closest("button") || e.target.closest(".rs")) return;
-        const id = this.board.id;
+        const id = this.device.id;
         const ids = orderedIds();
         if (e.shiftKey && selectAnchor !== null && ids.includes(selectAnchor)) {
           const a = ids.indexOf(selectAnchor);
@@ -428,7 +428,7 @@ class Tile {
         }
         pendingCollapse = null; // sürükleme başladı: çoklu seçim bırakınca daraltılmasın
         e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", String(this.board.id));
+        e.dataTransfer.setData("text/plain", String(this.device.id));
         dragStart(this);
       });
       this.el.addEventListener("dragend", () => {
@@ -472,7 +472,7 @@ class Tile {
           // Alt kenardaki dikey sürükleme, görüntü yüksekliğindeki değişimin genişlik karşılığına çevrilir.
           const dx = ev.clientX - startX, dy = (ev.clientY - startY) * ar;
           const d = dir === "e" ? dx : dir === "s" ? dy : (Math.abs(dx) > Math.abs(dy) ? dx : dy);
-          tileSizes[this.board.id] = { w: Math.round(Math.max(Tile.MIN_W, Math.min(maxW, w0 + d))) };
+          tileSizes[this.device.id] = { w: Math.round(Math.max(Tile.MIN_W, Math.min(maxW, w0 + d))) };
           this.applySize();
         };
         const onUp = () => {
@@ -493,47 +493,47 @@ class Tile {
 
   /** Kutucuğun kendi genişliği (yoksa ortak boyut — CSS --tile-min) ve görüntünün en-boy oranı (--ar). */
   applySize() {
-    const size = tileSizes[this.board.id];
+    const size = tileSizes[this.device.id];
     const s = this.el.style;
     if (size && size.w) s.setProperty("--w", size.w + "px"); else s.removeProperty("--w");
-    const res = tileRes[this.board.id];
+    const res = tileRes[this.device.id];
     if (res) s.setProperty("--ar", res[0] + " / " + res[1]); else s.removeProperty("--ar");
   }
 
   /** Görüntünün en-boy oranı (genişlik / yükseklik): cihazın bilinen çözünürlüğü, yoksa 16:9. */
   aspect() {
-    const res = tileRes[this.board.id];
+    const res = tileRes[this.device.id];
     return res ? res[0] / res[1] : 16 / 9;
   }
 
   /**
    * Cihazın ekran çözünürlüğü (VNC çerçeve boyutu — bağlanınca ve cihazda değişince): kutucuk oranı
    * buna uyar, cihaz kapalıyken de son bilinen oran kullanılsın diye bu tarayıcıda saklanır; üst sayfaya
-   * bildirilir (slider'ın yanındaki % değeri — bkz. Boards "tm-res").
+   * bildirilir (slider'ın yanındaki % değeri — bkz. Devices "tm-res").
    */
   setResolution(w, h) {
     if (!(w > 0 && h > 0)) return;
-    const old = tileRes[this.board.id];
+    const old = tileRes[this.device.id];
     if (!old || old[0] !== w || old[1] !== h) {
-      tileRes[this.board.id] = [w, h];
+      tileRes[this.device.id] = [w, h];
       try { localStorage.setItem(TILE_RES_KEY, JSON.stringify(tileRes)); } catch (e) { /* kalıcılık önemsiz */ }
       if (embed) this.applySize();
     }
-    if (embed) window.parent.postMessage({ type: "tm-res", id: this.board.id, w, h }, location.origin);
+    if (embed) window.parent.postMessage({ type: "tm-res", id: this.device.id, w, h }, location.origin);
   }
 
   /** Ad/durum güncellemesi (gömülü kipte üst sayfadan gelen liste). */
-  setBoard(board) {
-    this.board = board;
-    this.el._boardId = board.id;
-    this.el.querySelector(".name").textContent = board.name || ("#" + board.id);
-    this.setWhoami(board.whoami);
-    this.setStats(board.stats);
-    this.el.classList.toggle("powersave", !!board.powersave);
+  setDevice(device) {
+    this.device = device;
+    this.el._deviceId = device.id;
+    this.el.querySelector(".name").textContent = device.name || ("#" + device.id);
+    this.setWhoami(device.whoami);
+    this.setStats(device.stats);
+    this.el.classList.toggle("powersave", !!device.powersave);
     this.tickShutdown();
     this.refreshWanted();
-    if ((board.refresh || 0) !== this.refreshNonce) {
-      this.refreshNonce = board.refresh || 0;
+    if ((device.refresh || 0) !== this.refreshNonce) {
+      this.refreshNonce = device.refresh || 0;
       this.refreshStream();
     }
   }
@@ -544,7 +544,7 @@ class Tile {
    */
   refreshStream() {
     if (!this.rfb || !this.el.classList.contains("live")) {
-      window.parent.postMessage({ type: "tm-refreshed", id: this.board.id }, location.origin);
+      window.parent.postMessage({ type: "tm-refreshed", id: this.device.id }, location.origin);
       return;
     }
     this.refreshPending = true;
@@ -553,12 +553,12 @@ class Tile {
 
   /**
    * Güç tasarrufu yazısının altında TiHA'nın geri sayımlı otomatik kapatmasına kalan süre (saniyede bir —
-   * bkz. aşağıdaki setInterval). `board.autoshutdown` (üst sayfadan, ~30 sn'lik yoklamadan): {phase, kind,
+   * bkz. aşağıdaki setInterval). `device.autoshutdown` (üst sayfadan, ~30 sn'lik yoklamadan): {phase, kind,
    * countdown, dialog_at, off_at} (epoch ms) ya da null (uygulanmıyor). Servis dakikada bir denetlediğinden
    * ±1 dk sapabilir; "10 dakika ertele" dışarıdan görünmez (sonraki yoklamada düzelir).
    */
   tickShutdown() {
-    const sd = this.board.autoshutdown;
+    const sd = this.device.autoshutdown;
     let text = "";
     if (sd) {
       const left = at => Math.max(0, Math.round((at - Date.now()) / 1000));
@@ -581,17 +581,17 @@ class Tile {
    * son 5 dakikada ölçüm yok — bkz. backend MetricsApi::latest). Yalnız gömülü kipte görünür (CSS).
    */
   setStats(stats) {
-    // board.hide: bu kullanıcının bu cihazda gizlediği göstergeler (cpu, temp, mem, disk_temp, fan, battery, net —
-    // alt bara sağ tıkla seçilir, sunucuda kullanıcı tercihi; bkz. Boards.__openStatsMenu).
-    const hide = new Set(this.board.hide || []);
-    const net = this.board.online === false || hide.has("net") ? null : this.board.net;
+    // device.hide: bu kullanıcının bu cihazda gizlediği göstergeler (cpu, temp, mem, disk_temp, fan, battery, net —
+    // alt bara sağ tıkla seçilir, sunucuda kullanıcı tercihi; bkz. Devices.__openStatsMenu).
+    const hide = new Set(this.device.hide || []);
+    const net = this.device.online === false || hide.has("net") ? null : this.device.net;
     const key = JSON.stringify([stats || null, net || null, [...hide]]);
     if (key === this.statsKey) return;
     this.statsKey = key;
     this.statsEl.textContent = "";
     this.netIcons(net);
     if (!stats) {
-      this.statsEl.insertAdjacentHTML("beforeend", `<span class="none">${this.board.online === false ? "Cihaz kapalı" : "Ölçüm yok"}</span>`);
+      this.statsEl.insertAdjacentHTML("beforeend", `<span class="none">${this.device.online === false ? "Cihaz kapalı" : "Ölçüm yok"}</span>`);
       return;
     }
     // Eşikler: warn/crit değerin üstünde ise renklenir; pilde ters (alt eşik) — CR2032 ~3 V, 2.5 V altı biter.
@@ -637,7 +637,7 @@ class Tile {
   }
 
   /**
-   * "Oturumları sorgula" ve "Oturum aç"/"Oturumu kapat" (bkz. Boards.js __sessionJob)
+   * "Oturumları sorgula" ve "Oturum aç"/"Oturumu kapat" (bkz. Devices.js __sessionJob)
    * sonucunu sol altta gösterir — yalnız önizlemede (q=thumb); tam ekran/tek cihaz görünümünde
    * (q=view) zaten canlı ekranın kendisi yeterli, rozet gereksiz. `whoami`: null (hiç sorgulanmadı,
    * gizli), {status:"querying", text?}, ya da {status:"ok"|"error", text}.
@@ -661,7 +661,7 @@ class Tile {
     ctx.resume();
     if (btn) { btn.innerHTML = SPEAKER_ON; btn.title = "Cihazın sesi aktarılıyor (kapatmak için tıklayın)"; btn.classList.add("on"); btn.classList.remove("err"); }
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    const sock = this.audioWs = new WebSocket(`${proto}//${location.host}/screen/ws/audio/${this.board.id}`);
+    const sock = this.audioWs = new WebSocket(`${proto}//${location.host}/screen/ws/audio/${this.device.id}`);
     sock.binaryType = "arraybuffer";
     let next = 0;
     let rest = null;      // çerçeve sınırına denk gelmeyen artık baytlar
@@ -712,11 +712,11 @@ class Tile {
 
   /**
    * " (23 dk)" / " (1 sa 12 dk)": cihazın ne zamandır oturumsuz açık olduğu (kullanıcı isteği). Başlangıç
-   * üst sayfadan gelir (board.noSessionSince, epoch sn — BoardsApi no_session_since: oturumsuz kalınan
+   * üst sayfadan gelir (device.noSessionSince, epoch sn — DevicesApi no_session_since: oturumsuz kalınan
    * açık aralığın başı ya da son oturumun bitişi); bilinmiyorsa boş. Dakikada bir tazelenir (bkz. tickWhoami).
    */
   noSessionFor() {
-    const since = this.board.noSessionSince;
+    const since = this.device.noSessionSince;
     if (!since) return "";
     const min = Math.max(0, Math.floor((Date.now() / 1000 - since) / 60));
     const h = Math.floor(min / 60), m = min % 60;
@@ -725,19 +725,19 @@ class Tile {
 
   /** Bağlı kalmalı mı: sekme görünür, kutucuk görünür alanda ve cihaz çevrimiçi (kapalı cihaza SSH denenmez). */
   refreshWanted() {
-    const offline = this.board.online === false;
+    const offline = this.device.online === false;
     this.el.classList.toggle("offline", offline);
     if (offline) {
       this.wanted = false;
       this.disconnect();
       this.syncPerf();
       // Ağda canlı ama SSH yanıt vermiyor (Akıllı Tahtalar ▸ Yönetilebilir: Hayır): kapalı DEĞİL, yönetilemiyor.
-      this.setState("offline", this.board.alive ? "Cihaz açık — yönetilemiyor (SSH yanıt vermiyor)" : "Cihaz kapalı");
+      this.setState("offline", this.device.alive ? "Cihaz açık — yönetilemiyor (SSH yanıt vermiyor)" : "Cihaz kapalı");
       return;
     }
     // Ekranı ayrı pencerede açık (bkz. "tm-popped"): aynı cihaza ikinci akış açılmaz; pencere kapanınca döner.
     const wasPopped = this.el.classList.contains("popped");
-    const isPopped = popped.has(this.board.id);
+    const isPopped = popped.has(this.device.id);
     this.el.classList.toggle("popped", isPopped);
     if (isPopped) {
       this.setWanted(false);
@@ -773,7 +773,7 @@ class Tile {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     // fresh=1: ekran değişti (bkz. refreshStream) — salt izleme paylaşılan yayındır (bkz. worker screen/shared_feed.py),
     // var olana katılmak yerine yenisi kurulur.
-    const ws = new WebSocket(`${proto}//${location.host}/screen/ws/${this.board.id}?q=${this.q}${this.control ? "&control=1" : ""}${embed ? "&nolog=1" : ""}${this.refreshPending ? "&fresh=1" : ""}`);
+    const ws = new WebSocket(`${proto}//${location.host}/screen/ws/${this.device.id}?q=${this.q}${this.control ? "&control=1" : ""}${embed ? "&nolog=1" : ""}${this.refreshPending ? "&fresh=1" : ""}`);
     const token = this.token = {};                  // eski bağlantının geç gelen "close"u yenisini bozmasın
     // Her bağlantı kendi katmanında: yeni katman en alta eklenir, böylece geçişte eski görüntü
     // üstte kalır (.msg/.whoami katmanları da hep üstte).
@@ -815,8 +815,8 @@ class Tile {
     rfb.addEventListener("connect", () => {
       this.setState("live");
       if (this.control) rfb.focus();
-      // "Bağlanıyor…" bitti: ana sayfa bu cihazın oturumunu sorgulasın (bkz. Boards.__onMessage "tm-live").
-      if (fresh) window.parent.postMessage({ type: "tm-live", id: this.board.id }, location.origin);
+      // "Bağlanıyor…" bitti: ana sayfa bu cihazın oturumunu sorgulasın (bkz. Devices.__onMessage "tm-live").
+      if (fresh) window.parent.postMessage({ type: "tm-live", id: this.device.id }, location.origin);
       if (prev) {
         // "connect" ilk kareden hemen önce gelir; yeni akış ilk görüntüsünü çizene dek eskisi kalsın.
         const old = prev;
@@ -825,7 +825,7 @@ class Tile {
           Tile.dropLayer(old);
           if (this.refreshPending) {
             this.refreshPending = false;
-            window.parent.postMessage({ type: "tm-refreshed", id: this.board.id }, location.origin);
+            window.parent.postMessage({ type: "tm-refreshed", id: this.device.id }, location.origin);
           }
         }, Tile.SWAP_MS);
       }
@@ -964,7 +964,7 @@ class Tile {
   setWanted(wanted) {
     if (wanted === this.wanted) return;
     this.wanted = wanted;
-    // "Ekranı yönet" (sağ menü — bkz. ui/BoardOps.screen manage): ilk bağlantı doğrudan müdahale kipinde.
+    // "Ekranı yönet" (sağ menü — bkz. ui/DeviceOps.screen manage): ilk bağlantı doğrudan müdahale kipinde.
     if (spec.manage && spec.control) this.setControl(true, true);
     wanted ? this.connect() : this.freeze();
     this.syncPerf();
@@ -985,7 +985,7 @@ class Tile {
     if (this.perfWs || this.perfTimer) return;
     if (!this.perfIn.firstChild) this.perfIn.innerHTML = '<div class="wait">Başarım verisi bekleniyor…</div>';
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = this.perfWs = new WebSocket(`${proto}//${location.host}/screen/ws/perf/${this.board.id}`);
+    const ws = this.perfWs = new WebSocket(`${proto}//${location.host}/screen/ws/perf/${this.device.id}`);
     ws.addEventListener("message", e => this.renderPerf(JSON.parse(e.data)));
     ws.addEventListener("close", () => {
       if (this.perfWs !== ws) return;           // bilerek kapatıldı (perfStop)
@@ -1025,7 +1025,7 @@ class Tile {
       `<div class="row"><span class="k">Çalışan:</span> ${esc(p.running)}</div>` +
       `<div class="row"><span class="k">Yük ort.:</span> ${p.load.map(v => Number(v).toFixed(2)).join(" ")}</div>` +
       `<div class="row"><span class="k">Çalışma:</span> ${d ? d + " gün, " : ""}${hms}</div>`;
-    const hw = this.board.hw ? `<div class="hw" title="${esc(this.board.hw)}">${esc(this.board.hw)}</div>` : "";
+    const hw = this.device.hw ? `<div class="hw" title="${esc(this.device.hw)}">${esc(this.device.hw)}</div>` : "";
     this.perfIn.style.setProperty("--rows", Math.max(p.cpus.length + 2, 4) + (hw ? 2 : 0));
     this.perfIn.innerHTML = `${hw}<div class="l">${cpus}${mem}${swp}</div><div class="r">${right}</div>`;
   }
@@ -1047,18 +1047,18 @@ class Tile {
 
   /**
    * Ekran güç tasarrufundaysa (DPMS — üst sayfanın "powersave"i) uyandırma ister: üst sayfa sağ menüdeki
-   * Ekran ▸ Uyandır ile aynı işi çalıştırır (bkz. Boards.js "tm-wake"). Art arda basışlar WAKE_MS içinde
+   * Ekran ▸ Uyandır ile aynı işi çalıştırır (bkz. Devices.js "tm-wake"). Art arda basışlar WAKE_MS içinde
    * bir kez gönderilir (iş sürerken "Ekran uyandırılıyor…" yazar; DPMS durumu sonraki yoklamada kalkar).
    */
   wake() {
     if (!this.el.classList.contains("powersave") || Date.now() - (this.wakeAt || 0) < Tile.WAKE_MS) return;
     this.wakeAt = Date.now();
-    window.parent.postMessage({ type: "tm-wake", id: this.board.id }, location.origin);
+    window.parent.postMessage({ type: "tm-wake", id: this.device.id }, location.origin);
   }
 
   /** Akış kalitesi: müdahale ve tam ekran en akıcı kipte, sohbet açıkken yazı okunacak kipte, yoksa kutucuğun kendi kalitesinde. */
   applyQuality() {
-    const q = this.control || this.isFs ? "view" : chatting.has(this.board.id) ? "chat" : this.base;
+    const q = this.control || this.isFs ? "view" : chatting.has(this.device.id) ? "chat" : this.base;
     if (q === this.q) return;
     this.q = q;
     this.reconnect();
@@ -1075,11 +1075,11 @@ class Tile {
     });
   }
 
-  /** İşi üst sayfa yürütür (bkz. BoardOps.__toggleInputLock); sonuç "tm-locks" ile gelir. */
+  /** İşi üst sayfa yürütür (bkz. DeviceOps.__toggleInputLock); sonuç "tm-locks" ile gelir. */
   toggleLock(btn) {
     if (btn.classList.contains("busy")) return;
     btn.classList.add("busy");
-    window.parent.postMessage({ type: "tm-inputlock", id: this.board.id, device: btn.dataset.device, lock: !btn.classList.contains("on"),
+    window.parent.postMessage({ type: "tm-inputlock", id: this.device.id, device: btn.dataset.device, lock: !btn.classList.contains("on"),
       locks: this.locks }, location.origin);
   }
 
@@ -1209,7 +1209,7 @@ function toggleSelected(id) {
 
 /** Kutucukların şu anki GÖRÜNÜR (DOM) sırasındaki kimlikleri — sürükle-bırak sonrası bu sıra değişir. */
 function orderedIds() {
-  return [...grid.children].filter(el => el.classList.contains("tile")).map(el => el._boardId);
+  return [...grid.children].filter(el => el.classList.contains("tile")).map(el => el._deviceId);
 }
 
 /*
@@ -1343,7 +1343,7 @@ if (embed) {
   });
 }
 
-const io = "IntersectionObserver" in window && (embed || spec.boards.length > 1)
+const io = "IntersectionObserver" in window && (embed || spec.devices.length > 1)
   ? new IntersectionObserver(entries => {
       // Gömülü kipte iframe'in kendisi gizlenince (Liste sekmesi) bütün kutucuklar "görünmez" olur;
       // o durumda bağlantılar burada kesilmez — üst sayfa 10 sn sonra "tm-pause" ile duraklatır
@@ -1415,13 +1415,13 @@ function netHint(it, radio) {
 // TiHA otomatik kapatma geri sayımı (güç tasarrufu yazısının altında) — bkz. Tile.tickShutdown.
 setInterval(() => { if (!document.hidden) tiles.forEach(t => t.tickShutdown()); }, 1000);
 // "Oturumu açık kullanıcı yok (N dk)" süresi üst sayfa güncelleme göndermese de ilerlesin.
-setInterval(() => { if (!document.hidden) tiles.forEach(t => t.board.whoami && t.setWhoami(t.board.whoami)); }, 30000);
+setInterval(() => { if (!document.hidden) tiles.forEach(t => t.device.whoami && t.setWhoami(t.device.whoami)); }, 30000);
 
 // Siyah (güç tasarrufundaki) ekran algısı — bkz. Tile.checkBlank.
 setInterval(() => { if (!document.hidden) tiles.forEach(t => t.checkBlank()); }, 2000);
 
 /** Kutucukları verilen listeye eşitler: yenileri ekler, gidenleri kaldırır, kalanları günceller (yeniden bağlanmadan). */
-function setBoards(list) {
+function setDevices(list) {
   const ids = new Set(list.map(b => b.id));
   for (const [id, t] of tiles) {
     if (!ids.has(id)) {
@@ -1451,7 +1451,7 @@ function setBoards(list) {
     // Tam ekrandaki kutucuk taşınmaz: DOM'da yer değiştiren öğe tarayıcıda tam ekrandan çıkar (sıra, tam ekran bitince
     // bir sonraki listede düzelir; diğer kutucuklar onun çevresine dizilir).
     if (!drag && grid.children[i] !== t.el && t.el !== document.fullscreenElement) grid.insertBefore(t.el, grid.children[i] || null);
-    t.setBoard(b);
+    t.setDevice(b);
   });
   if (!list.length && !empty) {
     empty = document.createElement("div");
@@ -1496,7 +1496,7 @@ if (embed) {
   // Üst sayfa (Cihazlar) grid'deki cihaz listesini her değiştiğinde gönderir.
   window.addEventListener("message", e => {
     if (e.source !== window.parent || e.origin !== location.origin || !e.data) return;
-    if (e.data.type === "tm-boards") { setBoards(e.data.boards || []); markLoaded(); }
+    if (e.data.type === "tm-devices") { setDevices(e.data.devices || []); markLoaded(); }
     else if (e.data.type === "tm-selection") setSelected((e.data.ids || []).filter(id => tiles.has(id)), true);
     else if (e.data.type === "tm-size") setTileSize(e.data.px, !!e.data.reset);
     else if (e.data.type === "tm-fit") window.parent.postMessage({ type: "tm-fit", px: fitTileWidth(e.data.cols) }, location.origin);
@@ -1531,10 +1531,10 @@ function markLoaded() {
   document.getElementById("loading")?.remove();
 }
 
-// Gömülü kipte liste üst sayfadan ("tm-boards") gelir: o gelene dek boş liste çizilmez (yoksa yükleme
+// Gömülü kipte liste üst sayfadan ("tm-devices") gelir: o gelene dek boş liste çizilmez (yoksa yükleme
 // sırasında yanlışlıkla "Gösterilecek cihaz yok." görünüyordu). Tek pencere kipinde liste adresle gelir.
 if (!embed) {
-  setBoards(spec.boards);
+  setDevices(spec.devices);
   markLoaded();
 }
 </script>

@@ -47,9 +47,9 @@ final class CommandLogApi
         $where = ['time >= ?::timestamptz', 'time <= ?::timestamptz'];
         $params = [self::commandLogTimeBound($request->query('from'), '-7 days'), self::commandLogTimeBound($request->query('to'), 'now')];
 
-        if ($boardId = $request->query('board_id')) {
-            $where[] = 'board_id = ?';
-            $params[] = (int) $boardId;
+        if ($deviceId = $request->query('device_id')) {
+            $where[] = 'device_id = ?';
+            $params[] = (int) $deviceId;
         }
         if ($username = $request->query('username')) {
             $where[] = 'username = ?';
@@ -67,7 +67,7 @@ final class CommandLogApi
         $limit = $request->queryInt('limit', 300, 1, 2000);
         $offset = $request->queryInt('offset', 0, 0, 10000000);
         $rows = Db::all(
-            'SELECT (extract(epoch FROM time) * 1000)::bigint AS ts, board_name, username, source, command, exit_code, status
+            'SELECT (extract(epoch FROM time) * 1000)::bigint AS ts, device_name, username, source, command, exit_code, status
              FROM command_log WHERE ' . implode(' AND ', $where) . '
              ORDER BY time DESC, id DESC LIMIT ' . ($limit + 1) . ' OFFSET ' . $offset,
             $params

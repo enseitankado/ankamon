@@ -43,9 +43,9 @@ final class DashboardApi
         // yalnız kendininki (JobsApi::index ile aynı kural) — "dashboard" tek başına bunları açmasın.
         $canLogs = Auth::can($user, 'logs');
         return [
-            // "online" Akıllı Tahtalar'daki "Çevrimiçi" ile aynı: ağda canlı (BoardsApi alive — SSH yanıtı ya da ağ
-            // taramasında MAC çevrim içi); "manageable" = SSH ile oturum açılabiliyor (BoardsApi manageable). Grid ile tutarsızlık olmasın.
-            'boards' => Db::one(
+            // "online" Akıllı Tahtalar'daki "Çevrimiçi" ile aynı: ağda canlı (DevicesApi alive — SSH yanıtı ya da ağ
+            // taramasında MAC çevrim içi); "manageable" = SSH ile oturum açılabiliyor (DevicesApi manageable). Grid ile tutarsızlık olmasın.
+            'devices' => Db::one(
                 "SELECT count(*) AS total,
                         count(*) FILTER (WHERE b.online OR EXISTS (SELECT 1 FROM net_devices nd
                                                   WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
@@ -53,7 +53,7 @@ final class DashboardApi
                         count(*) FILTER (WHERE b.ssh_ok AND b.session_checked_at > now() - interval '3 minutes') AS manageable,
                         count(*) FILTER (WHERE b.exporter_ok) AS exporter_ok,
                         count(*) FILTER (WHERE b.last_log_at > now() - interval '24 hours') AS logging
-                 FROM boards b"
+                 FROM devices b"
             ),
             // Son 24 saat, saatlik: toplam ve hata düzeyi (severity ≤ 3) log sayıları.
             'log_histogram' => !$canLogs ? [] : Db::all(
@@ -64,10 +64,10 @@ final class DashboardApi
                  GROUP BY 1 ORDER BY 1"
             ),
             'recent_errors' => !$canLogs ? [] : Db::all(
-                "SELECT (extract(epoch FROM received_at) * 1000)::bigint AS ts, host, bm.board_id, bm.board_label,
+                "SELECT (extract(epoch FROM received_at) * 1000)::bigint AS ts, host, bm.device_id, bm.device_label,
                         severity, program, ltrim(message) AS message
                  FROM logs l
-                 LEFT JOIN LATERAL (SELECT b.id AS board_id, NULLIF(b.label, '') AS board_label FROM boards b
+                 LEFT JOIN LATERAL (SELECT b.id AS device_id, NULLIF(b.label, '') AS device_label FROM devices b
                      WHERE lower(b.hostname) = lower(l.host) OR host(b.ip) = l.from_ip LIMIT 1) bm ON true
                  WHERE received_at > now() - interval '24 hours' AND severity <= 3
                  ORDER BY received_at DESC LIMIT 15"
@@ -79,7 +79,7 @@ final class DashboardApi
                     "SELECT j.id, j.title, j.status, j.summary, extract(epoch FROM j.created_at)::bigint AS created_at,
                             COALESCE((SELECT json_agg(json_build_object('id', b.id,
                                           'name', COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip))) ORDER BY b.label, b.hostname)
-                                      FROM job_targets t JOIN boards b ON b.id = t.board_id WHERE t.job_id = j.id), '[]') AS targets
+                                      FROM job_targets t JOIN devices b ON b.id = t.device_id WHERE t.job_id = j.id), '[]') AS targets
                      FROM jobs j WHERE ?::boolean OR j.created_by = ? ORDER BY j.id DESC LIMIT 8",
                     [(bool) $user['is_admin'], $user['id']]
                 )
@@ -111,7 +111,7 @@ final class DashboardApi
                 'rows' => (int) Db::value("SELECT approximate_row_count(?::regclass)", [$t]),
             ];
         }
-        foreach (['command_log', 'job_events', 'board_sessions', 'activity_log', 'audit_log'] as $t) {
+        foreach (['command_log', 'job_events', 'device_sessions', 'activity_log', 'audit_log'] as $t) {
             $tables[$t] = [
                 'bytes' => (int) Db::value("SELECT pg_total_relation_size(?::regclass)", [$t]),
                 'rows' => (int) Db::value("SELECT count(*) FROM $t"), // $t sabit listeden, kullanıcı girdisi değil

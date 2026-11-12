@@ -32,14 +32,14 @@
  * Varsayılan: "Çevrim içi cihazlar" panosu (docker/grafana/dashboards/cevrimici-cihazlar.json) — şu an
  * çevrim içi TÜM cihazlar, her grafikte cihaz başına bir çizgi; lejant tablosunda son/en yüksek değerler.
  * Düğme satırındaki seçim kutusundan tek bir cihaz seçilince o cihazın ayrıntılı panosu (cihaz-genel-bakis,
- * var-board) açılır. Seçim yalnız bu sayfa açıkken hatırlanır.
+ * var-device) açılır. Seçim yalnız bu sayfa açıkken hatırlanır.
  */
 qx.Class.define("ankamon.page.Metrics", {
   extend: ankamon.page.Base,
 
   statics: {
     ALL_URL: "/grafana/d/ankamon-cevrimici/cevrim-ici-cihazlar?kiosk",
-    BOARD_URL: "/grafana/d/ankamon-genel/cihaz-genel-bakis?kiosk&var-board="
+    DEVICE_URL: "/grafana/d/ankamon-genel/cihaz-genel-bakis?kiosk&var-device="
   },
 
   construct(user) {
@@ -102,14 +102,14 @@ qx.Class.define("ankamon.page.Metrics", {
     __shown: null,
 
     /** Seçili cihaz kimliği; null = tüm çevrim içi cihazlar. */
-    __boardId() {
+    __deviceId() {
       const sel = this.__select.getSelection()[0];
       return sel ? sel.getModel() : null;
     },
 
     __url() {
-      const id = this.__boardId();
-      return id === null ? ankamon.page.Metrics.ALL_URL : ankamon.page.Metrics.BOARD_URL + id;
+      const id = this.__deviceId();
+      return id === null ? ankamon.page.Metrics.ALL_URL : ankamon.page.Metrics.DEVICE_URL + id;
     },
 
     /**
@@ -117,24 +117,24 @@ qx.Class.define("ankamon.page.Metrics", {
      * cihazda yalnız o cihaz. Eksiklik iki türlüdür ama kurulum TEK hazır komuttur — "Metrik izlemeyi kur"
      * (actions/node-exporter; fan/pil/anakart sensörlerini de etkinleştirir):
      *   • son 7 günde hiç veri gelmeyen cihazlar (has_data);
-     *   • fan/anakart sensörü olmayan ve anakart sensörü adımı henüz denenmemiş cihazlar (has_board_sensors,
+     *   • fan/anakart sensörü olmayan ve anakart sensörü adımı henüz denenmemiş cihazlar (has_device_sensors,
      *     superio_done — yonga desteklenmiyorsa komut yeniden önerilmez).
      * Komutun yolu tıklanır: Komut çalıştır penceresi bu cihazlar için o hazır komut seçili açılır
-     * (bkz. ui.BoardOps.run). Listede kapalı cihaz varsa sonuna "WoL ile aç" bağlantısı eklenir.
+     * (bkz. ui.DeviceOps.run). Listede kapalı cihaz varsa sonuna "WoL ile aç" bağlantısı eklenir.
      */
     __updateNotice() {
       const esc = qx.bom.String.escape;
       const list = this.__coverage || [];
-      const id = this.__boardId();
+      const id = this.__deviceId();
       const shown = list.filter(b => id === null || b.id === id);
       const missing = shown.filter(b => !b.has_data);
-      const noBoard = shown.filter(b => b.has_data && !b.has_board_sensors && !b.superio_done);
+      const noDevice = shown.filter(b => b.has_data && !b.has_device_sensors && !b.superio_done);
       const steps = [
-        { key: "node-exporter", boards: shown.filter(b => !b.has_data || (!b.has_board_sensors && !b.superio_done)),
+        { key: "node-exporter", devices: shown.filter(b => !b.has_data || (!b.has_device_sensors && !b.superio_done)),
           title: "Metrik izlemeyi kur (fan/pil/anakart sensörleri dahil)",
           what: "işlemci, bellek, disk, ağ, sıcaklık; anakartın donanım izleme yongası destekleniyorsa fan devri, " +
             "CMOS pili ve anakart sıcaklığı da" }
-      ].filter(st => st.boards.length);
+      ].filter(st => st.devices.length);
       const canRun = this._can("actions");
       const link = (attr, text) => `<span ${attr} style="color:#0b57d0;text-decoration:underline;cursor:pointer">${text}</span>`;
       const names = arr => arr.slice(0, 12).map(b => esc(b.name) + (b.online ? "" : " (kapalı)")).join(", ") +
@@ -155,24 +155,24 @@ qx.Class.define("ankamon.page.Metrics", {
           : "<b>Bu cihazda hiç sensör verisi yok:</b> sensör istemcisi (metrik izleme) kurulu değil ya da çalışmıyor" +
             (missing[0].online ? "" : " (cihaz kapalı" + wol(missing) + ")") + ".");
       }
-      if (noBoard.length) {
+      if (noDevice.length) {
         lines.push(id === null
-          ? `<b>${noBoard.length} cihazda fan / anakart sensörü verisi yok:</b> ${names(noBoard)}${wol(noBoard)}.`
-          : "<b>Bu cihazda fan / anakart sensörü verisi yok.</b>" + (noBoard[0].online ? "" : " Cihaz kapalı" + wol(noBoard) + "."));
+          ? `<b>${noDevice.length} cihazda fan / anakart sensörü verisi yok:</b> ${names(noDevice)}${wol(noDevice)}.`
+          : "<b>Bu cihazda fan / anakart sensörü verisi yok.</b>" + (noDevice[0].online ? "" : " Cihaz kapalı" + wol(noDevice) + "."));
       }
       this.__noticeTargets = {};
       if (steps.length) {
         const path = st => {
           const text = `Komut çalıştır ▸ Hazır / Serbest komut çalıştır ▸ Sensörler — ${esc(st.title)}`;
-          this.__noticeTargets[st.key] = st.boards.map(b => b.id);
+          this.__noticeTargets[st.key] = st.devices.map(b => b.id);
           return canRun ? link(`data-sensor-run="${st.key}"`, text) : `<b>${text}</b>`;
         };
         const count = st => {
           if (id !== null) {
             return "";
           }
-          const off = st.boards.filter(b => !b.online).length;
-          return ` — ${st.boards.length} cihaz` + (off ? ` (${off} kapalı: önce açılmalı)` : "");
+          const off = st.devices.filter(b => !b.online).length;
+          return ` — ${st.devices.length} cihaz` + (off ? ` (${off} kapalı: önce açılmalı)` : "");
         };
         lines.push((steps.length > 1 ? "Kurmak için Cihazlar'da cihazları işaretleyip sırasıyla şu hazır komutları çalıştırın" :
           "Kurmak için Cihazlar'da cihazları işaretleyip şu hazır komutu çalıştırın") +
@@ -183,7 +183,7 @@ qx.Class.define("ankamon.page.Metrics", {
       const html = lines.join("<br>");
       this.__notice.setValue(html);
       // Katlı şerit: kaç cihazda eksik olduğu (ayrıntı açılır pencerede).
-      const n = new Set(missing.concat(noBoard).map(b => b.id)).size;
+      const n = new Set(missing.concat(noDevice).map(b => b.id)).size;
       this.__noticeSummary = !html ? ""
         : id !== null ? "⚠ Bu cihazda sensör verisi eksik"
         : `⚠ ${n} cihazda sensör verisi eksik`;
@@ -209,11 +209,11 @@ qx.Class.define("ankamon.page.Metrics", {
       const run = hit.getAttribute("data-sensor-run");
       if (run) {
         const ids = (this.__noticeTargets || {})[run] || [];
-        ankamon.ui.BoardOps.run(ids.map(i => ({ id: i })), this._user, run);
+        ankamon.ui.DeviceOps.run(ids.map(i => ({ id: i })), this._user, run);
         return;
       }
       const ids = hit.getAttribute("data-sensor-wol").split(",").map(Number);
-      ankamon.io.Api.post("/jobs", { type: "wol", board_ids: ids })
+      ankamon.io.Api.post("/jobs", { type: "wol", device_ids: ids })
         .then(() => ankamon.ui.Dialog.alert(
           `${ids.length} cihaza uyandırma (Wake-on-LAN) paketi gönderildi. WoL kurulumu yapılmışsa birkaç dakika ` +
           "sonra cihazlar açılacaktır.", "Uyandırma (WoL)"))
@@ -231,9 +231,9 @@ qx.Class.define("ankamon.page.Metrics", {
     },
 
     /** Belirli bir cihazın ayrıntılı grafiklerini göster. */
-    async showBoard(boardId) {
+    async showDevice(deviceId) {
       await this._refresh();
-      const item = this.__select.getChildren().find(i => i.getModel() === boardId);
+      const item = this.__select.getChildren().find(i => i.getModel() === deviceId);
       if (item) {
         this.__select.setSelection([item]);
       }
@@ -241,18 +241,18 @@ qx.Class.define("ankamon.page.Metrics", {
 
     async _refresh() {
       // Cihaz listesi her açılışta tazelenir (yeni eklenen / çevrim içi-dışı değişen cihazlar); seçim korunur.
-      let boards = [];
+      let devices = [];
       try {
-        boards = (await ankamon.io.Api.get("/boards")).boards;
+        devices = (await ankamon.io.Api.get("/devices")).devices;
       } catch (e) {
-        // "boards" yetkisi yoksa yalnız "Tüm çevrim içi cihazlar" kalır.
+        // "devices" yetkisi yoksa yalnız "Tüm çevrim içi cihazlar" kalır.
       }
       try {
-        this.__coverage = (await ankamon.io.Api.get("/metrics/coverage")).boards;
+        this.__coverage = (await ankamon.io.Api.get("/metrics/coverage")).devices;
       } catch (e) {
         this.__coverage = null; // bilgilendirme gösterilmez; grafikler yine açılır
       }
-      const keep = this.__boardId();
+      const keep = this.__deviceId();
       this.__filling = true;
       try {
         this.__select.getChildren().slice(1).forEach(item => {
@@ -260,7 +260,7 @@ qx.Class.define("ankamon.page.Metrics", {
           item.dispose();
         });
         const name = b => b.label || b.hostname || b.ip || "#" + b.id;
-        boards
+        devices
           .slice()
           .sort((a, b) => (b.online - a.online) || name(a).localeCompare(name(b), "tr"))
           .forEach(b => this.__select.add(new qx.ui.form.ListItem(name(b) + (b.online ? "" : " (çevrim dışı)"), null, b.id)));

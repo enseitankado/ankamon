@@ -27,7 +27,7 @@ final class ActionsApi
         return ['actions' => array_values($allowed)];
     }
 
-    /** İşletim sistemine göre işlev tanımı (platforms/catalog.json; bkz. ui.boards.Platforms). */
+    /** İşletim sistemine göre işlev tanımı (platforms/catalog.json; bkz. ui.devices.Platforms). */
     public function platforms(Request $request, array $user): array
     {
         return Platforms::catalog();

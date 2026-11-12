@@ -28,7 +28,7 @@
 /**
  * Cihazlar grid'inin "Oturum" sütunu için hücre çizici: oturum ekranı kilitliyse metinde geçen
  * "(kilitli)" ifadesi KIRMIZI ve KALIN gösterilir (kullanıcı isteği), geri kalan (kullanıcı adı)
- * olduğu gibi kalır. Kilit yoksa metin düz gösterilir (bkz. Boards.sessionText, StatusRenderer deseni).
+ * olduğu gibi kalır. Kilit yoksa metin düz gösterilir (bkz. Devices.sessionText, StatusRenderer deseni).
  */
 qx.Class.define("ankamon.ui.table.SessionRenderer", {
   extend: qx.ui.table.cellrenderer.Default,

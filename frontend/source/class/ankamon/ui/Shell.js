@@ -31,7 +31,7 @@
  *
  * Ağaçta cihaz başına düğüm yoktur — cihaz listesi, seçim ve sağ-tık işlemleri (Web terminal,
  * Komut çalıştır, Kapat/Uyandır) Cihazlar sayfasının kendi grid'inde (satır başı onay kutuları +
- * satır sağ menüsü) yapılır; bkz. page.Boards. Ağaç yalnız sayfalar arasında gezinir.
+ * satır sağ menüsü) yapılır; bkz. page.Devices. Ağaç yalnız sayfalar arasında gezinir.
  *
  * Düğüm "simgeleri" resim değil, etiketin başına eklenen Unicode karakterdir (bkz. ICON):
  * qx.ui.table.cellrenderer.Boolean'da yaşanan sorunla aynı kökten, bu derlenmiş build'de
@@ -119,11 +119,11 @@ qx.Class.define("ankamon.ui.Shell", {
       }
     }
 
-    // Cihazlar grid'inin satır menüsündeki "Logları göster" buradan tetiklenir (bkz. page.Boards
+    // Cihazlar grid'inin satır menüsündeki "Logları göster" buradan tetiklenir (bkz. page.Devices
     // __rowMenu) — sayfa nesnesine doğrudan referansı olmadığından mesaj veriyoluyla haberleşir.
-    qx.event.message.Bus.subscribe(ankamon.ui.Shell.OPEN_LOGS, msg => this.__openLogsForBoard(msg.getData()));
+    qx.event.message.Bus.subscribe(ankamon.ui.Shell.OPEN_LOGS, msg => this.__openLogsForDevice(msg.getData()));
     // StatusBar'ın sağ menüsündeki "Sistem logları"/"Komut logları" buradan tetiklenir — cihaz
-    // süzgeci olmadan, yalnız ilgili moda geçer (bkz. __openLogsForBoard'daki cihazlı benzeri).
+    // süzgeci olmadan, yalnız ilgili moda geçer (bkz. __openLogsForDevice'daki cihazlı benzeri).
     qx.event.message.Bus.subscribe(ankamon.ui.Shell.OPEN_LOGS_MODE, msg => this.__openLogsMode(msg.getData()));
     // Genel bakış kartları (bkz. page.Dashboard __target) buradan sayfa/pencere açar.
     qx.event.message.Bus.subscribe(ankamon.ui.Shell.OPEN_PAGE, msg => this.__openPage(msg.getData()));
@@ -177,7 +177,7 @@ qx.Class.define("ankamon.ui.Shell", {
 
     // Metin tabanlı düğüm simgeleri (bkz. sınıf başı not). Boş: belirgin bir simge gerekmiyor.
     ICON: {
-      dashboard: "◈", boards: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
+      dashboard: "◈", devices: "▭", logs: "▤", sessions: "♙", metrics: "∿", users: "◉", settings: "⚙",
       webshell: "▭", screen: "▣", screenControl: "🖱", reboot: "↻", filemanager: "▦", run: "▸", shutdown: "■", wol: "▲", edit: "✎", delete: "✕",
       info: "ℹ", backup: "⬇", copy: "⧉", distribute: "⇉", collect: "⇇", bulk: "⇄", wakeScreen: "☀", sleepScreen: "☾", screenLock: "🔐", screenUnlock: "🔓", cast: "⇪", logout: "⏏", lock: "🔒", password: "🔑", diagnose: "⚕", system: "⚒", diskusage: "⛁", software: "⬢",
       network: "⇆", subnet: "▫", taskmgr: "☷", anomalies: "✚", leagues: "♛",
@@ -196,12 +196,12 @@ qx.Class.define("ankamon.ui.Shell", {
       // retap: ağaçta zaten seçili düğüme yeniden tıklamak sayfayı yeniler (sayfada "Yenile" düğmesi yok).
       { id: "dashboard", label: "Genel bakış", feature: "dashboard", retap: true, create: u => new ankamon.page.Dashboard(u) },
       // Cihazlar (kullanıcı isteği 2026-11-06): altında "Liste" (bu sayfa — liste/ekran seçimi sayfanın içinde, bkz.
-      // page.Boards), Sensörler ve eklenti sekmeleri (Ahenk; "diagnose" sayfasının sekmeleri, inline). selfLeaf: sayfanın
+      // page.Devices), Sensörler ve eklenti sekmeleri (Ahenk; "diagnose" sayfasının sekmeleri, inline). selfLeaf: sayfanın
       // kendisi ağaçta ilk alt seçenek olarak da durur; Cihazlar'a tıklamak onu seçer (varsayılan seçenek).
-      // "Cihazlar" → "Bilgisayarlar" → "Ağ" (kullanıcı isteği 2026-11-09; kimlik "boards" kalır). Ağ envanteri sayfası
+      // "Cihazlar" → "Bilgisayarlar" → "Ağ" (kullanıcı isteği 2026-11-09; kimlik "devices" kalır). Ağ envanteri sayfası
       // ("network") onun altında "Ağ" alt menüsü.
       // Ağ ▸ Liste (ağ envanteri, "network") + Ağ ▸ Akıllı Tahtalar (bu sayfa; eski adı "Liste") — kullanıcı isteği 2026-11-09.
-      { id: "boards", label: "Ağ", feature: "boards", selfLeaf: "Akıllı Tahtalar", create: u => new ankamon.page.Boards(u) },
+      { id: "devices", label: "Ağ", feature: "devices", selfLeaf: "Akıllı Tahtalar", create: u => new ankamon.page.Devices(u) },
       // parent: ağaçta o sayfanın düğümünün ALTINDA. Üst sayfa kullanıcıya kapalıysa kökte gösterilir — bkz. __createTree.
       // collapsed: kökte olsa da katlı başlar (uzun sekme listesi menüyü doldurmasın — bkz. __rememberOpen).
       // Sekmeleri ağaçta da (kullanıcı isteği: zaman çizelgesi sol menüden açılsın). key: Oturumlar sekmesinde
@@ -215,7 +215,7 @@ qx.Class.define("ankamon.ui.Shell", {
       // Simgesiz (kullanıcı isteği 2026-11-10: noIcon). "Ders arası sıralaması" → "Teneffüsler"; sayfadaki "Kullanıcılar /
       // Cihazlar" seçimi kalktı, her sıralamanın altında Kullanıcılar ve Bilgisayarlar yaprağı (group — bkz. __buildNode).
       // Akıllı Tahtalar'ın altında (kullanıcı isteği 2026-11-10: underSelf — üst düğümün kendi seçeneğinin altında).
-      { id: "leagues", label: "Ligler", feature: "logs", parent: "boards", underSelf: true, collapsed: true, noIcon: true, create: u => new ankamon.page.Leagues(u),
+      { id: "leagues", label: "Ligler", feature: "logs", parent: "devices", underSelf: true, collapsed: true, noIcon: true, create: u => new ankamon.page.Leagues(u),
         tabs: () => ankamon.page.Leagues.TABS.map(tab => ({ key: tab.key, label: tab.label, group: tab.group })) },
       // Sağlık: sorun tespiti (SSH denetimi) ile anomaliler (sürekli izleme) tek bölümde — bkz. page.Anomalies,
       // ui.health.Status. Kimlik "anomalies" kalır (nav_order, hatırlanan sekme); features: ikisinden biri yeterli, sekme
@@ -238,7 +238,7 @@ qx.Class.define("ankamon.ui.Shell", {
       // eklentiler sonra: liste sabit kalır).
       // Bakım ana menüsü kalktı (kullanıcı isteği 2026-11-06): sekmeleri (Sensörler, Ahenk…) inline — kendi düğümü olmadan
       // doğrudan Cihazlar'ın altında. Cihazlar kullanıcıya kapalıysa kökte kendi düğümüyle ("Sensörler") durur.
-      { id: "diagnose", label: "Sensörler", parent: "boards", inline: true, features: ["metrics", "diagnose"], collapsed: true,
+      { id: "diagnose", label: "Sensörler", parent: "devices", inline: true, features: ["metrics", "diagnose"], collapsed: true,
         create: u => new ankamon.page.Maintenance(u),
         // Eklenti sekmeleri (Ahenk) Akıllı Tahtalar'ın altında (underSelf — kullanıcı isteği 2026-11-10); Sensörler Ağ'ın altında.
         tabs: () => [{ key: "metrics", label: "Sensörler", feature: "metrics" }]
@@ -247,15 +247,15 @@ qx.Class.define("ankamon.ui.Shell", {
       { id: "logs", label: "Loglar", feature: "logs", parent: "system", collapsed: true, noIcon: true, create: u => new ankamon.page.Logs(u),
         tabs: () => ankamon.ui.Shell.LOG_KINDS.map(kind => ({ key: kind.mode, label: kind.label })) },
       // Ağ envanteri: bütün ağların cihazları tek listede (kullanıcı isteği 2026-11-09: ağ başına alt düğüm yok; ağ
-      // işlemleri sayfadaki "Ağlar" düğmesinde — bkz. page.Network). Üst menü "Ağ"ın (boards) altında (kullanıcı isteği
+      // işlemleri sayfadaki "Ağlar" düğmesinde — bkz. page.Network). Üst menü "Ağ"ın (devices) altında (kullanıcı isteği
       // 2026-11-09); o kullanıcıya kapalıysa kökte.
       // Ağ ▸ Varlıklar (kullanıcı isteği 2026-11-10: eski "Ağ ▸ Liste", simgesiz); first: üst düğümün kendi seçeneğinden
-      // (Akıllı Tahtalar) önce. Akıllı Tahtalar listesi buradaki "Akıllı tahta" türlü satırlardan belirlenir (bkz. BoardsApi LISTED).
+      // (Akıllı Tahtalar) önce. Akıllı Tahtalar listesi buradaki "Akıllı tahta" türlü satırlardan belirlenir (bkz. DevicesApi LISTED).
       // Ağ ▸ Varlıklar = bütün varlıklar (kullanıcı isteği 2026-11-10: "Varlıklar ▸ Tüm Varlıklar" alt düğümü kalktı). Kullanıcının
       // varlık grupları Ağ'ın DOĞRUDAN altında (bkz. __syncAssetGroups); grup seçilince AYNI sayfa o grubun üyelerine süzülür
       // (page.Network setGroup — kendi taraması yok, Varlıklar'dan türer). Ağ'ın alt seçeneklerinin sırası sürükle-bırakla
       // değişir (bkz. __makeChildReorderable).
-      { id: "network", label: "Varlıklar", feature: "network", parent: "boards", first: true, noIcon: true,
+      { id: "network", label: "Varlıklar", feature: "network", parent: "devices", first: true, noIcon: true,
         create: u => new ankamon.page.Network(u) },
       // Ankamon'un kendi bakımı (servisler, zamanlanmış işler, veritabanı, yapılandırma) — yalnız yönetici.
       { id: "system", label: "Sistem", admin: true, retap: true, create: u => new ankamon.page.System(u) },
@@ -285,14 +285,14 @@ qx.Class.define("ankamon.ui.Shell", {
       { label: "Komut logları", mode: "command" }
     ],
 
-    // Boards grid'inin satır menüsü ve Genel bakış'ın hata/görev satırları, Loglar sayfasını bir cihaza
-    // süzülmüş açmak için bu mesajı yayınlar (payload: board id ya da {boardId, severity}) — bkz.
-    // construct()'taki subscribe ve __openLogsForBoard.
+    // Devices grid'inin satır menüsü ve Genel bakış'ın hata/görev satırları, Loglar sayfasını bir cihaza
+    // süzülmüş açmak için bu mesajı yayınlar (payload: device id ya da {deviceId, severity}) — bkz.
+    // construct()'taki subscribe ve __openLogsForDevice.
     OPEN_LOGS: "ankamon.openLogs",
     // StatusBar'ın sağ menüsü, Loglar sayfasını cihaz süzgeci olmadan belirli bir modda açmak için
     // bu mesajı yayınlar (payload: "system"|"command") — bkz. __openLogsMode.
     OPEN_LOGS_MODE: "ankamon.openLogsMode",
-    // {page: "boards"|"metrics"|"system", ...} sayfayı açar, kalan alanları sayfanın openWith()'ine
+    // {page: "devices"|"metrics"|"system", ...} sayfayı açar, kalan alanları sayfanın openWith()'ine
     // verir; {diskUsage: "metrics"|"queue"|"backups"|…} ise Disk kullanımı sayfasını o sekmede açar.
     OPEN_PAGE: "ankamon.openPage"
   },
@@ -400,7 +400,7 @@ qx.Class.define("ankamon.ui.Shell", {
       });
       // Sıralanabilen YALNIZ Ağ'ın alt seçenekleri (kullanıcı isteği 2026-11-10): ana düğümler ve diğer alt menüler sabit.
       // Varlıklar her zaman en üstte, taşınamaz (bkz. __pinnedChild). Kayıtlı sıra uygulanır.
-      this.__nodes.filter(n => n instanceof qx.ui.tree.TreeFolder && n.getUserData("page").id === "boards").forEach(n => {
+      this.__nodes.filter(n => n instanceof qx.ui.tree.TreeFolder && n.getUserData("page").id === "devices").forEach(n => {
         n.getChildren().forEach(child => this.__makeChildReorderable(child));
         this.__applyChildOrder(n);
       });
@@ -854,6 +854,9 @@ qx.Class.define("ankamon.ui.Shell", {
 
     /** Bkz. OPEN_PAGE. Ağaçtaki vurgu da açılan sayfaya taşınır (sessizce — çift yenileme olmasın). */
     __openPage(data) {
+      if (data.page === "boards") {
+        data = { ...data, page: "devices" }; // eski sayfa kimliği (terim geçişi 2026-11-12) — eklentiler, saklı son sayfa
+      }
       if (data.diskUsage) {
         data = { page: "diskusage", tab: data.diskUsage }; // Disk kullanımı sayfası, o sekmede
       }
@@ -984,13 +987,13 @@ qx.Class.define("ankamon.ui.Shell", {
 
     /**
      * Bkz. OPEN_LOGS: Sistem logları moduna alır ve verilen cihaza süzer.
-     * @param data {Number|Map} cihaz kimliği ya da {boardId, severity} (ör. Genel bakış'tan "3" = hatalar)
+     * @param data {Number|Map} cihaz kimliği ya da {deviceId, severity} (ör. Genel bakış'tan "3" = hatalar)
      */
-    __openLogsForBoard(data) {
-      const opts = typeof data === "object" && data !== null ? data : { boardId: data };
+    __openLogsForDevice(data) {
+      const opts = typeof data === "object" && data !== null ? data : { deviceId: data };
       const widget = this.__openLogsPage("system");
-      if (widget && widget.setBoardFilter) {
-        widget.setBoardFilter(opts.boardId, opts.severity);
+      if (widget && widget.setDeviceFilter) {
+        widget.setDeviceFilter(opts.deviceId, opts.severity);
       }
     },
 

@@ -111,9 +111,9 @@ qx.Class.define("ankamon.ui.DiskUsage", {
             n: data.total.n, first: data.total.first, last: data.total.last, bytes: data.total.bytes, estimated: false
           }];
           if (data.unmatched) {
-            rows.push({ scope: { board: "unmatched" }, name: "— Cihazsız / eşleşmeyen —", ...data.unmatched, bytes: data.unmatched.est_bytes, estimated: true });
+            rows.push({ scope: { device: "unmatched" }, name: "— Cihazsız / eşleşmeyen —", ...data.unmatched, bytes: data.unmatched.est_bytes, estimated: true });
           }
-          data.boards.forEach(b => rows.push({ scope: { board: b.board_id }, ...b, bytes: b.est_bytes, estimated: true }));
+          data.devices.forEach(b => rows.push({ scope: { device: b.device_id }, ...b, bytes: b.est_bytes, estimated: true }));
           rows.forEach(r => {
             r.deletable = true;
             r.cells = [r.name, r.n, F.dateTime(r.first), F.dateTime(r.last), this.__size(r.bytes, r.estimated)];
@@ -146,9 +146,9 @@ qx.Class.define("ankamon.ui.DiskUsage", {
           const data = await ankamon.io.Api.get("/storage/metrics");
           const rows = [{ all: true, scope: {}, ...data.total, name: "— Tüm cihazlar —", bytes: data.total.bytes, estimated: false }];
           if (data.unmatched) {
-            rows.push({ scope: { board: "unmatched" }, ...data.unmatched, name: "— Cihazsız / eşleşmeyen —", bytes: data.unmatched.est_bytes, estimated: true });
+            rows.push({ scope: { device: "unmatched" }, ...data.unmatched, name: "— Cihazsız / eşleşmeyen —", bytes: data.unmatched.est_bytes, estimated: true });
           }
-          data.boards.forEach(b => rows.push({ scope: { board: b.board_id }, ...b, bytes: b.est_bytes, estimated: true }));
+          data.devices.forEach(b => rows.push({ scope: { device: b.device_id }, ...b, bytes: b.est_bytes, estimated: true }));
           rows.forEach(r => {
             r.records = r.n;
             r.n = r.records + r.agg; // onay metni ve silinebilirlik için toplam satır
@@ -177,7 +177,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
         load: async () => {
           const data = await ankamon.io.Api.get("/storage/screenshots");
           const rows = [{ all: true, scope: { all: "1" }, ...data.total, name: "— Tüm cihazlar —" }];
-          data.boards.forEach(b => rows.push({ scope: { name: b.name }, ...b }));
+          data.devices.forEach(b => rows.push({ scope: { name: b.name }, ...b }));
           rows.forEach(r => {
             r.deletable = true;
             r.estimated = false;
@@ -201,7 +201,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
         load: async () => {
           const data = await ankamon.io.Api.get(url);
           const rows = [{ all: true, scope: { all: "1" }, ...data.total, name: "— Tümü —", estimated: false }];
-          data.boards.forEach(b => rows.push({ scope: { name: b.name }, ...b, bytes: b.est_bytes, estimated: true }));
+          data.devices.forEach(b => rows.push({ scope: { name: b.name }, ...b, bytes: b.est_bytes, estimated: true }));
           rows.forEach(r => {
             r.deletable = true;
             r.n = Number(r.n);
@@ -223,7 +223,7 @@ qx.Class.define("ankamon.ui.DiskUsage", {
         load: async () => {
           const data = await ankamon.io.Api.get("/storage/chat");
           const rows = [{ all: true, scope: { all: "1" }, ...data.total, name: "— Tüm cihazlar —", estimated: false }];
-          data.boards.forEach(b => rows.push({ scope: { name: b.name }, ...b, bytes: b.est_bytes, estimated: true }));
+          data.devices.forEach(b => rows.push({ scope: { name: b.name }, ...b, bytes: b.est_bytes, estimated: true }));
           rows.forEach(r => {
             r.deletable = true;
             r.n = Number(r.n);

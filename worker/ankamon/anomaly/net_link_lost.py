@@ -68,10 +68,10 @@ SELECT host, from_ip, min(received_at) AS delivered, min(device_time) AS first_d
 FROM g GROUP BY host, from_ip, grp ORDER BY host, from_ip, min(received_at)
 """
 
-_BOARDS = """
+_DEVICES = """
 SELECT id, lower(hostname) AS host, host(ip) AS ip, monitor_enabled,
        COALESCE(NULLIF(label, ''), hostname, host(ip)) AS name
-FROM boards WHERE hostname IS NOT NULL AND hostname <> '' AND ip IS NOT NULL
+FROM devices WHERE hostname IS NOT NULL AND hostname <> '' AND ip IS NOT NULL
 """
 
 # Kopukluktan önce zamanında gelen son log (yoksa cihaz Ankamon'a yeni yönlendirilmiştir: ilk temas, kopukluk değil).
@@ -97,14 +97,14 @@ WHERE host = %(host)s AND from_ip = %(ip)s AND program = 'rsyslogd' AND message 
 _SCRAPED = """
 SELECT count(DISTINCT date_trunc('minute', m.time)) AS n
 FROM metrics m JOIN metrics_tag t USING (tag_id)
-WHERE t.board_id = %(board)s AND t.name = 'node_boot_time_seconds' AND m.time BETWEEN %(s)s AND %(e)s
+WHERE t.device_id = %(device)s AND t.name = 'node_boot_time_seconds' AND m.time BETWEEN %(s)s AND %(e)s
 """
 
 # Sunucu o aralıkta başka cihazlardan log ya da sensör verisi alıyordu (sunucu ya da bütün ağ kapalı değildi).
 _OTHERS = """
 SELECT (SELECT count(DISTINCT host) FROM logs WHERE received_at BETWEEN %(s)s AND %(e)s AND host <> %(host)s)
-     + (SELECT count(DISTINCT t.board_id) FROM metrics m JOIN metrics_tag t USING (tag_id)
-        WHERE t.name = 'node_boot_time_seconds' AND m.time BETWEEN %(s)s AND %(e)s AND t.board_id <> %(board)s) AS n
+     + (SELECT count(DISTINCT t.device_id) FROM metrics m JOIN metrics_tag t USING (tag_id)
+        WHERE t.name = 'node_boot_time_seconds' AND m.time BETWEEN %(s)s AND %(e)s AND t.device_id <> %(device)s) AS n
 """
 
 _CARRIER = """
@@ -137,19 +137,19 @@ WHERE host = %(host)s AND from_ip = %(ip)s AND program = 'rsyslogd' AND device_t
 
 def _candidates(conn, since, delayed: bool):
     """Kuyruk boşaltmaları → kayıtlar. delayed=False: cihaza ulaşılamadı (ağ koptu); True: ulaşılabiliyordu (log yolu)."""
-    boards = {}
-    for r in conn.execute(_BOARDS).fetchall():
-        boards[(r["host"], r["ip"])] = r
+    devices = {}
+    for r in conn.execute(_DEVICES).fetchall():
+        devices[(r["host"], r["ip"])] = r
     found, scopes, seen = [], [], set()
     previous = None
     for b in conn.execute(_BURSTS, {"since": since, "late": LATE, "gap": FLUSH_GAP}).fetchall():
-        board = boards.get(((b["host"] or "").lower(), b["from_ip"]))
-        if not board:
+        device = devices.get(((b["host"] or "").lower(), b["from_ip"]))
+        if not device:
             continue   # kayıtsız ad ya da kalıbın adını taşıyan başka cihaz
-        key = (board["host"], b["from_ip"])
+        key = (device["host"], b["from_ip"])
         if key not in seen:
             seen.add(key)
-            scopes.append((board["host"], since, b["delivered"]))
+            scopes.append((device["host"], since, b["delivered"]))
         args = {"host": b["host"], "ip": b["from_ip"], "delivered": b["delivered"], "first": b["first_dev"]}
         last_ok = conn.execute(_LAST_OK, args).fetchone()["at"]
         # İlk temas ya da eski kuyruğun, bağlantı çalışırken yeniden gönderimi kopukluk değildir.
@@ -168,19 +168,19 @@ def _candidates(conn, since, delayed: bool):
             previous["record"]["detail"]["queued"] += b["n"]
             continue
         window = {"s": start, "e": end}
-        if not board["monitor_enabled"]:
+        if not device["monitor_enabled"]:
             if delayed:
                 continue   # sensör verisi yok: cihaza ulaşılabildiği bilinemez
             reachable = False
         else:
-            scraped = conn.execute(_SCRAPED, {**window, "board": str(board["id"])}).fetchone()["n"]
+            scraped = conn.execute(_SCRAPED, {**window, "device": str(device["id"])}).fetchone()["n"]
             ratio = scraped / _minutes(end - start)
             if delayed and ratio < DELAY_SCRAPED_MIN:
                 continue
             reachable = ratio > SCRAPED_MAX
         if not delayed and reachable:
             continue       # Ankamon cihaza ulaşabiliyordu: gecikme log yolunda (log_delayed), ağ bağlantısında değil
-        if conn.execute(_OTHERS, {**window, "host": b["host"], "board": str(board["id"])}).fetchone()["n"] == 0:
+        if conn.execute(_OTHERS, {**window, "host": b["host"], "device": str(device["id"])}).fetchone()["n"] == 0:
             continue       # hiçbir cihazın logu zamanında gelmedi: sorun sunucuda ya da bütün ağda
         common = {"queued": b["n"], "last_ok": last_ok, "delivered": b["delivered"], "rebooted": bool(boot)}
         if delayed:
@@ -200,7 +200,7 @@ def _candidates(conn, since, delayed: bool):
                      + (" · arada cihaz yeniden açıldı" if boot else ""))
             detail = dict(common, text=text, cable=cable,
                           carrier=[f"{c['device_time']:%H:%M:%S} {c['message'][:120]}" for c in carrier[:4]])
-        record = {"host": board["host"], "board_id": board["id"], "board_name": board["name"],
+        record = {"host": device["host"], "device_id": device["id"], "device_name": device["name"],
                   "started_at": start, "ended_at": end, "detail": detail}
         found.append(record)
         previous = {"key": key, "end": end, "record": record}

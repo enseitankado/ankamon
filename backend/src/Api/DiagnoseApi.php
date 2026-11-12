@@ -57,7 +57,7 @@ final class DiagnoseApi
                     -- Küçük taramalarda (otomatik tarama çoğu kez 1-2 cihazlık) seçicide cihaz adları da yazılsın.
                     (SELECT string_agg(COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)), ', ')
                        FROM (SELECT * FROM job_targets t WHERE t.job_id = j.id LIMIT 4) t
-                       JOIN boards b ON b.id = t.board_id) AS names
+                       JOIN devices b ON b.id = t.device_id) AS names
              FROM jobs j LEFT JOIN users u ON u.id = j.created_by
              WHERE j.type = 'diagnose' ORDER BY j.id DESC LIMIT 400"
         );
@@ -106,18 +106,18 @@ final class DiagnoseApi
     public function latest(): array
     {
         $targets = Db::all(
-            "SELECT DISTINCT ON (t.board_id) t.board_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS board,
+            "SELECT DISTINCT ON (t.device_id) t.device_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS device,
                     host(b.ip) AS ip, t.status, t.output, extract(epoch FROM t.finished_at)::bigint AS finished_at,
                     j.id AS run_id, COALESCE((j.params->>'auto')::boolean, false) AS run_auto, u.username AS run_by
              FROM job_targets t
              JOIN jobs j ON j.id = t.job_id AND j.type = 'diagnose'
-             JOIN boards b ON b.id = t.board_id
+             JOIN devices b ON b.id = t.device_id
              LEFT JOIN users u ON u.id = j.created_by
              WHERE t.status NOT IN ('queued', 'running')
-             ORDER BY t.board_id, t.finished_at DESC NULLS LAST, j.id DESC"
+             ORDER BY t.device_id, t.finished_at DESC NULLS LAST, j.id DESC"
         );
         return ['job' => ['id' => 'latest', 'status' => 'done', 'latest' => true, 'auto' => false, 'created_by' => null,
-            'targets' => $targets, 'boards' => (int) Db::value('SELECT count(*) FROM boards')]];
+            'targets' => $targets, 'devices' => (int) Db::value('SELECT count(*) FROM devices')]];
     }
 
     public function show(Request $request): array
@@ -132,10 +132,10 @@ final class DiagnoseApi
         unset($job['params']);
         $job['auto'] = !empty($params['auto']);
         $job['targets'] = Db::all(
-            "SELECT t.board_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS board, host(b.ip) AS ip,
+            "SELECT t.device_id, COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS device, host(b.ip) AS ip,
                     t.status, t.output, extract(epoch FROM t.finished_at)::bigint AS finished_at
-             FROM job_targets t JOIN boards b ON b.id = t.board_id
-             WHERE t.job_id = ? ORDER BY board",
+             FROM job_targets t JOIN devices b ON b.id = t.device_id
+             WHERE t.job_id = ? ORDER BY device",
             [$job['id']]
         );
         return ['job' => $job];
@@ -150,8 +150,8 @@ final class DiagnoseApi
         $days = self::intervalDays();
         $rows = Db::all(
             "SELECT b.id, extract(epoch FROM max(j.created_at))::bigint AS last
-             FROM boards b
-             LEFT JOIN job_targets t ON t.board_id = b.id AND t.status = 'ok'
+             FROM devices b
+             LEFT JOIN job_targets t ON t.device_id = b.id AND t.status = 'ok'
              LEFT JOIN jobs j ON j.id = t.job_id AND j.type = 'diagnose'
              GROUP BY b.id"
         );
@@ -159,21 +159,21 @@ final class DiagnoseApi
         // Son denemesi başarısız olan cihazlar (bağlanılamadı, parola reddedildi…): zamanlayıcı bunları
         // DIAGNOSE_RETRY_HOURS'ta bir yeniden dener (bkz. worker diagnose_schedule RETRY_SECONDS).
         $failing = Db::all(
-            "SELECT board FROM (
-                SELECT DISTINCT ON (t.board_id) COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS board, t.status
-                FROM job_targets t JOIN jobs j ON j.id = t.job_id AND j.type = 'diagnose' JOIN boards b ON b.id = t.board_id
+            "SELECT device FROM (
+                SELECT DISTINCT ON (t.device_id) COALESCE(NULLIF(b.label, ''), b.hostname, host(b.ip)) AS device, t.status
+                FROM job_targets t JOIN jobs j ON j.id = t.job_id AND j.type = 'diagnose' JOIN devices b ON b.id = t.device_id
                 WHERE t.status NOT IN ('queued', 'running')
-                ORDER BY t.board_id, t.finished_at DESC NULLS LAST, j.id DESC) x
-             WHERE status <> 'ok' ORDER BY board"
+                ORDER BY t.device_id, t.finished_at DESC NULLS LAST, j.id DESC) x
+             WHERE status <> 'ok' ORDER BY device"
         );
         $never = count(array_filter($lasts, fn($l) => $l === null));
         $known = array_filter($lasts, fn($l) => $l !== null);
         return [
             'interval_days' => $days,
             'interval_default' => self::envIntervalDays(),
-            'boards' => count($rows),
+            'devices' => count($rows),
             'retry_hours' => (float) (getenv('DIAGNOSE_RETRY_HOURS') ?: 6),
-            'failing' => array_column($failing, 'board'),
+            'failing' => array_column($failing, 'device'),
             'never_scanned' => $never,
             // En eski denetimli cihazın "uygun an aranır" ve "en geç" zamanları.
             'next_from' => $known ? (int) (min($known) + $days * 86400 * 0.85) : null,

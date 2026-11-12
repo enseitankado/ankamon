@@ -7,7 +7,7 @@ webssh yazı boyutunu yalnız açılışta URL'den (?fontsize=) alır; sonradan 
 yüklemeyi (= SSH oturumunu koparmayı) gerektirirdi. Bu yama `wssh.set_fontsize(px)` ekler: xterm'in
 fontSize seçeneğini değiştirir, önbellekteki hücre ölçüsünü sıfırlar ve pencereye sığan yeni satır/
 sütun sayısını sunucuya bildirir (oturum sürer). Ankamon'un web terminal penceresindeki A−/A+
-düğmeleri bunu çağırır (bkz. frontend ui/BoardOps.js __terminalWindow).
+düğmeleri bunu çağırır (bkz. frontend ui/DeviceOps.js __terminalWindow).
 """
 
 import pathlib

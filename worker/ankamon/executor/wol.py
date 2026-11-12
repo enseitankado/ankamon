@@ -65,7 +65,7 @@ def _targets(ip: str | None) -> list[tuple[str | None, str]]:
 def wake(mac: str, ip: str | None) -> tuple[bool, str]:
     """Verilen MAC'e sihirli paket gönderir. (başarı, ileti) döner.
 
-    mac her zaman KABLOLU kartın MAC'idir (boards.mac); kablosuz MAC (boards.wifi_mac, göç 043) kullanılmaz:
+    mac her zaman KABLOLU kartın MAC'idir (devices.mac); kablosuz MAC (devices.wifi_mac, göç 043) kullanılmaz:
     kapalı cihazda Wi-Fi kartı ağa bağlı değildir, Wi-Fi WoL cihazlarda genelde desteklenmez."""
     if not mac:
         return False, "Bu cihazın kablolu MAC adresi kayıtlı değil; uyandırma gönderilemez."

@@ -45,13 +45,13 @@
  * Acil, Dikkat, Bilgi'de liste her zaman — kullanıcı isteği, eski "Cihaz" seçicisinin yerine). Altta seçili cihazın
  * bulguları ve önerileri (cihaz seçilmeden boş, başlık satırı yok); ayırıcı Durum'daki gibi kalın. Düzeye göre süzme
  * grid'in Genel durum / Acil / Dikkat / Bilgi sütunlarında (üstteki eski "Göster" kutuları kalktı — kullanıcı isteği). Hepsi sunucuya gitmeden son rapor verisinden yeniden çizilir (bkz. __render / __apply).
- * Durum'daki SSH bulgusuna çift tık → showBoard(): "Son durum" + grid o cihaza süzülür.
+ * Durum'daki SSH bulgusuna çift tık → showDevice(): "Son durum" + grid o cihaza süzülür.
  */
 qx.Class.define("ankamon.page.Diagnose", {
   extend: ankamon.page.Base,
 
   events: {
-    /** Rapor yüklendi/değişti (veri: görev — {targets: [{board_id, board, ip, status, output …}], latest, …}). */
+    /** Rapor yüklendi/değişti (veri: görev — {targets: [{device_id, device, ip, status, output …}], latest, …}). */
     reportLoaded: "qx.event.type.Data"
   },
 
@@ -99,7 +99,7 @@ qx.Class.define("ankamon.page.Diagnose", {
 
     // Sayı sütunları (Acil/Dikkat/Bilgi) da hazır listeli: "kaç acil bulgusu olan cihazlar" seçilebilsin.
     this.__columns = [
-      { id: "board", label: "Cihaz", width: 180, choices: true },
+      { id: "device", label: "Cihaz", width: 180, choices: true },
       { id: "ip", label: "IP", width: 120, choices: false },
       { id: "state", label: "Genel durum", width: 130, choices: true },
       { id: "bad", label: "Acil", width: 75, choices: true },
@@ -153,7 +153,7 @@ qx.Class.define("ankamon.page.Diagnose", {
     },
     ORDER: ["bad", "warn", "info", "ok"],
     /** Tablo modeli sütunları (0 = cihaz anahtarı); ts ve rank görünmeyen sıralama değerleri. */
-    COL: { board: 1, ip: 2, state: 3, bad: 4, warn: 5, info: 6, top: 7, at: 8, by: 9, ts: 10, rank: 11 }
+    COL: { device: 1, ip: 2, state: 3, bad: 4, warn: 5, info: 6, top: 7, at: 8, by: 9, ts: 10, rank: 11 }
   },
 
   members: {
@@ -176,7 +176,7 @@ qx.Class.define("ankamon.page.Diagnose", {
     },
     __filters: null,
     __allRows: null,
-    __pendingBoard: null,
+    __pendingDevice: null,
     __selKey: null,
     __restoring: false,
     __runBox: null,
@@ -293,7 +293,7 @@ qx.Class.define("ankamon.page.Diagnose", {
         return "Henüz tarama yapılmadı.";
       }
       if (j.latest) {
-        return `<span style="opacity:.8">${j.targets.length} / ${j.boards} cihazın en son denetimi — ` +
+        return `<span style="opacity:.8">${j.targets.length} / ${j.devices} cihazın en son denetimi — ` +
           "tarihi her satırın sağında</span>";
       }
       return j.auto ? "Otomatik tarama (yalnız denetim zamanı gelen cihazlar)"
@@ -336,15 +336,15 @@ qx.Class.define("ankamon.page.Diagnose", {
      * Durum'daki SSH bulgusundan gelince: "Son durum" raporu (Durum her cihazın en son denetimini gösterir) ve grid o
      * cihaza süzülür; satır gelince seçilir (bulguları altta açılsın).
      */
-    showBoard(name) {
-      this.__pendingBoard = name;
+    showDevice(name) {
+      this.__pendingDevice = name;
       const latest = this.__runBox.getChildren().find(it => it.getModel() === "latest");
       if (latest && this.__jobId !== "latest") {
         this.__runBox.setSelection([latest]);
       } else {
         this.__jobId = "latest";
       }
-      this.__filters.board.setValue(`"${name}"`);
+      this.__filters.device.setValue(`"${name}"`);
       this.__apply();
     },
 
@@ -384,7 +384,7 @@ qx.Class.define("ankamon.page.Diagnose", {
       this.__targets = new Map();
       const rows = [];
       targets.forEach(t => {
-        const key = String(t.board_id ?? t.board);
+        const key = String(t.device_id ?? t.device);
         const r = this.__parse(t);
         const pending = jobRunning && ["queued", "running"].includes(t.status);
         const halted = !jobRunning && ["queued", "running"].includes(t.status);
@@ -411,10 +411,10 @@ qx.Class.define("ankamon.page.Diagnose", {
         const by = this.__job && this.__job.latest ? (t.run_auto ? "otomatik" : "elle: " + (t.run_by || "—"))
           : (this.__job.auto ? "otomatik" : "elle: " + (this.__job.created_by || "—"));
         this.__targets.set(key, t);
-        rows.push([key, t.board, t.ip || "", state, ...counts, top, ts ? F.dateTime(ts * 1000) : "", by, ts, rank]);
+        rows.push([key, t.device, t.ip || "", state, ...counts, top, ts ? F.dateTime(ts * 1000) : "", by, ts, rank]);
       });
       const C = ankamon.page.Diagnose.COL;
-      rows.sort((x, y) => x[C.rank] - y[C.rank] || String(x[C.board]).localeCompare(String(y[C.board]), "tr", { numeric: true }));
+      rows.sort((x, y) => x[C.rank] - y[C.rank] || String(x[C.device]).localeCompare(String(y[C.device]), "tr", { numeric: true }));
       this.__allRows = rows;
       this.__apply();
       this.fireDataEvent("reportLoaded", this.__job || null);
@@ -428,7 +428,7 @@ qx.Class.define("ankamon.page.Diagnose", {
         return;
       }
       const B = ankamon.page.Base;
-      const selected = this.__pendingBoard === null ? this.__selKey : null;
+      const selected = this.__pendingDevice === null ? this.__selKey : null;
       const filters = this.__columns.map((c, i) => ({ i: i + 1, text: (this.__filters[c.id].getValue() || "").trim() }))
         .filter(f => f.text);
       const shown = this.__allRows.filter(cells => filters.every(f => B.filterMatch(cells[f.i], f.text)));
@@ -437,14 +437,14 @@ qx.Class.define("ankamon.page.Diagnose", {
       let index = -1;
       for (let row = 0; row < tm.getRowCount(); row++) {
         const data = tm.getRowData(row);
-        if (this.__pendingBoard !== null ? data[1] === this.__pendingBoard : data[0] === selected) {
+        if (this.__pendingDevice !== null ? data[1] === this.__pendingDevice : data[0] === selected) {
           index = row;
           break;
         }
       }
       // Bekleyen cihaz "Son durum" geldiğinde bulunduysa ya da o raporda hiç yoksa bırakılır.
-      if (this.__pendingBoard !== null && (index >= 0 || (this.__job && this.__job.latest))) {
-        this.__pendingBoard = null;
+      if (this.__pendingDevice !== null && (index >= 0 || (this.__job && this.__job.latest))) {
+        this.__pendingDevice = null;
       }
       const sm = this.__table.getSelectionModel();
       if (index >= 0) {
@@ -512,11 +512,11 @@ qx.Class.define("ankamon.page.Diagnose", {
         if (!t) {
           return;
         }
-        const boardCell = many ? `<td style="${td};font-weight:600;white-space:nowrap">${esc(t.board)}</td>` : "";
+        const deviceCell = many ? `<td style="${td};font-weight:600;white-space:nowrap">${esc(t.device)}</td>` : "";
         if (!this.__parse(t)) {
           if (!["queued", "running"].includes(t.status)) {
             any = true;
-            h += `<tr>${boardCell}<td style="${td}">${badge("bad")}</td><td style="${td}">Bağlantı</td>` +
+            h += `<tr>${deviceCell}<td style="${td}">${badge("bad")}</td><td style="${td}">Bağlantı</td>` +
               `<td style="${td}" colspan="2">${esc(t.output || "Denetlenemedi")}</td></tr>`;
           }
           return;
@@ -526,7 +526,7 @@ qx.Class.define("ankamon.page.Diagnose", {
           any = true;
           const group = c.group !== lastGroup ? `<div style="opacity:.65;font-size:12px">${esc(c.group)}</div>` : "";
           lastGroup = c.group;
-          h += `<tr>${boardCell}<td style="${td}">${badge(c.level)}</td><td style="${td}">${group}${esc(c.title)}</td>` +
+          h += `<tr>${deviceCell}<td style="${td}">${badge(c.level)}</td><td style="${td}">${group}${esc(c.title)}</td>` +
             `<td style="${td}">${esc(c.detail)}</td><td style="${td}">${esc(c.advice || "")}</td></tr>`;
         });
       });

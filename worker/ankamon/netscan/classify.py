@@ -38,7 +38,7 @@ from __future__ import annotations
 # Arayüzdeki "Varlık türü" seçim listesiyle aynı adlar (bkz. frontend page/Network.js TYPES).
 PC = "Bilgisayar"
 SERVER = "Sunucu"
-BOARD = "Akıllı tahta"
+DEVICE = "Akıllı tahta"
 PRINTER = "Yazıcı"
 CAMERA = "IP kamera"
 NETWORK = "Ağ cihazı"
@@ -59,7 +59,7 @@ _VENDOR_RULES: list[tuple[tuple[str, ...], str]] = [
     (("hikvision", "dahua", "axis communications", "uniview", "zhejiang uniview", "reolink", "hanwha",
       "vivotek", "mobotix", "provision-isr", "foscam", "amcrest", "ezviz"), CAMERA),
     (("ubiquiti", "ruckus", "aruba", "cambium", "engenius", "meraki", "aerohive", "extreme networks"), AP),
-    (("cisco", "juniper", "mikrotik", "routerboard", "tp-link", "netgear", "d-link", "zyxel", "fortinet",
+    (("cisco", "juniper", "mikrotik", "routerdevice", "tp-link", "netgear", "d-link", "zyxel", "fortinet",
       "sophos", "h3c", "ruijie", "allied telesis", "hewlett packard enterprise", "huawei technologies",
       "edgecore", "dell emc networking", "netis", "tenda", "airties", "keenetic", "draytek", "palo alto",
       "checkpoint", "watchguard", "brocade", "arista"), NETWORK),
@@ -69,7 +69,7 @@ _VENDOR_RULES: list[tuple[tuple[str, ...], str]] = [
       "huawei device", "nokia", "zte", "tecno", "infinix", "general mobile", "google"), PHONE),
     # MEB okullarındaki ETAP akıllı tahtaların ana kartı Vestel (00:09:df…) — Ankamon'a henüz
     # kaydolmamış (log göndermeyen) cihazlar da böyle tanınır.
-    (("vestel",), BOARD),
+    (("vestel",), DEVICE),
     (("arcelik", "arçelik", "lg electronics", "sony", "tcl", "hisense", "philips", "roku",
       "amazon technologies", "chromecast"), TV),
     (("raspberry pi",), "Raspberry Pi"),
@@ -101,17 +101,17 @@ _CAMERA_PORTS = {554, 8554, 37777, 34567}
 _WINDOWS_PORTS = {135, 139, 445, 3389}
 
 
-def guess_type(*, vendor: str, mac_random: bool, is_board: bool, is_gateway: bool, is_self: bool,
+def guess_type(*, vendor: str, mac_random: bool, is_device: bool, is_gateway: bool, is_self: bool,
                scan: dict | None) -> str:
     if is_self:
         return SELF
-    if is_board:
-        return BOARD
+    if is_device:
+        return DEVICE
     if is_gateway:
         return ROUTER
     low = vendor.lower()
     if "vestel" in low:  # bkz. _VENDOR_RULES — porttan önce: cihazın 9100'ü yazıcı sanılmasın
-        return BOARD
+        return DEVICE
     ports = {p["port"] for p in (scan or {}).get("ports", [])}
     # nmap'in kendi cihaz türü (servis bazlı daha kesin, sonra OS sınıfı) — "general purpose" türsüzdür.
     for p in (scan or {}).get("ports", []):
