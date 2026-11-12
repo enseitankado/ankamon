@@ -125,7 +125,7 @@ qx.Class.define("ankamon.ui.devices.Platforms", {
      * Menü maddelerini seçili cihazların işletim sistemine göre işaretler (alt menüler dahil). Desteklemeyen
      * maddeler devre dışı + ipucu; kısmen desteklenenlerde ipucu ve sayı eki (N cihaz) desteklenenlere göre.
      */
-    decorate(menu, devices) {
+    decorate(menu, devices, inherited = null) {
       if (!menu || !devices || !devices.length) {
         return menu;
       }
@@ -133,15 +133,20 @@ qx.Class.define("ankamon.ui.devices.Platforms", {
         if (!(item instanceof qx.ui.menu.AbstractButton)) {
           return;
         }
+        // Eklentinin beyan ettiği aileler (Extensions addDeviceMenu platforms) alt maddelere de geçer.
+        const declared = item.getUserData("ankamon.platforms") || inherited;
         const sub = item.getMenu && item.getMenu();
         if (sub) {
-          this.decorate(sub, devices);
+          this.decorate(sub, devices, declared);
         }
         const key = item.getUserData("ankamon.menuKey");
-        if (!key || sub) {
+        // Alt menülü madde yalnız kendisi bir işlevse (ör. "Ekranımı yansıt", "Web filtresi", "Oturum aç") ya da eklenti
+        // aile beyan ettiyse işaretlenir; "Yönet"/"Ekran" gibi gruplar alt maddeleriyle belirlenir.
+        if (!key || (sub && !this.functionOf(key) && !item.getUserData("ankamon.platforms"))) {
           return;
         }
-        const yes = this.only(key, devices);
+        const fits = b => (declared ? declared === "*" || [].concat(declared).includes(this.familyOf(b)) : this.supports(key, this.familyOf(b)));
+        const yes = devices.filter(fits);
         const no = devices.filter(b => !yes.includes(b));
         if (!no.length) {
           return;

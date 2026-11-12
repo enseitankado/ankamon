@@ -122,6 +122,9 @@ qx.Class.define("ankamon.ext.Extensions", {
      *     araç çubuğunda da o grubun düğmesinde görünür (grup yoksa — yetki/çevrimdışı — eklentinin kendi bölümüne).
      *   bar: {id, label, iconSvg|icon, mirror?, primary?, sep?, single?, hint?} — isteğe bağlı ayrı araç çubuğu düğmesi;
      *     mirror maddenin etiketiyse düğmenin menüsü maddenin alt menüsünün aynısıdır.
+     *   platforms: isteğe bağlı — maddenin (ve alt maddelerinin) çalıştığı işletim sistemi aileleri: ["linux", "windows",
+     *     "macos", "other"] ya da "*" (hepsi; ör. yalnız Ankamon kaydı tutan işlevler). Verilmezse katalogdaki menü anahtarına,
+     *     o da yoksa yalnız Linux'a göre (bkz. ui.devices.Platforms, platforms/README.md).
      * }
      */
     addDeviceMenu(spec) {
@@ -141,6 +144,9 @@ qx.Class.define("ankamon.ext.Extensions", {
           const item = spec.build(device, devices, user) || null;
           if (item && spec.parent) {
             item.setUserData("ankamon.menuParent", spec.parent);
+          }
+          if (item && spec.platforms) {
+            item.setUserData("ankamon.platforms", spec.platforms);
           }
           return item;
         } catch (e) {
