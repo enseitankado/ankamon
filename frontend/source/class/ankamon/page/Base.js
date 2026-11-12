@@ -294,9 +294,12 @@ qx.Class.define("ankamon.page.Base", {
      * {sütun id: metin}; boşsa kayıt silinir). Kayıt, yazım bitince (600 ms) bir kez gider.
      * @param fields {Map} {columnId: TextField} — _addColumnFilters'ın (yedek kutular gerçeğiyle yer değiştirir)
      * @param keyOf {Function} o anki anahtar (null/boş: saklanmaz)
+     * @param skip {Array?} saklanmayan sütun id'leri (ör. Wi-Fi Monitör'de Sensör: pencere her açılışta başka sensörlerle açılır,
+     *   eski sensör adlarıyla süzgeç bütün satırları gizlerdi)
      * @return {Map} {restore(), save()}
      */
-    filterPersistence(fields, keyOf, user) {
+    filterPersistence(fields, keyOf, user, skip) {
+      const skipped = new Set(skip || []);
       const B = ankamon.page.Base;
       let restoring = false;
       let timer = null;
@@ -310,7 +313,7 @@ qx.Class.define("ankamon.page.Base", {
           const saved = (key && (user.ui_prefs || {})[key]) || {};
           restoring = true;
           try {
-            Object.keys(fields).forEach(id => {
+            Object.keys(fields).filter(id => !skipped.has(id)).forEach(id => {
               const value = typeof saved[id] === "string" ? saved[id] : "";
               if ((fields[id].getValue() || "") !== value) {
                 fields[id].setValue(value);
@@ -331,7 +334,7 @@ qx.Class.define("ankamon.page.Base", {
               return; // bu arada görünüm değişti: eski görünümün değeri yeni anahtara yazılmaz
             }
             const value = {};
-            Object.keys(fields).forEach(id => {
+            Object.keys(fields).filter(id => !skipped.has(id)).forEach(id => {
               const text = (fields[id].getValue() || "").trim();
               if (text) {
                 value[id] = text;
@@ -849,6 +852,7 @@ qx.Class.define("ankamon.page.Base", {
      *   {persist: true | "anahtar" | Function} — süzgeç değerleri oturum sahibinde saklanır ve grid kurulurken geri
      *   yüklenir (kullanıcı isteği 2026-11-10: cihaz grid'leri). true: tablonun prefsKey'i; Function: o anki görünümün
      *   anahtarı (ör. Ağ ▸ varlık grupları — görünüm değişince fields.restoreSaved() çağrılır). Kayıt "<anahtar>.filters".
+     *   {persistSkip: [sütun id]} — saklanmayan sütunlar (bkz. filterPersistence).
      * @return {Map} {columnId: TextField} — değerlerini okumak için (bkz. çağıranların __apply'ı)
      */
     /**
@@ -945,7 +949,7 @@ qx.Class.define("ankamon.page.Base", {
         const prefsKey = table.getUserData("prefsKey");
         const keyOf = typeof opts.persist === "function" ? opts.persist
           : () => (typeof opts.persist === "string" ? opts.persist : prefsKey);
-        persist = B.filterPersistence(fields, keyOf, this._user);
+        persist = B.filterPersistence(fields, keyOf, this._user, opts.persistSkip);
         persist.restore();
         Object.defineProperty(fields, "restoreSaved", { value: () => persist.restore(), enumerable: false });
       }
@@ -969,6 +973,14 @@ qx.Class.define("ankamon.page.Base", {
           cell.getChildControl("label").setToolTipText(column.hint);
         }
         const previous = fields[column.id];
+        // Yedekte bekleyen değer (ör. kayıtlı süzgeç, Genel bakış kartından "Çevrimiçi") gerçek kutuya dinleyici bağlanmadan
+        // geçer; süzme başlık kurulumu bittikten sonra bir kez yapılır. Eşzamanlı süzme (setData → kalıcı sıralama →
+        // metaDataChanged) başlığı bu hücre henüz yerleşmeden yeniden kurduruyor, hücre yeniden oluşup değeri yine
+        // devralıyordu: sonsuz özyineleme ("Maximum call stack size exceeded"; Wi-Fi Monitör başlıksız ve donuk — 2026-11-12).
+        const inherited = previous && previous !== field && previous.getValue() && !field.getValue() ? previous.getValue() : null;
+        if (inherited) {
+          field.setValue(inherited);
+        }
         field.addListener("changeValue", changed, this);
         fields[column.id] = field;
         // Liste yalnız tam satırları veren (ve eşleşmeyi filterMatch ile yapan) grid'de: tırnaklı seçim düz
@@ -978,9 +990,12 @@ qx.Class.define("ankamon.page.Base", {
           button.addListener("execute", () => openChoices(column, col - offset, button));
           refreshButtons();
         }
-        // Yedekte bekleyen değer (ör. Genel bakış kartından "Çevrimiçi") gerçek kutuya geçer ve süzer.
-        if (previous && previous !== field && previous.getValue() && !field.getValue()) {
-          field.setValue(previous.getValue());
+        if (inherited) {
+          qx.event.Timer.once(() => {
+            if (!table.isDisposed() && !field.isDisposed()) {
+              changed();
+            }
+          }, this, 0);
         }
       });
       columns.forEach((column, index) => columnModel.setHeaderCellRenderer(index + offset, renderer));

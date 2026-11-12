@@ -27,8 +27,9 @@
 
 /**
  * Wi-Fi Monitör "Güvenilir listesi…": güvenilir (sabit) işaretlenmiş vericiler — erişim noktası ya da Wi-Fi cihazı, MAC adresiyle —,
- * kapsamı (okul geneli / sınıf) ve işaretleyen; seçilenler listeden çıkarılır ya da kapsamları topluca değiştirilir (okul geneli ya da
- * seçilen tahtanın sınıfı — kullanıcı isteği 2026-11-10; PUT /api/wifimon/fixed). Eski "ağ adı" ve "Bluetooth" kayıtları artık
+ * kapsamı (tesis geneli / salon) ve işaretleyen; seçilenler listeden çıkarılır ya da kapsamları topluca değiştirilir (tesis geneli ya da
+ * seçilen tahtanın salonu — kullanıcı isteği 2026-11-10; "okul"/"sınıf" yerine "tesis"/"salon" 2026-11-12; PUT /api/wifimon/fixed).
+ * Bütün hücre ve başlıklarda açıklayıcı ipucu (kullanıcı isteği 2026-11-12: lise öğrencisinin anlayacağı dil). Eski "ağ adı" ve "Bluetooth" kayıtları artık
  * uygulanmaz (güven yalnız MAC ile — kullanıcı isteği 2026-11-06), silinebilsinler diye listelenir (bkz. ui.boards.WifiMonitor, backend
  * WifimonFixedEmittersApi).
  *
@@ -41,8 +42,22 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
   type: "static",
 
   statics: {
-    KIND_LABEL: { ssid: "Ağ adı (eski kayıt — uygulanmıyor)", bssid: "Erişim noktası (MAC)", bt: "Bluetooth (eski kayıt — uygulanmıyor)",
-      probe: "Wi-Fi cihazı (MAC; ağ arayan / bağlı)" },
+    KIND_LABEL: { ssid: "Ağ adı (eski kayıt — uygulanmıyor)", bssid: "Erişim noktası", bt: "Bluetooth (eski kayıt — uygulanmıyor)",
+      probe: "Wi-Fi cihazı" },
+
+    /** Tür hücresinin ipucu (lise düzeyinde açıklama). */
+    KIND_HINT: {
+      bssid: "Erişim noktası: kablosuz ağı (Wi-Fi) yayınlayan cihaz — genelde tavanda ya da duvarda duran, modeme benzeyen kutu. " +
+        "Parantez içinde yayınladığı Wi-Fi ağının adı (SSID) yazar.",
+      probe: "Wi-Fi cihazı: telefon, tablet, yazıcı gibi Wi-Fi kullanan bir cihaz. Sensörler onu bir ağ ararken ya da bir ağa bağlıyken duydu. " +
+        "Parantez içinde (biliniyorsa) adı ya da bağlı olduğu ağ yazar.",
+      ssid: "Eski tür kayıt: yalnız ağ adıyla güvenilir sayma. Artık uygulanmıyor — aynı adı herkes (ör. bir telefonun paylaşım noktası) " +
+        "kullanabildiği için güven yalnız MAC adresiyle kurulur. Silebilirsiniz.",
+      bt: "Eski tür kayıt: Bluetooth cihazı. Wi-Fi Monitör artık Bluetooth taramıyor; bu kayıt uygulanmıyor. Silebilirsiniz."
+    },
+
+    /** Bant adı sinyal hücresinde: "2.4GHz", "5.0GHz" (kullanıcı isteği 2026-11-12: "2.4GHz=-83dB" biçimi). */
+    BAND_SHORT: { "2.4": "2.4GHz", "5": "5.0GHz", "6": "6.0GHz", "?": "?GHz" },
 
     /**
      * @param getFixed {Function} () → güncel güvenilir listesi
@@ -73,9 +88,10 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
       const del = new qx.ui.form.Button("Seçilenleri listeden çıkar");
       const close = new qx.ui.form.Button("Kapat");
       close.addListener("execute", () => win.close());
-      // Toplu kapsam: hedef (okul geneli ya da bir tahtanın sınıfı) + uygula.
-      const scope = new qx.ui.form.SelectBox().set({ width: 240, toolTipText: "Seçilen kayıtların yeni kapsamı" });
-      scope.add(new qx.ui.form.ListItem("Okul geneli", null, ""));
+      // Toplu kapsam: hedef (tesis geneli ya da bir tahtanın salonu) + uygula.
+      const scope = new qx.ui.form.SelectBox().set({ width: 240, toolTipText: "İşaretli kayıtların yeni kapsamı. Tesis geneli: cihaz bütün " +
+        "salonlardaki sensörlerde güvenilir sayılır. Salon: yalnız o salonun sensöründe güvenilir sayılır, başka yerde duyulursa yabancı görünür." });
+      scope.add(new qx.ui.form.ListItem("Tesis geneli", null, ""));
       const apply = new qx.ui.form.Button("Seçilenlerin kapsamını değiştir");
       // Eklentilerin düğmeleri (ankamon.ext.Extensions.addWifiTrustedAction): işaretli kayıtlarla çalışır.
       const extButtons = ankamon.ext.Extensions.wifiTrustedActions().map(spec => {
@@ -106,61 +122,108 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
         }
         const name = b => b.label || b.hostname || b.ip || "#" + b.id;
         (res.boards || []).slice().sort((a, b) => name(a).localeCompare(name(b), "tr")).forEach(b =>
-          scope.add(new qx.ui.form.ListItem(`Sınıf: ${name(b)}`, null, String(b.id))));
+          scope.add(new qx.ui.form.ListItem(`Salon: ${name(b)}`, null, String(b.id))));
       }).catch(() => {
-        // Tahta listesi alınamazsa yalnız "Okul geneli" seçilebilir.
+        // Tahta listesi alınamazsa yalnız "Tesis geneli" seçilebilir.
       });
 
       const draw = () => {
         const list = getFixed();
         const td = "padding:3px 8px;border-bottom:1px solid rgba(127,127,127,.2);white-space:nowrap";
         const attr = t => esc(t || "").replace(/"/g, "&quot;");
+        // Hücre: içerik + ipucu (title; fare kayınca kapanır — ui.ToolTipPolicy).
+        const cell = (content, tip, style) => `<td style="${td}${style ? ";" + style : ""}"${tip ? ` title="${attr(tip)}"` : ""}>${content}</td>`;
+        const muted = text => `<span style="opacity:.6">${esc(text)}</span>`;
         const sensorsById = new Map(((loc && loc.sensors) || []).map(x => [x.id, x]));
         const placed = new Map(((loc && loc.locations) || []).map(x => [x.addr, x]));
         const sensorOptions = ((loc && loc.sensors) || []).map(x => [x.id, Loc.sensorName(x)])
           .sort((a, b) => a[1].localeCompare(b[1], "tr"));
-        // Konum sütunları: MAC'li kayıtlarda sensör sinyalleri, öneri, açılır liste (eski ağ adı / BT kayıtlarında boş).
+        const COLS = [
+          ["", "Satırı işaretleyip alttaki düğmelerle (kapsam değiştir, listeden çıkar) toplu işlem yapın."],
+          ["Tür", "Kaydın ne olduğu: erişim noktası (Wi-Fi yayınlayan cihaz) ya da Wi-Fi cihazı (telefon, yazıcı…); parantez içinde Wi-Fi adı."],
+          ["MAC adresi", "Güvenilir sayılan radyonun donanım kimliği (MAC adresi). Güven bu adresle kurulur."],
+          ["Fiziksel cihaz", "Aynı kutuya ait sayılan adreslerin ortak başı (ilk 5 bayt). Bir erişim noktası her radyosu için ayrı adres kullanır."],
+          ["Adres sayısı", "Bu fiziksel cihaza ait sayılan MAC adresi sayısı (ör. 2,4 GHz ve 5 GHz radyoları)."],
+          ["Bantlar", "Cihazın sensörlerce duyulduğu frekans bantları (2,4 / 5 GHz)."],
+          ["Sensörlerde sinyal", "Cihazı en güçlü duyan iki sensör ve bant bant ortalama sinyal gücü (dB; 0'a yakın = güçlü)."],
+          ["Konum/sensör önerisi", "Ölçümlere göre cihazın büyük olasılıkla yanında durduğu sensör (akıllı tahta)."],
+          ["Konum (yanındaki sensör)", "Cihazın gerçekte hangi sensörün yanında olduğu — listeden seçin, hemen kaydedilir."],
+          ["Kapsam", "Güvenin geçerli olduğu yer: tesis geneli (her salonda) ya da tek salon."],
+          ["Güvenilir işaretleyen", "Bu kaydı güvenilir listesine ekleyen kullanıcı ve zamanı."]
+        ];
+        const SIGNAL_HELP = "Sinyal gücü dBm (desibel-miliwatt; hücrede kısaca dB) ile ölçülür ve eksi bir sayıdır: 0'a yakın oldukça güçlüdür. −40 çok yakın, " +
+          "−60 iyi, −75 zayıf, −90 neredeyse duyulmuyor. Uzaklık iki katına çıkınca sinyal yaklaşık 6 dB düşer; duvar, kapı, insan " +
+          "vücudu da zayıflatır. Ortalama birçok ölçümden alınır (n = ölçüm sayısı, σ = ölçümlerin ne kadar dalgalandığı).";
+        // MAC'li kayıtlarda fiziksel cihaz (3 sütun), sinyal, öneri, konum; eski ağ adı / BT kayıtlarında boş hücreler.
         const locCells = f => {
           if (!(f.kind === "bssid" || f.kind === "probe")) {
-            return `<td style="${td}"></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"></td>`;
+            const na = "Eski tür kayıt: konum ve sinyal bilgisi tutulmaz.";
+            return [1, 2, 3, 4, 5, 6].map(() => cell("", na)).join("");
           }
           if (!loc) {
-            return `<td style="${td};opacity:.6" colspan="4">yükleniyor…</td>`;
+            return `<td style="${td};opacity:.6" colspan="6">yükleniyor…</td>`;
           }
           const rows = Loc.groupStats(f.kind, f.value, loc.stats);
           const addrs = Array.from(new Set([f.value.toUpperCase()].concat(rows.map(r => r.addr)))).sort();
-          const bands = Array.from(new Set(rows.map(r => r.band)));
-          const bandOf = a => Array.from(new Set(rows.filter(r => r.addr === a).map(r => Loc.BAND_LABEL[r.band] || r.band))).join(", ") || "bu dönemde duyulmadı";
-          const group = f.kind === "bssid"
-            ? `<td style="${td};font-family:monospace" title="${attr("Aynı fiziksel cihaz sayılan adresler (ilk 5 bayt aynı — kestirim):\n" +
-              addrs.map(a => `${a} — ${bandOf(a)}`).join("\n"))}">${esc(Loc.groupKey(f.kind, f.value))}:xx` +
-              `<span style="font-family:inherit;opacity:.7"> · ${addrs.length} adres${bands.length ? " (" + bands.map(b => Loc.BAND_LABEL[b] || b).join(" + ") + ")" : ""}</span></td>`
-            : `<td style="${td};opacity:.7">tek adres</td>`;
+          const bands = ["2.4", "5", "6", "?"].filter(b => rows.some(r => r.band === b));
+          const bandOf = a => Array.from(new Set(rows.filter(r => r.addr === a).map(r => Loc.BAND_LABEL[r.band] || r.band))).join(", ") ||
+            "bu dönemde duyulmadı";
+          const addrList = addrs.map(a => `${a} — ${bandOf(a)}`).join("\n");
+          const prefix = f.kind === "bssid"
+            ? cell(`<span style="font-family:monospace">${esc(Loc.groupKey(f.kind, f.value))}:xx</span>`,
+              "Bir erişim noktası (tek kutu) her radyosu (2,4 GHz ve 5 GHz) ve yayınladığı her ağ için ayrı MAC adresi kullanır; bu " +
+              "adreslerin genelde yalnız son baytı farklıdır. Bu yüzden ilk 5 baytı aynı adresler tek fiziksel cihaz sayılır (tahmin: " +
+              "art arda numaralı iki cihaz da birleşebilir).\nBu cihazın adresleri:\n" + addrList)
+            : cell(muted("tek adres"), "Wi-Fi cihazı (telefon, yazıcı…) tek adresle izlenir; başka adresle birleştirilmez.");
+          const count = cell(String(addrs.length), `Bu fiziksel cihaza ait sayılan ${addrs.length} MAC adresi (yanında hangi bantta duyulduğu):\n` + addrList,
+            "text-align:right");
+          const bandCell = cell(bands.length ? esc(bands.map(b => this.BAND_SHORT[b]).join(" + ")) : muted("—"),
+            "Cihazın sensörlerce duyulduğu frekans bantları. 2,4 GHz daha uzağa gider ve duvardan kolay geçer; 5 GHz duvarda çok " +
+            "zayıflar. Bir sensör 5 GHz'i de güçlü duyuyorsa cihaz büyük olasılıkla o sensörle aynı odadadır." +
+            (bands.length ? "" : "\nSon " + loc.days + " günde hiçbir sensör bu cihazı duymadı."));
           const ranked = Loc.rank(rows);
-          const sum = Loc.summary(ranked, sensorsById);
           const sug = Loc.suggest(ranked, sensorsById);
+          const signalText = ranked.slice(0, 2).map(x => Loc.sensorName(sensorsById.get(x.boardId)) + " " +
+            ["2.4", "5", "6", "?"].filter(b => x.bands[b]).map(b => `${this.BAND_SHORT[b]}=${Math.round(x.bands[b].avg)}dB`).join(" · ")).join(" | ");
+          const sum = Loc.summary(ranked, sensorsById);
+          const signal = cell(signalText ? esc(signalText) : muted("veri yok"),
+            SIGNAL_HELP + "\n\n" + (sum.tip || `Bu cihazı son ${loc.days} günde hiçbir sensör duymadı (veri Wi-Fi Monitör açıkken kaydedilir).`));
+          const suggestion = cell(sug ? esc(sug.text) : muted("—"),
+            "Sensörlerin ölçümlerine göre cihazın büyük olasılıkla yanında durduğu sensör (akıllı tahta). En güçlü ortalama sinyali alan " +
+            "sensör seçilir; 5 GHz zaten daha zayıf geldiği için 5 GHz ölçümüne 7 dB eklenerek karşılaştırılır. Parantezde güven derecesi " +
+            "ve ikinci en iyi sensörden kaç dB önde olduğu yazar (fark büyükse öneri daha güvenilirdir)." + (sug ? "\n\n" + sug.tip :
+              "\n\nHenüz ölçüm yok: Wi-Fi Monitör'ü bu cihazın yakınındaki tahtalarla açık tutun."));
           const here = placed.get(f.value.toUpperCase());
           const select = `<select data-addr="${attr(f.value.toUpperCase())}" data-kind="${attr(f.kind)}" style="max-width:240px">` +
             `<option value="">— belirlenmedi —</option>` +
             sensorOptions.map(([id, name]) => `<option value="${id}"${here && here.board_id === id ? " selected" : ""}>${esc(name)}` +
               `${sug && sug.boardId === id ? " ★" : ""}</option>`).join("") + "</select>";
-          const hereTip = here ? `Kayıtlı konum: ${here.sensor_name}${here.sensor_mac ? " (kablolu MAC " + here.sensor_mac.toUpperCase() + ")" : ""} — ` +
-            `${here.set_by}, ${new Date(here.set_ts).toLocaleString("tr-TR")}` : "Konum belirlenmedi. ★ = öneri.";
-          return group +
-            `<td style="${td}" title="${attr(sum.tip || "Bu cihazı son " + loc.days + " günde hiçbir sensör duymadı (Wi-Fi Monitör açıkken kaydedilir).")}">` +
-            `${sum.text ? esc(sum.text) : '<span style="opacity:.6">veri yok</span>'}</td>` +
-            `<td style="${td}" title="${attr(sug ? sug.tip : "")}">${sug ? esc(sug.text) : '<span style="opacity:.6">—</span>'}</td>` +
-            `<td style="${td}" title="${attr(hereTip)}">${select}</td>`;
+          const place = cell(select, "Bu cihaz gerçekte hangi sensörün (akıllı tahtanın) yanında? Listeden seçin; seçim hemen kaydedilir. " +
+            "★ = öneri. Listede sensörün kod adı, kod adı yoksa bilgisayar adı / kablolu MAC adresi yazar.\n\n" +
+            (here ? `Kayıtlı konum: ${here.sensor_name}${here.sensor_mac ? " (kablolu MAC " + here.sensor_mac.toUpperCase() + ")" : ""} — ` +
+              `${here.set_by}, ${new Date(here.set_ts).toLocaleString("tr-TR")}` : "Konum henüz belirlenmedi."));
+          return prefix + count + bandCell + signal + suggestion + place;
         };
+        const kindCell = f => {
+          const label = this.KIND_LABEL[f.kind] || f.kind;
+          const name = f.kind === "bssid" || f.kind === "probe" ? (f.label || "") : "";
+          return cell(esc(label) + (name ? ` (${esc(name)})` : ""), this.KIND_HINT[f.kind] || label);
+        };
+        const macCell = f => f.kind === "ssid"
+          ? cell(esc(f.value), "Eski kayıt: burada MAC adresi değil Wi-Fi ağ adı (SSID) var. Artık uygulanmıyor.")
+          : cell(esc(f.value), "MAC adresi: Wi-Fi radyosunun fabrikada verilen donanım kimliği (6 bayt, iki haneli onaltılık sayılar). Güven bu " +
+            "adresle kurulur — aynı Wi-Fi adını taşıyan başka bir cihaz (ör. bir telefonun paylaşım noktası) güvenilir sayılmaz.", "font-family:monospace");
+        const scopeCell = f => f.board_id
+          ? cell(esc("Salon: " + (f.board_name || "#" + f.board_id)), "Bu cihaz yalnız bu salonun sensöründe güvenilir sayılır; başka salonda " +
+            "duyulursa yabancı görünür. Değiştirmek için satırı işaretleyip alttaki Kapsam kutusunu kullanın.")
+          : cell("<b>Tesis geneli</b>", "Bu cihaz bütün salonlardaki sensörlerde güvenilir sayılır. Değiştirmek için satırı işaretleyip alttaki " +
+            "Kapsam kutusunu kullanın.");
         html.setHtml(list.length ? `<table style="border-collapse:collapse;width:100%;font-size:13px"><tr>` +
-          ["", "Tür", "Değer", "Ad", "Fiziksel cihaz", "Sensörlerde sinyal (dBm)", "Konum önerisi", "Konum (yanındaki sensör)", "Kapsam", "İşaretleyen"]
-            .map(h => `<th style="${td};text-align:left">${h}</th>`).join("") + "</tr>" +
-          list.map(f => `<tr><td style="${td}"><input type="checkbox" data-id="${f.id}"></td>` +
-            `<td style="${td}">${this.KIND_LABEL[f.kind] || esc(f.kind)}</td>` +
-            `<td style="${td};font-family:${f.kind === "ssid" ? "inherit" : "monospace"}">${esc(f.value)}</td>` +
-            `<td style="${td}">${esc(f.label || "")}</td>` + locCells(f) +
-            `<td style="${td}">${f.board_id ? esc(f.board_name || "#" + f.board_id) : "<b>Okul geneli</b>"}</td>` +
-            `<td style="${td};opacity:.75">${esc(f.created_by || "")} · ${new Date(f.created_ts).toLocaleString("tr-TR")}</td></tr>`).join("") +
+          COLS.map(([h, tip]) => `<th style="${td};text-align:left" title="${attr(tip)}">${esc(h)}</th>`).join("") + "</tr>" +
+          list.map(f => "<tr>" + cell(`<input type="checkbox" data-id="${f.id}">`, COLS[0][1]) + kindCell(f) + macCell(f) + locCells(f) +
+            scopeCell(f) + cell(`${esc(f.created_by || "")} · ${new Date(f.created_ts).toLocaleString("tr-TR")}`,
+              `${f.created_by || "?"} bu kaydı ${new Date(f.created_ts).toLocaleString("tr-TR")} tarihinde güvenilir listesine ekledi.`, "opacity:.75") +
+            "</tr>").join("") +
           "</table>" : `<div style="padding:12px;opacity:.75">Güvenilir listesi boş.</div>`);
         all.setValue(false);
       };
@@ -185,7 +248,7 @@ qx.Class.define("ankamon.ui.boards.WifimonFixedDialog", {
         const item = scope.getSelection()[0];
         const boardId = item.getModel() ? Number(item.getModel()) : null;
         if (!await ankamon.ui.Dialog.confirm(`${ids.length} kaydın kapsamı <b>${esc(item.getLabel())}</b> olacak.` +
-          (boardId === null ? "" : "<br>Bu vericiler yalnız o tahtanın sensöründe güvenilir sayılır."), "Değiştir")) {
+          (boardId === null ? "" : "<br>Bu vericiler yalnız o salonun sensöründe güvenilir sayılır."), "Değiştir")) {
           return;
         }
         try {

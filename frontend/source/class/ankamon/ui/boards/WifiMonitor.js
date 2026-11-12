@@ -76,8 +76,10 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
     RADIO_CHANGED: "ankamon.wifimon.radio",
 
     /**
-     * Tahta başına dinleme planı: {force} (kablo + Wi-Fi bağlı, kullanıcı onayladı: Wi-Fi bağlantısı kesilip dinlenir) ya da
-     * {noSniff: "wifionly"|"declined"} (yalnız ağ taraması). Kablo bilgisi Tahtalar listesinin Kablo sütunuyla aynı kaynaktan
+     * Tahta başına dinleme planı: {force} (kablo + Wi-Fi bağlı, kullanıcı onayladı: Wi-Fi bağlantısı kesilip dinlenir),
+     * {exclude} (kablo + Wi-Fi bağlı, kullanıcı "Dahil etmeden tara" dedi: tahta sensör olarak HİÇ kullanılmaz, öteki seçili
+     * tahtalarla taranır — kullanıcı bildirimi 2026-11-12: önce yalnız dinleme kapanıyor, tahta yine sensör oluyordu) ya da
+     * {noSniff: "wifionly"} (yalnız Wi-Fi ile bağlı: yalnız ağ taraması). Kablo bilgisi Tahtalar listesinin Kablo sütunuyla aynı kaynaktan
      * (page.Boards.cableText); kesin koruma tahtadadır (SSH Wi-Fi'den geliyorsa asla monitör kipi — worker wifi_remote_scan.py).
      */
     async __wifimonPlan(boards) {
@@ -95,11 +97,12 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
           `<b>${both.map(b => esc(name(b))).join(", ")}</b> hem kabloyla hem Wi-Fi ile bağlı.<br><br>Wi-Fi trafiğini dinlemek için ` +
           `${both.length > 1 ? "bu tahtaların" : "bu tahtanın"} <b>Wi-Fi bağlantısı kopacak</b> ve pencere açık kaldıkça kopuk ` +
           "kalacak (kablo bağlantısı ve uzaktan erişim sürer); pencere kapanınca Wi-Fi yeniden bağlanır.<br><br>" +
-          "<b>Dahil etmeden tara</b>: Wi-Fi bağlantısı kopmaz, bu tahtalarda yalnız çevredeki Wi-Fi ağları taranır (dinleme yok).");
+          `<b>Dahil etmeden tara</b>: ${both.length > 1 ? "bu tahtalar" : "bu tahta"} sensör olarak kullanılmaz (Wi-Fi bağlantısına ` +
+          "dokunulmaz); tarama öteki seçili tahtalarla yapılır.");
         if (answer === null) {
           return null;
         }
-        both.forEach(b => plan.set(b.id, answer ? { force: true } : { noSniff: "declined" }));
+        both.forEach(b => plan.set(b.id, answer ? { force: true } : { exclude: true }));
       }
       return plan;
     },
@@ -112,7 +115,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         win.add(new qx.ui.basic.Label(message).set({ rich: true, wrap: true }));
         const cancel = new qx.ui.form.Button("Vazgeç").set({ toolTipText: "Wi-Fi Monitör açılmaz" });
         const scan = new qx.ui.form.Button("Dahil etmeden tara").set({
-          toolTipText: "Wi-Fi bağlantısı kopmaz; bu tahtalarda yalnız ağ taraması yapılır" });
+          toolTipText: "Bu tahtalar sensör olarak kullanılmaz (Wi-Fi bağlantılarına dokunulmaz); öteki seçili tahtalarla taranır" });
         const ok = new qx.ui.form.Button("Dahil et (Wi-Fi kopacak)");
         cancel.addListener("execute", () => win.close());
         scan.addListener("execute", () => {
@@ -145,7 +148,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         if (!plan) {
           return; // Vazgeç
         }
-        fresh.forEach(board => this.__win.ctx.addBoard(board, plan.get(board.id) || {}));
+        fresh.filter(board => !(plan.get(board.id) || {}).exclude).forEach(board => this.__win.ctx.addBoard(board, plan.get(board.id) || {}));
         this.__win.open();
         this.__win.focus();
         return;
@@ -153,6 +156,13 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
       const plan = await this.__wifimonPlan(boards);
       if (!plan) {
         return; // Vazgeç: pencere açılmaz
+      }
+      // "Dahil etmeden tara": o tahtalar sensör olmaz; hiç tahta kalmazsa pencere açılmaz.
+      boards = boards.filter(b => !(plan.get(b.id) || {}).exclude);
+      if (!boards.length) {
+        ankamon.ui.Dialog.alert("Taranacak sensör kalmadı: seçili tahtaların hepsi dahil edilmedi. Wi-Fi Monitör'ü başka tahtalarla " +
+          "açın ya da bu tahtaları dahil edin (Wi-Fi bağlantıları pencere açıkken kopar).", "Wi-Fi Monitör");
+        return;
       }
       const bounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280 };
       const win = ankamon.ui.Dialog.window("Wi-Fi Monitör", Math.max(900, Math.min(1400, bounds.width - 40)), { maximizable: true });
@@ -281,8 +291,8 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         applyTo(sensorTable, sensorColumns, sensorFilters, sensorRows, 1);
         syncTabs(table.getTableModel().getRowCount());
       };
-      const filters = host._addColumnFilters(table, columns, apply, { rows: () => allRows, persist: true });
-      const sensorFilters = host._addColumnFilters(sensorTable, sensorColumns, applySensors, { rows: () => sensorRows, persist: true });
+      const filters = host._addColumnFilters(table, columns, apply, { rows: () => allRows, persist: true, persistSkip: ["sensor"] });
+      const sensorFilters = host._addColumnFilters(sensorTable, sensorColumns, applySensors, { rows: () => sensorRows, persist: true, persistSkip: ["sensor"] });
 
       const render = () => {
         if (renderQueued || closed) {
@@ -489,8 +499,7 @@ qx.Class.define("ankamon.ui.boards.WifiMonitor", {
         return watching ? "Wi-Fi izleme için geçici açık; izleme bitince kapatılacak." : "Wi-Fi geçici açık, tarama sonrası kapatılacak.";
       };
       const PLAN_NOTE = {
-        wifionly: "Tahta ağa yalnız Wi-Fi ile bağlı görünüyor: SSH erişimi kopmasın diye monitör kipine alınmıyor (yalnız ağ taraması).",
-        declined: "Wi-Fi bağlantısı korunsun diye dinlenmiyor (yalnız ağ taraması)."
+        wifionly: "Tahta ağa yalnız Wi-Fi ile bağlı görünüyor: SSH erişimi kopmasın diye monitör kipine alınmıyor (yalnız ağ taraması)."
       };
       const planNote = feed => (feed.plan.noSniff && probeBox.getValue() ? PLAN_NOTE[feed.plan.noSniff] : "");
       const discard = sock => {
