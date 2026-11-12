@@ -124,4 +124,5 @@ def unsupported_text(what: str, family: str) -> str:
 def powershell_command(script: str) -> str:
     """PowerShell betiğini SSH komut satırına güvenle taşır: UTF-16LE + base64 (-EncodedCommand; tırnak/kaçış sorunu yok)."""
     encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
-    return f"powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}"
+    # -OutputFormat Text: hata akışı CLIXML değil düz metin gelsin (stdout yönlendirilince PowerShell varsayılanı CLIXML).
+    return f"powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -OutputFormat Text -EncodedCommand {encoded}"

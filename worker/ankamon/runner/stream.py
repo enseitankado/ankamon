@@ -29,12 +29,15 @@ from __future__ import annotations
 
 import os
 import queue
+import re
 import shlex
 import subprocess
 import threading
 import time
 
 _READY = "__ANKAMON_READY__"
+# PowerShell 7 hata metnindeki ANSI renk/biçim kodları (iş çıktısında okunmuyordu) — yalnız PowerShell hedefinde silinir.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 _MAX_LINES = 20000          # cihaz başına saklanan en çok çıktı satırı (sonrası sayılır, saklanmaz)
 _MAX_LINE = 2000            # tek satırın en çok uzunluğu
 _FLUSH_SECONDS = 0.3        # olaylar en geç bu kadar bekletilip topluca yazılır (veritabanı yükü)
@@ -164,6 +167,8 @@ def run(device: dict, user: str, password: str, *, body: str, env: dict | None, 
         if line is None:
             open_pipes -= 1
             continue
+        if shell == "powershell":
+            line = _ANSI_RE.sub("", line)
         if kind == "out" and not ready and line.strip() == _READY:
             ready = True
             events.add("info", f"Bağlandı ({time.monotonic() - started:.1f} sn) — komut çalıştırılıyor")
