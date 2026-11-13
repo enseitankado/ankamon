@@ -49,7 +49,12 @@ final class DashboardApi
                 "SELECT count(*) AS total,
                         count(*) FILTER (WHERE b.online OR EXISTS (SELECT 1 FROM net_devices nd
                                                   WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
-                                                    AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at))) AS online,
+                                                    AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at))
+                                           -- taze log (DevicesApi rl.fresh ile aynı ölçüt — 2026-11-13)
+                                           OR EXISTS (SELECT 1 FROM logs l WHERE l.received_at > now() - interval '45 seconds'
+                                                    AND l.device_time > now() - interval '45 seconds'
+                                                    AND l.received_at - l.device_time < interval '1 minute'
+                                                    AND (lower(l.host) = lower(b.hostname) OR l.from_ip = host(b.ip)))) AS online,
                         count(*) FILTER (WHERE b.ssh_ok AND b.session_checked_at > now() - interval '3 minutes') AS manageable,
                         count(*) FILTER (WHERE b.exporter_ok) AS exporter_ok,
                         count(*) FILTER (WHERE b.last_log_at > now() - interval '24 hours') AS logging

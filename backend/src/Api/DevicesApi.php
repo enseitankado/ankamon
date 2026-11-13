@@ -87,8 +87,11 @@ final class DevicesApi
                 AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at))
          AND NOT (b.shutdown_at IS NOT NULL AND NOT b.online
                   AND (b.last_seen_at IS NULL OR b.last_seen_at < b.shutdown_at + interval '3 minutes'))) AS net_online,
-        (b.online OR (EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
-                AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at))
+        -- Taze log da canlılık kanıtıdır (kullanıcı bildirimi 2026-11-13: ders başı açılan tahtalar log gönderirken SSH henüz
+        -- açılmadığı için 10–20 sn «çevrim dışı» görünüyordu; «oturum açıldı logu var ama çevrim dışı»): son 45 sn'de cihazın
+        -- kendi saatine göre de taze bir log geldiyse (rl.fresh — kuyrukta bekleyip sonradan gelen eski loglar sayılmaz).
+        (b.online OR ((COALESCE(rl.fresh, false) OR EXISTS (SELECT 1 FROM net_devices nd WHERE (nd.mac = b.mac OR nd.mac = b.wifi_mac) AND nd.online
+                AND (b.last_seen_at IS NULL OR nd.last_seen_at >= b.last_seen_at)))
          AND NOT (b.shutdown_at IS NOT NULL
                   AND (b.last_seen_at IS NULL OR b.last_seen_at < b.shutdown_at + interval '3 minutes')))) AS alive,
         -- «Yönetilebilir» TEK ölçüt (kullanıcı isteği 2026-11-10): cihaza SSH ile root girişi BAŞARILI — son 3 dakikada
@@ -101,15 +104,17 @@ final class DevicesApi
             AS ssh_login_failing";
 
     /**
-     * devices + "şu anda log mu geliyor" (rl) — yalnız last_log_at'i hemen göstermek için (bir cihaz
-     * log göndermeye başladığında, worker'ın last_log_at'i yazmasını beklemeden). "online" bilerek
+     * devices + "şu anda log mu geliyor" (rl) — last_log_at'i hemen göstermek ve taze logu (rl.fresh) «Çevrimiçi»
+     * (alive) kanıtı saymak için (2026-11-13). "online" (SSH/sensör portu — «Yönetilebilir»in temeli) bilerek
      * buna bakmaz, yalnız device_status'ın yoklamasına (ssh_ok/exporter_ok, en hızlı STATUS_TICK_SECONDS'ta
      * bir güncellenir — bkz. worker/__main__.py) dayanır: SSH/sensör portu asıl erişilebilirlik,
      * log akışı tek başına yeterli değil (ör. kuyruğa birikmiş eski loglar yanlışlıkla "çevrimiçi"
      * gösterebilirdi). logs_host_time_idx (host, received_at DESC) bu sorguyu indeksli tutar.
      */
     private const FROM = "FROM devices b LEFT JOIN LATERAL (
-        SELECT max(received_at) AS at, bool_or(from_ip = host(b.ip)) AS ip_log FROM logs
+        SELECT max(received_at) AS at, bool_or(from_ip = host(b.ip)) AS ip_log,
+               bool_or(received_at > now() - interval '45 seconds' AND device_time > now() - interval '45 seconds'
+                       AND received_at - device_time < interval '1 minute') AS fresh FROM logs
         WHERE received_at > now() - interval '2 minutes'
           AND (lower(host) = lower(b.hostname) OR from_ip = host(b.ip))
     ) rl ON true";
