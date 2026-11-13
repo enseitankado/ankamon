@@ -145,6 +145,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   .tile:fullscreen { background: #000; }
   .tile:fullscreen .view { flex: 1; aspect-ratio: auto; }
   .tile.offline .msg { color: #888; }
+  /* "Kapanıyor…" yazan cihaz kapandı: kutucuk kalkmadan önce CLOSED_NOTE_MS "Kapandı" (bkz. Tile.showClosed). */
+  .tile.closed .msg { color: #fff; font-size: 16px; font-weight: 600; }
   /* Ekranı ayrı pencerede açık cihaz (Devices.js "tm-popped"): önizleme akışı durur, yerine bu not. */
   .tile.popped .msg { color: #8cf; font-size: 14px; font-weight: 600; }
   /* Önizlemede (q=thumb) oturum durumu — "Oturumları sorgula" sonucu ve "Oturum aç"/"Oturumu kapat"
@@ -522,6 +524,36 @@ class Tile {
     if (embed) window.parent.postMessage({ type: "tm-res", id: this.device.id, w, h }, location.origin);
   }
 
+  /**
+   * "Kapanıyor…" yazan cihaz kapandı (üst sayfa tm-devices closed {id: an}, bkz. Devices.js __closedNotes):
+   * CLOSED_NOTE_MS boyunca ortada ve sol altta "Kapandı" (kullanıcı isteği 2026-11-13). Sonra kutucuk listede
+   * değilse kalkar (bkz. setDevices leaving), listedeyse olağan "Cihaz kapalı" görünümüne döner.
+   * @return {Boolean} bu kapanış ilk kez mi işlendi
+   */
+  showClosed(at) {
+    if (this.closedAt === at) return false;
+    this.closedAt = at;
+    this.closedUntil = Date.now() + CLOSED_NOTE_MS;
+    clearTimeout(this.closedTimer);
+    this.closedTimer = setTimeout(() => {
+      this.closedUntil = 0;
+      this.el.classList.remove("closed");
+      if (!this.el._leaving) this.setDevice(this.device);
+    }, CLOSED_NOTE_MS);
+    this.paintClosed();
+    return true;
+  }
+
+  paintClosed() {
+    this.el.classList.add("offline", "closed");
+    this.wanted = false;
+    this.disconnect();
+    this.setState("offline", "Kapandı");
+    this.whoamiEl.classList.remove("querying", "error");
+    this.whoamiEl.textContent = "Kapandı";
+    this.whoamiEl.hidden = false;
+  }
+
   /** Ad/durum güncellemesi (gömülü kipte üst sayfadan gelen liste). */
   setDevice(device) {
     this.device = device;
@@ -536,6 +568,7 @@ class Tile {
       this.refreshNonce = device.refresh || 0;
       this.refreshStream();
     }
+    if (this.closedUntil > Date.now()) this.paintClosed();
   }
 
   /**
@@ -698,6 +731,7 @@ class Tile {
   }
 
   setWhoami(whoami) {
+    if (this.closedUntil > Date.now()) return;   // "Kapandı" süresince (bkz. showClosed)
     if (!whoami || spec.q !== "thumb") {
       this.whoamiEl.hidden = true;
       return;
@@ -1171,6 +1205,9 @@ function toggleFullscreen(el) {
 }
 
 const tiles = new Map();   // cihaz id → Tile
+// Kapanıp listeden düşen cihazın kutucuğu "Kapandı" yazarak bu kadar daha kalır (bkz. Tile.showClosed, setDevices).
+const CLOSED_NOTE_MS = 2000;
+const leaving = new Map(); // cihaz id → {t, timer}: tiles'tan çıkmış, süresi dolunca DOM'dan kalkacak kutucuk
 let chatting = new Set(spec.chat || []);   // sohbet penceresi açık cihazlar (üst sayfadan "tm-chat")
 let popped = new Set();     // ekranı ayrı pencerede açık cihazlar (üst sayfadan "tm-popped")
 // Üst sayfada Ekranlar sekmesi bir süredir görünmüyor ("tm-pause"): akışlar durur, kutucuklar ve son
@@ -1420,16 +1457,28 @@ setInterval(() => { if (!document.hidden) tiles.forEach(t => t.device.whoami && 
 // Siyah (güç tasarrufundaki) ekran algısı — bkz. Tile.checkBlank.
 setInterval(() => { if (!document.hidden) tiles.forEach(t => t.checkBlank()); }, 2000);
 
-/** Kutucukları verilen listeye eşitler: yenileri ekler, gidenleri kaldırır, kalanları günceller (yeniden bağlanmadan). */
-function setDevices(list) {
+/**
+ * Kutucukları verilen listeye eşitler: yenileri ekler, gidenleri kaldırır, kalanları günceller (yeniden bağlanmadan).
+ * @param closed {Object?} {id: an} "Kapanıyor…" yazıp az önce kapanan cihazlar (Devices.js __closedNotes): kutucukta
+ *   CLOSED_NOTE_MS "Kapandı"; listeden düşmüşse kutucuk o süre sonunda kalkar (hemen değil).
+ */
+function setDevices(list, closed = {}) {
   const ids = new Set(list.map(b => b.id));
   for (const [id, t] of tiles) {
     if (!ids.has(id)) {
+      tiles.delete(id);
       t.disconnect();
       t.perfStop();
       if (io) io.unobserve(t.el);
-      t.el.remove();
-      tiles.delete(id);
+      if (closed[id]) t.showClosed(closed[id]);
+      const left = (t.closedUntil || 0) - Date.now();
+      if (left > 0) {
+        t.el._leaving = true;
+        t.el.classList.remove("selected");
+        leaving.set(id, { t, timer: setTimeout(() => { t.el.remove(); leaving.delete(id); }, left) });
+      } else {
+        t.el.remove();
+      }
     }
   }
   let empty = document.getElementById("empty");
@@ -1437,7 +1486,17 @@ function setDevices(list) {
     empty.remove();
     empty = null;
   }
-  list.forEach((b, i) => {
+  // Sıra eşitlemesinde kalkmayı bekleyen ("Kapandı") kutucuklar atlanır: yerlerinde durur, ötekileri kaydırmaz.
+  const skipLeaving = el => { while (el && el._leaving) el = el.nextElementSibling; return el; };
+  let ref = skipLeaving(grid.firstElementChild);
+  list.forEach(b => {
+    const gone = leaving.get(b.id);
+    if (gone) {   // "Kapandı" süresinde listeye geri döndü: bekleyen kutucuk hemen kalkar, yenisi kurulur
+      clearTimeout(gone.timer);
+      if (ref === gone.t.el) ref = skipLeaving(ref.nextElementSibling);
+      gone.t.el.remove();
+      leaving.delete(b.id);
+    }
     let t = tiles.get(b.id);
     if (!t) {
       t = new Tile(b);
@@ -1450,8 +1509,11 @@ function setDevices(list) {
     // sırayı taşıyan tazelemesiyle geri alınmasın (bırakınca tm-reorder ile yeni sıra kaydedilir).
     // Tam ekrandaki kutucuk taşınmaz: DOM'da yer değiştiren öğe tarayıcıda tam ekrandan çıkar (sıra, tam ekran bitince
     // bir sonraki listede düzelir; diğer kutucuklar onun çevresine dizilir).
-    if (!drag && grid.children[i] !== t.el && t.el !== document.fullscreenElement) grid.insertBefore(t.el, grid.children[i] || null);
+    if (ref === t.el) ref = skipLeaving(ref.nextElementSibling);
+    else if (!drag && t.el !== document.fullscreenElement) grid.insertBefore(t.el, ref);
+    else if (ref) ref = skipLeaving(ref.nextElementSibling);
     t.setDevice(b);
+    if (closed[b.id]) t.showClosed(closed[b.id]);
   });
   if (!list.length && !empty) {
     empty = document.createElement("div");
@@ -1496,7 +1558,7 @@ if (embed) {
   // Üst sayfa (Cihazlar) grid'deki cihaz listesini her değiştiğinde gönderir.
   window.addEventListener("message", e => {
     if (e.source !== window.parent || e.origin !== location.origin || !e.data) return;
-    if (e.data.type === "tm-devices") { setDevices(e.data.devices || []); markLoaded(); }
+    if (e.data.type === "tm-devices") { setDevices(e.data.devices || [], e.data.closed || {}); markLoaded(); }
     else if (e.data.type === "tm-selection") setSelected((e.data.ids || []).filter(id => tiles.has(id)), true);
     else if (e.data.type === "tm-size") setTileSize(e.data.px, !!e.data.reset);
     else if (e.data.type === "tm-fit") window.parent.postMessage({ type: "tm-fit", px: fitTileWidth(e.data.cols) }, location.origin);

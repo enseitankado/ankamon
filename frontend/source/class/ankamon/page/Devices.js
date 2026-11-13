@@ -332,6 +332,9 @@ qx.Class.define("ankamon.page.Devices", {
     TILE_REFRESH_MS: 8000,
     // "Kapanıyor…" yazısı (bkz. __sessionOps shutdownSent) cihaz bu süre içinde kapanmadıysa kalkar.
     SHUTDOWN_NOTE_MS: 3 * 60 * 1000,
+    // "Kapanıyor…" yazan cihaz kapanınca kutucukta bu süre "Kapandı" görünür, sonra kutucuk kalkar/kapalıya döner
+    // (kullanıcı isteği 2026-11-13; süre iframe'de: screen/index.html CLOSED_NOTE_MS). Bilgi biraz daha uzun gönderilir.
+    CLOSED_NOTE_MS: 3000,
 
     // Ekran görünümü kapandıktan (Liste ya da başka sayfa) bu kadar sonra önizleme akışları duraklar
     // (kutucuklar son görüntüleriyle kalır — bkz. __pausePreview).
@@ -1036,14 +1039,29 @@ qx.Class.define("ankamon.page.Devices", {
       return this.__shownDevices || [];
     },
 
+    /** "Kapanıyor…" yazıp kapanan cihazlar: id → kapandığı an (bkz. __previewList, __pushPreview closed). */
+    __closedNotes: null,
+
     __previewList() {
       const whoami = this.__whoamiState || new Map();
       const metrics = this.__metrics || {};
+      // "Kapanıyor…" (shutdownSent) yazan cihaz kapandı: BÜTÜN cihazlarda bakılır — kapanan cihaz süzgeçle (ör. yalnız
+      // çevrimiçi) listeden düşse de kutucuğu kalkmadan önce "Kapandı" gösterir (bkz. __pushPreview closed).
+      whoami.forEach((w, id) => {
+        const device = this.__devices && this.__devices.get(id);
+        if (w.off && device && !device.online) {
+          whoami.delete(id);
+          if (!this.__closedNotes) {
+            this.__closedNotes = new Map();
+          }
+          this.__closedNotes.set(id, Date.now());
+        }
+      });
       return this.__orderedShown().map(b => {
         // WoL yazısı (bkz. __sessionOps wolSent) cihaz açılınca kalkar; "Kapanıyor…" (shutdownSent) cihaz kapanınca
-        // ya da kapanmadıysa SHUTDOWN_NOTE_MS sonra.
+        // (yukarıda) ya da kapanmadıysa SHUTDOWN_NOTE_MS sonra.
         const w = whoami.get(b.id);
-        if (w && ((w.wol && b.online) || (w.off && (!b.online || Date.now() - w.off > ankamon.page.Devices.SHUTDOWN_NOTE_MS)))) {
+        if (w && ((w.wol && b.online) || (w.off && Date.now() - w.off > ankamon.page.Devices.SHUTDOWN_NOTE_MS))) {
           whoami.delete(b.id);
         }
         // Kutucuğun alt barı (bkz. screen/index.html Tile.setStats): grid'in İşlemci/Bellek/sensör
@@ -1124,14 +1142,23 @@ qx.Class.define("ankamon.page.Devices", {
         return;
       }
       const list = this.__previewList();
-      const key = JSON.stringify(list);
+      // Yeni kapanan cihazlar {id: an}: iframe kutucukta CLOSED_NOTE_MS "Kapandı" gösterir, listede yoksa sonra kaldırır.
+      const closed = {};
+      (this.__closedNotes || new Map()).forEach((at, id) => {
+        if (Date.now() - at < ankamon.page.Devices.CLOSED_NOTE_MS) {
+          closed[id] = at;
+        } else {
+          this.__closedNotes.delete(id);
+        }
+      });
+      const key = JSON.stringify([list, closed]);
       const el = this.__iframeEl();
       if (key === this.__previewKey || !el || !el.contentWindow) {
         return;
       }
       this.__previewKey = key;
       // Sayfa henüz yükleniyorsa mesaj kaybolabilir; sayfa hazır olunca "tm-ready" ile yeniden ister.
-      el.contentWindow.postMessage({ type: "tm-devices", devices: list }, window.location.origin);
+      el.contentWindow.postMessage({ type: "tm-devices", devices: list, closed }, window.location.origin);
     },
 
     /**
