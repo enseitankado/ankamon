@@ -1259,7 +1259,7 @@ qx.Class.define("ankamon.ui.DeviceOps", {
       }
       const esc = qx.bom.String.escape;
       const where = devices.length > 1 ? `${devices.length} cihaz` : esc(devices[0].label || devices[0].hostname || devices[0].ip);
-      const win = ankamon.ui.Dialog.window(`Kullanıcı sil — ${where}`, 480);
+      const win = ankamon.ui.Dialog.window(`Kullanıcı sil — ${devices.length > 1 ? devices.length + " cihaz" : devices[0].label || devices[0].hostname || devices[0].ip}`, 480);
       const status = new qx.ui.basic.Label("Hesaplar yükleniyor…").set({ rich: true, wrap: true, textColor: "app-muted" });
       win.add(status);
       // Listenin üstünde süzme kutusu: ad ya da tam adda geçen metne göre (işaretli olanlar gizlense de seçili kalır).
@@ -1350,7 +1350,7 @@ qx.Class.define("ankamon.ui.DeviceOps", {
       const can = feature => user.is_admin || user.features.includes(feature);
       const ADMIN = ["etapadmin", "root"];
       const where = devices.length > 1 ? `${devices.length} cihaz` : esc(devices[0].label || devices[0].hostname || devices[0].ip);
-      const win = ankamon.ui.Dialog.window(`Parola ayarla — ${where}`, 560);
+      const win = ankamon.ui.Dialog.window(`Parola ayarla — ${devices.length > 1 ? devices.length + " cihaz" : devices[0].label || devices[0].hostname || devices[0].ip}`, 560);
       // İki sekme: "Kullanıcılar" (toplu) ve yönetici hesapları (tek bilgisayarda, bkz. ui.devices.AdminPasswordPanel).
       const tabs = new qx.ui.tabview.TabView().set({ contentPadding: 0 });
       const pane = new qx.ui.tabview.Page("Kullanıcılar");
