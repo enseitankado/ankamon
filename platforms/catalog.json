@@ -37,7 +37,7 @@
   "functions": [
     { "id": "screen_view", "title": "Ekranı izleme / yönetme", "menu": ["Ekranı göster", "Bilgisayarı yönet"],
       "impl": { "linux": "x11vnc + SSH tüneli (paylaşımlı izleme yansıtıcısı)" } },
-    { "id": "screen_power", "title": "Ekranı uyandır / uyut", "menu": ["Uyandır", "Uyut"], "jobs": ["wake", "sleep"],
+    { "id": "screen_power", "title": "Ekranı uyandır / uyut", "menu": ["Ekranı uyandır", "Ekranı uyut"], "jobs": ["wake", "sleep"],
       "impl": { "linux": "xset dpms (X oturumu)" } },
     { "id": "screen_lock", "title": "Ekran kilidi", "menu": ["Ekranı kilitle", "Ekran kilidini aç"], "jobs": ["screen_lock", "screen_unlock"],
       "impl": { "linux": "cihaz bekçisi + EVIOCGRAB + tam ekran pencere" } },

@@ -275,7 +275,7 @@ def devices_from_devices(conn) -> int:
         activity.record(conn, f"Yeni cihaz (ağ envanterinde akıllı tahta): {r['mac']} ({r['ip'] or 'IP yok'})")
     # Kayıt açılırken cihazın adı çoğu zaman henüz bilinmez (ad/NetBIOS taraması sonra doldurur): adı boş cihaz kaydı,
     # cihazın sonradan öğrenilen adını alır (kullanıcı bildirimi 2026-11-11: Cihazlar listesinde "Bilgisayar adı" boş,
-    # Bilgisayar ayrıntılarında dolu). NetBIOS adı büyük harfle gelir (ETAP-8AB221): cihaz adları gibi küçük harfe çevrilir.
+    # Cihaz ayrıntılarında dolu). NetBIOS adı büyük harfle gelir (ETAP-8AB221): cihaz adları gibi küçük harfe çevrilir.
     named = conn.execute(
         """UPDATE devices b SET hostname = CASE WHEN d.hostname = upper(d.hostname) THEN lower(d.hostname) ELSE d.hostname END,
                   updated_at = now()

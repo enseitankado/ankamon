@@ -115,7 +115,9 @@ qx.Class.define("ankamon.page.Devices", {
       // Son 24 saatte sensör verisi geldi mi — Var/Yok (Varlıklar'la aynı ölçüt; backend Core\DeviceSensors::lastSeenAll).
       { id: "sensors", label: "Sensörler", hint: "Sensör verisi geliyor mu (son 24 saat)", width: 90, choices: true },
       { id: "seen", label: "Son görülme", width: 120 },
-      { id: "log", label: "Son log", width: 120 }
+      { id: "log", label: "Son log", width: 120 },
+      // Fiziksel konum (kullanıcı isteği 2026-11-13): Varlıklar'daki ile aynı değer (bkz. ui.network.PhysicalLocation, göç 054).
+      { id: "location", label: ankamon.ui.network.PhysicalLocation.LABEL, hint: ankamon.ui.network.PhysicalLocation.HINT, width: 150, choices: true }
     ];
     // storageKey: sütun genişliği + görünürlüğü localStorage'da kalıcı olur, sütun görünürlüğü
     // menüsü açılır (bkz. Base.js _createTable).
@@ -468,7 +470,8 @@ qx.Class.define("ankamon.page.Devices", {
             unit(m.cpu_temp, " °C"), unit(m.case_temp, " °C"), unit(m.disk_temp, " °C"),
             unit(m.fan_rpm, " RPM"), m.battery_v === null || m.battery_v === undefined ? "" : m.battery_v.toFixed(2) + " V",
             device.sensors_at ? "Var" : "Yok",
-            F.ago(device.last_seen_at), F.ago(device.last_log_at)
+            F.ago(device.last_seen_at), F.ago(device.last_log_at),
+            device.location || ""
           ]
         };
       });
@@ -1502,7 +1505,7 @@ qx.Class.define("ankamon.page.Devices", {
         own.forEach(item => menu.add(item));
       }
       // Bilgi kartı: ortak (bkz. DeviceOps.logsAndInfo). "Logları göster" burada yok (kullanıcı isteği 2026-11-11):
-      // Bilgisayar ayrıntıları penceresindeki "Loglar" düğmesinde.
+      // Cihaz ayrıntıları penceresindeki "Loglar" düğmesinde.
       const extra = ankamon.ui.DeviceOps.logsAndInfo(device, this._user, devices, { noLogs: true }).map(item => () => menu.add(item));
       // Bilgisayarı aç (WoL) artık DeviceOps.menu'de "Bilgisayarı kapat"ın hemen yanında (kullanıcı
       // isteği: ikisi komşu); çevrimiçi cihazda orada devre dışı görünür.

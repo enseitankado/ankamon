@@ -153,7 +153,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
 
       const columns = [
         { id: "name", label: "Cihaz", width: 180 },
-        { id: "location", label: "Konum", width: 120 },
+        { id: "location", label: ankamon.ui.network.PhysicalLocation.LABEL, hint: ankamon.ui.network.PhysicalLocation.HINT, width: 140 },
         { id: "status", label: "Durum", width: 100 },
         { id: "ip", label: "IP" }
       ];

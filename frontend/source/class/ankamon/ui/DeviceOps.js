@@ -35,7 +35,7 @@ qx.Class.define("ankamon.ui.DeviceOps", {
 
   statics: {
     /**
-     * Cihaz ekle (device null) / Düzenle. Düzenle artık Bilgisayar ayrıntıları penceresi (kullanıcı isteği 2026-11-09):
+     * Cihaz ekle (device null) / Düzenle. Düzenle artık Cihaz ayrıntıları penceresi (kullanıcı isteği 2026-11-09):
      * cihazın ağ envanteri satırı + "Cihaz" sekmesinde cihaza özel alanlar (bkz. ui.network.DeviceWindow, deviceForm).
      * Cihazlar'ın ve Bakım ▸ Ahenk'in sağ menüsündeki "Düzenle" buradan geçer (tek kaynak). Verilen satırda kayıt
      * alanları yoksa (ör. Ahenk grid'i) cihaz /api/devices/{id}'den okunur.
@@ -74,10 +74,11 @@ qx.Class.define("ankamon.ui.DeviceOps", {
 
     /**
      * Cihaz kaydının düzenlenebilir alanları (devices tablosu, PATCH /api/devices/{id}) — TEK liste: Cihaz ekle penceresi
-     * ve Bilgisayar ayrıntıları ▸ Cihaz sekmesi buradan kurulur; cihaza yeni düzenlenebilir alan eklenince ikisinde de
+     * ve Cihaz ayrıntıları ▸ Cihaz sekmesi buradan kurulur; cihaza yeni düzenlenebilir alan eklenince ikisinde de
      * kendiliğinden görünür (kullanıcı isteği 2026-11-09).
      * @param device {Map|null} null: yeni cihaz (takma ad ve kablolu MAC zorunlu)
-     * @param opts {Map?} {noLabel: true} — takma ad alanı yok (Bilgisayar ayrıntıları'nda tek takma ad Genel sekmesinde)
+     * @param opts {Map?} {noLabel: true} — takma ad alanı yok (Cihaz ayrıntıları'nda tek takma ad Genel sekmesinde);
+     *   {noLocation: true} — fiziksel konum alanı yok (aynı nedenle Genel sekmesinde)
      * @return {Map} {form, read()} — read(): doğrulanmış değerler ya da (hata gösterilip) null
      */
     deviceForm(device, opts = {}) {
@@ -92,7 +93,10 @@ qx.Class.define("ankamon.ui.DeviceOps", {
       if (!opts.noLabel) {
         form.text("label", "Takma ad" + mark, device.label, "ör. A Blok 2. Derslik");
       }
-      form.text("location", "Konum", device.location, "ör. B blok, 2. kat");
+      if (!opts.noLocation) {
+        // Fiziksel konum: Tesis Envanteri kodu (il.ilçe.tesis.bina.kat.salon) ya da serbest metin, hazır değer listeli.
+        form.addField("location", ankamon.ui.network.PhysicalLocation.LABEL, ankamon.ui.network.PhysicalLocation.field(device.location));
+      }
       form.text("ip", "IP adresi", device.ip).setToolTipText(
         "Cihazın bilinen adresi. Ağ taraması cihazın MAC'ini başka adreste görürse ya da cihaz yeni adresinden log " +
         "gönderirse kendiliğinden güncellenir.");
@@ -949,7 +953,7 @@ qx.Class.define("ankamon.ui.DeviceOps", {
      * menu()'nün dışında kalan iki ortak madde (Cihazlar sağ menüsünde Düzenle/Sil'in üstünde, Bakım ▸ Ahenk'te
      * de): Logları göster (Loglar sayfasını bu cihaza süzülmüş açar — bkz. ui.Shell.OPEN_LOGS) ve hemen altında
      * Bilgi kartı (kullanıcı isteği; yalnız çevrimiçi cihazda). Yetkiye göre boş dizi dönebilir.
-     * @param opts {Map?} {noLogs: true} — Logları göster eklenmez (Cihazlar/Varlıklar: Bilgisayar ayrıntıları ▸ Loglar
+     * @param opts {Map?} {noLogs: true} — Logları göster eklenmez (Cihazlar/Varlıklar: Cihaz ayrıntıları ▸ Loglar
      *   düğmesine taşındı — kullanıcı isteği 2026-11-11)
      */
     logsAndInfo(device, user, devices = [device], opts = {}) {
@@ -1054,14 +1058,15 @@ qx.Class.define("ankamon.ui.DeviceOps", {
           // Fare/klavye ile müdahale tek cihazda anlamlı: çoklu seçimde de yalnız sağ tıklanan cihaz.
           subAdd(screens, ICON.screenControl, "Bilgisayarı yönet", () => this.screen([device], user, true));
         }
-        // Uyandır: güç tasarrufuna girmiş (önizlemede siyah) ekranı uyandırır — çoklu seçimde tüm açık
+        // Ekranı uyandır / Ekranı uyut (kullanıcı isteği 2026-11-13: araç çubuğunda Güç altında "Uyandır" bilgisayarı uyandırmak
+        // sanılmasın diye başlarında "Ekranı" var). Uyandır: güç tasarrufuna girmiş (önizlemede siyah) ekranı uyandırır — çoklu seçimde tüm açık
         // cihazlar (bkz. worker executor/display.py). Ekranlar önizlemesinde iş penceresi açılmaz.
         if (can("screen")) {
-          subAdd(screens, ICON.wakeScreen, "Uyandır" + count, () => (sessionOps && sessionOps.wake
+          subAdd(screens, ICON.wakeScreen, "Ekranı uyandır" + count, () => (sessionOps && sessionOps.wake
             ? sessionOps.wake(online)
             : this.__job({ type: "wake", device_ids: online.map(b => b.id) }, "Ekranı uyandır")));
           // Uyut: ekranı güç tasarrufuna sokar (DPMS kapalı; cihaza dokunulunca açılır).
-          stateAdd(screens, ICON.sleepScreen, "Uyut" + count, online.filter(b => !this.isScreenAsleep(b)), list => (sessionOps && sessionOps.sleep
+          stateAdd(screens, ICON.sleepScreen, "Ekranı uyut" + count, online.filter(b => !this.isScreenAsleep(b)), list => (sessionOps && sessionOps.sleep
             ? sessionOps.sleep(list)
             : this.__job({ type: "sleep", device_ids: list.map(b => b.id) }, "Ekranı uyut")));
         }

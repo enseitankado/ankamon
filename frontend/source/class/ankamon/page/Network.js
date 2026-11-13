@@ -120,7 +120,10 @@ qx.Class.define("ankamon.page.Network", {
       { id: "activity_detail", label: "Ağ akışı", hint: "Görülen akış ayrıntısı: kbit/sn + baskın protokol; görünür akış yoksa Windows IP-ID gönderim hızı (sakin/boş).", width: 170 },
       // Sensörler: bağlı cihaz kaydına son 24 saatte sensör verisi geldi mi — Var/Yok (kullanıcı isteği 2026-11-12;
       // backend Core\DeviceSensors::lastSeenAll). Sona eklendi: servis/paylaşım alt satırları sabit sütun sırası kullanır.
-      { id: "sensors", label: "Sensörler", hint: "Sensör verisi geliyor mu (son 24 saat)", width: 90, choices: true }
+      { id: "sensors", label: "Sensörler", hint: "Sensör verisi geliyor mu (son 24 saat)", width: 90, choices: true },
+      // Fiziksel konum (kullanıcı isteği 2026-11-13): Tesis Envanteri kodu il.ilçe.tesis.bina.kat.salon ya da serbest metin
+      // (bkz. ui.network.PhysicalLocation, göç 054). Sona eklendi: servis/paylaşım alt satırları sabit sütun sırası kullanır.
+      { id: "location", label: ankamon.ui.network.PhysicalLocation.LABEL, hint: ankamon.ui.network.PhysicalLocation.HINT, width: 150, choices: true }
       // Ayrı "Takma ad" (MAC kaydı) sütunu yok (kullanıcı isteği, 2026-10-19: "Takma ad / Ad" ile yineleniyordu);
       // MAC ↔ takma ad kaydı "Takma ad / Ad"ın kendisini besler — bkz. ui.network.Ops.deviceName (known_alias).
     ];
@@ -174,7 +177,7 @@ qx.Class.define("ankamon.page.Network", {
         this.__toggle(id);
       }
     });
-    // Çift tıklama = Bilgisayar ayrıntıları (kullanıcı isteği; düzenleme sağ menüde ve ayrıntılar penceresinde).
+    // Çift tıklama = Cihaz ayrıntıları (kullanıcı isteği; düzenleme sağ menüde ve ayrıntılar penceresinde).
     this.__table.addListener("cellDbltap", e => {
       const id = this.__model.getValue(0, e.getRow());
       if (typeof id === "number" && e.getColumn() !== 2) {
@@ -345,7 +348,7 @@ qx.Class.define("ankamon.page.Network", {
       // activity_pps) yedek gösterilir. flow_at 10 dk'dan eskiyse görülen akış yok sayılır.
       // "Ağ etkinliği" STANDART sayısal metrik: görülen akış yoğunluğu, kbit/sn (pasif gözlem, flows.py).
       // Hücre tek bir SAYI (birim sütun başlığında); ölçüm yoksa (flow_at 10 dk'dan eski) null = boş.
-      // Baskın protokol ve Windows IP-ID gönderim hızı artık grid'de değil, Bilgisayar ayrıntıları penceresinde.
+      // Baskın protokol ve Windows IP-ID gönderim hızı artık grid'de değil, Cihaz ayrıntıları penceresinde.
       // İki sütun aynı pasif gözlem verisinden (flows.py):
       //  - "Ağ etkinliği": 0–100 GÖRELİ yoğunluk — referans o anki tüm cihazların görülen akışı (en yüksek = 100).
       //  - "Ağ akışı": insan-okur ayrıntı (kbit/sn + baskın protokol; görünür akış yoksa Windows IP-ID gönderim hızı).
@@ -387,7 +390,8 @@ qx.Class.define("ankamon.page.Network", {
           d.notes || "",
           F.etap(d.etap),
           normNum(d), flowText(d),
-          d.sensors_at ? "Var" : "Yok"
+          d.sensors_at ? "Var" : "Yok",
+          d.location || ""
         ]
       }));
       this.__apply();
@@ -598,7 +602,7 @@ qx.Class.define("ankamon.page.Network", {
 
     async __edit(device) {
       if (device) {
-        this.__showDetails(device); // düzenleme Bilgisayar ayrıntıları penceresinde
+        this.__showDetails(device); // düzenleme Cihaz ayrıntıları penceresinde
         return;
       }
       const networks = (this.__networks || []).filter(n => n.attached || (device && n.id === device.network_id));
@@ -611,7 +615,7 @@ qx.Class.define("ankamon.page.Network", {
       }
     },
 
-    /** Tek varlık: Bilgisayar ayrıntıları; birden çok: toplu düzenleme. */
+    /** Tek varlık: Cihaz ayrıntıları; birden çok: toplu düzenleme. */
     __editMany(devices) {
       if (devices.length === 1) {
         this.__showDetails(devices[0]);
@@ -724,7 +728,7 @@ qx.Class.define("ankamon.page.Network", {
     },
 
     /**
-     * Bilgisayar ayrıntıları (çift tıklama, sağ menü, Düzenle — kullanıcı isteği 2026-11-09): düzenle kipinde açılan
+     * Cihaz ayrıntıları (çift tıklama, sağ menü, Düzenle — kullanıcı isteği 2026-11-09): düzenle kipinde açılan
      * sekmeli pencere (Genel / Cihaz / Portlar ve paylaşımlar), alt düğme Kaydet — bkz. ui.network.DeviceWindow.
      */
     __showDetails(device) {
@@ -761,7 +765,7 @@ qx.Class.define("ankamon.page.Network", {
       const ICON = ankamon.ui.Shell.ICON;
       const add = (icon, label, handler) => menu.add(ankamon.ui.DeviceOps.menuButton(icon, label, handler));
       const count = devices.length > 1 ? ` (${devices.length} cihaz)` : "";
-      add(ICON.info, "Bilgisayar ayrıntıları", () => this.__showDetails(device));
+      add(ICON.info, "Cihaz ayrıntıları", () => this.__showDetails(device));
       menu.add(new qx.ui.menu.Separator());
       if (device.services.length || (device.shares && device.shares.length)) {
         add("▾", this.__expanded.has(device.id) ? "Ayrıntıları gizle" : "Ayrıntıları göster", () => this.__toggle(device.id));

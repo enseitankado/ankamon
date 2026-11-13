@@ -142,7 +142,7 @@ if [ -n "$wifi" ]; then
     chip=$(lspci -s "$(basename "$dev")" 2>/dev/null | sed 's/^[^ ]* [^:]*: //')
     [ -n "$chip" ] || chip="$(cat "$dev/../manufacturer" 2>/dev/null) $(cat "$dev/../product" 2>/dev/null)"  # USB wifi
     echo "WIFI_CHIP=$chip"
-    # Desteklenen bantlar (Bilgisayar ayrıntıları — kullanıcı isteği 2026-11-11): NetworkManager'ın kart özellikleri;
+    # Desteklenen bantlar (Cihaz ayrıntıları — kullanıcı isteği 2026-11-11): NetworkManager'ın kart özellikleri;
     # yoksa iw'nin bant listesi (Band 1 = 2,4 GHz, Band 2 = 5 GHz, Band 4 = 6 GHz).
     props=$(nmcli -t -f WIFI-PROPERTIES device show "$wifi" 2>/dev/null)
     bands=""

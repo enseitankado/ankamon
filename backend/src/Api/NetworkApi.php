@@ -46,7 +46,8 @@ use Ankamon\Core\Request;
 final class NetworkApi
 {
     // Arayüzdeki tür listesi ile worker/ankamon/netscan/classify.py adları aynı tutulur (serbest metin de kabul edilir).
-    private const TEXT_LIMITS = ['label' => 120, 'device_type' => 60, 'model' => 160, 'notes' => 2000, 'hostname' => 160];
+    // location: Fiziksel konum (Tesis Envanteri kodu il.ilçe.tesis.bina.kat.salon ya da serbest metin; göç 054 — bağlı cihazla eş).
+    private const TEXT_LIMITS = ['label' => 120, 'device_type' => 60, 'model' => 160, 'notes' => 2000, 'hostname' => 160, 'location' => 120];
 
     public function index(): array
     {
@@ -77,7 +78,7 @@ final class NetworkApi
         ];
     }
 
-    /** ?network=<id> (0/boş: tüm ağlar), ?device=<id> (yalnız o cihazın cihaz satırı — Bilgisayar ayrıntıları penceresi).
+    /** ?network=<id> (0/boş: tüm ağlar), ?device=<id> (yalnız o cihazın cihaz satırı — Cihaz ayrıntıları penceresi).
      * Her cihaz kendi servis listesiyle döner. */
     public function devices(Request $request): array
     {
@@ -89,7 +90,7 @@ final class NetworkApi
                     d.label, d.vendor, COALESCE(NULLIF(d.device_type, ''), d.type_auto) AS device_type,
                     d.device_type AS device_type_manual, d.type_auto,
                     COALESCE(NULLIF(d.model, ''), d.model_auto) AS model, d.model AS model_manual, d.model_auto,
-                    d.os_guess, extract(epoch FROM d.os_guess_at)::bigint AS os_guess_at, d.notes, d.source, d.online, d.etap,
+                    d.os_guess, extract(epoch FROM d.os_guess_at)::bigint AS os_guess_at, d.notes, d.location, d.source, d.online, d.etap,
                     -- IP/maske ve sunucunun o ağa bağlı olduğu arabirim(ler) (kullanıcı isteği 2026-11-09: tek listede iki sütun).
                     CASE WHEN d.ip IS NULL THEN NULL ELSE host(d.ip) || '/' || masklen(n.cidr) END AS ip_mask,
                     array_to_string(n.ifaces, ', ') AS iface,
@@ -151,6 +152,25 @@ final class NetworkApi
         // ETAP faz bilgisi (bkz. migration 018, worker netscan/etap_phase.py); yoksa null.
         $devices = array_map(static fn(array $d) => ['etap' => $d['etap'] === null ? null : json_decode((string) $d['etap'], true)] + $d, $devices);
         return ['devices' => $devices] + $state;
+    }
+
+    /**
+     * GET /api/network/locations → {locations: [{value, count}], prefix}: daha önce girilmiş fiziksel konumlar (varlıklar ve
+     * cihazlar; en çok kullanılan önce) — düzenleme pencerelerindeki hazır değer listesi. prefix: Ayarlar ▸ Kuruluş'taki
+     * il.ilçe.tesis kodlarından kodun öneki ("55.11.165."; kodlar eksikse boş).
+     */
+    public function locations(): array
+    {
+        $rows = Db::all(
+            "SELECT location AS value, count(*) AS count FROM (
+                 SELECT location FROM net_devices WHERE location <> ''
+                 UNION ALL
+                 -- Varlık kaydı olmayan cihazlar (eş değer net_devices'ta zaten sayıldı).
+                 SELECT b.location FROM devices b WHERE b.location <> ''
+                   AND NOT EXISTS (SELECT 1 FROM net_devices nd WHERE nd.mac = b.mac OR nd.mac = b.wifi_mac)
+             ) x GROUP BY location ORDER BY count(*) DESC, location LIMIT 500"
+        );
+        return ['locations' => $rows, 'prefix' => \Ankamon\Core\FacilityInventoryCode::prefix()];
     }
 
     public function createDevice(Request $request, array $user): array
@@ -320,6 +340,9 @@ final class NetworkApi
             if ($request->has($key)) {
                 $fields[$key] = mb_substr(trim((string) $request->input($key)), 0, $limit);
             }
+        }
+        if (isset($fields['location'])) {
+            $fields['location'] = mb_substr(\Ankamon\Core\FacilityInventoryCode::complete($fields['location']), 0, 120);
         }
         if ($request->has('ip')) {
             $ip = trim((string) $request->input('ip'));

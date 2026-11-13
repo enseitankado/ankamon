@@ -50,6 +50,9 @@ final class ExtensionsApi
         $out = [];
         foreach (Extensions::all() as $name => $ext) {
             $ext['values'] = self::readValues($name, $ext['settings']);
+            // Çekirdek ayarı asıl kaynak olan ve orada dolu alanlar (formda salt okunur; bkz. Extensions::coreLocked).
+            $ext['core_locked'] = array_values(array_map(static fn($p) => $p['key'],
+                array_filter($ext['settings'], static fn($p) => Extensions::coreLocked($p))));
             $out[] = $ext;
         }
         return ['extensions' => $out];
@@ -100,6 +103,10 @@ final class ExtensionsApi
                 $value = (int) $value;
             }
             // Kuruluş'tan dolan değer olduğu gibi kaydedilirse boş saklanır: ayar çekirdek ayarını izlemeyi sürdürür.
+            // core_source alanı çekirdekte doluyken eklentiye yazılmaz (asıl kaynak çekirdek; eklentinin eski kaydı dokunulmadan kalır).
+            if (Extensions::coreLocked($param)) {
+                continue;
+            }
             if (isset($param['default_from']) && $value !== ''
                 && (string) $value === (string) Extensions::coreDefault((string) $param['default_from'])) {
                 $value = '';
@@ -119,6 +126,8 @@ final class ExtensionsApi
             $stored = Settings::get('ext.' . $name . '.' . $key);
             if (($param['type'] ?? 'text') === 'password') {
                 $values[$key] = ($stored !== null && $stored !== '') ? '***' : '';
+            } elseif (Extensions::coreLocked($param)) {
+                $values[$key] = Extensions::coreDefault((string) $param['default_from']);
             } elseif (($stored === null || $stored === '') && isset($param['default_from'])) {
                 // Boş ayar çekirdek ayarından dolar (ör. "organization.name" — Ayarlar ▸ Kuruluş); bkz. Extensions::coreDefault.
                 $values[$key] = Extensions::coreDefault((string) $param['default_from']) ?? ($param['default'] ?? '');

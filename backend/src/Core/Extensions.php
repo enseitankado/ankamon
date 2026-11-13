@@ -84,6 +84,15 @@ final class Extensions
      */
     public static function setting(string $name, string $key, mixed $default = null): mixed
     {
+        // "core_source": true — çekirdek ayarı ASIL KAYNAK: doluysa eklentinin kendi kaydına bakılmaz (ör. il/ilçe/tesis
+        // kodları Ayarlar ▸ Kuruluş'ta girildiyse); boşsa eklentinin kendine kaydettiği değer kullanılır.
+        $param = self::param($name, $key);
+        if ($param !== null && !empty($param['core_source']) && isset($param['default_from'])) {
+            $core = self::coreDefault((string) $param['default_from']);
+            if ($core !== null && $core !== '') {
+                return $core;
+            }
+        }
         $value = Settings::get('ext.' . $name . '.' . $key);
         if ($value === null || $value === '') {
             // Şemada "default_from" varsa boş ayar çekirdek ayarından dolar (ör. Ayarlar ▸ Kuruluş).
@@ -97,6 +106,27 @@ final class Extensions
             }
         }
         return $value ?? $default;
+    }
+
+    /** Eklenti ayar şemasında anahtarın tanımı (yoksa null). */
+    public static function param(string $name, string $key): ?array
+    {
+        foreach ((self::get($name)['settings'] ?? []) as $param) {
+            if (($param['key'] ?? null) === $key) {
+                return $param;
+            }
+        }
+        return null;
+    }
+
+    /** "core_source" alanı şu an çekirdek ayarından mı geliyor (çekirdekte dolu — eklenti formunda salt okunur). */
+    public static function coreLocked(array $param): bool
+    {
+        if (empty($param['core_source']) || !isset($param['default_from'])) {
+            return false;
+        }
+        $core = self::coreDefault((string) $param['default_from']);
+        return $core !== null && $core !== '';
     }
 
     /**

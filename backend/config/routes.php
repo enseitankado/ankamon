@@ -76,6 +76,8 @@ return [
     ['POST',   '/api/network/devices',       [Api\NetworkApi::class, 'createDevice'],   'network.manage'],
     ['DELETE', '/api/network/devices',       [Api\NetworkApi::class, 'deleteDevices'],  'network.manage'],
     ['PATCH',  '/api/network/devices/{id}',  [Api\NetworkApi::class, 'updateDevice'],   'network.manage'],
+    // Fiziksel konum hazır değer listesi (Cihaz ayrıntıları — Varlıklar ve Akıllı Tahtalar'dan açılır).
+    ['GET',    '/api/network/locations',     [Api\NetworkApi::class, 'locations'],      'user'],
     // Varlıklar ▸ Web arayüzünü aç: aynı ağ → doğrudan adres, değilse konteyner vekili (bkz. Api\DeviceWebProxyApi).
     ['POST',   '/api/network/devices/{id}/web', [Api\DeviceWebProxyApi::class, 'open'], 'network'],
     ['PATCH',  '/api/network/networks/{id}', [Api\NetworkApi::class, 'updateNetwork'],  'network.manage'],

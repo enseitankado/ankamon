@@ -26,7 +26,7 @@
  */
 
 /**
- * Bilgisayar ayrıntıları — TOPLU düzenleme (kullanıcı isteği 2026-11-10): Ağ ▸ Varlıklar (ve varlık grupları) ile
+ * Cihaz ayrıntıları — TOPLU düzenleme (kullanıcı isteği 2026-11-10): Ağ ▸ Varlıklar (ve varlık grupları) ile
  * Ağ ▸ Akıllı Tahtalar'da birden çok satır işaretliyken "Düzenle". Tek bilgisayar penceresinin (ui.network.DeviceWindow)
  * alanlarını taşır; her bilgisayara ÖZGÜ olanlar (takma ad, IP adresi, bilgisayar adı, kablolu/kablosuz MAC) salt okunur
  * ve devre dışıdır — topluca değiştirilemez. Toplu değişebilenler: varlık türü, marka/model, not (ağ envanteri kaydı) ve
@@ -120,7 +120,7 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
       const can = f => user.is_admin || (user.features || []).includes(f);
       const Ops = ankamon.ui.network.Ops;
       const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
-      const win = ankamon.ui.Dialog.window(`Bilgisayar ayrıntıları — ${count} bilgisayar (toplu düzenleme)`, Math.min(720, root.width - 40));
+      const win = ankamon.ui.Dialog.window(`Cihaz ayrıntıları — ${count} cihaz (toplu düzenleme)`, Math.min(720, root.width - 40));
       win.set({ height: Math.min(700, root.height - 40) });
       win.add(new qx.ui.basic.Label(
         `<b>${count} bilgisayar</b> birlikte düzenleniyor. Yalnız değiştirdiğiniz alanlar hepsine yazılır; boş bırakılan ` +
@@ -141,6 +141,10 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
         Ops.TYPES.forEach(t => typeBox.add(new qx.ui.form.ListItem(t)));
         typeBox.setToolTipText("Seçilen bütün varlıkların türü. 'Akıllı tahta' türlü varlıklar Akıllı Tahtalar listesinde görünür.");
         this.__editable(assetForm, "device_type", "Varlık türü", assets, d => d.device_type_manual, typeBox);
+        // Fiziksel konum (Tesis Envanteri kodu) topluca: ör. aynı salondaki cihazlar. Cihaza bağlı varlıkta cihaz kaydına da eşlenir (göç 054).
+        const PL = ankamon.ui.network.PhysicalLocation;
+        this.__editable(assetForm, "location", PL.LABEL, assets, d => d.location,
+          PL.field("", this.__common(assets, d => d.location) === undefined ? this.MIXED : null));
         this.__editable(assetForm, "model", "Marka / model", assets, d => d.model_manual);
         this.__editable(assetForm, "notes", "Not", assets, d => d.notes);
         const general = page(`Genel (${assets.length} varlık)`);
@@ -154,7 +158,11 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
         if (!assetForm) {
           this.__fixed(deviceForm, "label", "Takma ad", devices, b => b.label);
         }
-        this.__editable(deviceForm, "location", "Konum", devices, b => b.location);
+        if (!assetForm) {
+          const PL = ankamon.ui.network.PhysicalLocation;
+          this.__editable(deviceForm, "location", PL.LABEL, devices, b => b.location,
+            PL.field("", this.__common(devices, b => b.location) === undefined ? this.MIXED : null));
+        }
         this.__fixed(deviceForm, "ip", "IP adresi", devices, b => b.ip);
         this.__fixed(deviceForm, "mac", "Kablolu MAC", devices, b => b.mac);
         this.__fixed(deviceForm, "wifi_mac", "Kablosuz MAC", devices, b => b.wifi_mac);
@@ -197,8 +205,8 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
       if (assetForm || deviceForm) {
         const save = new qx.ui.form.Button(`Kaydet (${count} bilgisayar)`);
         save.addListener("execute", async () => {
-          const assetChanges = assetForm ? this.__changed(assetForm, ["device_type", "model", "notes"]) : {};
-          const deviceChanges = deviceForm ? this.__changed(deviceForm, ["location", "exporter_port", "os_family", "monitor_enabled", "notes"]) : {};
+          const assetChanges = assetForm ? this.__changed(assetForm, ["device_type", "location", "model", "notes"]) : {};
+          const deviceChanges = deviceForm ? this.__changed(deviceForm, (assetForm ? [] : ["location"]).concat(["exporter_port", "os_family", "monitor_enabled", "notes"])) : {};
           if ("exporter_port" in deviceChanges) {
             const port = parseInt(deviceChanges.exporter_port, 10);
             if (!(port > 0 && port < 65536)) {
@@ -232,6 +240,7 @@ qx.Class.define("ankamon.ui.network.DeviceBulkEdit", {
           if (Object.keys(deviceChanges).length) {
             await run(devices, "/devices/", deviceChanges);
           }
+          ankamon.ui.network.PhysicalLocation.invalidate();
           if (failed) {
             ankamon.ui.Dialog.error(`${failed} kayıt kaydedilemedi; ötekiler kaydedildi.`);
           }

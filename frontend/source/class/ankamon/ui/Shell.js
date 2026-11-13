@@ -278,7 +278,7 @@ qx.Class.define("ankamon.ui.Shell", {
       // yalnız yöneticiye açık olduğundan diğer kullanıcılarda kökte görünür (bkz. __createTree).
       // Sekmeler yalnız yöneticide (diğer kullanıcı yalnız kendi temasını görür, sekme yok).
       { id: "settings", label: "Ayarlar", parent: "system", noIcon: true, create: u => new ankamon.page.Settings(u),
-        tabs: ["Görünüm", "Cihaz erişimi", "Ağ arabirimleri", "Ders saatleri", "Eklentiler"].map(label => ({ key: label, label, admin: true })) }
+        tabs: ["Görünüm", "Kuruluş", "Cihaz erişimi", "Ağ arabirimleri", "Ders saatleri", "Eklentiler"].map(label => ({ key: label, label, admin: true })) }
     ],
     LOG_KINDS: [
       { label: "Sistem logları", mode: "system" },

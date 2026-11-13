@@ -49,8 +49,10 @@ final class Settings
         // Ekranlar: cihazda x11vnc yoksa "Ekran istemcisini kur" (actions/vnc-install) arka planda
         // kendiliğinden çalıştırılsın mı (bkz. worker/ankamon/screen/__main__.py). Varsayılan: evet.
         'screen_vnc_autoinstall' => true,
-        // Kuruluş (Ayarlar ▸ Kuruluş): bildirim başlıklarında görünür, ntfy konu önerisi bundan türer.
-        'organization' => ['name' => '', 'code' => ''],
+        // Kuruluş (Ayarlar ▸ Kuruluş): bildirim başlıklarında görünür, ntfy konu önerisi bundan türer. il/ilçe/tesis kodları
+        // Tesis Envanteri Kodlama Sistemi'nin (il.ilçe.tesis.bina.kat.salon) önekidir: Fiziksel konum alanlarının önerisi ve
+        // Envanter eklentisinin envanter numarası buradan (asıl kaynak; bkz. Core\FacilityInventoryCode).
+        'organization' => ['name' => '', 'code' => '', 'il_kodu' => '', 'ilce_kodu' => '', 'tesis_kodu' => ''],
         // ntfy bildirimleri (Anomaliler ▸ Bildirimler; bkz. worker executor/ntfy.py).
         'ntfy' => ['server' => 'https://ntfy.sh', 'topic' => ''],
         // Cihaz sağlığı ▸ Yardım ▸ Denetim türleri (bkz. Api\AnomaliesApi::kinds/updateKind): sürekli izleme kurallarının

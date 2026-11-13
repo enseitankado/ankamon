@@ -66,10 +66,21 @@ final class SettingsApi
             $changed[] = 'screen_vnc_autoinstall';
         }
         if (is_array($org = $request->input('organization'))) {
-            Settings::set('organization', [
-                'name' => mb_substr(trim((string) ($org['name'] ?? '')), 0, 120),
-                'code' => mb_substr(trim((string) ($org['code'] ?? '')), 0, 40),
-            ]);
+            $current = Settings::get('organization');
+            $value = [
+                'name' => mb_substr(trim((string) ($org['name'] ?? $current['name'])), 0, 120),
+                'code' => mb_substr(trim((string) ($org['code'] ?? $current['code'])), 0, 40),
+            ];
+            // Tesis Envanteri kodunun il/ilçe/tesis parçaları: yalnız rakam, il ve ilçe en çok 2, tesis en çok 4 basamak
+            // (Envanter eklentisinin eski ayar doğrulamasıyla aynı sınırlar).
+            foreach (\Ankamon\Core\FacilityInventoryCode::PARTS as $key => [$label, $digits]) {
+                $part = trim((string) ($org[$key] ?? $current[$key] ?? ''));
+                if ($part !== '' && !preg_match('/^[0-9]{1,' . $digits . '}$/', $part)) {
+                    throw ApiError::badRequest("$label sayı olmalı ve en çok $digits basamaklı olabilir.");
+                }
+                $value[$key] = $part;
+            }
+            Settings::set('organization', $value);
             $changed[] = 'organization';
         }
         Audit::log($user, $request, 'settings.update', implode(',', $changed));

@@ -75,7 +75,10 @@ qx.Class.define("ankamon.ui.network.AssetCellHints", {
         "görünmüyorsa Windows cihazların gönderdiği paket sayısından tahmin edilir; 'sakin' = belirgin trafik yok.",
       sensors: "Bu cihazdan sensör verisi (işlemci, bellek, disk, sıcaklık, fan…) geliyor mu? Cihaza 'Metrik izlemeyi kur' " +
         "ile küçük bir ölçüm programı (node_exporter) kurulur; Ankamon onu dakikada bir okur. Var: son 24 saatte veri geldi. " +
-        "Yok: veri gelmedi (program kurulu değil, cihaz kapalı ya da yönetilen bir cihaz değil)."
+        "Yok: veri gelmedi (program kurulu değil, cihaz kapalı ya da yönetilen bir cihaz değil).",
+      location: "Cihazın okulda durduğu yer. Tesis Envanteri kodu il.ilçe.tesis.bina.kat.salon ile yazılır (ör. 55.11.165.1.2.15 " +
+        "= 55 il, 11 ilçe, 165 okul, 1. bina, 2. kat, 15. salon); kod bilinmiyorsa düz yazı da olur. Ankamon bunu kendisi " +
+        "bulamaz: Cihaz ayrıntıları penceresinde elle girilir. Akıllı tahtada Varlıklar ve Akıllı Tahtalar aynı değeri gösterir."
     },
 
     /** Ağ ▸ Akıllı Tahtalar (page.Devices) — Varlıklar'ın akıllı tahta alt kümesi. */
@@ -118,7 +121,10 @@ qx.Class.define("ankamon.ui.network.AssetCellHints", {
         "kurulan ölçüm programı (node_exporter) dakikada bir okunur. Var: son 24 saatte veri geldi. Yok: gelmedi (program " +
         "kurulu değil ya da cihaz kapalı).",
       seen: "Cihazın en son görüldüğü an (ağ taraması, SSH ya da log ile).",
-      log: "Cihazın Ankamon'a en son log (olay kaydı) gönderdiği an. Cihaz sistem loglarını ağ üzerinden Ankamon'a yollar."
+      log: "Cihazın Ankamon'a en son log (olay kaydı) gönderdiği an. Cihaz sistem loglarını ağ üzerinden Ankamon'a yollar.",
+      location: "Cihazın okulda durduğu yer. Tesis Envanteri kodu il.ilçe.tesis.bina.kat.salon ile yazılır (ör. 55.11.165.1.2.15 " +
+        "= 55 il, 11 ilçe, 165 okul, 1. bina, 2. kat, 15. salon); kod bilinmiyorsa düz yazı da olur. Ankamon bunu kendisi " +
+        "bulamaz: Cihaz ayrıntıları penceresinde elle girilir. Akıllı tahtada Varlıklar ve Akıllı Tahtalar aynı değeri gösterir."
     },
 
     /**

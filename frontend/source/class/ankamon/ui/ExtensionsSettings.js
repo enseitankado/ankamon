@@ -229,7 +229,13 @@ qx.Class.define("ankamon.ui.ExtensionsSettings", {
           const field = new qx.ui.form.TextField(value != null ? String(value) : "").set({
             placeholder: param.placeholder || ""
           });
-          if (param.default_from) {
+          if (param.core_source && (ext.core_locked || []).includes(key)) {
+            // Asıl kaynak çekirdek ayarı ve orada dolu (Extensions::coreLocked): burada değiştirilmez.
+            field.set({ readOnly: true, toolTipText: "Ayarlar ▸ Kuruluş'ta kayıtlı (asıl kaynak) — değiştirmek için Ayarlar ▸ Kuruluş'u düzenleyin." });
+          } else if (param.core_source) {
+            field.setToolTipText("Ayarlar ▸ Kuruluş'ta henüz girilmemiş: burada yazılan değer eklentinin kendi ayarına kaydedilir. " +
+              "Kuruluş'a girildiğinde oradaki değer geçerli olur (asıl kaynak Ayarlar ▸ Kuruluş).");
+          } else if (param.default_from) {
             // Sunucu boş ayarı çekirdek ayarından doldurur (ExtensionsApi default_from); aynı değer kalırsa izlemeyi sürdürür.
             field.setToolTipText("Ayarlar ▸ Kuruluş'tan otomatik dolar; değiştirmezseniz oradaki değişikliği izler.");
           }

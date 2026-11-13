@@ -89,7 +89,7 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
     /** Menü maddesi → grup (menüdeki etiket, cihaz sayısı eki olmadan — bkz. DeviceOps.menuButton). */
     ITEMS: {
       "Ekranı göster": "watch", "Ekran görüntüsü al": "watch", "Bilgisayarı yönet": "manage",
-      "Uyandır": "power", "Uyut": "power",
+      "Ekranı uyandır": "power", "Ekranı uyut": "power",
       "Ekranı kilitle": "lock", "Ekran kilidini aç": "lock", "Klavyeyi kilitle": "lock", "Klavye kilidini aç": "lock", "Fareyi kilitle": "lock",
       "Fare kilidini aç": "lock", "Dokunmatiği kilitle": "lock", "Dokunmatik kilidini aç": "lock",
       "Ekranımı yansıt": "watch", "Ekranı başka bilgisayara aktar…": "watch", "Ekran aktarımını durdur": "watch",

@@ -69,6 +69,19 @@ qx.Class.define("ankamon.page.Settings", {
       org.text("code", "Kuruluş kodu", (settings.organization || {}).code || "");
       this.__section(orgPage, "Kuruluş",
         "Okul ya da kurumun adı ve kodu (ör. MEB kurum kodu). Bildirim başlıklarında görünür; Sağlık ▸ Bildirimler'deki ntfy konu önerisi bunlardan türetilir.", org);
+      // Tesis Envanteri kodunun kurum parçaları (kullanıcı isteği 2026-11-13): ASIL KAYNAK burası — cihazların Fiziksel konum
+      // önerisi ve Envanter eklentisinin envanter numarası öneki (eklenti ayarı yalnız burası boşken kendi değerini kullanır).
+      const facility = new ankamon.ui.Form();
+      const o = settings.organization || {};
+      facility.text("il_kodu", "İl kodu", o.il_kodu || "", "ör. 55 (en çok 2 basamak)");
+      facility.text("ilce_kodu", "İlçe kodu", o.ilce_kodu || "", "ör. 11 (en çok 2 basamak)");
+      facility.text("tesis_kodu", "Tesis kodu", o.tesis_kodu || "", "ör. 165 (en çok 4 basamak)");
+      facility.softPlaceholders();
+      this.__section(orgPage, "Tesis Envanteri kodu",
+        ankamon.ui.network.PhysicalLocation.HINT_HTML +
+        "<br><br>Buradaki il, ilçe ve tesis kodları kodun ilk üç parçasıdır ve tüm Ankamon'da <b>asıl kaynaktır</b>: Fiziksel konum " +
+        "alanları bu öneki önerir; Envanter eklentisi envanter numarasının önekini buradan alır (burası boşsa eklentinin kendi " +
+        "ayarındaki kodlar kullanılır).", facility);
       tabs.add(orgPage);
 
       const access = this.__page("Cihaz erişimi");
@@ -108,7 +121,7 @@ qx.Class.define("ankamon.page.Settings", {
         `log alımı (port ${settings.syslog_port}), sensör okuma, SSH/Samba ile cihaz yönetimi, ağ taraması ve görülen akış ` +
         "gözlemi, servis/paylaşım/etkinlik taramaları, loglardan cihaz kaydı, Wake-on-LAN (cihazın bulunduğu ağa), ekran " +
         "yansıtma ve yerel ad duyurusu (Avahi). Bir cihazın cihaz olup olmadığına hangi ağda görüldüğü değil MAC adresi karar " +
-        "verir (ETAP cihaz önekleri; uymayan cihazın Bilgisayar ayrıntıları'nda varlık türü \"Akıllı tahta\" seçilir). Yeni bir " +
+        "verir (ETAP cihaz önekleri; uymayan cihazın Cihaz ayrıntıları'nda varlık türü \"Akıllı tahta\" seçilir). Yeni bir " +
         "kart takılınca ya da adresi değişince bir sonraki ağ taramasında kendiliğinden kullanılmaya başlar; ağ başına taramayı " +
         "durdurmak için Ağ ▸ Varlıklar ▸ <i>Ağlar</i> düğmesi. Kartlar arasında IP yönlendirmesi yapılmaz (ağlar birbirine " +
         "açılmaz).", this.__ifaceTable(settings.interfaces), 900);
@@ -139,7 +152,7 @@ qx.Class.define("ankamon.page.Settings", {
             ssh_access: ssh.values(),
             samba_access: samba.values(),
             screen_vnc_autoinstall: vncAuto.getValue(),
-            organization: org.values()
+            organization: Object.assign(org.values(), facility.values())
           });
           await ankamon.io.Api.put("/lesson-times", lessons.getValue());
           ankamon.ui.Dialog.alert("Ayarlar kaydedildi.");

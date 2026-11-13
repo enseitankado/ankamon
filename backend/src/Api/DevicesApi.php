@@ -307,6 +307,10 @@ final class DevicesApi
         if (($fields['hostname'] ?? null) === '') {
             $fields['hostname'] = null;
         }
+        // Fiziksel konum: yalnız bina.kat.salon yazıldıysa Kuruluş'taki il.ilçe.tesis öneki eklenir (Tesis Envanteri kodu).
+        if (isset($fields['location'])) {
+            $fields['location'] = mb_substr(\Ankamon\Core\FacilityInventoryCode::complete($fields['location']), 0, 120);
+        }
         if ($request->has('ip')) {
             $ip = trim((string) $request->input('ip'));
             if ($ip !== '' && !filter_var($ip, FILTER_VALIDATE_IP)) {
