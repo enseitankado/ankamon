@@ -62,7 +62,8 @@ qx.Class.define("ankamon.ui.devices.WifimonRender", {
         hint: "Duyulan vericinin MAC adresi (satıra çift tıklayın: bütün ayrıntılar)" },
       // Eskiden cihaz adının başındaki "N×" (kullanıcı isteği 2026-11-11: ayrı sütun). Görülme sayısı DEĞİL: aynı cihaz
       // sayılıp bu satırda birleşen rastgele adres sayısı (row.addrs; ölçütler WifimonClassify.MERGE_CRITERIA).
-      { id: "addrs", label: "Adres sayısı", width: 84, choices: true,
+      // Varsayılan gizli (kullanıcı isteği 2026-11-13; sütun menüsünden açılabilir — Kanıt'ta "N adres" zaten var).
+      { id: "addrs", label: "Adres sayısı", width: 84, choices: true, hidden: true,
         hint: "Aynı cihaz sayılıp bu satırda birleşen (rastgele) MAC adresi sayısı — telefonlar adreslerini değiştirir; ipucunda adresler" },
       { id: "kind", label: "Tür", width: 170, choices: true },
       { id: "name", label: "Ad", width: 170, hint: "Ağ adı (SSID); bağlı cihazda bağlı olduğu ağ" },
@@ -85,9 +86,19 @@ qx.Class.define("ankamon.ui.devices.WifimonRender", {
       { id: "seen", label: "Son tarama", width: 110, choices: false }
     ],
 
+    __collator: null,
+
+    /**
+     * Hızlı HTML kaçışı (& < > " '): qx.bom.String.escape her karakteri tablo eşlemesinden geçirir (Türkçe harfleri de
+     * varlığa çevirir) ve her render'da binlerce hücrede pahalıydı. Hücre/ipucu metinleri için bu yeterli ve güvenli.
+     */
+    esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    },
+
     chip(text, color, tip) {
-      return `<span title="${qx.bom.String.escape(tip || "")}" style="display:inline-block;padding:0 7px;border-radius:9px;font-size:12px;` +
-        `line-height:18px;font-weight:600;color:${color};border:1px solid ${color}66;white-space:nowrap">${qx.bom.String.escape(text)}</span>`;
+      return `<span title="${this.esc(tip || "")}" style="display:inline-block;padding:0 7px;border-radius:9px;font-size:12px;` +
+        `line-height:18px;font-weight:600;color:${color};border:1px solid ${color}66;white-space:nowrap">${this.esc(text)}</span>`;
     },
 
     /** Sinyal göstergesi: çubuk, yüzde (sabit genişlikte — çubuklar alt alta hizalı kalsın) ve yakınlık. Hücrede sola yaslı. */
@@ -221,7 +232,7 @@ qx.Class.define("ankamon.ui.devices.WifimonRender", {
      * @return {Map} {rows: Array, meta: Map}
      */
     sensorModel(entries) {
-      const esc = qx.bom.String.escape;
+      const esc = s => this.esc(s);
       const L = this.LEVELS;
       const rows = [];
       const meta = new Map();
@@ -285,7 +296,7 @@ qx.Class.define("ankamon.ui.devices.WifimonRender", {
      * @return {Map} {rows: Array, meta: Map}
      */
     model(entries, opts) {
-      const esc = qx.bom.String.escape;
+      const esc = s => this.esc(s);
       const rows = [];
       const meta = new Map();
       const now = opts.now;
@@ -400,10 +411,14 @@ qx.Class.define("ankamon.ui.devices.WifimonRender", {
           }
           return String(row[index] ?? "");
         };
+        // Tek paylaşılan Collator (kullanıcı bildirimi 2026-11-13, 15-20 sensörde tarayıcı yavaşlıyordu): localeCompare(…, "tr",
+        // {numeric}) HER karşılaştırmada yeni bir Intl.Collator kurar; her render'da binlerce satır yeniden sıralanınca ana iş
+        // parçacığının yarıdan fazlası burada gidiyordu.
+        const collator = this.__collator || (this.__collator = new Intl.Collator("tr", { numeric: true }));
         const compare = asc => (a, b) => {
           const ka = key(a);
           const kb = key(b);
-          const r = typeof ka === "number" && typeof kb === "number" ? ka - kb : String(ka).localeCompare(String(kb), "tr", { numeric: true });
+          const r = typeof ka === "number" && typeof kb === "number" ? ka - kb : collator.compare(String(ka), String(kb));
           return asc ? r : -r;
         };
         model.setSortMethods(index, { ascending: compare(true), descending: compare(false) });

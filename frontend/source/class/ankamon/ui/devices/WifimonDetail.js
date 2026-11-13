@@ -36,6 +36,77 @@ qx.Class.define("ankamon.ui.devices.WifimonDetail", {
 
   statics: {
     /**
+     * "Cihaz kimliği" bölümü: adres türü, birleşme özeti ve gerekçe rozetleri, WPS kimliği, IE parmak izi, aynı cihaz sayma
+     * ölçütleri (✓ eşleşen yeşil, – eşleşmeyen soluk; başlık kalın + açıklama küçük) ve adresler (eş genişlikli ızgara).
+     * plain: "Tümünü kopyala" metnine satır ekler.
+     */
+    __deviceSection(row, addrs, section, plain, esc) {
+      const Classify = ankamon.ui.devices.WifimonClassify;
+      const why = new Set(row.why || []);
+      const probing = row.kind === "probe" || (row.also || []).includes("probe");
+      const muted = s => `<span style="opacity:.65">${s}</span>`;
+      const badge = (text, color) => `<span style="display:inline-block;margin:0 4px 3px 0;padding:0 8px;border-radius:9px;` +
+        `font-size:12px;line-height:19px;color:${color};border:1px solid ${color}66;white-space:nowrap">${esc(text)}</span>`;
+      const facts = [
+        ["Adres türü", row.random ? "Rastgele (yerel yönetimli)" : "Kalıcı (üretici)",
+          row.random ? `<b>Rastgele</b> (yerel yönetimli) ${muted("— üretici kodu taşımaz; telefonlar adresini değiştirir")}`
+            : `<b>Kalıcı</b> (üretici adresi) ${muted("— cihaza özgü, değişmez")}`]
+      ];
+      if (addrs.length > 1) {
+        facts.push(["Aynı cihaz sayılan", `${addrs.length} adres`, `<b>${addrs.length}</b> adres ${muted("(aşağıda)")}`]);
+      } else if (row.random && probing) {
+        facts.push(["Aynı cihaz sayılan", "yalnız bu adres", muted("Başka bir adresle aynı cihaz sayılmadı")]);
+      }
+      if (why.size) {
+        const list = [...why].map(w => Classify.MERGE_REASON[w] || w);
+        facts.push(["Birleşme gerekçesi", list.join(", "), list.map(t => badge(t, "#1e8e3e")).join("")]);
+      }
+      const w = row.wps || {};
+      const wpsName = [w.maker, w.name, w.model, w.number].filter(Boolean).join(" · ");
+      if (wpsName || w.uuid) {
+        facts.push(["WPS kimliği", [wpsName, w.uuid].filter(Boolean).join(" — "),
+          (wpsName ? `<b>${esc(wpsName)}</b>` : "") + (w.uuid ? `<div style="font-family:monospace;font-size:12px;opacity:.75">UUID-E ${esc(w.uuid)}</div>` : "")]);
+      }
+      if (Array.isArray(row.iefp) && row.iefp.some(Boolean)) {
+        const names = ["HT", "VHT", "Hızlar", "Gen. yetenek", "Üretici"];
+        const slots = row.iefp.map((v, i) => [names[i], v ? Number(v).toString(16).padStart(4, "0") : "—"]);
+        if (row.ieord) {
+          slots.push(["IE sırası", Number(row.ieord).toString(16).padStart(4, "0")]);
+        }
+        facts.push(["IE parmak izi", slots.map(([k, v]) => `${k} ${v}`).join(" · "),
+          `<div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px">` + slots.map(([k, v]) =>
+            `<span>${muted(esc(k))} <span style="font-family:monospace">${esc(v)}</span></span>`).join("") + "</div>"]);
+      }
+      let html = section("Cihaz kimliği", facts);
+
+      if (row.random && probing || addrs.length > 1) {
+        const rowsHtml = Classify.MERGE_CRITERIA.map(([code, text]) => {
+          const hit = why.has(code);
+          const cut = text.indexOf(": ");
+          const title = cut > 0 ? text.slice(0, cut) : text;
+          const desc = cut > 0 ? text.slice(cut + 2) : "";
+          plain.push(`${hit ? "✓" : "–"} ${text}`);
+          return `<tr style="${hit ? "" : "opacity:.6"}"><td style="padding:4px 10px 4px 0;vertical-align:top;font-weight:700;` +
+            `color:${hit ? "#1e8e3e" : "inherit"}">${hit ? "✓" : "–"}</td><td style="padding:4px 0;vertical-align:top">` +
+            `<b>${esc(title)}</b>${desc ? `<div style="font-size:12px;opacity:.75">${esc(desc)}</div>` : ""}</td></tr>`;
+        }).join("");
+        const note = "Aranan ağ listeleri çelişen adresler birleşmez; kalıcı (üretici) adresler birleştirilmez. Kestirimdir: aynı model " +
+          "iki telefon yan yanaysa birleşebilir.";
+        plain.push(note, "");
+        html += `<h3 style="margin:12px 0 4px;font-size:13px">Aynı cihaz sayma ölçütleri ${muted("(✓ bu satırda eşleşen)")}</h3>` +
+          `<table style="border-collapse:collapse;width:100%">${rowsHtml}</table>` +
+          `<div style="font-size:12px;opacity:.65;margin-top:4px">${esc(note)}</div>`;
+      }
+
+      plain.push(`Adresler (${addrs.length}):`, ...addrs, "");
+      html += `<h3 style="margin:12px 0 4px;font-size:13px">Adresler (${addrs.length})</h3>` +
+        `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:3px 12px;font-family:monospace;font-size:12px">` +
+        addrs.map(a => `<span${a === row.addr ? ' style="font-weight:700" title="Satırda gösterilen (en çok yoklayan) adres"' : ""}>` +
+          `${esc(a)}</span>`).join("") + "</div>";
+      return html;
+    },
+
+    /**
      * @param m {Map} Tespitler satırının meta kaydı (WifimonRender.model: {feed, item, row, hint, texts …})
      * @param all {Map} bütün satırların meta kayıtları (aynı cihazı duyan öbür sensörler için)
      */
@@ -48,10 +119,12 @@ qx.Class.define("ankamon.ui.devices.WifimonDetail", {
       const addrs = (row.addrs && row.addrs.length ? row.addrs : [row.addr]).filter(Boolean);
       const plain = [];
       const section = (title, rows) => {
+        // [etiket, düz değer, HTML biçimi?]: ekranda HTML biçimi (varsa), "Tümünü kopyala"da düz değer. (Eskiden ikisi takastı:
+        // HTML biçimi — pre-wrap satırlar, rozetler — hiç görünmüyordu.)
         const body = rows.filter(r => r && r[1] !== null && r[1] !== undefined && r[1] !== "").map(([k, v, raw]) => {
-          plain.push(`${k}: ${String(raw ?? v).replace(/<[^>]*>/g, "")}`);
+          plain.push(`${k}: ${String(v).replace(/<[^>]*>/g, "")}`);
           return `<tr><td style="padding:3px 14px 3px 0;vertical-align:top;white-space:nowrap;opacity:.75">${esc(k)}</td>` +
-            `<td style="padding:3px 0;vertical-align:top">${raw === undefined ? esc(v) : v}</td></tr>`;
+            `<td style="padding:3px 0;vertical-align:top">${raw === undefined ? esc(v) : raw}</td></tr>`;
         }).join("");
         plain.push("");
         return body ? `<h3 style="margin:12px 0 4px;font-size:13px">${esc(title)}</h3><table style="border-collapse:collapse;width:100%">${body}</table>` : "";
@@ -76,15 +149,14 @@ qx.Class.define("ankamon.ui.devices.WifimonDetail", {
       html += section("Açıklamalar", [
         ["Durum", hint.level, pre(hint.level)],
         ["Tür", hint.kind, hint.kind ? pre(hint.kind) : undefined],
-        ["Cihaz", hint.device, hint.device ? pre(hint.device) : undefined],
         ["Üretici", hint.vendor, hint.vendor ? pre(hint.vendor) : undefined]
       ]);
+      // Cihaz kimliği (kullanıcı isteği 2026-11-13: eskiden hücre ipucunun düz metni tek blok halinde duruyordu).
+      html += this.__deviceSection(row, addrs, section, plain, esc);
       const terms = texts.evidence || [];
       if (terms.length) {
         html += section("Kanıtlar", terms.map(t => [t.text, t.tip && t.tip !== t.text ? t.tip : "✓"]));
       }
-      html += section(`Adresler (${addrs.length})`, addrs.map((a, i) => [String(i + 1), a,
-        `<span style="font-family:monospace">${esc(a)}</span>`]));
 
       // Bu pencerede aynı cihazı duyan bütün sensörler (aynı satır anahtarı).
       const peers = [...(all ? all.values() : [])].filter(x => x && !x.sensor && x.item && x.item.key === m.item.key);

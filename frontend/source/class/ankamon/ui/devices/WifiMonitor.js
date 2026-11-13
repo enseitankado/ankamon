@@ -169,9 +169,11 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
           "açın ya da bu cihazları dahil edin (Wi-Fi bağlantıları pencere açıkken kopar).", "Wi-Fi Monitör");
         return;
       }
-      const bounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280 };
-      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör", Math.max(900, Math.min(1400, bounds.width - 40)), { maximizable: true });
-      win.setHeight(640);
+      const bounds = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1280, height: 800 };
+      // Ekrana sığar (kenarları her zaman tutulup boyutlandırılabilsin); en küçük boyut pencere içeriğinden (Flow çubuklar).
+      const win = ankamon.ui.Dialog.window("Wi-Fi Monitör", Math.min(bounds.width - 20, Math.max(900, Math.min(1400, bounds.width - 40))),
+        { maximizable: true });
+      win.set({ height: Math.min(640, (bounds.height || 800) - 40), minWidth: 480, minHeight: 320 });
       this.__win = win;
       win.ctx = this.__createWifimonContext(win, user);
       devices.forEach(device => win.ctx.addDevice(device, plan.get(device.id) || {}));
@@ -191,8 +193,10 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
       const Render = ankamon.ui.devices.WifimonRender;
       const Base = ankamon.page.Base;
 
-      // Üst satır (iki sekmede ortak): tarama denetimleri.
-      const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" }));
+      // Üst satır (iki sekmede ortak): tarama denetimleri. Flow düzeni (kullanıcı bildirimi 2026-11-13, pencere fareyle
+      // daraltılamıyordu): tek satırlık HBox'lar pencerenin en küçük genişliğini ~1200 px'e kilitliyordu; Flow'da öğeler
+      // pencere daralınca alt satıra geçer.
+      const bar = new qx.ui.container.Composite(new qx.ui.layout.Flow(10, 6).set({ alignY: "middle" }));
       const refresh = new qx.ui.form.Button("Yenile");
       const watchBox = new qx.ui.form.CheckBox("Sürekli izle").set({
         value: true,
@@ -205,9 +209,7 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
       });
       const fixedBox = new qx.ui.form.CheckBox("Güvenilirleri göster");
       const help = new qx.ui.form.Button("?").set({ toolTipText: "Neler görülebilir, sınırlar" });
-      [refresh, watchBox, probeBox, fixedBox].forEach(w => bar.add(w));
-      bar.add(new qx.ui.core.Spacer(), { flex: 1 });
-      bar.add(help);
+      [refresh, watchBox, probeBox, fixedBox, help].forEach(w => bar.add(w));
       win.add(bar);
 
       // Sekmeler (kullanıcı isteği 2026-11-10): Tespitler (varsayılan) ve Sensörler, her biri kendi grid'iyle.
@@ -221,7 +223,7 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
       win.add(tabs, { flex: 1 });
 
       // Tespitler: güven işlemleri satır başındaki onay kutusuyla işaretlenen satırlara uygulanır.
-      const trustBar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
+      const trustBar = new qx.ui.container.Composite(new qx.ui.layout.Flow(8, 6).set({ alignY: "middle" }));
       const trustClass = new qx.ui.form.Button("Bu sınıfta güvenilir AP").set({ enabled: false });
       const trustSchool = new qx.ui.form.Button("Okul genelinde güvenilir AP").set({ enabled: false });
       const untrust = new qx.ui.form.Button("Güvenilirlikten çıkar").set({ enabled: false });
@@ -230,9 +232,7 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
         toolTipText: "Şu an görünen bütün kalıcı adresli vericileri kendi sınıflarına güvenilir işaretler (sınıflar boşken yapın)."
       });
       const manage = new qx.ui.form.Button("Güvenilir listesi…");
-      [trustClass, trustSchool, untrust, checkedInfo].forEach(w => trustBar.add(w));
-      trustBar.add(new qx.ui.core.Spacer(), { flex: 1 });
-      [baseline, manage].forEach(w => trustBar.add(w));
+      [trustClass, trustSchool, untrust, baseline, manage, checkedInfo].forEach(w => trustBar.add(w));
       findingsPage.add(trustBar);
 
       // Güvenlik uyarı şeridi (çevredeki AP'lerde pasif anomali — worker screen/wifimon_wids.py): yalnız bulgu varken görünür.
@@ -337,16 +337,23 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
       const filters = host._addColumnFilters(table, columns, apply, { rows: () => allRows, persist: true, persistSkip: ["sensor"] });
       const sensorFilters = host._addColumnFilters(sensorTable, sensorColumns, applySensors, { rows: () => sensorRows, persist: true, persistSkip: ["sensor"] });
 
+      // Uyarlanır kısma (kullanıcı bildirimi 2026-11-13: 15-20 sensörde tarayıcı yavaşlıyordu): her ileti render ister ama
+      // bir sonraki render, son render süresinin 4 katı geçmeden çalışmaz (en az 120 ms, en çok 2 sn) — ana iş parçacığının
+      // en çok ~%20'si yeniden kuruluma gider, iletiler ne kadar sık gelirse gelsin.
+      let renderCost = 0;
+      let lastRenderAt = 0;
       const render = () => {
         if (renderQueued || closed) {
           return;
         }
         renderQueued = true;
+        const wait = Math.max(120, Math.min(2000, renderCost * 4) - (Date.now() - lastRenderAt));
         qx.event.Timer.once(() => {
           renderQueued = false;
           if (closed) {
             return;
           }
+          const started = performance.now();
           const now = Date.now();
           const list = Array.from(feeds.values());
           const hearers = Classify.hearers(list);
@@ -364,7 +371,9 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
           renderAnomalies();
           const watching = list.some(f => f.watching && f.ws);
           win.setCaption(`Wi-Fi Monitör — ${list.length === 1 ? list[0].name : list.length + " sensör"}${watching ? " · sürekli izleniyor" : ""}`);
-        }, null, 120);
+          lastRenderAt = Date.now();
+          renderCost = performance.now() - started;
+        }, null, wait);
       };
 
       // Onay kutusu değişince işaretli küme güncellenir (görünmeyen — süzülmüş — satırların işareti korunur).

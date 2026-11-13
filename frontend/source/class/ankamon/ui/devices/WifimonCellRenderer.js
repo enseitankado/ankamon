@@ -57,13 +57,13 @@ qx.Class.define("ankamon.ui.devices.WifimonCellRenderer", {
     // overridden
     _getCellAttributes(cellInfo) {
       const hint = this.__wifimonHint ? this.__wifimonHint(cellInfo) : null;
-      return hint ? `title="${qx.bom.String.escape(hint).replace(/"/g, "&quot;")}"` : "";
+      return hint ? `title="${ankamon.ui.devices.WifimonRender.esc(hint)}"` : "";
     },
 
     // overridden
     _getContentHtml(cellInfo) {
       const html = this.__wifimonHtml ? this.__wifimonHtml(cellInfo) : null;
-      return html === null || html === undefined ? qx.bom.String.escape(this._formatValue(cellInfo)) : html;
+      return html === null || html === undefined ? ankamon.ui.devices.WifimonRender.esc(this._formatValue(cellInfo)) : html;
     }
   }
 });

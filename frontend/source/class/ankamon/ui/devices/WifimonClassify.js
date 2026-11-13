@@ -159,8 +159,11 @@ qx.Class.define("ankamon.ui.devices.WifimonClassify", {
       merged.dev = old.dev || row.dev;
       const fa = row.iefp;
       const fb = old.iefp;
-      if (Array.isArray(fa) && fa.length === 5 && Array.isArray(fb) && fb.length === 5) {
-        merged.iefp = fa.map((v, i) => v || fb[i]);  // slotları birleştir (bantlar arası)
+      const okA = Array.isArray(fa) && fa.length === 5;
+      const okB = Array.isArray(fb) && fb.length === 5;
+      if (okA || okB) {
+        // slotları birleştir (bantlar arası); yalnız birinde varsa o korunur (eskiden ikisinde de yoksa düşüyordu)
+        merged.iefp = okA && okB ? fa.map((v, i) => v || fb[i]) : (okA ? fa : fb);
       }
       merged.ieord = row.ieord || old.ieord;
       return merged;

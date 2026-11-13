@@ -187,8 +187,22 @@ qx.Class.define("ankamon.page.Base", {
      */
     choicesSuitable(values) {
       const B = ankamon.page.Base;
-      const distinct = new Set(values.map(v => B.filterText(v)));
-      if (distinct.size < 2 || distinct.size > B.CHOICES_MAX || distinct.size >= values.length) {
+      // Her ham değer bir kez katlanır ve CHOICES_MAX aşılınca hemen çıkılır: dataChanged'de her uygun-olmayan sütunun
+      // BÜTÜN hücreleri toLocaleLowerCase'ten geçiyordu (Wi-Fi Monitör 20 sensörde binlerce satır × her render).
+      const raw = new Set();
+      const distinct = new Set();
+      for (const v of values) {
+        const k = v ?? "";
+        if (raw.has(k)) {
+          continue;
+        }
+        raw.add(k);
+        distinct.add(B.filterText(v));
+        if (distinct.size > B.CHOICES_MAX) {
+          return false;
+        }
+      }
+      if (distinct.size < 2 || distinct.size >= values.length) {
         return false;
       }
       const filled = [...distinct].filter(Boolean);
@@ -208,6 +222,25 @@ qx.Class.define("ankamon.page.Base", {
      * @param user {Map} oturum sahibi (ui_prefs okunur/yazılır)
      * @param withWidths {Boolean} storageKey'li tablo: menünün baş kısmını __setupColumnPrefs düzenler
      */
+    /**
+     * Varsayılan gizli sütunlar (sütun tanımında hidden: true): kullanıcı başına BİR KEZ gizli listesine eklenir — kayıtlı
+     * gizleme tercihi olsa da (sütun sonradan varsayılan gizli yapıldıysa). Kullanıcı sonra sütun menüsünden açarsa açık
+     * kalır: uygulanan kimlikler "<key>.defaultsApplied" tercihinde tutulur. Gizli kimlik listesini (yeni dizi) döndürür.
+     */
+    withDefaultHidden(user, key, columns, saved) {
+      const prefs = user.ui_prefs || (user.ui_prefs = {});
+      const hidden = (saved || []).slice();
+      const appliedKey = key + ".defaultsApplied";
+      const applied = prefs[appliedKey] || [];
+      const fresh = columns.filter(c => c.hidden && !applied.includes(c.id)).map(c => c.id);
+      if (fresh.length) {
+        fresh.forEach(id => !hidden.includes(id) && hidden.push(id));
+        ankamon.page.Base.savePref(user, key + ".hidden", hidden);
+        ankamon.page.Base.savePref(user, appliedKey, applied.concat(fresh));
+      }
+      return hidden;
+    },
+
     setupColumnLayout(table, columns, offset, key, user, withWidths = false) {
       const self = ankamon.page.Base;
       const columnModel = table.getTableColumnModel();
@@ -223,7 +256,7 @@ qx.Class.define("ankamon.page.Base", {
 
       if (!withWidths) {
         // storageKey'li tablolarda gizleme __setupColumnPrefs'te uygulanır (localStorage geçişiyle birlikte).
-        const hidden = prefs[hiddenKey] || [];
+        const hidden = self.withDefaultHidden(user, key, columns, prefs[hiddenKey] || []);
         columns.forEach((column, index) => {
           if (hidden.includes(column.id)) {
             columnModel.setColumnVisible(index + offset, false);
@@ -704,7 +737,7 @@ qx.Class.define("ankamon.page.Base", {
       const widthsKey = key + ".widths";
       const hiddenKey = key + ".hidden";
       let userWidths = Object.assign({}, prefs[widthsKey] || {});
-      const hidden = prefs[hiddenKey] || this.__loadJson(hiddenKey) || [];
+      const hidden = ankamon.page.Base.withDefaultHidden(this._user, key, columns, prefs[hiddenKey] || this.__loadJson(hiddenKey) || []);
 
       columns.forEach((column, index) => {
         const col = index + offset;
