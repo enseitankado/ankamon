@@ -107,47 +107,52 @@ qx.Class.define("ankamon.ui.table.GridExport", {
       table.setColumnVisibilityButtonVisible(true);
       const button = table.getChildControl("column-button");
       button.setToolTipText(exportOnly ? "Yazdır / dışa aktar" : "Sütunlar, yazdır / dışa aktar");
-      // Menü her açılışta yeniden kurulur (qx _initColumnMenu); maddeler o anda eklenir. Bu dinleyici sayfanın
-      // kendi sütun menüsü eklemelerinden (Base.setupColumnLayout) SONRA bağlanır → maddeler en altta.
+      // Menü her açılışta yeniden kurulur (qx _initColumnMenu); maddeler o anda, menünün EN ÜSTÜNE eklenir (uzun
+      // sütun listesinde kaydırmadan görünsün — canlı denemede altta kalıyordu).
       table.addListener("columnVisibilityMenuCreateEnd", e => {
         const menu = e.getData().menu;
         if (exportOnly) {
           // Sütun maddeleri gizlenir (silinmez: qx onları bir sonraki açılışta kendisi boşaltır/izler).
           menu.getChildren().forEach(child => child.exclude());
-        } else {
-          menu.add(new qx.ui.menu.Separator());
         }
-        this.__addItems(table, menu);
+        const items = this.__items(table);
+        if (!exportOnly) {
+          items.push(new qx.ui.menu.Separator());
+        }
+        items.forEach((item, i) => menu.addAt(item, i));
       });
     },
 
-    __addItems(table, menu) {
+    /** Menü maddeleri (sırayla): [Yalnız işaretli satırlar], Yazdır…, Dışa aktar ▸, Panoya kopyala. */
+    __items(table) {
+      const menu = [];
       const checked = this.__checkedCount(table);
       let onlyChecked = null;
       if (checked) {
         onlyChecked = new qx.ui.menu.CheckBox(`Yalnız işaretli satırlar (${checked})`);
         onlyChecked.setToolTipText("İşaretsizse süzülmüş bütün satırlar alınır.");
-        menu.add(onlyChecked);
+        menu.push(onlyChecked);
       }
       const opts = () => ({ onlyChecked: !!(onlyChecked && onlyChecked.getValue()) });
       const print = new qx.ui.menu.Button("Yazdır…");
       print.setToolTipText("Grid'in sıralanmış/süzülmüş hâli yazıcı sayfası olarak; yazdırma penceresinden PDF de kaydedilebilir.");
       print.addListener("execute", () => this.print(table, opts()));
-      menu.add(print);
+      menu.push(print);
       const sub = new qx.ui.menu.Menu();
       this.FORMATS.forEach(([id, label]) => {
         const item = new qx.ui.menu.Button(label);
         item.addListener("execute", () => this.download(table, id, opts()));
         sub.add(item);
       });
-      menu.add(new qx.ui.menu.Button("Dışa aktar", null, null, sub));
+      menu.push(new qx.ui.menu.Button("Dışa aktar", null, null, sub));
       const copy = new qx.ui.menu.Button("Panoya kopyala");
       copy.setToolTipText("Sekmeyle ayrılmış (Excel/LibreOffice'e doğrudan yapıştırılır).");
       copy.addListener("execute", () => {
         const data = this.collect(table, opts());
         ankamon.util.Clipboard.copy(this.__delimited(data, "\t", false));
       });
-      menu.add(copy);
+      menu.push(copy);
+      return menu;
     },
 
     __checkedCount(table) {
@@ -199,6 +204,9 @@ qx.Class.define("ankamon.ui.table.GridExport", {
         const rowData = tm.getRowData ? tm.getRowData(row) : null;
         rows.push(cols.map(c => this.__cell(table, cm, c, row, tm.getValue(c.col, row), rowData)));
       }
+      // Başlıksız, yalnız tek simge taşıyan arayüz sütunları (ör. Varlıklar'ın ▸ alt satır aç/kapa sütunu) çıktıya girmez.
+      const keep = cols.map((c, i) => c.name !== "" || rows.some(r => r[i].length > 1));
+      const pick = arr => arr.filter((_, i) => keep[i]);
       let sort = "";
       try {
         const sc = tm.getSortColumnIndex ? tm.getSortColumnIndex() : -1;
@@ -208,7 +216,8 @@ qx.Class.define("ankamon.ui.table.GridExport", {
       } catch (e) {
         sort = "";
       }
-      return { title: this.title(table), at: new Date(), columns: cols.map(c => c.name), rows, sort, onlyChecked: !!opts.onlyChecked };
+      return { title: this.title(table), at: new Date(), columns: pick(cols.map(c => c.name)), rows: rows.map(pick), sort,
+        onlyChecked: !!opts.onlyChecked };
     },
 
     /** Hücrenin ekranda görünen metni: çizicinin içerik HTML'i düz metne çevrilir; çizemezse ham değer. */
@@ -249,7 +258,8 @@ qx.Class.define("ankamon.ui.table.GridExport", {
         tpl.content.querySelectorAll("br").forEach(n => n.replaceWith(" "));
         s = tpl.content.textContent;
       }
-      return s.replace(/\s+/g, " ").trim();
+      // Durum noktası gibi baştaki süs simgeleri ("●Çevrim içi") atılır.
+      return s.replace(/\s+/g, " ").trim().replace(/^[●○◉•▸▾]\s*(?=\S)/u, "");
     },
 
     /** "varliklar-2026-11-13-1530.csv" */
