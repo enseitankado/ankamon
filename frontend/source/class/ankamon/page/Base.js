@@ -677,6 +677,9 @@ qx.Class.define("ankamon.page.Base", {
       if (opts.filterable) {
         this._makeFilterable(table, columns);
       }
+      // KALICI KURAL (kullanıcı isteği 2026-11-13): her grid'de sütun düğmesi menüsünde Yazdır / Dışa aktar
+      // (sıralanmış/süzülmüş görünüm) — bkz. ui.table.GridExport. Sayfanın sütun menüsü eklemelerinden sonra bağlanır.
+      ankamon.ui.table.GridExport.attach(table);
       return table;
     },
 

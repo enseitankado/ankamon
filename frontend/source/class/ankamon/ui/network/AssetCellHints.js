@@ -67,8 +67,6 @@ qx.Class.define("ankamon.ui.network.AssetCellHints", {
       discovery: "Cihazın listeye hangi yollarla girdiği: Ağ taraması (sunucu ağda buldu), Log gönderimi (cihaz kendisi " +
         "log yolladı), Elle eklendi (siz eklediniz), Ankamon sunucusu (sunucunun kendisi). İlk yazılan, ilk giriş yoludur.",
       notes: "Bu cihaz için sizin yazdığınız serbest not (Düzenle penceresinden). Ankamon kendisi bir şey yazmaz.",
-      faz: "Akıllı tahtanın hangi FATİH projesi aşamasında (faz) alındığı ve markası. Anakart modelinden, o yoksa MAC " +
-        "adresinin ilk kısmından, ülke çapındaki cihaz envanterine bakılarak bulunur.",
       activity: "Cihazın ağı ne kadar kullandığı, 0–100 arası göreli puan (şu an en yoğun cihaz = 100). Ankamon ağdaki " +
         "trafiği dışarıdan izleyerek ölçer; cihaza bir şey kurulmaz.",
       activity_detail: "Ağ etkinliğinin ayrıntısı: saniyedeki veri miktarı (kbit/sn) ve en çok kullanılan protokol. Trafik " +
@@ -93,8 +91,10 @@ qx.Class.define("ankamon.ui.network.AssetCellHints", {
       mac: "Kablolu ağ kartının fabrika kimliği. Cihaz bu adresle tanınır; kapalı cihazı uzaktan açmak (Wake-on-LAN) da bununla yapılır.",
       wifi_mac: "Kablosuz (Wi-Fi) kartın fabrika kimliği. Cihaza SSH ile bağlanılıp kartın kalıcı adresi okunur " +
         "(Wi-Fi taramalarında görünen rastgele adres değil).",
-      faz: "Cihazın hangi FATİH aşamasında (faz) alındığı ve markası — anakart modelinden ya da MAC adresinin ilk " +
-        "kısmından, ülke çapındaki cihaz envanterine bakılarak bulunur.",
+      faz: "Tahtanın sınıfı: MEB'in FATİH projesinde hangi alım aşamasında (faz) alındığı ve markası (Faz 2'de işlemci " +
+        "üreticisi Intel/AMD — bakım ve sürücüleri ayrıdır). Ankamon bunu anakart modelinden, o okunamadıysa MAC adresinin " +
+        "ilk kısmından, ülke çapındaki ETAP tahta envanterine bakarak bulur. '(tahmin)': eşleme kesin değil. " +
+        "'ETAP cihazı': ETAP kurulu ama akıllı tahta olduğu bilinmeyen cihaz (ör. laboratuvar bilgisayarı).",
       session: "Cihazda şu an kim oturum açmış. Ankamon 30 saniyede bir SSH ile cihaza sorar. '(kilitli)': ekran kilitli; " +
         "'Oturum kapalı': giriş ekranında bekliyor.",
       wifi: "Cihazın Wi-Fi kartı açık mı, bir ağa bağlı mı. Donanım bilgisi toplanırken SSH ile cihaza sorulur.",

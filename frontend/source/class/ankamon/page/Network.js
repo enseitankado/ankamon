@@ -111,8 +111,8 @@ qx.Class.define("ankamon.page.Network", {
       // Keşif: satırın listeye nasıl girdiği — ağ taraması, log gönderimi ya da elle ekleme (kullanıcı isteği 2026-11-09).
       { id: "discovery", label: "Keşif", hint: "Cihazı bulan bütün kaynaklar (ilk sıradaki listeye ilk giriş yolu): Ankamon sunucusu, ağ taraması, log gönderimi, elle ekleme", width: 160 },
       { id: "notes", label: "Not", width: 150 },
-      // FATİH fazı (bkz. util.Format.etap). Sona eklendi: servis alt satırları sabit sütun sırası kullanır.
-      { id: "faz", label: "Faz", width: 130 },
+      // "Faz" sütunu yok (kullanıcı isteği 2026-11-13): FATİH fazı yalnız MEB akıllı tahtalarına özgü, genel varlık
+      // listesinde anlamsız — Akıllı Tahtalar'da "Tahta sınıfı" olarak durur (bkz. page.Devices, util.Format.etap).
       // Ağ etkinliği: IP ID örneklemesinden yaklaşık pkt/sn (yalnız Windows; bkz. worker netscan/activity.py,
       // bellek network-usage-study). Boş = ölçülmedi/güvenilmez (Linux/kamera/yanıt yok). Sona eklendi:
       // servis/paylaşım alt satırları sabit (düşük) sütun sırası kullanır, boş kalır.
@@ -388,7 +388,6 @@ qx.Class.define("ankamon.page.Network", {
           [...new Set([d.discovery].concat(d.discoveries || []))].filter(Boolean)
             .map(k => ankamon.page.Network.DISCOVERY[k] || k).join(", "),
           d.notes || "",
-          F.etap(d.etap),
           normNum(d), flowText(d),
           d.sensors_at ? "Var" : "Yok",
           d.location || ""

@@ -45,11 +45,19 @@ RUN mkdir -p source/resource/ankamon/hljs \
        node_modules/@highlightjs/cdn-assets/styles/github.min.css \
        node_modules/@highlightjs/cdn-assets/styles/github-dark.min.css \
        node_modules/@highlightjs/cdn-assets/LICENSE source/resource/ankamon/hljs/
+# Grid yazdır/dışa aktar (ui.table.GridExport — bütün grid'lerin sütun düğmesi menüsü): PDF için pdfmake (MIT,
+# https://pdfmake.github.io; gömülü Roboto Türkçe harfleri içerir), Excel (.xlsx) için ExcelJS (MIT,
+# https://github.com/exceljs/exceljs) hazır tarayıcı derlemeleri. Yalnız ilk dışa aktarmada yüklenir.
+RUN mkdir -p source/resource/ankamon/pdfmake source/resource/ankamon/exceljs \
+ && cp node_modules/pdfmake/build/pdfmake.min.js node_modules/pdfmake/build/vfs_fonts.js \
+       node_modules/pdfmake/LICENSE source/resource/ankamon/pdfmake/ \
+ && cp node_modules/exceljs/dist/exceljs.min.js node_modules/exceljs/LICENSE source/resource/ankamon/exceljs/
 # Sistem ▸ Yazılımlar için ön yüz kütüphanelerinin sürümleri ve MAC üretici tablosunun indirildiği gün.
 RUN node -e 'const v = p => require("/src/node_modules/" + p + "/package.json").version; \
       const fs = require("fs"); const m = fs.statSync("/out/manuf.gz"); \
       fs.writeFileSync("/out/frontend-versions.json", JSON.stringify({ qooxdoo: v("@qooxdoo/framework"), \
-        "vis-timeline": v("vis-timeline"), "highlight.js": v("@highlightjs/cdn-assets"), node: process.versions.node, \
+        "vis-timeline": v("vis-timeline"), "highlight.js": v("@highlightjs/cdn-assets"), \
+        pdfmake: v("pdfmake"), exceljs: v("exceljs"), node: process.versions.node, \
         manuf: m.size > 0 ? m.mtime.toISOString().slice(0, 10) : "" }))'
 RUN npx qx compile --target=build \
  && rm -rf compiled/build/transpiled compiled/build/db.json compiled/build/resource-db.json

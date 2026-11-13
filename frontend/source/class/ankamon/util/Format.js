@@ -73,10 +73,10 @@ qx.Class.define("ankamon.util.Format", {
     },
 
     /**
-     * ETAP faz bilgisinin grid metni (bkz. worker netscan/etap_phase.py, migration 017): "Faz 2 · Vestel",
-     * "Faz 3 · Arçelik? (tahmin)", ETAP'a kayıtlı ama cihaz olduğu bilinmeyen cihazda "ETAP cihazı".
+     * Akıllı Tahtalar "Tahta sınıfı" metni (bkz. worker netscan/etap_phase.py, migration 017): "FATİH Faz 2 · Vestel",
+     * "FATİH Faz 3 · Arçelik? (tahmin)", ETAP'a kayıtlı ama akıllı tahta olduğu bilinmeyen cihazda "ETAP cihazı".
      * "(tahmin)": faz eşlemesi çıkarım (doğrulanmadı) ya da yalnız MAC önekinden (donanım okunmadı).
-     * Faz 2'de marka yerine işlemci üreticisi yazılır (kullanıcı isteği): "Faz 2 - Intel" / "Faz 2 - AMD" —
+     * Faz 2'de marka yerine işlemci üreticisi yazılır (kullanıcı isteği): "FATİH Faz 2 - Intel" / "… - AMD" —
      * Faz 2 cihazlarının Intel ve AMD sürümleri ayrı bakım/sürücü ister. Kaynak önce cihazın okunan
      * işlemcisi (cpu: devices.facts.cpu_model), yoksa faz kaydındaki işlemci; ikisi de yoksa marka.
      * @param info {Map|null} devices.etap / net_devices.etap
@@ -89,7 +89,8 @@ qx.Class.define("ankamon.util.Format", {
       if (!info.tahta) {
         return "ETAP cihazı";
       }
-      const faz = info.faz ? `Faz ${info.faz}` : "Faz ?";
+      // "Tahta sınıfı" (kullanıcı isteği 2026-11-13): sınıfın kaynağı FATİH projesi alım fazı → "FATİH Faz 2 · …".
+      const faz = info.faz ? `FATİH Faz ${info.faz}` : "FATİH Faz ?";
       const vendor = String(info.faz) === "2" ? this.cpuVendor(cpu || info.islemci) : null;
       const text = vendor ? `${faz} - ${vendor}` : (info.marka ? `${faz} · ${info.marka}` : faz);
       return text + (info.guven === "cikarim" ? " (tahmin)" : "");

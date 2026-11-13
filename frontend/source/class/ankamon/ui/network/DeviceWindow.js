@@ -101,7 +101,7 @@ qx.Class.define("ankamon.ui.network.DeviceWindow", {
         ["Son görülme", d.online ? "şimdi (çevrim içi)" : when(d.last_seen_at)],
         ["Son log", d.last_log_at ? F.dateTime(d.last_log_at * 1000) : "log gelmedi"],
         ["Keşif", discovery || "—"],
-        ["Faz", F.etap(d.etap) || "—"],
+        ["Tahta sınıfı", F.etap(d.etap) || "—"],
         ["Cihaz kaydı", d.device_name ? `${d.device_name} (Akıllı Tahtalar'da kayıtlı)` : "yok"],
         ["Not", d.notes || "—"]
       ].map(([k, v]) => [k, String(v ?? "").replace(/<[^>]+>/g, "").trim() || "—"]);

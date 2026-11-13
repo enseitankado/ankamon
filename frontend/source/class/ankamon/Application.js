@@ -56,6 +56,8 @@ qx.Class.define("ankamon.Application", {
       this.getRoot().set({ blockerColor: "#808080", blockerOpacity: 0.35 });
       // Grid'lerde sağ tıklama işaret (✓) değiştirmez, yalnız satırı seçip sağ menüyü açar.
       ankamon.ui.table.RightClickPatch.install();
+      // Bütün grid'lerde (eklentiler dahil) sütun düğmesi menüsünde Yazdır / Dışa aktar (bkz. ui.table.GridExport).
+      ankamon.ui.table.GridExport.install();
       // İpuçları süreyle kapanmaz, fare hareket edince kapanır.
       ankamon.ui.ToolTipPolicy.install();
       // Terim geçişi (2026-11-12): tarayıcıda saklı "boards" anahtarlı tercihler "devices" adına bir kez taşınır

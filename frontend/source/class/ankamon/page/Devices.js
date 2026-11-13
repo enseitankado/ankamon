@@ -73,8 +73,10 @@ qx.Class.define("ankamon.page.Devices", {
       // yazar; NetworkManager'ın taramadaki rastgele adresi değil).
       { id: "mac", label: "Kablolu MAC", hint: "Kablolu ağ kartının MAC adresi (uzaktan uyandırma bununla)", width: 140 },
       { id: "wifi_mac", label: "Kablosuz MAC", hint: "Wi-Fi kartının kalıcı (fabrika) MAC adresi", width: 140 },
-      // FATİH fazı (bkz. util.Format.etap — anakart modelinden, yoksa maskelenmiş MAC önekinden).
-      { id: "faz", label: "Faz", hint: "FATİH fazı ve cihaz markası", width: 130 },
+      // Tahta sınıfı (kullanıcı isteği 2026-11-13; eski adı "Faz"): verinin kaynağı FATİH projesinin ülke çapı ETAP tahta
+      // envanteri (anakart modeli → alım fazı/marka/işlemci) — sınıf bu kaynağa göre: "FATİH Faz 2 · Intel", "ETAP cihazı"…
+      // Kimlik "faz" kalır (kullanıcıların kayıtlı sütun sırası/genişliği/süzgeci korunur). Bkz. util.Format.etap.
+      { id: "faz", label: "Tahta sınıfı", hint: "FATİH projesindeki alım sınıfı (faz) ve marka/işlemci — anakart modelinden ya da MAC'ten", width: 150 },
       // İşletim sistemi ailesi + adı (göç 052; kullanıcı isteği 2026-11-12): işlevler buna göre seçilir (platforms/README.md).
       { id: "os", label: "İşletim sistemi", hint: "Cihazın işletim sistemi — sağ menü ve araç çubuğu işlevleri buna göre uygulanır (Düzenle ▸ İşletim sistemi ile değiştirilebilir)", width: 170 },
       // Anlık oturum (bkz. worker executor/session_probe.py — 30 sn'de bir SSH ile yoklanır; Oturum aç/

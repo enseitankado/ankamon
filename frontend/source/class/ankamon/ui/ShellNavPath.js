@@ -45,6 +45,7 @@ qx.Class.define("ankamon.ui.ShellNavPath", {
     this.setBackgroundColor("app-header");
     this.__menus = [];
     this.__parts = [];
+    ankamon.ui.ShellNavPath.__current = this;
     const home = this.__part("Ankamon", "app-title");
     home.addListener("tap", () => this.__tree && this.__open(home, this.__tree.getRoot().getChildren()));
     this.add(home);
@@ -55,6 +56,17 @@ qx.Class.define("ankamon.ui.ShellNavPath", {
   },
 
   statics: {
+    __current: null,
+
+    /** Üst yolun düz metni ("Ankamon > Ağ > Varlıklar") — yazdır/dışa aktar başlığı (bkz. ui.table.GridExport). */
+    currentText() {
+      const nav = ankamon.ui.ShellNavPath.__current;
+      if (!nav || !nav.__tree) {
+        return "";
+      }
+      return ["Ankamon"].concat(nav.__path().map(item => ankamon.ui.ShellNavPath.text(item))).join(" > ");
+    },
+
     /** Düğümün yoldaki adı: baştaki simge karakteri atılır (bkz. ui.Shell ICON); düğüm kendi adını da verebilir. */
     text(item) {
       return item.getUserData("ankamon.navText") || String(item.getLabel() || "").replace(/^[^\p{L}\p{N}(]+/u, "");
