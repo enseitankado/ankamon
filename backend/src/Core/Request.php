@@ -45,6 +45,18 @@ final class Request
         $this->path = rtrim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/', '/') ?: '/';
     }
 
+    /**
+     * Gövdesi verilen istek (HTTP gövdesi okunmaz): başka bir uç noktanın doğrulamasını aynı kurallarla çalıştırmak
+     * için — ör. zamanlanmış görev kaydedilirken görev tanımı JobsApi::spec'ten geçer (bkz. SchedulesApi).
+     * @param array<string,mixed> $body
+     */
+    public static function fromBody(array $body): self
+    {
+        $request = new self();
+        $request->body = $body;
+        return $request;
+    }
+
     public function query(string $key, ?string $default = null): ?string
     {
         $value = $_GET[$key] ?? null;

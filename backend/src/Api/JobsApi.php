@@ -118,7 +118,12 @@ final class JobsApi
         return ['job' => $job, 'targets' => $targets, 'events' => $events];
     }
 
-    public function create(Request $request, array $user): array
+    /**
+     * Görev tanımını doğrular ve kullanıcının yetkisini denetler (cihazlara dokunmaz, görev yazmaz): create() ve
+     * zamanlanmış görevler (SchedulesApi — kaydederken aynı kurallar) ortak kullanır.
+     * @return array{0:string,1:string,2:string,3:array,4:bool} [tür, yetki, başlık, parametreler, cihaz gerekir mi]
+     */
+    public function spec(Request $request, array $user): array
     {
         $type = (string) $request->input('type', '');
         [$feature, $title, $params, $needsDevices] = match ($type) {
@@ -220,6 +225,12 @@ final class JobsApi
             && !Auth::can($user, 'devices.passwords.' . $params['account'])) {
             throw ApiError::forbidden($params['account'] . ' parolasını ayarlama yetkiniz yok.');
         }
+        return [$type, $feature, $title, $params, $needsDevices];
+    }
+
+    public function create(Request $request, array $user): array
+    {
+        [$type, , $title, $params, $needsDevices] = $this->spec($request, $user);
 
         // board_ids: eski ad (terim geçişi 2026-11-12) — eklentiler ve eski sekmeler.
         $deviceIds = array_values(array_unique(array_map('intval',

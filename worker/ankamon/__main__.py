@@ -38,13 +38,14 @@ import logging
 import time
 
 from . import config, db
-from .tasks import TASKS, device_credentials, device_sessions, device_status, session_probe, telegraf_targets
+from .tasks import TASKS, device_credentials, device_sessions, device_status, session_probe, telegraf_targets, user_schedules
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("ankamon")
 
 # session_probe kendi içinde INTERVAL_SECONDS'ta (30 sn) bir çalışır — bkz. tasks/session_probe.py.
-_FAST_TASKS = [device_credentials, device_status, device_sessions, session_probe, telegraf_targets]
+# user_schedules: kullanıcı zamanlamaları dakikayı kaçırmasın, "Şimdi çalıştır" ≤10 sn'de başlasın.
+_FAST_TASKS = [device_credentials, device_status, device_sessions, session_probe, telegraf_targets, user_schedules]
 _OTHER_TASKS = [task for task in TASKS if task not in _FAST_TASKS]
 
 

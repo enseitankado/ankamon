@@ -166,6 +166,12 @@ return [
     ['POST',   '/api/system/services',   [Api\ServicesApi::class, 'control'],   'admin'],
     ['GET',    '/api/system/jobs',       [Api\SystemInfoApi::class, 'jobs'],     'admin'],
     ['POST',   '/api/system/jobs/run',   [Api\SystemInfoApi::class, 'runJob'],   'admin'],
+    // Kullanıcı tanımlı zamanlanmış görevler (Sistem ▸ Zamanlanmış işler ▸ Görevler/Sonuçlar; worker tasks/user_schedules.py).
+    ['GET',    '/api/schedules',         [Api\SchedulesApi::class, 'index'],     'admin'],
+    ['POST',   '/api/schedules',         [Api\SchedulesApi::class, 'save'],      'admin'],
+    ['PUT',    '/api/schedules/{id}/enabled', [Api\SchedulesApi::class, 'setEnabled'], 'admin'],
+    ['POST',   '/api/schedules/{id}/run', [Api\SchedulesApi::class, 'runNow'],   'admin'],
+    ['DELETE', '/api/schedules/{id}',    [Api\SchedulesApi::class, 'delete'],    'admin'],
     ['GET',    '/api/system/database',   [Api\SystemInfoApi::class, 'database'], 'admin'],
     ['GET',    '/api/system/config',     [Api\SystemInfoApi::class, 'config'],   'admin'],
     ['GET',    '/api/system/software',   [Api\SoftwareApi::class, 'index'],   'admin'],
