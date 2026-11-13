@@ -61,7 +61,7 @@ qx.Class.define("ankamon.ui.Shell", {
     const navWidth = Math.min(NAV.NAV_MAX, Math.max(NAV.NAV_MIN, Number(prefs["nav.width"]) || NAV.NAV_DEFAULT));
     this.__navPane = new qx.ui.container.Composite(new qx.ui.layout.Grow()).set({ width: navWidth });
     this.__navPane.add(this.__createTree());
-    this.__stack = new qx.ui.container.Stack().set({ padding: 10 });
+    this.__stack = new qx.ui.container.Stack().set({ padding: [4, 10, 10, 10] }); // üstte az boşluk (kullanıcı isteği 2026-11-13: görünür alan)
     // flex ÇIPLAK SAYI olarak verilemez (qx.ui.core.Widget.__addHelper options'ı doğrudan
     // setLayoutProperties()'e geçirir, obje bekler) — bare "1" sessizce yok sayılıyordu, Stack
     // hiç flex almıyordu; bu da SplitPane'in dar pencerede navPane+stack toplamını (daralmayan
@@ -258,7 +258,9 @@ qx.Class.define("ankamon.ui.Shell", {
       { id: "network", label: "Varlıklar", feature: "network", parent: "devices", first: true, noIcon: true,
         create: u => new ankamon.page.Network(u) },
       // Ankamon'un kendi bakımı (servisler, zamanlanmış işler, veritabanı, yapılandırma) — yalnız yönetici.
-      { id: "system", label: "Sistem", admin: true, retap: true, create: u => new ankamon.page.System(u) },
+      // Sistem sayfasının sekmeleri ağaçta da alt seçenek (kullanıcı isteği 2026-11-13); anahtar = sekme etiketi (Base._rememberTab).
+      { id: "system", label: "Sistem", admin: true, retap: true, create: u => new ankamon.page.System(u),
+        tabs: ["Genel", "Servisler", "Zamanlanmış işler", "Veritabanı", "Yapılandırma"].map(label => ({ key: label, label })) },
       // Kullanıcılar ve Ayarlar "Sistem"in altında (kullanıcı isteği).
       // Disk kullanımı ve veri silme (eski açılır pencere — kullanıcı isteği: Sistem altında sayfa).
       // Sistem'in alt seçenekleri simgesiz (kullanıcı isteği 2026-11-10: noIcon).

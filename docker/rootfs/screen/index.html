@@ -254,7 +254,10 @@ try {
 } catch (e) { /* boş/bozuk fragman */ }
 const embed = !!spec.embed;   // Cihazlar sayfasının "Ekranlar" sekmesi: liste üst sayfadan güncellenir
 // Ekranlar araç çubuğunun aç/kapa düğmeleri (üst sayfadan "tm-view"): alt donanım barı, başarım görünümü.
-const view = { stats: true, perf: false };
+// Gömülü (Ekranlar sekmesi) görünümde Sensörler barı varsayılan kapalı (kullanıcı isteği 2026-11-13); üst sayfa tm-ready
+// sonrası kullanıcının kayıtlı seçimini tm-view ile gönderir — bar açılışta bir an görünüp kaybolmasın.
+const view = { stats: !embed, perf: false };
+if (embed) document.documentElement.classList.add("nostats");
 const single = !embed && spec.devices.length === 1;
 // Sınıflar normalde baştaki senkron betikte zaten eklenir (FOUC önleme); burada tekrar eklemek
 // zararsız (idempotent) ve hash'in o betikte beklenmedik şekilde ayrıştırılamadığı bir durum için güvence.

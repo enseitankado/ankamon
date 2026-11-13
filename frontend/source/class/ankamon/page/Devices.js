@@ -702,6 +702,10 @@ qx.Class.define("ankamon.page.Devices", {
         } else if (id === "stats" || id === "perf") {
           this.__screenView[id] = on;
           this.__saveScreenView();
+          if (id === "stats") {
+            // Sensörler barı seçimi kullanıcı hesabında (sonraki oturumlarda ve başka tarayıcıda da hatırlanır).
+            ankamon.page.Base.savePref(this._user, "devices.screenStats", on);
+          }
           this.__pushView();
         }
       });
@@ -725,9 +729,10 @@ qx.Class.define("ankamon.page.Devices", {
       } catch (e) {
         // localStorage erişilemiyor ya da bozuk — varsayılana düş.
       }
-      // Donanım barı her açılışta basılı başlar (kullanıcı isteği: varsayılan etkin) — kapatılması
-      // yalnız o oturum için geçerlidir; Başarım seçimi kalıcıdır.
-      return { stats: true, perf: view.perf === true };
+      // Sensörler barı varsayılan KAPALI (kullanıcı isteği 2026-11-13); kullanıcı açarsa hesabında saklanır
+      // (ui_prefs "devices.screenStats") ve sonraki oturumlarda açık gelir. Başarım seçimi tarayıcıda kalıcıdır.
+      const prefs = this._user.ui_prefs || {};
+      return { stats: prefs["devices.screenStats"] === true, perf: view.perf === true };
     },
 
     __saveScreenView() {

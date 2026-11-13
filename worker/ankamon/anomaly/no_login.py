@@ -76,8 +76,13 @@ def detect(conn, since):
     fresh = watermark is not None and now - watermark <= GAP
 
     intervals = conn.execute(_INTERVALS, (since,)).fetchall()
+    # Süren kayıtlar: bu turda yeniden bulunmayanlar kapsam dışında kalırsa sonsuza dek "sürüyor" görünüyordu (kullanıcı
+    # bildirimi 2026-11-13: kapalı cihazlarda haftalardır süren "Oturumsuz açık"). Bkz. aşağıdaki kapsam ve kapanış.
+    open_records = conn.execute(
+        "SELECT host, device_id, device_name, started_at, updated_at, detail FROM anomalies WHERE kind = %s AND ended_at IS NULL",
+        (KIND,)).fetchall()
     if not intervals:
-        return [], []
+        return _close_orphans(open_records, set()), []
     sessions = {}
     oldest = min(i["started_at"] for i in intervals)
     for s in conn.execute(_SESSIONS, (list({i["host"] for i in intervals}), oldest)).fetchall():
@@ -86,13 +91,20 @@ def detect(conn, since):
     # Her host'un sonuncusu (sorgu sıralı) tek "sürüyor olabilir" aralık.
     last = {i["host"]: idx for idx, i in enumerate(intervals)}
     found, scopes = [], []
+    # Kapsam host başına TEK aralık: ilk açık aralığın başı (ya da since) → şimdi. Aralık başına (başlangıç, son log) kapsamı,
+    # cihazın son logundan SONRA başlamış kaydı (ör. kapanışta oturum kapandı, kayıt o an "sürüyor" yazıldı) ya da açık
+    # aralıkları yeniden hesaplanınca hiçbir aralığa düşmeyen kaydı kapsamıyordu — o kayıt bir daha ne siliniyor ne kapanıyordu.
+    first_start = {}
+    for iv in intervals:
+        first_start.setdefault(iv["host"], iv["started_at"])
+    for host, start in first_start.items():
+        scopes.append((host, min(start, since), now))
     for idx, iv in enumerate(intervals):
         host, start = iv["host"], iv["started_at"]
         ongoing = last[host] == idx and fresh and watermark - iv["last_at"] <= GAP
         end = now if ongoing else iv["last_at"]
         live_session = (iv["session_username"] is not None and iv["session_checked_at"] is not None
                         and now - iv["session_checked_at"] <= PROBE_FRESH)
-        scopes.append((host, start, end))
 
         def add(gap_start, gap_end, detail, is_open=False):
             if gap_end - gap_start >= THRESHOLD:
@@ -110,9 +122,19 @@ def detect(conn, since):
             if s_end > cursor:
                 cursor = s_end
                 detail = {"reason": "logout", "user": s["username"]}
-        if cursor < end:
+        # Oturum cihazın son logundan SONRA kapandıysa (kapanışta oturum kapanır) ardından gelen boşluk oturumsuz çalışma
+        # değildir — cihaz o an kapanıyordu; eskiden 15 dk boyunca "sürüyor" sayılıp kapalı cihazda açık kalıyordu.
+        if cursor < end and cursor < iv["last_at"]:
             add(cursor, end, detail, is_open=ongoing and not live_session)
-    return found, scopes
+    return found + _close_orphans(open_records, set(first_start)), scopes
+
+
+def _close_orphans(open_records, covered_hosts):
+    """Açık aralığı bu pencerede hiç bulunmayan host'un (ad değişti, kayıt silindi, loglar gelmiyor) süren kaydı, kuralın
+    onu en son doğruladığı anda (updated_at) kapanır — kapsam dışı kaldığı için başka türlü kapanmazdı."""
+    return [{"host": r["host"], "device_id": r["device_id"], "device_name": r["device_name"], "started_at": r["started_at"],
+             "ended_at": max(r["updated_at"], r["started_at"]), "detail": r["detail"] or {}}
+            for r in open_records if r["host"] not in covered_hosts]
 
 
 # --- Anlık tarama (bkz. anomaly.scan) ----------------------------------------------------------------------

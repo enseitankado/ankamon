@@ -56,7 +56,7 @@ qx.Class.define("ankamon.page.Anomalies", {
     const watch = this._can("anomalies");
     const ssh = this._can("diagnose");
 
-    this._addButton("Yenile", () => this.refresh());
+    // "Yenile" düğmesi yok (kullanıcı isteği 2026-11-13): sayfa her açıldığında ve ağaçta yeniden tıklanınca yenilenir.
 
     this.__tabs = new qx.ui.tabview.TabView();
     this.__status = new ankamon.ui.health.Status(this);

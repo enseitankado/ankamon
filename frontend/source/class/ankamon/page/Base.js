@@ -443,6 +443,10 @@ qx.Class.define("ankamon.page.Base", {
     // içerik genişliğine göre büyüyor, Flow asla sarmıyordu). Bu yüzden genişliği, sayfanın kendi
     // "resize" olayında elle sayfanın genişliğine kilitliyoruz; Flow o zaman zorunlu olarak sarar.
     this._actions = new qx.ui.container.Composite(new qx.ui.layout.Flow(6, 6));
+    // Düğmesi olmayan sayfada satır yer kaplamasın (kullanıcı isteği 2026-11-13: sayfaların üstünde gereksiz boşluk —
+    // boş satır VBox aralığını yine harcıyordu); ilk düğme/öğe eklenince görünür.
+    this._actions.exclude();
+    this._actions.addListener("addChildWidget", () => this._actions.show());
     this.add(this._actions);
     this.addListener("resize", e => {
       const width = e.getData().width;
@@ -807,6 +811,13 @@ qx.Class.define("ankamon.page.Base", {
      * @param name {String} sayfaya özgü kısa ad, ör. "devices"
      */
     _rememberTab(tabs, name) {
+      // Ana sayfa sekmelerinde içerik çerçevesinin iç dolgusu dar (kullanıcı isteği 2026-11-13: görünür alan etkin
+      // kullanılsın — temanın varsayılanı sekmenin içinde ~16 px boşluk bırakıyordu).
+      tabs.setContentPadding([6, 8, 8, 8]);
+      // Sekme düğmeleri de daha alçak (temanın dikey dolgusu düğmeyi ~43 px yapıyordu); yatay dolgu temada kalır.
+      const lowButton = page => page.getButton && page.getButton().set({ paddingTop: 4, paddingBottom: 4 });
+      tabs.getChildren().forEach(lowButton);
+      tabs.addListener("addChildWidget", e => lowButton(e.getData()));
       const key = "tab." + name;
       const idOf = tab => this.__tabId(tab);
       // Ağaçtan istenmiş ama sekmeler henüz kurulmamışsa (ör. Ayarlar her yüklemede yeniden kurar) o sekme.

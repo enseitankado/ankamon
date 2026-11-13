@@ -47,6 +47,7 @@ qx.Class.define("ankamon.ui.system.Tab", {
     this._status = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true });
     this._bar.add(this._status, { flex: 1 });
     this.add(this._bar);
+    this.__syncBar();
     // Eşzamanlı ikinci çağrı (ör. sayfa açılışı + appear) load()'daki __loading ile yutulur.
     this.addListener("appear", () => this.load());
   },
@@ -69,7 +70,14 @@ qx.Class.define("ankamon.ui.system.Tab", {
         this._status.setValue(`<span style="color:#c5221f">Yüklenemedi: ${qx.bom.String.escape(e.message || String(e))}</span>`);
       } finally {
         this.__loading = false;
+        this.__syncBar();
       }
+    },
+
+    /** Durum satırı yalnız düğmesi ya da yazısı varken yer kaplar (kullanıcı isteği 2026-11-13: Sistem ▸ Genel'in üstünde boşluk). */
+    __syncBar() {
+      const used = this._bar.getChildren().length > 1 || !!this._status.getValue();
+      this._bar.setVisibility(used ? "visible" : "excluded");
     },
 
     /** Sekme gerçekten ekranda mı (TabView seçili olmayan sayfayı "hidden" yapar — isSeeable yetmez). */
