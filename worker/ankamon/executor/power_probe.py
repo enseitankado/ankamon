@@ -82,13 +82,14 @@ _UNSAFE = [
 
 
 def parse_smart(raw: str) -> dict:
-    """smartctl -j -i -A → {"model", "power_cycles", "unsafe_shutdowns", "unsafe_attr"} (okunamayan alan None)."""
-    out = {"model": None, "power_cycles": None, "unsafe_shutdowns": None, "unsafe_attr": None}
+    """smartctl -j -i -A → {"model", "serial", "power_cycles", "unsafe_shutdowns", "unsafe_attr"} (okunamayan alan None)."""
+    out = {"model": None, "serial": None, "power_cycles": None, "unsafe_shutdowns": None, "unsafe_attr": None}
     try:
         data = json.loads(raw) if raw.strip() else {}
     except ValueError:
         return out
     out["model"] = data.get("model_name") or data.get("model_family")
+    out["serial"] = data.get("serial_number")
     out["power_cycles"] = data.get("power_cycle_count")
     nvme = data.get("nvme_smart_health_information_log")
     if isinstance(nvme, dict) and isinstance(nvme.get("unsafe_shutdowns"), int):
@@ -146,6 +147,7 @@ def parse(output: str) -> dict | None:
         "booted_at": now - uptime,
         "disk": (values.get("DISK") or "").strip() or None,
         "disk_model": smart["model"],
+        "disk_serial": smart["serial"],
         "power_cycles": smart["power_cycles"],
         "unsafe_shutdowns": smart["unsafe_shutdowns"],
         "unsafe_attr": smart["unsafe_attr"],
@@ -176,16 +178,17 @@ def probe(device: dict, user: str, password: str, timeout: int = 20) -> dict | N
 def store(conn, device_id: int, rec: dict) -> None:
     """Açılış başına tek satır; aynı açılışta yeniden yoklanırsa sayaçlar ve probed_at tazelenir (ilk okuma zamanı kalır)."""
     conn.execute(
-        """INSERT INTO device_power_probes (device_id, boot_id, booted_at, disk, disk_model, power_cycles,
+        """INSERT INTO device_power_probes (device_id, boot_id, booted_at, disk, disk_model, disk_serial, power_cycles,
                                            unsafe_shutdowns, unsafe_attr, prev_started_at, prev_ended_at, prev_clean,
                                            prev_kind, prev_last_line, eta_shutdown)
-           VALUES (%s, %s, to_timestamp(%s), %s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s), %s, %s, %s, %s::jsonb)
+           VALUES (%s, %s, to_timestamp(%s), %s, %s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s), %s, %s, %s, %s::jsonb)
            ON CONFLICT (device_id, boot_id) DO UPDATE SET
              probed_at = now(), power_cycles = COALESCE(EXCLUDED.power_cycles, device_power_probes.power_cycles),
              unsafe_shutdowns = COALESCE(EXCLUDED.unsafe_shutdowns, device_power_probes.unsafe_shutdowns),
              unsafe_attr = COALESCE(EXCLUDED.unsafe_attr, device_power_probes.unsafe_attr),
              disk_model = COALESCE(EXCLUDED.disk_model, device_power_probes.disk_model),
+             disk_serial = COALESCE(EXCLUDED.disk_serial, device_power_probes.disk_serial),
              eta_shutdown = EXCLUDED.eta_shutdown""",
-        (device_id, rec["boot_id"], rec["booted_at"], rec["disk"], rec["disk_model"], rec["power_cycles"],
+        (device_id, rec["boot_id"], rec["booted_at"], rec["disk"], rec["disk_model"], rec["disk_serial"], rec["power_cycles"],
          rec["unsafe_shutdowns"], rec["unsafe_attr"], rec["prev_started_at"], rec["prev_ended_at"], rec["prev_clean"],
          rec["prev_kind"], rec["prev_last_line"], json.dumps(rec["eta_shutdown"], ensure_ascii=False)))

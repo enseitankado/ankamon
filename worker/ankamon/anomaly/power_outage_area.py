@@ -179,7 +179,7 @@ def _record(members, devices, now, known):
     confirmed = sum(1 for e in members if e["confirm"] == "smart")
     place = label(prefix)
     text = (f"Toplu elektrik kesintisi ({level}): {place} — {len(members)} cihaz aynı anda güçsüz kaldı"
-            + (f", {confirmed}'i SMART ile teyitli" if confirmed else "")
+            + (f" (SMART ile teyitli: {confirmed})" if confirmed else "")
             + (f"; {len(live)} cihaz hâlâ kapalı" if live else "")
             + (f"; aynı yerde {len(staying)} cihaz açık kaldı (kesinti tek hatta/sigortada olabilir)" if staying else ""))
     if not boots:

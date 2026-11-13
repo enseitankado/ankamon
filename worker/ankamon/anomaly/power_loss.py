@@ -124,7 +124,7 @@ WHERE host = %(host)s AND from_ip = %(ip)s AND received_at BETWEEN %(r0)s AND %(
 """
 
 _PROBES = """
-SELECT device_id, boot_id, booted_at, first_probed_at, power_cycles, unsafe_shutdowns, unsafe_attr, disk_model,
+SELECT device_id, boot_id, booted_at, first_probed_at, power_cycles, unsafe_shutdowns, unsafe_attr, disk_model, disk_serial,
        prev_started_at, prev_ended_at, prev_clean, prev_last_line, eta_shutdown
 FROM device_power_probes WHERE booted_at >= %s ORDER BY device_id, booted_at
 """
@@ -174,6 +174,9 @@ def _smart_delta(probe, baseline):
     """→ (artış, açılış farkı, metin) ya da None (karşılaştırılamaz)."""
     if not probe or not baseline:
         return None
+    s1, s0 = probe.get("disk_serial"), baseline.get("disk_serial")
+    if s1 and s0 and s1 != s0:
+        return None   # başka disk: disk değişmiş ya da ölçüm eski IP'deki başka cihazdan (bkz. göç 056)
     u1, u0 = probe["unsafe_shutdowns"], baseline["unsafe_shutdowns"]
     if u1 is None or u0 is None or probe["unsafe_attr"] != baseline["unsafe_attr"] or u1 < u0:
         return None   # sayaç yok, disk değişmiş ya da sayaç sıfırlanmış

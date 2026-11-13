@@ -49,12 +49,17 @@ def _magic(mac: str) -> bytes:
 
 
 def _targets(ip: str | None) -> list[tuple[str | None, str]]:
-    """[(arabirim, yayın adresi)] — cihazın ağı bulunursa yalnız o, yoksa bağlı her ağ."""
+    """[(arabirim, yayın adresi)] — bağlı her ağ; cihazın bilinen IP'sinin ağı önce.
+
+    Yalnız kayıttaki IP'nin ağına göndermek yetmez: IP eskiyebilir (DHCP, kablo başka porta/VLAN'a). 2026-11-13'te
+    «B Blok - Arge 1»in kaydı eski 10.255.187.x IP'sini taşıyordu, tahta 192.168.23.x'teydi: paket yalnız eth1'e gitti,
+    tahta uyanmadı; bütün ağlara gönderilince uyandı. Sihirli paket yalnız MAC'i eşleşen kartı uyandırır, öteki ağlara
+    gitmesi zararsızdır."""
     nets = [(n["iface"], ipaddress.ip_network(n["cidr"])) for n in ifaces.networks()]
     if ip:
         try:
             addr = ipaddress.ip_address(ip)
-            nets = [n for n in nets if addr in n[1]] or nets
+            nets = sorted(nets, key=lambda n: addr not in n[1])
         except ValueError:
             pass
     if not nets:  # arabirim okunamadı: eski davranış (varsayılan rotadan genel yayın)

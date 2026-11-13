@@ -77,6 +77,25 @@ class SmartTest(unittest.TestCase):
         self.assertEqual(power_loss._smart_delta(dict(base, power_cycles=2306), base)[:2], (0, 1))
         self.assertIsNone(power_loss._smart_delta(dict(base, unsafe_shutdowns=3), base))        # disk değişmiş
         self.assertIsNone(power_loss._smart_delta(dict(base, unsafe_shutdowns=None), base))
+        # Seri numarası farklı: başka disk / eski IP'deki başka cihazın ölçümü (göç 056) — karşılaştırılmaz
+        a, b = dict(base, disk_serial="S1"), dict(base, disk_serial="S2", unsafe_shutdowns=1175)
+        self.assertIsNone(power_loss._smart_delta(b, a))
+        self.assertEqual(power_loss._smart_delta(dict(b, disk_serial="S1"), a)[0], 1)
+
+
+class WolTargetsTest(unittest.TestCase):
+    def test_all_networks_device_first(self):
+        from ankamon.executor import wol
+        nets = [{"iface": "eth1", "cidr": "10.255.187.0/24"}, {"iface": "eth0", "cidr": "192.168.16.0/21"}]
+        orig = wol.ifaces.networks
+        wol.ifaces.networks = lambda: nets
+        try:
+            # Kayıttaki IP eskimiş olsa da paket öteki ağa da gider; cihazın bilinen ağı önce.
+            self.assertEqual(wol._targets("192.168.23.67"), [("eth0", "192.168.23.255"), ("eth1", "10.255.187.255")])
+            self.assertEqual([t[0] for t in wol._targets("10.255.187.213")], ["eth1", "eth0"])
+            self.assertEqual(len(wol._targets(None)), 2)
+        finally:
+            wol.ifaces.networks = orig
 
 
 class ProbeParseTest(unittest.TestCase):

@@ -46,22 +46,35 @@ log = logging.getLogger(__name__)
 
 REFRESH = "30 minutes"
 _BATCH = 40
+# Çevrim dışı görülen cihazlar: yeniden çevrim içi olunca (ve SSH açılınca) beklemeden yoklanır. Kısa kesintide (fiş
+# çekilip hemen takıldı, ~1 dk) device_uptime yeni aralık açmaz (15 dk boşluk istemez) ve tahtalar açılış izini
+# göndermez: yalnız REFRESH beklenirse arada ikinci bir kapanma olursa iki olay tek farka karışırdı (2026-11-13 Arge
+# testinde yoklama 20 dk gecikti). Süreç belleğinde: worker yeniden başlarsa yine device_uptime + REFRESH geçerli.
+_pending: set[int] = set()
 
+# Son 15 dk'da açılış satırı (rsyslogd «[origin…] start») gelen cihazlar: kısa kesinti iki tur arasında kalsa da yakalanır.
 _DUE = f"""
+WITH rb AS MATERIALIZED (
+    SELECT lower(host) AS host, max(received_at) AS at FROM logs
+    WHERE received_at > now() - interval '15 minutes' AND program = 'rsyslogd' AND message LIKE '[origin%%] start'
+    GROUP BY 1
+)
 SELECT d.id, host(d.ip) AS ip
 FROM devices d
+LEFT JOIN rb ON rb.host = lower(d.hostname)
 LEFT JOIN LATERAL (SELECT max(probed_at) AS at FROM device_power_probes p WHERE p.device_id = d.id) p ON true
 LEFT JOIN LATERAL (SELECT max(started_at) AS at FROM device_uptime u
                    WHERE u.host IN (d.hostname, lower(d.hostname))) u ON true
 WHERE d.online AND d.ssh_ok AND d.ip IS NOT NULL AND COALESCE(d.os_family, 'linux') = 'linux'
-  AND (p.at IS NULL OR p.at < now() - interval '{REFRESH}' OR u.at > p.at)
+  AND (p.at IS NULL OR p.at < now() - interval '{REFRESH}' OR u.at > p.at OR rb.at > p.at OR d.id = ANY(%s))
 ORDER BY p.at NULLS FIRST
 LIMIT {_BATCH}
 """
 
 
 def run(conn) -> None:
-    devices = conn.execute(_DUE).fetchall()
+    _pending.update(r["id"] for r in conn.execute("SELECT id FROM devices WHERE NOT online").fetchall())
+    devices = conn.execute(_DUE, (list(_pending),)).fetchall()
     if not devices:
         return
     user, password = _device_access(conn)
@@ -72,6 +85,7 @@ def run(conn) -> None:
         results = list(pool.map(lambda d: (d["id"], power_probe.probe(dict(d), user, password)), devices))
     for device_id, rec in results:
         if rec:
+            _pending.discard(device_id)
             try:
                 power_probe.store(conn, device_id, rec)
             except Exception:  # noqa: BLE001 — bir cihazın kaydı diğerlerini durdurmasın
