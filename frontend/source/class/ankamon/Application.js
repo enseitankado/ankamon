@@ -88,14 +88,20 @@ qx.Class.define("ankamon.Application", {
     },
 
     async __start() {
+      let user = null;
       try {
-        const user = await ankamon.io.Api.get("/auth/me");
+        user = await ankamon.io.Api.get("/auth/me");
         // Shell/sayfalar oluşturulmadan önce uygulanır ki ilk çizim doğrudan doğru temayla olsun.
         ankamon.theme.Registry.apply(user.theme);
         // Eklentiler Shell'den ÖNCE başlar: sekme/kanca kayıtları (ör. Bakım sekmesi) sol ağaç kurulurken hazır olsun.
         await ankamon.ext.Extensions.start({ user, app: this });
         this.__show(new ankamon.ui.Shell(user));
       } catch (e) {
+        if (user) {
+          // Oturum geçerli ama arayüz kurulamadı (bir sayfa/eklenti hatası): sessizce giriş ekranına dönmek "parola doğru
+          // ama giriş olmuyor" gibi görünüyordu (2026-11-13) — hata en azından tarayıcı konsolunda görünsün.
+          console.error("Ankamon arayüzü kurulamadı:", e);
+        }
         this.__showLogin();
       }
     },

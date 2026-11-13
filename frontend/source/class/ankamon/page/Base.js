@@ -846,7 +846,11 @@ qx.Class.define("ankamon.page.Base", {
     _rememberTab(tabs, name) {
       // Ana sayfa sekmelerinde içerik çerçevesinin iç dolgusu dar (kullanıcı isteği 2026-11-13: görünür alan etkin
       // kullanılsın — temanın varsayılanı sekmenin içinde ~16 px boşluk bırakıyordu).
-      tabs.setContentPadding([6, 8, 8, 8]);
+      // Yalnız TabView'da: Bakım (page.Maintenance) sekmelerini bilerek Stack'te tutar — Stack'te setContentPadding yok;
+      // koşulsuz çağrı sayfa kurulumunu bozuyordu (son sayfa Ahenk/Sensörler iken yenilemede giriş açılmıyordu, 2026-11-13).
+      if (tabs.setContentPadding) {
+        tabs.setContentPadding([6, 8, 8, 8]);
+      }
       // Sekme düğmeleri de daha alçak (temanın dikey dolgusu düğmeyi ~43 px yapıyordu); yatay dolgu temada kalır.
       const lowButton = page => page.getButton && page.getButton().set({ paddingTop: 4, paddingBottom: 4 });
       tabs.getChildren().forEach(lowButton);
