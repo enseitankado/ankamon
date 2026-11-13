@@ -1372,14 +1372,19 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         const first = new qx.ui.form.PasswordField().set({ placeholder: "Yeni parola", liveUpdate: true });
         const second = new qx.ui.form.PasswordField().set({ placeholder: "Yeni parola (tekrar)", liveUpdate: true });
         const note = new qx.ui.basic.Label("").set({ rich: true });
-        box.add(new qx.ui.basic.Label("Parola:"), { row: 0, column: 0 });
+        [first, second].forEach(f => f.getContentElement().setAttribute("autocomplete", "new-password"));
+        box.add(new qx.ui.basic.Label("Parola:").set({ alignY: "middle" }), { row: 0, column: 0 });
         box.add(first, { row: 0, column: 1 });
-        box.add(new qx.ui.basic.Label("Tekrar:"), { row: 1, column: 0 });
+        // Rastgele parola düğmesi + Göster (ui.PasswordDice): üretilen parola iki kutuya yazılır ve gösterilir.
+        box.add(ankamon.ui.PasswordDice.controls([first, second]), { row: 0, column: 2 });
+        box.add(new qx.ui.basic.Label("Tekrar:").set({ alignY: "middle" }), { row: 1, column: 0 });
         box.add(second, { row: 1, column: 1 });
-        box.add(note, { row: 2, column: 1 });
+        box.add(note, { row: 2, column: 1, colSpan: 2 });
         if (bootWipe) {
-          box.add(new qx.ui.basic.Label(this.BOOT_WIPE_NOTE).set({ textColor: "app-warn", toolTipText: this.BOOT_WIPE_HINT, alignY: "middle" }), { row: 0, column: 2 });
-          first.setToolTipText(this.BOOT_WIPE_HINT);
+          // Uzun açıklama sarmalı ipucunda (tek satır ekranı boydan boya geçiyordu — kullanıcı bildirimi 2026-11-13).
+          const tip = ankamon.ui.ToolTipPolicy.wrapped(this.BOOT_WIPE_HINT);
+          box.add(new qx.ui.basic.Label(this.BOOT_WIPE_NOTE).set({ textColor: "app-warn", toolTip: tip, alignY: "middle" }), { row: 1, column: 2 });
+          first.setToolTip(tip);
         }
         const pair = {
           box, first, second,

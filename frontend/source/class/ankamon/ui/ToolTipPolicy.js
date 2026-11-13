@@ -60,6 +60,16 @@ qx.Class.define("ankamon.ui.ToolTipPolicy", {
     SHOW_MS: 700,
     __installed: false,
 
+    /**
+     * Uzun düz metin için sarmalanan ipucu: qx'in toolTipText ipucu tek satır çizer (uzun metin ekranı boydan boya
+     * geçiyordu — Parola ayarla, kullanıcı bildirimi 2026-11-13). Metin kaçışlanır, satır sonları korunur.
+     * @return {qx.ui.tooltip.ToolTip} widget.setToolTip(...) ile verilir
+     */
+    wrapped(text, maxWidth = 420) {
+      return new qx.ui.tooltip.ToolTip(qx.bom.String.escape(String(text || "")).replace(/\n/g, "<br>"))
+        .set({ rich: true, maxWidth });
+    },
+
     /** Uygulama açılışında bir kez çağrılır (bkz. Application.main). */
     install() {
       if (this.__installed) {

@@ -102,7 +102,8 @@ qx.Class.define("ankamon.ui.devices.AdminPasswordPanel", {
       grid.add(verify, { row: 0, column: 2 });
       grid.add(verifyNote, { row: 1, column: 1, colSpan: 2 });
       grid.add(new qx.ui.basic.Label("Yeni:"), { row: 2, column: 0 });
-      grid.add(first, { row: 2, column: 1, colSpan: 2 });
+      grid.add(first, { row: 2, column: 1 });
+      grid.add(ankamon.ui.PasswordDice.controls([first, second]), { row: 2, column: 2 });
       grid.add(new qx.ui.basic.Label("Tekrar:"), { row: 3, column: 0 });
       grid.add(second, { row: 3, column: 1, colSpan: 2 });
       group.add(grid);

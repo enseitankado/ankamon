@@ -65,10 +65,10 @@ qx.Class.define("ankamon.ui.Form", {
       if (!warning) {
         return this.addField(key, label, field);
       }
-      field.setToolTipText(warning.hint);
+      field.setToolTip(ankamon.ui.ToolTipPolicy.wrapped(warning.hint));
       const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
       row.add(field, { flex: 1 });
-      row.add(new qx.ui.basic.Label(warning.note).set({ textColor: "app-warn", toolTipText: warning.hint }));
+      row.add(new qx.ui.basic.Label(warning.note).set({ textColor: "app-warn", toolTip: ankamon.ui.ToolTipPolicy.wrapped(warning.hint) }));
       this.add(new qx.ui.basic.Label(label), { row: this.__row, column: 0 });
       this.add(row, { row: this.__row, column: 1 });
       this.__fields[key] = field;
