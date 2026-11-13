@@ -98,6 +98,52 @@ class WolTargetsTest(unittest.TestCase):
             wol.ifaces.networks = orig
 
 
+class _Conn:
+    """Taramanın saklı ölçüm sorgusu için sahte bağlantı."""
+
+    def __init__(self, row):
+        self.row, self.args = row, None
+
+    def execute(self, sql, args):
+        self.args = args
+        return self
+
+    def fetchone(self):
+        return self.row
+
+
+class ScanEvaluateTest(unittest.TestCase):
+    """Anlık tarama: runner cihazı iş hedefi olarak verir ({"device_id": …}) — saklı ölçümle karşılaştırılmalı."""
+
+    def _values(self, clean, por):
+        smart = json.dumps({"serial_number": "S1", "ata_smart_attributes": {"table": [
+            _attr(12, "Power_Cycle_Count", 1471), _attr(235, "POR_Recovery_Count", por)]}})
+        return {"BOOT_ID": "yeni", "NOW": "1794567000", "UPTIME": "60", "SMART_JSON": smart,
+                "PREV_CLEAN": "1" if clean else "0", "PREV_END": "1794566900"}
+
+    def _last(self, por, serial="S1"):
+        return {"unsafe_shutdowns": por, "unsafe_attr": "235 POR_Recovery_Count", "power_cycles": 1470,
+                "booted_at": T0, "disk_serial": serial}
+
+    def test_plug_pull_confirmed(self):
+        conn = _Conn(self._last(724))
+        r = power_loss.evaluate(self._values(False, 725), {"device": {"device_id": 1, "ip": "x"}, "conn": conn})
+        self.assertEqual(conn.args, (1, "yeni"))
+        self.assertIs(r["anomaly"], True)
+        self.assertIn("SMART ile teyit edildi", r["summary"])
+
+    def test_etap_shutdown_not_anomaly(self):
+        r = power_loss.evaluate(self._values(False, 725), {"device": {"device_id": 1}, "conn": _Conn(self._last(725))})
+        self.assertIs(r["anomaly"], False)
+        self.assertIn("fiş çekilmedi", r["summary"])
+
+    def test_unknown_without_baseline_or_other_disk(self):
+        r = power_loss.evaluate(self._values(False, 725), {"device": {"device_id": 1}, "conn": _Conn(None)})
+        self.assertIsNone(r["anomaly"])
+        r = power_loss.evaluate(self._values(False, 725), {"device": {"id": 1}, "conn": _Conn(self._last(700, "S9"))})
+        self.assertIsNone(r["anomaly"])
+
+
 class ProbeParseTest(unittest.TestCase):
     def test_parse(self):
         out = "\n".join([

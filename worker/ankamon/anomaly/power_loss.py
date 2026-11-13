@@ -378,7 +378,7 @@ from ..executor import power_probe as _probe  # noqa: E402
 PROBE = _probe.SCRIPT
 
 _LAST_STORED = """
-SELECT unsafe_shutdowns, unsafe_attr, power_cycles, booted_at FROM device_power_probes
+SELECT unsafe_shutdowns, unsafe_attr, power_cycles, booted_at, disk_serial FROM device_power_probes
 WHERE device_id = %s AND boot_id <> %s ORDER BY booted_at DESC LIMIT 1
 """
 
@@ -399,12 +399,23 @@ def evaluate(values: dict, ctx: dict) -> dict:
         parts.append("disk ani güç kaybı sayacı sunmuyor")
     else:
         parts.append(f"SMART {rec['unsafe_attr']} = {rec['unsafe_shutdowns']} (açılış sayısı {rec['power_cycles']})")
+        # Runner taramada iş hedefini verir (anahtar "device_id"); "id" de kabul (2026-11-13: yalnız "id" aranıyordu,
+        # karşılaştırma hiç yapılmıyor, fişten çekilen cihaz taramada «bilinmiyor» kalıyordu).
         device = ctx.get("device") or {}
-        if ctx.get("conn") is not None and device.get("id"):
-            last = ctx["conn"].execute(_LAST_STORED, (device["id"], rec["boot_id"])).fetchone()
-            if last and last["unsafe_shutdowns"] is not None and last["unsafe_attr"] == rec["unsafe_attr"]:
-                inc = rec["unsafe_shutdowns"] - last["unsafe_shutdowns"]
-                parts.append(f"önceki ölçümden beri {inc} ani güç kaybı")
-                if rec["prev_clean"] is False:
-                    anomaly = inc > 0
+        device_id = device.get("device_id") or device.get("id")
+        last = None
+        if ctx.get("conn") is not None and device_id:
+            last = ctx["conn"].execute(_LAST_STORED, (device_id, rec["boot_id"])).fetchone()
+        comparable = (last and last["unsafe_shutdowns"] is not None and last["unsafe_attr"] == rec["unsafe_attr"]
+                      and rec["unsafe_shutdowns"] >= last["unsafe_shutdowns"]
+                      and not (last["disk_serial"] and rec["disk_serial"] and last["disk_serial"] != rec["disk_serial"]))
+        if comparable:
+            inc = rec["unsafe_shutdowns"] - last["unsafe_shutdowns"]
+            parts.append(f"önceki ölçümden ({last['booted_at']:%d.%m %H:%M} açılışı) beri {inc} ani güç kaybı")
+            if rec["prev_clean"] is False:
+                anomaly = inc > 0
+                parts.insert(0, "Elektrik kesildi ya da fiş çekildi (SMART ile teyit edildi)" if inc > 0
+                             else "İşletim sistemi kapattı (ETAP zorla/otomatik kapatma) — fiş çekilmedi")
+        elif rec["prev_clean"] is False:
+            parts.append("karşılaştırılacak önceki SMART ölçümü yok")
     return {"anomaly": anomaly, "summary": "; ".join(parts), "detail": rec}
