@@ -26,10 +26,14 @@ fi
 
 # Güç kesintisi direnci: fsync/full_page_writes/synchronous_commit açık. Veri sayfası sağlama toplamları
 # initdb'de etkinleştirildi. Yalnız yerel dinleme.
+# recovery_init_sync_method=syncfs: ani kapanış sonrası kurtarmadan önceki "veri dizinini diske eşitle" adımı dosya
+# dosya fsync yerine dosya sisteminde tek syncfs (aynı güvence, Linux). Dosya başına fsync yavaş diskte ~1,5 dk
+# sürüyordu (2026-11-13) ve açılışı geciktiriyordu.
 exec su-exec postgres postgres -D "$PGDATA" \
     -c listen_addresses=127.0.0.1 \
     -c max_connections=100 \
     -c fsync=on -c full_page_writes=on -c synchronous_commit=on \
+    -c recovery_init_sync_method=syncfs \
     -c wal_compression=on -c max_wal_size=1GB -c checkpoint_timeout=5min \
     -c shared_preload_libraries=timescaledb \
     -c timescaledb.telemetry_level=off \

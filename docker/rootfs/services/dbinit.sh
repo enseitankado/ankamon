@@ -30,12 +30,17 @@ set -eu
 
 export PGHOST=127.0.0.1 PGPORT=5432 PGUSER=ankamon PGPASSWORD="$POSTGRES_PASSWORD"
 
+# Ani kapanıştan (elektrik kesintisi, yeniden başlatma) sonra PostgreSQL önce kurtarma yapar; yavaş diskte dakikalar
+# sürebilir. Eski 60 sn sınırı aşılınca dbinit düşüyor (autorestart yok), db-ready bayrağı oluşmadığından php-fpm ve
+# runner hiç başlamıyor, API 502 kalıyordu (2026-11-13, iki kez). Bu yüzden uzun bekler, ara ara durum yazar.
 echo "ankamon: PostgreSQL bekleniyor…"
-for _ in $(seq 1 60); do
+dbinit_pg_bekleme=1800
+for dbinit_pg_saniye in $(seq 1 "$dbinit_pg_bekleme"); do
     pg_isready -q && break
+    [ $((dbinit_pg_saniye % 30)) -eq 0 ] && echo "ankamon: PostgreSQL hâlâ açılıyor (kurtarma sürüyor olabilir), ${dbinit_pg_saniye} sn…"
     sleep 1
 done
-pg_isready -q || { echo "ankamon: PostgreSQL açılmadı." >&2; exit 1; }
+pg_isready -q || { echo "ankamon: PostgreSQL ${dbinit_pg_bekleme} sn içinde açılmadı." >&2; exit 1; }
 
 # --- Eski ad göçü: tihamon -> ankamon (yeniden adlandırma; mevcut PGDATA'da BİR KEZ) ---
 # Yeni kurulumda superuser zaten 'ankamon' (POSTGRES_USER); eski kurulumda 'tihamon'. Eskiyse, eski
