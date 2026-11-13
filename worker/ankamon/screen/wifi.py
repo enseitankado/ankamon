@@ -46,6 +46,7 @@ Sunucu iletileri, `phase` alanıyla:
         | {kind: client (Wi-Fi'ye bağlı cihaz), addr, bssid, name (bağlı olduğu ağ adı), chan, signal, rssi, count, random,
            vendor, device_name (adres bir cihazın kablolu/kablosuz MAC'iyse), hints, phone, first_seen, seen_days}],
         devices (yoklama yapan kestirilen cihaz sayısı), clients (bağlı cihaz sayısı),
+        anomalies [{sig, sev, label, key, detail, ssid, bssid}] (çevredeki AP'lerde pasif güvenlik imzaları — bkz. wifimon_wids),
         note (boşsa dinlendi: nodev|tools|radio|busy|nomon|shared|monfail|sshwifi), secs, at}.
   done {result: restored|shared|none|fail|lock, radio, policy (off: cihazda "Wi-Fi'yi kapat" kuralı var), wifi_temp, wifi_fail}:
         geri yükleme sonucu (radyo durumu devices.facts'e de yazılır), ardından kapanış 1000.
@@ -66,7 +67,7 @@ import tornado.websocket
 
 from .. import db
 from ..executor.hwfacts import mark_wifi_radio
-from . import wifimon_phone_hints, wifimon_probe_merge, wifimon_signal_log, wifimon_sightings
+from . import wifimon_phone_hints, wifimon_probe_merge, wifimon_signal_log, wifimon_sightings, wifimon_wids
 from .wifi_remote_scan import wifimon_remote_command
 
 log = logging.getLogger("ankamon.screen.wifi")
@@ -120,13 +121,16 @@ def parse_probes(sections: dict) -> dict:
     adresler aynı cihaz kestirimiyle (WPS kimliği, ağ listesi, sıra numarası sürekliliği, parmak izi + yakın sinyal — bkz.
     wifimon_probe_merge.py) tek satırda birleşir (addrs, why, dev alanları). Bağlı cihazlar
     (t: "c") ayrı satırlar: telefonun ağ başına rastgele adresi o ağda sabit kaldığından adres başına bir cihaz sayılır."""
-    rows, clients = [], []
+    rows, clients, ap_records = [], [], []
     for line in sections.get("PROBE", []):
         try:
             e = json.loads(line)
         except ValueError:
             continue
         rssi = e.get("rssi")
+        if e.get("t") in ("ap", "ar"):  # rogue-AP / KARMA toplamları (wifimon_wids ile anomali tespiti)
+            ap_records.append(e)
+            continue
         if e.get("t") == "c":
             clients.append({"kind": "client", "addr": str(e.get("addr", "")).upper(), "bssid": str(e.get("bssid", "")).upper(),
                             "name": str(e.get("ssid") or ""), "chan": str(e.get("chan") or ""), "rssi": rssi,
@@ -137,6 +141,7 @@ def parse_probes(sections: dict) -> dict:
                      "ssids": e.get("ssids") or [], "rssi": rssi, "signal": rssi_to_percent(rssi) if isinstance(rssi, int) else None,
                      "count": int(e.get("count") or 0), "fp": str(e.get("fp") or ""),
                      "fps": [str(f) for f in e.get("fps") or []][:4], "seq": e.get("seq"), "ts": e.get("ts"),
+                     "iefp": [int(x) for x in e.get("iefp") or []][:5] or None, "ieord": int(e["ieord"]) if isinstance(e.get("ieord"), int) else None,
                      "wps": {str(k): str(v)[:40] for k, v in e["wps"].items()} if isinstance(e.get("wps"), dict) else None,
                      "chan": "", "freq": "", "rate": "", "security": "", "active": False})
     for row in rows:
@@ -155,6 +160,7 @@ def parse_probes(sections: dict) -> dict:
     rows += clients
     rows.sort(key=lambda r: -(r["signal"] if r["signal"] is not None else -1))
     return {"phase": "probes", "rows": rows, "devices": devices, "clients": len(clients), "note": info.get("note", ""),
+            "anomalies": wifimon_wids.scan_anomalies(ap_records),
             "secs": int(info["secs"]) if info.get("secs", "").isdigit() else None, "at": int(time.time())}
 
 

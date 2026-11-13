@@ -65,7 +65,12 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
       "bağlantıları pencere kapanana dek kesilir). Kanıttaki <i>N sensörde</i>: aynı MAC adresini duyan sensör sayısı. " +
       "<b>Sınırlar:</b> ekranı kapalı telefon seyrek yoklar, bağlı telefon yalnız dinlenen kanalda ve o anda bir şey " +
       "gönderiyorsa görülür — <i>Sürekli izle</i> açık kalsın; uçak kipindeki ya da Wi-Fi'si kapalı telefon görülemez; sinyal " +
-      "gücü yalnız kaba bir yakınlık ipucudur, komşu sınıftaki telefon da duyulabilir.",
+      "gücü yalnız kaba bir yakınlık ipucudur, komşu sınıftaki telefon da duyulabilir. <b>Güvenlik uyarıları:</b> dinleme " +
+      "sırasında çevredeki erişim noktalarında pasif anomali imzaları da aranır ve bulgu varsa Tespitler sekmesinin üstünde " +
+      "kırmızı bir şeritte listelenir — <b>sahte AP / evil-twin</b> (aynı ağ adının farklı üreticilerden ya da çok kanaldan " +
+      "yayını, iki fiziksel verici), <b>şifreleme düşürme</b>, aşırı uzun ağ adı, <b>KARMA/MANA</b>, Pwnagotchi ve " +
+      "ESP32/Flipper/Pineapple gibi <b>saldırı araçları</b> (seyrek IE'li beacon). Bu imzalar sezgiseldir (karışık üreticili " +
+      "kurumsal ağlarda yanlış uyarı olabilir); bilgilendirir, kendiliğinden engellemez.",
 
     __win: null,
 
@@ -230,6 +235,44 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
       [baseline, manage].forEach(w => trustBar.add(w));
       findingsPage.add(trustBar);
 
+      // Güvenlik uyarı şeridi (çevredeki AP'lerde pasif anomali — worker screen/wifimon_wids.py): yalnız bulgu varken görünür.
+      const anomalyLabel = new qx.ui.basic.Label().set({ rich: true, wrap: true, selectable: true });
+      const anomalyBar = new qx.ui.container.Composite(new qx.ui.layout.VBox()).set({
+        marginBottom: 2, visibility: "excluded"
+      });
+      anomalyBar.add(anomalyLabel);
+      findingsPage.add(anomalyBar);
+      const SEV_RANK = { critical: 3, high: 2, medium: 1, low: 0 };
+      const SEV_HTML = {
+        critical: "<span style='color:#d32f2f'>⛔ ağır</span>",
+        high: "<span style='color:#e65100'>⚠ yüksek</span>",
+        medium: "<span style='color:#b08900'>△ orta</span>",
+        low: "<span style='color:#888'>· düşük</span>"
+      };
+      const esc = s => String(s == null ? "" : s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      const renderAnomalies = () => {
+        const seen = new Set();
+        const uniq = [];
+        feeds.forEach(feed => (feed.anomalies || []).forEach(a => {
+          const k = feed.name + "|" + a.sig + "|" + a.key;
+          if (!seen.has(k)) {
+            seen.add(k);
+            uniq.push({ a, sensor: feed.name });
+          }
+        }));
+        if (!uniq.length) {
+          anomalyBar.setVisibility("excluded");
+          return;
+        }
+        uniq.sort((p, q) => (SEV_RANK[q.a.sev] || 0) - (SEV_RANK[p.a.sev] || 0));
+        const lines = uniq.slice(0, 6).map(x => `${SEV_HTML[x.a.sev] || ""} <b>${esc(x.a.label)}</b> — ${esc(x.a.detail)}` +
+          ` <span style='opacity:.65'>[${esc(x.sensor)}]</span>`);
+        const more = uniq.length > 6 ? `<br><span style='opacity:.7'>+ ${uniq.length - 6} uyarı daha</span>` : "";
+        anomalyLabel.setValue("<div style='background:rgba(220,70,40,0.10);padding:6px 10px;border-radius:4px'>" +
+          `<b>Çevredeki ağlarda güvenlik uyarısı (${uniq.length})</b><br>` + lines.join("<br>") + more + "</div>");
+        anomalyBar.setVisibility("visible");
+      };
+
       // Grid'ler: page.Base yardımcılarıyla (süzgeç kutuları + hazır değer listesi, sütun sırası/gizleme tercihi).
       const host = new ankamon.ui.devices.WifimonGridHost(user);
       const columns = Render.COLUMNS;
@@ -318,6 +361,7 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
           sensorRows = sensors.rows;
           applySensors();
           apply();
+          renderAnomalies();
           const watching = list.some(f => f.watching && f.ws);
           win.setCaption(`Wi-Fi Monitör — ${list.length === 1 ? list[0].name : list.length + " sensör"}${watching ? " · sürekli izleniyor" : ""}`);
         }, null, 120);
@@ -556,6 +600,7 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
           });
           feed.probes.forEach((p, key) => now - p.at > this.PROBE_KEEP_MS && feed.probes.delete(key));
           feed.probeInfo = d;
+          feed.anomalies = d.anomalies || [];
           feed.at = now;
           feed.statusText = `Son tarama ${new Date(now).toLocaleTimeString("tr-TR")}`;
           const wasSniffing = feed.sniffing;
@@ -694,7 +739,7 @@ qx.Class.define("ankamon.ui.devices.WifiMonitor", {
           }
           const feed = { device, plan: plan || {}, name: device.label || device.hostname || device.ip || "#" + device.id, ws: null,
             watching: false, probe: false, sniffing: false, forced: false, error: false, statusText: "", notes: [], data: null,
-            probes: new Map(), probeInfo: null, initialKeys: null, at: 0 };
+            probes: new Map(), probeInfo: null, anomalies: [], initialKeys: null, at: 0 };
           feeds.set(device.id, feed);
           connect(feed);
         },

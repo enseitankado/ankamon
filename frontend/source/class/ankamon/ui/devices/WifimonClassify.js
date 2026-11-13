@@ -77,7 +77,8 @@ qx.Class.define("ankamon.ui.devices.WifimonClassify", {
       ["ssid", "Aynı ağ listesi: aranan ağlar aynı ya da biri ötekini kapsıyor (tek ortak ağda sinyal farkı da ≤ 12 dB olmalı)"],
       ["seq", "Sıra numarası sürekliliği: yeni adresin ilk 802.11 sıra numarası eskisinin sonuncusunu sürdürüyor " +
         "(≤ 48 atlama, ≤ 15 sn ara, sinyal farkı ≤ 12 dB)"],
-      ["fp", "Aynı yetenek parmak izi ve yakın sinyal: desteklenen hız/yetenek öğeleri aynı, sinyal farkı ≤ 12 dB"]
+      ["fp", "Aynı yetenek parmak izi ve yakın sinyal: IE parmak izi (hız/HT/VHT/genişletilmiş yetenek/üretici — 5 slottan " +
+        "≥3'ü) ve IE sırası aynı, sinyal farkı ≤ 12 dB"]
     ],
 
     /**
@@ -107,6 +108,9 @@ qx.Class.define("ankamon.ui.devices.WifimonClassify", {
         }
         return common >= 2 || this.__near(a, b) ? "ssid" : "";
       }
+      if (this.__near(a, b) && this.__iefpMatch(a, b)) {
+        return "fp";
+      }
       const fa = a.fps && a.fps.length ? a.fps : [a.fp];
       const fb = new Set(b.fps && b.fps.length ? b.fps : [b.fp]);
       return fa.some(f => f && fb.has(f)) && this.__near(a, b) ? "fp" : "";
@@ -115,6 +119,28 @@ qx.Class.define("ankamon.ui.devices.WifimonClassify", {
     /** En güçlü sinyaller yakın mı (≤ 12 dB — worker SIGNAL_NEAR_DB). */
     __near(a, b) {
       return typeof a.rssi === "number" && typeof b.rssi === "number" && Math.abs(a.rssi - b.rssi) <= 12;
+    },
+
+    /**
+     * IE-parmak-izi (5 slot) + IE-sırası eşleşmesi — worker wifimon_probe_merge._iefp_match ile aynı: ≥3 ortak sıfır-olmayan
+     * slot VE IE-sırası uyumlu. Tek sha1 'fps' eşitliğinden daha dayanıklı (bir öğe değişse de cihazı bağlar).
+     */
+    __iefpMatch(a, b) {
+      const fa = a.iefp;
+      const fb = b.iefp;
+      if (!(Array.isArray(fa) && Array.isArray(fb) && fa.length === 5 && fb.length === 5)) {
+        return false;
+      }
+      let slots = 0;
+      for (let i = 0; i < 5; i++) {
+        if (fa[i] && fb[i] && fa[i] === fb[i]) {
+          slots++;
+        }
+      }
+      if (slots < 3) {
+        return false;
+      }
+      return !(a.ieord && b.ieord) || a.ieord === b.ieord;
     },
 
     /**
@@ -131,6 +157,12 @@ qx.Class.define("ankamon.ui.devices.WifimonClassify", {
         wps: row.wps || old.wps
       });
       merged.dev = old.dev || row.dev;
+      const fa = row.iefp;
+      const fb = old.iefp;
+      if (Array.isArray(fa) && fa.length === 5 && Array.isArray(fb) && fb.length === 5) {
+        merged.iefp = fa.map((v, i) => v || fb[i]);  // slotları birleştir (bantlar arası)
+      }
+      merged.ieord = row.ieord || old.ieord;
       return merged;
     },
 

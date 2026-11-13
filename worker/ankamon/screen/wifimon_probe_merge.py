@@ -57,9 +57,25 @@ REASON_TEXT = {
 }
 
 
+IEFP_MIN_SLOTS = 3       # 5 IE-parmak-izi slotundan en az kaçı tutmalı (kısmi eşleşme: bir öğe değişse de bağlanır)
+
+
 def _near(a: dict, b: dict) -> bool:
     ra, rb = a.get("rssi"), b.get("rssi")
     return isinstance(ra, int) and isinstance(rb, int) and abs(ra - rb) <= SIGNAL_NEAR_DB
+
+
+def _iefp_match(a: dict, b: dict) -> bool:
+    """IE-parmak-izi (5 slot) + IE-sırası ile model eşleşmesi: en az IEFP_MIN_SLOTS ortak sıfır-olmayan slot VE IE-sırası uyumlu
+    (aynı ya da biri bilinmiyor). sha1 'fps' eşitliğinden daha dayanıklı — tek öğe (ör. kanal/güç) değişse de tutar."""
+    fa, fb = a.get("iefp"), b.get("iefp")
+    if not (isinstance(fa, list) and isinstance(fb, list) and len(fa) == len(fb) == 5):
+        return False
+    slots = sum(1 for x, y in zip(fa, fb) if x and y and x == y)
+    if slots < IEFP_MIN_SLOTS:
+        return False
+    oa, ob = a.get("ieord"), b.get("ieord")
+    return not (oa and ob) or oa == ob
 
 
 def _ssid_relation(a: dict, b: dict) -> str:
@@ -96,6 +112,8 @@ def same_device(a: dict, b: dict) -> str:
         return ""
     if _near(a, b) and (_seq_follows(a, b) or _seq_follows(b, a)):
         return "seq"
+    if _near(a, b) and _iefp_match(a, b):
+        return "fp"
     fa, fb = set(a.get("fps") or [a.get("fp")]) - {None, ""}, set(b.get("fps") or [b.get("fp")]) - {None, ""}
     if fa & fb and _near(a, b):
         return "fp"
@@ -109,6 +127,9 @@ def device_key(row: dict) -> str:
         return "w:" + uuid
     if row.get("ssids"):
         return "s:" + hashlib.sha1("\n".join(sorted(row["ssids"])).encode()).hexdigest()[:10]
+    iefp = row.get("iefp")
+    if isinstance(iefp, list) and any(iefp):
+        return "f:" + ",".join("%x" % x for x in iefp) + "/" + ("%x" % (row.get("ieord") or 0))
     return "f:" + (sorted(row.get("fps") or [row.get("fp") or row.get("addr", "")])[0])
 
 
@@ -141,16 +162,23 @@ def merge_random(rows: list[dict]) -> list[dict]:
         members.sort(key=lambda r: -(r.get("count") or 0))
         row = dict(members[0])
         if len(members) > 1:
-            ssids, fps, rssi = [], [], None
+            ssids, fps, rssi, iefp = [], [], None, [0, 0, 0, 0, 0]
             for m in members:
                 ssids += [s for s in m.get("ssids") or [] if s not in ssids]
                 fps += [f for f in m.get("fps") or [m.get("fp")] if f and f not in fps]
+                mf = m.get("iefp")
+                if isinstance(mf, list) and len(mf) == 5:
+                    iefp = [a or b for a, b in zip(iefp, mf)]  # slotları birleştir (ör. 2,4 ve 5 GHz çerçeveleri)
+                if not row.get("ieord") and m.get("ieord"):
+                    row["ieord"] = m["ieord"]
                 if isinstance(m.get("rssi"), int) and (rssi is None or m["rssi"] > rssi):
                     rssi = m["rssi"]
                 if not row.get("wps") and m.get("wps"):
                     row["wps"] = m["wps"]
             row.update(ssids=ssids[:12], fps=fps[:8], rssi=rssi, count=sum(m.get("count") or 0 for m in members),
                        name=", ".join(ssids[:12]))
+            if any(iefp):
+                row["iefp"] = iefp
             for key in ("signal", "first_seen", "seen_days"):
                 vals = [m.get(key) for m in members if m.get(key) is not None]
                 if vals:
