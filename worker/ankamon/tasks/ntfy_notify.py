@@ -53,6 +53,7 @@ _LABELS = {
     "net_link_lost": "Ağ bağlantısı koptu", "log_delayed": "Log iletimi gecikti", "ssh_bruteforce": "SSH kaba kuvvet",
     "dhcp_issue": "DHCP adres alamadı", "nic_error": "Ağ kartı hatası", "identity_conflict": "Ad / IP çakışması",
     "subnet_changed": "Cihaz başka ağda", "clock_skew": "Cihaz saati yanlış",
+    "power_loss": "Elektrik kesintisi / fişten çekme", "power_outage_area": "Toplu elektrik kesintisi",
 }
 
 

@@ -26,7 +26,7 @@
 """Periyodik görevler. Yeni görev: run(conn) tanımlayan bir modül ekleyip TASKS'a yazın."""
 
 from .. import anomaly
-from . import diagnose_schedule, device_identity, device_sessions, device_uptime, devices_from_logs, device_status, break_league, net_device_logs, ntfy_notify, session_activity, session_end, session_league, telegraf_targets
+from . import diagnose_schedule, device_identity, device_sessions, device_uptime, devices_from_logs, device_status, break_league, net_device_logs, ntfy_notify, power_probe, session_activity, session_end, session_league, telegraf_targets
 
 # Sıra önemlidir: önce kayıt, sonra durum, oturumlar (device_status'ın güncellediği "online"a bakar),
 # kimlik (MAC; SSH erişimi gerekir), Telegraf hedefleri (device_status'ın güncellediği exporter_ok'a
@@ -43,6 +43,7 @@ from . import diagnose_schedule, device_identity, device_sessions, device_uptime
 # kapalı saat gölgeleri için; dakikalık doğruluk yeter, hızlı döngüde değil).
 # anomaly: anomali kuralları (Cihazlar ▸ Anomaliler) — device_uptime ve session_end'in ardından (onların
 # güncellediği aralıklar/oturumlar üzerinden hesaplar; bkz. ankamon/anomaly).
+# power_probe: açılıştan sonra SMART güç sayaçları + önceki açılışın sonu (elektrik kesintisi anomalisinin teyidi; anomaly'den önce).
 # diagnose_schedule: haftalık otomatik sorun tespiti — kaynaklar müsaitken görev kuyruğa yazar (bkz. o dosya).
 # session_end: cihazı yeniden erişilebilir olan "cihaz çevrimdışı oldu" kapanışlarını cihazın açılış günlüğüne
 # bakıp netleştirir (düzenli kapatma / ETAP otomatik kapanma / elektrik kesintisi …; bkz. o dosya).
@@ -51,7 +52,7 @@ from . import diagnose_schedule, device_identity, device_sessions, device_uptime
 # break_league: Oturumlar ▸ Teneffüs Ligi — ders aralarında açık kalan cihazlar (device_uptime ve oturumlardan sonra).
 # net_device_logs: Ağ ▸ "Son log" sütunu (cihaz IP'sinden son log; logs tablosu arayüz sorgusunda taranmasın diye).
 TASKS = [devices_from_logs, device_status, device_sessions, device_identity, telegraf_targets, device_uptime, session_end,
-         anomaly, diagnose_schedule, session_activity, ntfy_notify, session_league, break_league, net_device_logs]
+         power_probe, anomaly, diagnose_schedule, session_activity, ntfy_notify, session_league, break_league, net_device_logs]
 
 
 def _extension_tasks() -> list:

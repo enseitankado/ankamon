@@ -52,7 +52,8 @@ import logging
 import os
 import sys
 
-from . import cmos_battery, identity, net_events, net_link_lost, no_login, ntp_unsynced, temp_high, uefi_nvram_high
+from . import (cmos_battery, identity, net_events, net_link_lost, no_login, ntp_unsynced, power_loss,
+               power_outage_area, temp_high, uefi_nvram_high)
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ def _extension_rules() -> list:
 
 
 RULES = [no_login, ntp_unsynced, temp_high.cpu_rule, temp_high.disk_rule, cmos_battery, net_link_lost,
-         uefi_nvram_high, net_link_lost.delayed_rule] + net_events.RULES + identity.RULES + _extension_rules()
+         uefi_nvram_high, net_link_lost.delayed_rule, power_loss, power_outage_area] + net_events.RULES + identity.RULES + _extension_rules()
 
 # Her turda yeniden hesaplanan geriye dönük pencere (geç gelen loglar/oturum kayıtları için).
 WINDOW = datetime.timedelta(days=1)

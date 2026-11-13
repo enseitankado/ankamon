@@ -109,6 +109,27 @@ final class AnomaliesApi
             'source_detail' => 'Cihazın loglarının geç gelmesi (Ankamon bağlanmaz).',
             'every' => '5 dk',
         ],
+        'power_loss' => [
+            'label' => 'Elektrik kesintisi / fişten çekme',
+            'description' => 'Cihaz işletim sistemi kapatmadan güçsüz kaldı: fişi ya da priz anahtarı çekildi, elektrik kesildi (güç düğmesine basılı tutarak kapatma da aynı görünür). Cihaz yeniden açılınca saptanır: önceki çalışmanın sonunda kapanış logu gelmemiş ve cihazın kendi günlüğü kapanış izi olmadan bitmiş. '
+                . 'Teyit sistem diskinin SMART ani güç kaybı sayacıyla yapılır (iki açılış arasındaki artış): ETAP\'ın "Zorla kapat" düğmesi ve otomatik kapanması da günlükte iz bırakmaz ama diski düzgün durdurur, sayaç artmaz — bunlar sayılmaz. '
+                . 'Sayaç artmışsa kayıt "SMART ile teyit edildi", disk sayaç sunmuyorsa ya da önceki ölçüm yoksa "olası" yazılır (cihazın otomatik kapanma ayarı kapanışı açıklayabiliyorsa yazılmaz). Kayıt kesinti anından yeniden açılışa kadar sürer.',
+            'level' => 'warn',
+            'scan' => true,
+            'source' => 'Log + SSH verisi',
+            'source_detail' => 'Cihazın logları ve her açılıştan sonra (ayrıca 30 dk\'da bir) SSH ile bir kez okunan SMART güç sayaçları ile önceki açılışın günlük sonu.',
+            'every' => '5 dk',
+        ],
+        'power_outage_area' => [
+            'label' => 'Toplu elektrik kesintisi',
+            'description' => 'Aynı bina ya da kattaki birden çok cihaz aynı anda (birkaç dakika içinde) güçsüz kaldı. Yalnız fiziksel konumu (Tesis Envanteri kodu il.ilçe.tesis.bina.kat.salon) girilmiş cihazlar değerlendirilir; kayıt ortak konuma göre salon, kat, bina ya da tesis düzeyindedir. '
+                . 'Cihazlar hâlâ kapalıyken de saptanır (aynı anda çevrim dışı olan, Ankamon\'dan kapatılmamış ve kapanış logu göndermemiş cihazlar — o yerdeki cihazların en az yarısı); cihazlar açılınca elektrik kesintisi kayıtları ve SMART ile doğrulanır, doğrulanmazsa kayıt silinir. Aynı yerde açık kalan cihazlar sayılır: kesinti yalnız bir hatta ya da sigortada olabilir.',
+            'level' => 'bad',
+            'scan' => false,
+            'source' => 'Log + SSH verisi',
+            'source_detail' => 'Elektrik kesintisi kayıtları, cihazların çevrim içi yoklaması (10 sn) ve fiziksel konum kodları.',
+            'every' => '5 dk',
+        ],
         'ssh_bruteforce' => [
             'label' => 'SSH kaba kuvvet',
             'description' => 'Aynı kaynaktan en az 10 başarısız SSH girişi (aralarında 10 dakikadan uzun ara yok). Kaynak adres ve denenen hesaplar ayrıntıda; kaynak Ankamon\'un kendisi de olabilir (ayarlardaki parola cihazınkinden farklıysa).',
