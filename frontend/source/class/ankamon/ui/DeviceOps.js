@@ -1066,6 +1066,9 @@ qx.Class.define("ankamon.ui.DeviceOps", {
           subAdd(commands, ICON.webshell, "Web terminal" + count, () =>
             devices.length > 1 ? this.webshellMulti(devices) : this.webshell(device));
         }
+        // Komut menüsüne sabitlenen hazır komutlar (kullanıcı isteği 2026-11-23; Komut çalıştır penceresinde sabitlenir):
+        // araç çubuğunun Komut düğmesi de bu alt menüden türer.
+        ankamon.ui.devices.ReadyCommandPins.addMenuItems(commands, devices, user);
         group(ICON.run, "Komut çalıştır" + count, commands);
 
         // Yönet ▸ Ekranı göster, Bilgisayarı yönet, Uyandır, Uyut, giriş kilitleri, Web Filtre ▸ …
@@ -1597,6 +1600,11 @@ qx.Class.define("ankamon.ui.DeviceOps", {
      * @param user {Map} oturum sahibi — hangi seçeneklerin sunulacağını (actions/shell yetkisi) belirler
      * @param preselect {String?} pencere bu hazır işlem (actions/<id>) seçili açılır — ör. Bakım ▸ Sensörler
      *   uyarısındaki kurulum bağlantıları; işlem listede yoksa (yetki) ilk satır kalır
+     *
+     * Eklentilerin hazır komutları (ankamon.ext.Extensions.addReadyCommandSource — ör. TiHA adımları) listenin sonunda
+     * kendi başlıklarıyla; seçilip Çalıştır'a basılınca eklentinin kendi yolu (penceresi/onayı) çalışır. Seçim kutusunun
+     * yanındaki "Sabitle" düğmesi seçili hazır komutu Komut menüsüne sabitler (ui.devices.ReadyCommandPins — kullanıcı
+     * isteği 2026-11-23); sabit olanların başında ★.
      */
     async run(devices, user, preselect = null) {
       const ids = devices.map(b => b.id);
@@ -1615,6 +1623,13 @@ qx.Class.define("ankamon.ui.DeviceOps", {
           return;
         }
       }
+      // Eklentilerin hazır komutları (yüklü, etkin ve kullanıcı yetkiliyse kaynak kayıtlıdır).
+      const extEntries = await ankamon.ext.Extensions.readyCommands(user).catch(() => []);
+      const Pins = ankamon.ui.devices.ReadyCommandPins;
+      const pinEntry = model => (model.extEntry
+        ? { key: model.extEntry.key, label: model.extEntry.label, platforms: model.extEntry.platforms || null }
+        : { key: "action:" + model.id, label: model.title, platforms: model.platforms || null });
+      Pins.refreshLabels(user, actions.map(pinEntry).concat(extEntries.map(e => pinEntry({ extEntry: e }))));
 
       // İşletim sistemine göre (kullanıcı isteği 2026-11-12; platforms/README.md): üstte hedeflerin aile dağılımı; hazır
       // işlemler desteklediği aileleri gösterir, seçili cihazların hiçbirinde betiği olmayan işlem seçilemez; serbest
@@ -1631,20 +1646,50 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         select.add(new qx.ui.form.ListItem("— Serbest komut —", null, null));
       }
       const famText = a => (a.platforms || ["linux"]).map(f => P.label(f)).join(", ");
-      actions.forEach(a => {
-        const usable = present.filter(f => (a.platforms || ["linux"]).includes(f));
-        const item = new qx.ui.form.ListItem(`${a.category} — ${a.title}  [${famText(a)}]`, null, a);
+      // Seçim satırının metni: sabitse başında ★ (sabitleme değişince yeniden yazılır — bkz. pinBtn).
+      const itemText = (category, title, model) => `${Pins.isPinned(user, pinEntry(model).key) ? "★ " : ""}${category} — ${title}  [${famText(model.extEntry || model)}]`;
+      const addItem = (category, title, model) => {
+        const usable = present.filter(f => ((model.extEntry || model).platforms || ["linux"]).includes(f));
+        const item = new qx.ui.form.ListItem(itemText(category, title, model), null, model);
+        item.setUserData("ankamon.itemText", () => itemText(category, title, model));
         if (!usable.length) {
           item.set({ enabled: false, toolTipText: `Seçili cihazların sisteminde (${present.map(f => P.label(f)).join(", ")}) bu işlemin uygulaması yok.` });
         }
         select.add(item);
-      });
+      };
+      actions.forEach(a => addItem(a.category, a.title, a));
+      extEntries.forEach(e => addItem(e.category || "Eklenti", e.label, { extEntry: e }));
       if (!select.getChildren().length) {
         ankamon.ui.Dialog.alert("Çalıştırabileceğiniz hazır işlem ya da komut izniniz yok.");
         win.close();
         return;
       }
-      win.add(select);
+      // Seçili hazır komutu Komut menüsüne (sağ menü Komut çalıştır ▸ ve araç çubuğu Komut düğmesi) sabitle / kaldır.
+      const pinBtn = new qx.ui.form.Button("").set({ padding: [2, 8] });
+      const selectRow = new qx.ui.container.Composite(new qx.ui.layout.HBox(6).set({ alignY: "middle" }));
+      selectRow.add(select, { flex: 1 });
+      selectRow.add(pinBtn);
+      win.add(selectRow);
+      const syncPin = () => {
+        const sel = select.getSelection()[0];
+        const model = sel ? sel.getModel() : null;
+        const pinned = !!model && Pins.isPinned(user, pinEntry(model).key);
+        pinBtn.set({
+          label: pinned ? "★ Sabitlendi" : "☆ Sabitle", enabled: !!model,
+          toolTipText: !model ? "Serbest komut sabitlenemez; bir hazır komut seçin."
+            : pinned ? "Komut menüsünde sabit — tıklayınca sabitleme kalkar."
+              : "Komut menüsüne sabitle: sağ menüde Komut çalıştır ▸ altında ve araç çubuğundaki Komut düğmesinde doğrudan madde olur."
+        });
+      };
+      pinBtn.addListener("execute", () => {
+        const sel = select.getSelection()[0];
+        if (!sel || !sel.getModel()) {
+          return;
+        }
+        Pins.toggle(user, pinEntry(sel.getModel()));
+        sel.setLabel(sel.getUserData("ankamon.itemText")());
+        syncPin();
+      });
       const desc = new qx.ui.basic.Label("").set({ rich: true, wrap: true, textColor: "app-muted" });
       win.add(desc);
       const body = new qx.ui.container.Composite(new qx.ui.layout.VBox());
@@ -1658,7 +1703,16 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         body.removeAll().forEach(w => w.dispose());
         form = null;
         commandArea = null;
-        if (action === null) {
+        syncPin();
+        if (action && action.extEntry) {
+          const entry = action.extEntry;
+          const fams = entry.platforms || ["linux"];
+          const skipped = devices.filter(b => !fams.includes(P.familyOf(b)));
+          desc.setValue(qx.bom.String.escape(entry.hint || "") +
+            `<br><span style="opacity:.8">Tanımlı olduğu sistemler: ${qx.bom.String.escape(famText(entry))}` +
+            (skipped.length ? ` — <b>${skipped.length} cihaz (${qx.bom.String.escape(P.summary(skipped))}) atlanır</b>` : "") + "</span>" +
+            `<br><b>${qx.bom.String.escape(entry.runNote || "Çalıştır, komutun kendi penceresini açar (ayarlar ve onay orada).")}</b>`);
+        } else if (action === null) {
           // Aile başına komut kutusu (yalnız seçimde bulunan ve serbest komutu destekleyen aileler).
           const shells = present.filter(f => P.supports("Hazır / Serbest komut çalıştır", f));
           const other = present.filter(f => !shells.includes(f));
@@ -1707,6 +1761,11 @@ qx.Class.define("ankamon.ui.DeviceOps", {
       runBtn.addListener("execute", () => {
         const sel = select.getSelection()[0];
         const action = sel ? sel.getModel() : null;
+        if (action && action.extEntry) {
+          win.close();
+          action.extEntry.run(devices, user);
+          return;
+        }
         if (action === null) {
           const commands = {};
           Object.entries(commandArea || {}).forEach(([f, area]) => {
@@ -1769,6 +1828,52 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         source.addListener("changeValue", e => target.setValue(this.etapUsername(e.getData())));
       });
       return form;
+    },
+
+    /**
+     * Hazır işlemi Komut çalıştır penceresi olmadan çalıştırır — Komut menüsüne sabitlenmiş madde (ui.devices.ReadyCommandPins):
+     * kendi arayüzü olan işlem (ör. Disk editörü) penceresini açar (tek cihaz); parametresi olan işlem önce parametre
+     * penceresini; parametresizse action.json "confirm" verilmişse onay sorulur (menüden tek tıkla yeniden başlat/kapat
+     * gibi işler kazara çalışmasın), sonra görev başlar ve canlı çıktı penceresi açılır.
+     * @param action {Map} /api/actions öğesi
+     */
+    async runReadyAction(action, devices, user) {
+      const ids = devices.map(b => b.id);
+      if (!ids.length) {
+        return;
+      }
+      const esc = qx.bom.String.escape;
+      if (action.ui) {
+        if (ids.length !== 1) {
+          ankamon.ui.Dialog.alert(`${esc(action.title)} tek cihazda çalışır — yalnız bir cihaz işaretleyin.`);
+          return;
+        }
+        this.openActionUi(action, devices[0]);
+        return;
+      }
+      const caption = `Komut çıktısı — ${action.title}`;
+      const form = this.actionForm(action);
+      if (!form) {
+        if (action.confirm && !await ankamon.ui.Dialog.confirm(
+          `<b>${esc(action.title)}</b> ${ids.length > 1 ? `<b>${ids.length} cihazda</b>` : "seçili cihazda"} çalıştırılsın mı?` +
+          (action.description ? `<br><br>${esc(action.description)}` : ""), "Çalıştır")) {
+          return;
+        }
+        this.__job({ type: "action", action: action.id, device_ids: ids, values: {} }, caption);
+        return;
+      }
+      const P = ankamon.ui.devices.Platforms;
+      const win = ankamon.ui.Dialog.window(`${action.title} — ${ids.length} cihaz`, 560);
+      win.add(new qx.ui.basic.Label(`<b>Hedefler:</b> ${esc(P.summary(devices))}`).set({ rich: true }));
+      win.add(new qx.ui.basic.Label(esc(action.description || "")).set({ rich: true, wrap: true, textColor: "app-muted" }));
+      win.add(form);
+      const runBtn = new qx.ui.form.Button("Çalıştır");
+      runBtn.addListener("execute", () => {
+        win.close();
+        this.__job({ type: "action", action: action.id, device_ids: ids, values: form.values() }, caption);
+      });
+      ankamon.ui.Dialog.buttons(win, [runBtn]);
+      win.open();
     },
 
     /**

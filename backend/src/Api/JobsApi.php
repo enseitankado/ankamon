@@ -127,7 +127,7 @@ final class JobsApi
     {
         $type = (string) $request->input('type', '');
         [$feature, $title, $params, $needsDevices] = match ($type) {
-            'action' => $this->actionJob($request),
+            'action' => $this->actionJob($request, $user),
             'command' => $this->commandJob($request),
             'wol' => ['power', 'Uyandır (Wake-on-LAN)', [], true],
             // "screen" yetkisiyle: Ekranlar sekmesindeki önizlemelerin sağ menüsünden tetiklenir
@@ -288,7 +288,7 @@ final class JobsApi
     /** Parolası ayrı yetkiyle ("devices.passwords.<hesap>") ayarlanabilen cihaz hesapları (bkz. create). */
     private const ADMIN_ACCOUNTS = ['etapadmin', 'root'];
 
-    private function actionJob(Request $request): array
+    private function actionJob(Request $request, array $user): array
     {
         $action = Actions::all()[(string) $request->input('action', '')]
             ?? throw ApiError::badRequest('Bilinmeyen işlem.');
@@ -302,7 +302,9 @@ final class JobsApi
                 throw ApiError::badRequest(implode(', ', $blocked) . ' hesabı silinemez (cihaz yönetimi için korunur).');
             }
         }
-        return [$action['feature'], $action['title'], ['action' => $action['id'], 'values' => $values], true];
+        // Eklentinin bu işleme bağladığı ek doğrulama (ör. TiHA adımı şemada var mı, ayarlar) — bkz. Actions::addJobCheck.
+        [$values, $title] = Actions::checkJob($action, $values, $user);
+        return [$action['feature'], $title, ['action' => $action['id'], 'values' => $values], true];
     }
 
     /**
