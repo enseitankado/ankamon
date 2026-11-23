@@ -36,6 +36,10 @@
  * sonra "Uygula" akışı değişmez). Sınırlar ve 1 MiB hizalama ui.disk.DiskModel'in (resizeLimits, creatable) kurallarıyla
  * aynıdır: komşu bölüm/boşluk, disk sonu, dosya sisteminin en küçük boyutu, büyüyüp küçülebilme, bağlı bölüm taşınamaz.
  *
+ * Yapılamayan ya da sınıra takılan sürüklemede neden söylenir (kullanıcı isteği 2026-11-23): sürüklerken hayalet kutunun notunda
+ * kırmızı satır (dosya sistemi küçültmeyi desteklemiyor, araç yok, bölüm bağlı, dolu alan kadar en küçük boyut, komşu bölüm…),
+ * kutunun üstünde ipucu ve bırakınca editörde kısa bildirim (host.notify) — nedenler DiskModel.limitReasons / why.
+ *
  * Çubuk orantılı değildir (küçük bölüm en az %3 yer kaplar), bu yüzden piksel → sektör eşlemesi her sürüklemede yalnız
  * ilgili kutuların (bölüm + önündeki/arkasındaki boşluk) piksel aralığı üzerinden yerel ve doğrusaldır.
  */
@@ -50,7 +54,8 @@ qx.Class.define("ankamon.ui.disk.DiskBarDrag", {
 
     /**
      * @param el {Element} çubuğun DOM kabı (qx.ui.embed.Html içerik öğesi; içi setHtml ile yenilenir)
-     * @param host {Map} { disk() → simüle disk, tools() → cihaz araçları, select(i), drop(plan, result) }
+     * @param host {Map} { disk() → simüle disk, tools() → cihaz araçları, select(i), drop(plan, result),
+     *   notify(text) → sürükleme yapılamadığında/sınıra takıldığında bırakınca kısa bildirim }
      */
     attach(el, host) {
       let active = false;
@@ -61,7 +66,15 @@ qx.Class.define("ankamon.ui.disk.DiskBarDrag", {
         const box = e.target.closest && e.target.closest("[data-i]");
         if (box && el.contains(box)) {
           const plan = this.__plan(el, host, box, e.clientX);
-          box.style.cursor = !plan ? "pointer" : { end: "ew-resize", start: "ew-resize", move: "grab", create: "crosshair" }[plan.mode];
+          const tip = box.getAttribute("data-tip") || "";
+          if (plan && plan.mode) {
+            box.style.cursor = { end: "ew-resize", start: "ew-resize", move: "grab", create: "crosshair" }[plan.mode];
+            box.title = plan.note ? `${tip}\n${plan.note}` : tip;
+          } else {
+            // Fareyle değiştirilemiyorsa nedeni ipucunda da (sürüklemeye kalkışınca hayalet kutu yerine kırmızı not çıkar).
+            box.style.cursor = plan && plan.why ? "not-allowed" : "pointer";
+            box.title = plan && plan.why ? `${tip}\nFareyle değiştirilemez: ${plan.why}` : tip;
+          }
         }
       });
       el.addEventListener("mousedown", e => {
@@ -72,6 +85,9 @@ qx.Class.define("ankamon.ui.disk.DiskBarDrag", {
         e.preventDefault();
         const index = parseInt(box.getAttribute("data-i"), 10);
         const plan = this.__plan(el, host, box, e.clientX);
+        if (plan && !plan.mode) {
+          plan.boxLeft = box.getBoundingClientRect().left;
+        }
         const x0 = e.clientX;
         let moved = false;
         let overlay = null;
@@ -84,7 +100,7 @@ qx.Class.define("ankamon.ui.disk.DiskBarDrag", {
           moved = true;
           if (plan) {
             overlay = overlay || this.__overlay(el, box);
-            result = this.__compute(plan, x0, ev.clientX);
+            result = plan.mode ? this.__compute(plan, x0, ev.clientX) : null;
             this.__show(el, overlay, plan, result);
           }
         };
@@ -98,6 +114,11 @@ qx.Class.define("ankamon.ui.disk.DiskBarDrag", {
           host.select(index);
           if (moved && plan && result && result.changed) {
             host.drop(plan, result);
+          }
+          // Yapılamadıysa ya da sınıra takıldıysa neden bırakınca da söylenir (pencere açılsa bile altında görünür).
+          const why = moved && plan ? (plan.mode ? result && result.why : plan.why) : null;
+          if (why && host.notify) {
+            host.notify(why);
           }
         };
         document.addEventListener("mousemove", move, true);
@@ -126,18 +147,25 @@ qx.Class.define("ankamon.ui.disk.DiskBarDrag", {
       const a = M.align(disk);
       const r = box.getBoundingClientRect();
       if (part.kind === "free") {
-        if (!M.creatable(disk, part).ok) {
-          return null;
+        const can = M.creatable(disk, part);
+        if (!can.ok) {
+          return { mode: null, why: can.why };
         }
         const first = Math.ceil((part.start + (part.logical ? 1 : 0)) / a) * a;
         const maxMib = Math.floor((part.end - first + 1) / a);
-        return maxMib < 1 ? null : { mode: "create", part, a, first, maxMib, top: r.top, height: r.height,
+        return maxMib < 1 ? { mode: null, why: "Bu boşluk bölüm için çok küçük." } : { mode: "create", part, a, first, maxMib, top: r.top, height: r.height,
           map: this.__map(r.left, r.right, part.start, part.end) };
       }
-      if (part.kind === "extended" || M.why(disk, part, "resize", host.tools() || {})) {
-        return null;
+      if (part.kind === "extended") {
+        return { mode: null, why: "Genişletilmiş bölüm fareyle boyutlandırılamaz (içindeki mantıksal bölümleri sürükleyin)." };
       }
-      const L = M.resizeLimits(disk, part);
+      const tools = host.tools() || {};
+      const blocked = M.why(disk, part, "resize", tools);
+      if (blocked) {
+        return { mode: null, why: blocked };
+      }
+      const L = M.resizeLimits(disk, part, tools);
+      const R = M.limitReasons(disk, part, tools);
       const { before, after } = M.neighbours(disk, part);
       const rectOf = p => {
         const b = el.querySelector(`[data-i="${disk.parts.indexOf(p)}"]`);
@@ -149,22 +177,24 @@ qx.Class.define("ankamon.ui.disk.DiskBarDrag", {
       const edge = Math.min(this.EDGE, r.width / 4);
       let mode = x >= r.right - edge ? "end" : (x <= r.left + edge ? "start" : "move");
       const cur = Math.round(L.size / a);
-      const plan = { part, a, L, map, top: r.top, height: r.height, cur,
+      const plan = { part, a, L, R, map, top: r.top, height: r.height, cur, note: null,
         beforeNow: Math.round((part.start - L.minStart) / a),
         total: Math.floor((L.maxEnd - L.minStart + 1) / a),
         minMib: Math.max(1, Math.ceil(L.minSize / a)),
         maxMib: Math.floor(L.maxSize / a) };
       if (mode !== "end" && !L.canMove) {
-        return null;   // bağlı bölüm taşınamaz; yalnız sağ kenarı (sonu) değişir
+        return { mode: null, why: R.move };   // bağlı bölüm taşınamaz; yalnız sağ kenarı (sonu) değişir
       }
       if (mode === "move" && plan.total <= cur) {
-        return null;   // önünde/arkasında boşluk yok
+        return { mode: null, why: "Önünde ve arkasında boş alan yok — taşınamaz." };
       }
       if (mode === "end" && plan.minMib >= cur && plan.maxMib <= cur) {
-        mode = L.canMove && plan.total > cur ? "move" : null;
-      }
-      if (!mode) {
-        return null;
+        const both = `Küçültme: ${R.shrink || R.floor} Büyütme: ${R.grow || R.growEnd}`;
+        if (!(L.canMove && plan.total > cur)) {
+          return { mode: null, why: `Boyutu değiştirilemez. ${both}` };
+        }
+        mode = "move";
+        plan.note = `Boyutu değiştirilemez, yalnız taşınır. ${both}`;
       }
       plan.mode = mode;
       return plan;
@@ -182,21 +212,45 @@ qx.Class.define("ankamon.ui.disk.DiskBarDrag", {
         const start = plan.first + before * a;
         return { before, size: endMib - before, start, end: start + (endMib - before) * a - 1, changed: true };
       }
-      const L = plan.L;
+      const { L, R } = plan;
       let before = plan.beforeNow;
       let size = plan.cur;
+      let why = null;   // fare sınırın ötesinde: neden orada durdu (kullanıcıya söylenir)
+      // Küçültmeyi durduran: dosya sistemi hiç küçülemiyorsa onun nedeni, yoksa en küçük boyut (dolu alan).
+      const shrinkWhy = () => R.shrink || R.floor;
       if (plan.mode === "end") {
         const start = L.canMove ? L.minStart + before * a : plan.part.start;
-        size = clamp(Math.round((map.toSector(x) - start) / a), plan.minMib, Math.min(plan.maxMib, Math.floor((L.maxEnd + 1 - start) / a)));
+        const hi = Math.min(plan.maxMib, Math.floor((L.maxEnd + 1 - start) / a));
+        const raw = Math.round((map.toSector(x) - start) / a);
+        size = clamp(raw, plan.minMib, hi);
+        if (raw < plan.minMib) {
+          why = shrinkWhy();
+        } else if (raw > hi) {
+          why = !L.canGrow ? R.grow : R.growEnd;
+        }
       } else if (plan.mode === "start") {
         const right = plan.beforeNow + plan.cur;   // sağ kenar sabit (MiB, L.minStart'tan)
-        before = clamp(Math.round((map.toSector(x) - L.minStart) / a), Math.max(0, right - plan.maxMib), right - plan.minMib);
+        const lo = Math.max(0, right - plan.maxMib);
+        const raw = Math.round((map.toSector(x) - L.minStart) / a);
+        before = clamp(raw, lo, right - plan.minMib);
         size = right - before;
+        if (raw > right - plan.minMib) {
+          why = shrinkWhy();
+        } else if (raw < lo) {
+          why = lo > 0 && !L.canGrow ? R.grow : R.startEnd;
+        }
       } else {
-        before = clamp(plan.beforeNow + Math.round((map.toSector(x) - map.toSector(x0)) / a), 0, plan.total - plan.cur);
+        const raw = plan.beforeNow + Math.round((map.toSector(x) - map.toSector(x0)) / a);
+        before = clamp(raw, 0, plan.total - plan.cur);
+        if (raw < 0) {
+          why = R.startEnd;
+        } else if (raw > plan.total - plan.cur) {
+          why = R.growEnd.replace("Arkasındaki boş alan burada bitiyor", "Arkasındaki boş alan bitti");
+        }
       }
       const start = L.canMove ? L.minStart + before * a : plan.part.start;
-      return { before, size, start, end: start + size * a - 1, changed: before !== plan.beforeNow || size !== plan.cur };
+      return { before, size, start, end: start + size * a - 1, changed: before !== plan.beforeNow || size !== plan.cur, why,
+        info: plan.note };
     },
 
     __overlay(el, box) {
@@ -214,6 +268,15 @@ qx.Class.define("ankamon.ui.disk.DiskBarDrag", {
       const base = el.getBoundingClientRect();
       const ghost = layer.querySelector("[data-ghost]");
       const note = layer.querySelector("[data-note]");
+      if (!plan.mode) {
+        // Sürüklenemez: hayalet kutu yok, kutunun üstünde kırmızı not (neden).
+        ghost.style.display = "none";
+        this.__noteText(note, null, plan.why);
+        note.style.maxWidth = Math.max(160, base.width - 4) + "px";
+        note.style.left = Math.max(0, Math.min(base.width - note.offsetWidth - 2, plan.boxLeft - base.left)) + "px";
+        note.style.top = "2px";
+        return;
+      }
       const left = plan.map.toPx(res.start) - base.left;
       const width = Math.max(2, plan.map.toPx(res.end + 1) - base.left - left);
       Object.assign(ghost.style, { left: left + "px", width: width + "px", top: (plan.top - base.top) + "px", height: plan.height + "px" });
@@ -225,10 +288,29 @@ qx.Class.define("ankamon.ui.disk.DiskBarDrag", {
         const moved = res.start !== plan.part.start;
         text = `${mib(res.size)} (şu an ${mib(plan.cur)}) · önünde ${mib(res.before)} boşluk${moved ? " · taşınır" : ""}`;
       }
-      note.textContent = text;
+      this.__noteText(note, text, res.why, res.info);
+      note.style.maxWidth = (base.width - 4) + "px";
       const w = note.offsetWidth;
       note.style.left = Math.max(0, Math.min(base.width - w - 2, left)) + "px";
       note.style.top = Math.max(0, plan.top - base.top + 2) + "px";
+    },
+
+    /**
+     * Not kutusu: üst satır yeni boyut/konum, varsa alt satır neden (sınıra takıldı / yapılamaz — kırmızı zemin) ya da
+     * bilgi (ör. boyutu değişmez, yalnız taşınır — turuncu zemin).
+     */
+    __noteText(note, text, why, info) {
+      note.textContent = "";
+      if (text) {
+        note.appendChild(document.createTextNode(text));
+      }
+      if (why || info) {
+        const line = document.createElement("div");
+        line.style.cssText = "white-space:normal;font-weight:600";
+        line.textContent = why ? "⛔ " + why : "ℹ " + info;
+        note.appendChild(line);
+      }
+      note.style.background = why ? "#c5221f" : (info ? "#a35200" : "#2a6dd8");
     }
   }
 });

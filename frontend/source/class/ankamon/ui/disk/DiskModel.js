@@ -38,19 +38,20 @@ qx.Class.define("ankamon.ui.disk.DiskModel", {
     /**
      * Dosya sistemleri: renk (GParted renkleri), araç, çevrimiçi/çevrimdışı yapılabilenler.
      * grow/shrink: false | "offline" (bağlı değilken) | "online" (bağlıyken de); label: "online" | "offline" | false.
+     * rtool: boyut değiştirme aracı (cihazda yoksa büyütme/küçültme yapılamaz — disk-editor tools).
      */
     FS: {
-      ext4: { color: "#314E6C", tool: "mkfs.ext4", grow: "online", shrink: "offline", label: "online", check: true, uuid: true },
-      ext3: { color: "#5A8AB5", tool: "mkfs.ext3", grow: "online", shrink: "offline", label: "online", check: true, uuid: true },
-      ext2: { color: "#9DB8D2", tool: "mkfs.ext2", grow: "online", shrink: "offline", label: "online", check: true, uuid: true },
+      ext4: { color: "#314E6C", tool: "mkfs.ext4", rtool: "resize2fs", grow: "online", shrink: "offline", label: "online", check: true, uuid: true },
+      ext3: { color: "#5A8AB5", tool: "mkfs.ext3", rtool: "resize2fs", grow: "online", shrink: "offline", label: "online", check: true, uuid: true },
+      ext2: { color: "#9DB8D2", tool: "mkfs.ext2", rtool: "resize2fs", grow: "online", shrink: "offline", label: "online", check: true, uuid: true },
       fat32: { color: "#18D918", tool: "mkfs.vfat", grow: false, shrink: false, label: "offline", check: true, uuid: true, max: 11 },
       fat16: { color: "#16D9A0", tool: "mkfs.vfat", grow: false, shrink: false, label: "offline", check: true, uuid: true, max: 11 },
-      ntfs: { color: "#42E5AC", tool: "mkfs.ntfs", grow: "offline", shrink: "offline", label: "offline", check: true, uuid: true },
+      ntfs: { color: "#42E5AC", tool: "mkfs.ntfs", rtool: "ntfsresize", grow: "offline", shrink: "offline", label: "offline", check: true, uuid: true },
       exfat: { color: "#2E8B57", tool: "mkfs.exfat", grow: false, shrink: false, label: "offline", check: true, uuid: false },
-      btrfs: { color: "#FF9955", tool: "mkfs.btrfs", grow: "online", shrink: "online", label: "online", check: true, uuid: "btrfstune" },
-      xfs: { color: "#EEEE00", tool: "mkfs.xfs", grow: "online", shrink: false, label: "offline", check: true, uuid: true },
+      btrfs: { color: "#FF9955", tool: "mkfs.btrfs", rtool: "btrfs", grow: "online", shrink: "online", label: "online", check: true, uuid: "btrfstune" },
+      xfs: { color: "#EEEE00", tool: "mkfs.xfs", rtool: "xfs_growfs", grow: "online", shrink: false, label: "offline", check: true, uuid: true },
       f2fs: { color: "#DF9898", tool: "mkfs.f2fs", grow: false, shrink: false, label: false, check: false, uuid: false },
-      "linux-swap": { color: "#C1665A", tool: "mkswap", grow: "online", shrink: "offline", label: "online", check: false, uuid: "offline" }
+      "linux-swap": { color: "#C1665A", tool: "mkswap", rtool: "mkswap", grow: "online", shrink: "offline", label: "online", check: false, uuid: "offline" }
     },
     /** Biçimlendirme listesinin sırası. */
     FS_ORDER: ["ext4", "ext3", "ext2", "fat32", "fat16", "ntfs", "exfat", "btrfs", "xfs", "f2fs", "linux-swap", "none"],
@@ -241,7 +242,7 @@ qx.Class.define("ankamon.ui.disk.DiskModel", {
             return "Genişletilmiş bölüm bu sürümde yeniden boyutlandırılamaz.";
           }
           if (!part.fs || part.fs === "none") {
-            return this.__resizeNone(disk, part);
+            return this.__resizeNone(disk, part, tools);
           }
           if (!fs) {
             return `${part.fs} dosya sistemi yeniden boyutlandırılamaz.`;
@@ -252,7 +253,7 @@ qx.Class.define("ankamon.ui.disk.DiskModel", {
           if (busy && fs.grow !== "online" && fs.shrink !== "online") {
             return "Bölüm kullanımda — bu dosya sistemi bağlıyken yeniden boyutlandırılamaz; önce ayırın.";
           }
-          return this.__resizeNone(disk, part);
+          return this.__resizeNone(disk, part, tools);
         case "format":
           if (part.kind === "extended") {
             return "Genişletilmiş bölüm biçimlendirilmez.";
@@ -297,9 +298,10 @@ qx.Class.define("ankamon.ui.disk.DiskModel", {
 
     /**
      * Yeniden boyutlandırma/taşıma sınırları (sektör): {minStart, maxEnd, minSize, maxSize, canMove}
-     * Bağlı bölüm taşınamaz; büyüme/küçülme dosya sisteminin yeteneğine göre.
+     * Bağlı bölüm taşınamaz; büyüme/küçülme dosya sisteminin yeteneğine ve (tools verilmişse) cihazdaki araca göre.
+     * @param tools {Map?} cihazdaki araçlar (disk-editor taraması); verilmezse araç denetlenmez
      */
-    resizeLimits(disk, part) {
+    resizeLimits(disk, part, tools) {
       const a = this.align(disk);
       const { before, after } = this.neighbours(disk, part);
       const fs = this.FS[part.fs] || null;
@@ -315,8 +317,10 @@ qx.Class.define("ankamon.ui.disk.DiskModel", {
         minStart = part.start;
       }
       const maxEnd = after ? after.end : part.end;
-      const canGrow = raw || (fs && (fs.grow === "online" || (fs.grow === "offline" && !part.busy)));
-      const canShrink = raw || (fs && (fs.shrink === "online" || (fs.shrink === "offline" && !part.busy)));
+      // Araç yalnız tarama "yok" dediyse eksik sayılır (eski taramada anahtar hiç olmayabilir).
+      const noTool = !raw && !!fs && !!fs.rtool && !!tools && tools[fs.rtool] === false ? fs.rtool : null;
+      const canGrow = raw || (!noTool && fs && (fs.grow === "online" || (fs.grow === "offline" && !part.busy)));
+      const canShrink = raw || (!noTool && fs && (fs.shrink === "online" || (fs.shrink === "offline" && !part.busy)));
       let minSize = canShrink ? Math.max(a, Math.ceil(((part.used || 0) * 1.1) / disk.sector / a) * a) : size;
       // Takası küçültmek için etkin olmamalı.
       if (part.fs === "linux-swap" && part.swap) {
@@ -324,15 +328,74 @@ qx.Class.define("ankamon.ui.disk.DiskModel", {
       }
       minSize = Math.min(minSize, size);
       const maxSize = canGrow ? (maxEnd - minStart + 1) : size;
-      return { minStart, maxEnd, minSize, maxSize, canMove, canGrow, canShrink, size };
+      return { minStart, maxEnd, minSize, maxSize, canMove, canGrow, canShrink, size, noTool };
+    },
+
+    /**
+     * Boyut/konum sınırlarının kullanıcıya söylenecek nedenleri (kullanıcı isteği 2026-11-23: "fare ile dosya sistemi
+     * ufaltma yapılamadığında neden yapılamadığını söylesin") — ui.disk.DiskBarDrag sürüklerken ve bırakınca gösterir.
+     * → { shrink: küçültülemiyorsa neden | null, floor: en küçük boyutun nedeni, grow: büyütülemiyorsa neden | null,
+     *     growEnd: en büyük boyutun (sağ sınırın) nedeni, move: taşınamıyorsa neden | null, startEnd: sol sınırın nedeni }
+     */
+    limitReasons(disk, part, tools) {
+      const L = this.resizeLimits(disk, part, tools);
+      const a = this.align(disk);
+      const fs = this.FS[part.fs] || null;
+      const name = this.fsName(part.fs);
+      const raw = !part.fs || part.fs === "none";
+      const where = (part.mounts || []).join(", ") || (part.swap ? "takas" : "");
+      const mib = n => n >= 1024 ? `${n} MiB (${(n / 1024).toFixed(1).replace(".", ",")} GiB)` : `${n} MiB`;
+      const list = disk.parts;
+      const { before, after } = this.neighbours(disk, part);
+      const nextOf = p => list.slice(list.indexOf(p) + 1).find(q => q.kind !== "free" && !(q.kind === "logical" && part.kind !== "logical"));
+      const prevOf = p => list.slice(0, list.indexOf(p)).reverse().find(q => q.kind !== "free" && q.kind !== "logical");
+      const next = nextOf(after || part);
+      const prev = prevOf(before || part);
+      const capability = (kind, verb) => {
+        if (raw) {
+          return null;
+        }
+        if (!fs) {
+          return `${part.fs} dosya sistemi tanınmıyor — ${verb}.`;
+        }
+        if (L.noTool) {
+          return `Cihazda ${L.noTool} aracı yok — ${name} ${verb}.`;
+        }
+        if (!fs[kind]) {
+          if (kind === "shrink" && part.fs === "xfs") {
+            return "XFS küçültülemez (XFS yalnız büyütülebilir).";
+          }
+          return `${name} dosya sistemi ${verb} (araç bu işlemi desteklemiyor)${L.canMove ? " — yalnız taşınabilir" : ""}.`;
+        }
+        if (fs[kind] === "offline" && part.busy) {
+          return `Bölüm bağlı (${where}) — ${name} bağlıyken ${verb}; önce Bölüm ▸ Ayır.`;
+        }
+        return null;
+      };
+      let shrink = capability("shrink", "küçültülemez");
+      if (!shrink && part.fs === "linux-swap" && part.swap) {
+        shrink = "Takas etkin — küçültmek için önce Bölüm ▸ Ayır (takası kapat).";
+      }
+      const minMib = Math.max(1, Math.ceil(L.minSize / a));
+      const floor = part.used ? `En küçük ${mib(minMib)}: dosya sisteminde ${mib(Math.ceil(part.used / 1048576))} dolu (+%10 pay) — ` +
+          "kullanılan alandan küçük yapılamaz." : `En küçük ${mib(minMib)}.`;
+      const grow = capability("grow", "büyütülemez");
+      const growEnd = after ? `Arkasındaki boş alan burada bitiyor${next ? ` (sonraki bölüm ${next.path || "yeni bölüm"})` : " (disk sonu)"}.`
+        : `Arkasında boş alan yok${next ? ` — hemen arkasında ${next.path || "yeni bölüm"} var` : " (disk sonu)"}.`;
+      const move = L.canMove ? null : `Bölüm bağlı (${where}) — bağlı bölüm taşınamaz, yalnız sonu değişebilir; önce Bölüm ▸ Ayır.`;
+      const startEnd = before ? `Önündeki boş alan burada bitiyor${prev ? ` (önceki bölüm ${prev.path || "yeni bölüm"})` : " (disk başı)"}.`
+        : `Önünde boş alan yok${prev ? ` — hemen önünde ${prev.path || "yeni bölüm"} var` : ""}.`;
+      return { shrink, floor, grow, growEnd, move, startEnd };
     },
 
     /** Ne taşınabilir, ne büyüyebilir, ne küçülebilirse neden; yoksa null. */
-    __resizeNone(disk, part) {
-      const L = this.resizeLimits(disk, part);
+    __resizeNone(disk, part, tools) {
+      const L = this.resizeLimits(disk, part, tools);
       if (L.minStart === part.start && L.minSize === L.size && L.maxSize === L.size) {
-        return part.busy ? "Arkasında boş alan yok ve bağlıyken küçültülemez/taşınamaz — değiştirilecek bir şey yok."
-          : "Önünde/arkasında boş alan yok ve bu dosya sistemi küçültülemez — değiştirilecek bir şey yok.";
+        // Hangi yönün neden kapalı olduğu tek tek söylenir (küçültme, büyütme, taşıma).
+        const R = this.limitReasons(disk, part, tools);
+        return "Boyutu ve yeri değiştirilemez. Küçültme: " + (R.shrink || R.floor) + " Büyütme: " + (R.grow || R.growEnd) +
+          (R.move ? " " + R.move : " Taşıma: önünde/arkasında boş alan yok.");
       }
       return null;
     },
