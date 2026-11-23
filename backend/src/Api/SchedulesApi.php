@@ -135,8 +135,11 @@ final class SchedulesApi
                 // Kendi penceresi olan hazır komut (ör. Disk editörü) zamanlanmaz.
                 throw ApiError::badRequest($action['title'] . ' kendi penceresinde çalışır; zamanlanamaz.');
             }
+            // Boş bırakılan gizli parametre saklanacak bir sır taşımaz (ör. TiHA adımı tahtadaki mevcut ayarlarıyla
+            // uygulanır, değer paketi boş — kullanıcı isteği 2026-11-23): yalnız DOLU gizli değer reddedilir.
             foreach ($action['params'] ?? [] as $param) {
-                if (($param['type'] ?? 'text') === 'password') {
+                $given = trim((string) (((array) ($job['values'] ?? []))[$param['key']] ?? $param['default'] ?? ''));
+                if (($param['type'] ?? 'text') === 'password' && $given !== '') {
                     throw ApiError::badRequest('Parola isteyen hazır işlemler zamanlanamaz (gizli değer saklanmaz).');
                 }
             }

@@ -45,7 +45,9 @@
  * Kanca dışındaki eklenti noktaları: addMaintenanceTab (Bakım sekmesi), addDeviceMenu (Cihazlar sağ menüsü
  * maddesi ve isteğe bağlı araç çubuğu düğmesi), addPage (sol menüde eklentinin kendi sayfası), addWifiTrustedAction
  * (Wi-Fi Monitör güvenilir listesinde işaretli kayıtlara düğme), addDiskUsageTab (Sistem ▸ Disk kullanımı'nda eklentinin
- * verisi için sekme), addSettingsTab (Sistem ▸ Eklentiler'de eklentinin bölümüne ayar formunun yanında ek sekme).
+ * verisi için sekme), addSettingsTab (Sistem ▸ Eklentiler'de eklentinin bölümüne ayar formunun yanında ek sekme),
+ * addReadyCommandSource (Komut çalıştır penceresinin, Komut menüsü sabitlerinin ve zamanlanmış görevlerin hazır komut listesine
+ * eklentinin kendi hazır komutları).
  *
  * Bir eklentinin durumu değişip kanca yanıtları farklılaşınca changed() çağrılır (CHANGED mesajı): kancayı
  * sürekli gösterilen bir öğe için soran çekirdek bileşenleri (ör. alt çubuk) yanıtı yeniden değerlendirir.
@@ -66,6 +68,8 @@ qx.Class.define("ankamon.ext.Extensions", {
     __deviceMenus: [],       // eklentilerin Cihazlar sağ menüsü maddeleri (bkz. addDeviceMenu)
     __diskUsageTabs: [],    // eklentilerin Disk kullanımı sekme tanımı üreticileri (bkz. addDiskUsageTab)
     __settingsTabs: {},     // {eklenti-adı: [{key, label, create}]} Sistem ▸ Eklentiler ek sekmeleri (bkz. addSettingsTab)
+    __readyCommandSources: [], // eklentilerin hazır komut kaynakları ({name, list}) (bkz. addReadyCommandSource)
+    __context: null,        // start() bağlamı ({user, app}) — readyCommands'ın varsayılan kullanıcısı
 
     /**
      * Oturum açıldığında BİR KEZ, Shell oluşturulmadan ÖNCE (bkz. ankamon.Application): önce eklentilerin
@@ -79,6 +83,7 @@ qx.Class.define("ankamon.ext.Extensions", {
         return;
       }
       this.__started = true;
+      this.__context = context;
       try {
         this.__enabled = (await ankamon.io.Api.get("/extensions/active")).active || {};
       } catch (e) {
@@ -223,6 +228,52 @@ qx.Class.define("ankamon.ext.Extensions", {
     /** @return {Array} eklentinin Sistem ▸ Eklentiler ek sekmeleri. */
     settingsTabs(name) {
       return this.__settingsTabs[name] || [];
+    },
+
+    /**
+     * Bir eklenti hazır komut listesine kendi komutlarını ekler (kullanıcı isteği 2026-11-23): Komut çalıştır penceresinin
+     * seçim kutusu, "Komut menüsüne sabitle" (ui.devices.ReadyCommandPins — sağ menü ve araç çubuğu Komut düğmesi) ve
+     * Sistem ▸ Zamanlanmış görevler ▸ yeni görev penceresi bu listeyi okur. init() içinde yalnız eklenti etkin ve kullanıcı
+     * yetkiliyse çağrılmalı.
+     * @param source {Map|Function} {name, list(user)} ya da yalnız list işlevi. name sabitlemelerin anahtarına girer
+     *   (eklenti kaldırılınca/kapatılınca o eklentinin sabitleri menüde görünmez). list(user) → Array|Promise<Array>:
+     *   [{
+     *     id: kaynak içinde tekil kimlik,
+     *     label: görünen ad, category: seçim kutusundaki başlık (ör. "TiHA"), hint: açıklama (düz metin),
+     *     platforms: isteğe bağlı OS aileleri (yoksa ["linux"]),
+     *     run(devices, user): seçili cihazlarda çalıştırır — parametre/onay gerekiyorsa kendi penceresini açar,
+     *     schedule: isteğe bağlı — zamanlanabilirse {
+     *       matches(jobRequest) → Boolean: kayıtlı zamanlamanın görevi bu komut mu (düzenlemede seçili gelir),
+     *       form(box, jobRequest|null) → {values() → /api/jobs gövdesi ({type, …}; cihazsız) | null (eksik; uyarıyı kendisi gösterir)}
+     *     }
+     *   }]
+     */
+    addReadyCommandSource(source) {
+      this.__readyCommandSources.push(typeof source === "function" ? { name: "", list: source } : source);
+    },
+
+    /** @return {Boolean} bu adla kayıtlı hazır komut kaynağı var mı (eklenti yüklü, etkin, kullanıcı yetkili). */
+    hasReadyCommandSource(name) {
+      return this.__readyCommandSources.some(src => src.name === name);
+    },
+
+    /**
+     * Eklentilerin hazır komutları (hata veren kaynak atlanır). Her öğeye source (kaynak adı) ve key ("ext:<kaynak>:<id>" —
+     * sabitleme anahtarı) eklenir. @param user {Map?} verilmezse oturum sahibi @return {Promise<Array>}
+     */
+    async readyCommands(user = null) {
+      const who = user || (this.__context && this.__context.user);
+      const lists = await Promise.all(this.__readyCommandSources.map(async src => {
+        try {
+          return ((await src.list(who)) || []).map(entry => Object.assign({}, entry, {
+            source: src.name, key: `ext:${src.name}:${entry.id}`
+          }));
+        } catch (e) {
+          qx.log.Logger.error(this, `Eklenti hazır komutları alınamadı: ${src.name}: ${e}`);
+          return [];
+        }
+      }));
+      return lists.flat();
     },
 
     /** @return {Array} eklentilerin kayıtlı sayfa tanımları (bkz. addPage). */

@@ -31,6 +31,9 @@
  * türleri) · hedef (seçili cihazlar — aranabilir onay kutulu liste — ya da çalışma anında çevrimiçi tüm cihazlar) ·
  * zaman (bir kez / seçili günlerde saatinde / aralıkla). Kaydederken sunucu görevi elle başlatılanla AYNI kurallarla
  * doğrular (SchedulesApi → JobsApi::spec). Parola isteyen hazır işlemler zamanlanamaz (gizli değer saklanmaz).
+ * Hazır işlem seçicisinde Komut çalıştır'daki bütün hazır komutlar ve eklentilerin hazır komutları (ör. TiHA adımları —
+ * ankamon.ext.Extensions.addReadyCommandSource "schedule") görünür (kullanıcı isteği 2026-11-23); zamanlanamayanlar
+ * (kendi penceresi olan, parola isteyen) gerekçesiyle soluk.
  */
 qx.Class.define("ankamon.ui.system.ScheduleEditor", {
   type: "static",
@@ -61,7 +64,8 @@ qx.Class.define("ankamon.ui.system.ScheduleEditor", {
         loaded = await Promise.all([
           ankamon.io.Api.get("/actions").then(r => r.actions),
           ankamon.io.Api.get("/devices").then(r => r.devices),
-          ankamon.io.Api.get("/anomalies", { limit: 1 }).then(r => r.kinds || {})
+          ankamon.io.Api.get("/anomalies", { limit: 1 }).then(r => r.kinds || {}),
+          ankamon.ext.Extensions.readyCommands().catch(() => [])
         ]);
       } catch (e) {
         ankamon.ui.Dialog.error(e);
@@ -70,6 +74,7 @@ qx.Class.define("ankamon.ui.system.ScheduleEditor", {
       const actions = loaded[0];
       const devices = loaded[1];
       const kinds = loaded[2];
+      const extEntries = loaded[3];
       const esc = qx.bom.String.escape;
       const s = schedule || {};
       const req = s.job_request || {};
@@ -112,7 +117,7 @@ qx.Class.define("ankamon.ui.system.ScheduleEditor", {
         const type = typeBox.getSelection()[0].getModel();
         const same = type === req.type;
         if (type === "action") {
-          current = this.__actionBody(typeBody, actions, same ? req : null);
+          current = this.__actionBody(typeBody, actions, same ? req : null, extEntries);
         } else if (type === "command") {
           current = this.__commandBody(typeBody, same ? req : null);
         } else if (type === "anomaly_scan") {
@@ -254,22 +259,41 @@ qx.Class.define("ankamon.ui.system.ScheduleEditor", {
       name.focus();
     },
 
-    /** Hazır işlem seçici + işlemin alanları. */
-    __actionBody(box, actions, req) {
+    /**
+     * Hazır işlem seçici + işlemin alanları. Eklentilerin hazır komutları ({extEntry}) listenin sonunda; zamanlanabilen
+     * eklenti komutu kendi alanlarını çizer ve görev gövdesini kendisi verir (schedule.form), kayıtlı görevi schedule.matches tanır.
+     */
+    __actionBody(box, actions, req, extEntries = []) {
       const esc = qx.bom.String.escape;
       const select = new qx.ui.form.SelectBox();
       const secret = a => (a.params || []).some(p => p.type === "password");
-      actions.filter(a => !a.ui).forEach(a => {   // kendi penceresi olan hazır komut (Disk editörü) zamanlanmaz
+      const tip = (item, text) => item.set({ enabled: false, toolTipText: text });
+      // Bütün hazır komutlar görünür; zamanlanamayanlar gerekçesiyle soluk (sunucu da reddeder — SchedulesApi).
+      actions.forEach(a => {
         const item = new qx.ui.form.ListItem(`${a.category} — ${a.title}`, null, a);
-        if (secret(a)) {
-          item.set({ enabled: false, toolTipText: "Parola isteyen işlemler zamanlanamaz (gizli değer saklanmaz)." });
+        if (a.ui) {
+          tip(item, `${a.title} kendi penceresinde çalışır; zamanlanamaz.`);
+        } else if (secret(a)) {
+          tip(item, "Parola isteyen işlemler zamanlanamaz (gizli değer saklanmaz).");
         }
         select.add(item);
-        if (req && req.action === a.id) {
+        if (req && req.action === a.id && item.getEnabled()) {
           select.setSelection([item]);
         }
       });
-      if (!req) {
+      extEntries.forEach(e => {
+        const item = new qx.ui.form.ListItem(`${e.category || "Eklenti"} — ${e.label}`, null, { extEntry: e });
+        if (!e.schedule) {
+          tip(item, "Bu hazır komut zamanlanamaz (yalnız kendi penceresinden çalışır).");
+        }
+        select.add(item);
+        if (req && e.schedule && e.schedule.matches(req)) {
+          select.setSelection([item]);
+        }
+      });
+      // Yeni görevde ya da kayıtlı görev listede yoksa (ör. eklentisi kapatıldı) ilk seçilebilir komut.
+      const chosen = select.getSelection()[0];
+      if (!req || !chosen || !chosen.getEnabled()) {
         const first = select.getChildren().find(i => i.getEnabled());
         first && select.setSelection([first]);
       }
@@ -279,10 +303,19 @@ qx.Class.define("ankamon.ui.system.ScheduleEditor", {
       const fields = new qx.ui.container.Composite(new qx.ui.layout.VBox());
       box.add(fields);
       let form = null;
+      let extForm = null; // eklenti komutunun kendi alanları ({values()})
       const draw = () => {
         fields.removeAll().forEach(w => w.dispose());
         form = null;
+        extForm = null;
         const a = select.getSelection()[0].getModel();
+        if (a.extEntry) {
+          desc.setValue(esc(String(a.extEntry.hint || "").slice(0, 600)));
+          if (a.extEntry.schedule) {
+            extForm = a.extEntry.schedule.form(fields, req && a.extEntry.schedule.matches(req) ? req : null);
+          }
+          return;
+        }
         desc.setValue(esc(a.description || "").slice(0, 600));
         if ((a.params || []).length) {
           form = new ankamon.ui.Form();
@@ -303,6 +336,13 @@ qx.Class.define("ankamon.ui.system.ScheduleEditor", {
       return {
         values: () => {
           const a = select.getSelection()[0].getModel();
+          if (a.extEntry) {
+            if (!extForm) {
+              ankamon.ui.Dialog.alert("Bu hazır komut zamanlanamaz.");
+              return null;
+            }
+            return extForm.values();
+          }
           return { type: "action", action: a.id, values: form ? form.values() : {} };
         }
       };

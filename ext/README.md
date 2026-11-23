@@ -66,6 +66,13 @@ ext/<ad>/
   satırı ve ekran kutucuğu menüsüne eklenir; `bar` verilirse araç çubuğunda düğme olur (`mirror`: maddenin alt
   menüsü düğmenin menüsüdür).
 
+- **Hazır komutlar:** `ankamon.ext.Extensions.addReadyCommandSource({name, list(user)})` — `list` eklentinin hazır
+  komutlarını döndürür (`[{id, label, category, hint, platforms?, run(devices, user), schedule?}]`); Komut çalıştır
+  penceresinde listelenir, Komut menüsüne sabitlenebilir (sağ menü Komut çalıştır ▸ ve araç çubuğu Komut düğmesi) ve
+  `schedule` ({matches(jobRequest), form(box, jobRequest)}) verilirse Sistem ▸ Zamanlanmış görevler'de zamanlanır.
+  Sunucuda bir hazır işlemin görev isteğine ek doğrulama `backend/boot.php`'den `Core\Actions::addJobCheck(id, fn)`
+  ile bağlanır (JobsApi::spec — elle görev ve zamanlanmış görev kaydı aynı denetimden geçer).
+
 - **Sol menü sayfası:** `ankamon.ext.Extensions.addPage({id, label, icon, feature, parent?, tabs?, create(user)})` —
   `ui.Shell` PAGES biçimi; `create` bir `ankamon.page.Base` döndürür. `parent` yoksa sayfa kökte "Sistem"den önce durur;
   ağaç, üst yol gösterimi ve sekme yaprakları çekirdek sayfalarındaki gibi kendiliğinden gelir.

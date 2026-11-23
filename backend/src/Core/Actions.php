@@ -36,6 +36,38 @@ namespace Ankamon\Core;
  */
 final class Actions
 {
+    /** @var array<string, callable[]> hazır işlem kimliği → ek doğrulayıcılar (bkz. addJobCheck) */
+    private static array $jobChecks = [];
+
+    /**
+     * Bir hazır işlemin görev isteğine ek doğrulama bağlar — eklentiler backend/boot.php'den (çekirdek eklentiyi adıyla
+     * bilmez). JobsApi::spec her "action" görevinde (elle /api/jobs, zamanlanmış görev kaydı — SchedulesApi) Actions::values
+     * sonrasında çağırır. Doğrulayıcı geçersiz istekte ApiError atar; döndürdüğü dizide 'values' (düzeltilmiş değerler) ve
+     * 'title' (görev başlığı, ör. "TiHA: Zaman senkronizasyonu — uygula") verilebilir.
+     *
+     * @param callable(array<string,mixed> $action, array<string,string> $values, array<string,mixed> $user): ?array $check
+     */
+    public static function addJobCheck(string $actionId, callable $check): void
+    {
+        self::$jobChecks[$actionId][] = $check;
+    }
+
+    /**
+     * Kayıtlı ek doğrulayıcıları sırayla uygular. @return array{0: array<string,string>, 1: string} [değerler, görev başlığı]
+     */
+    public static function checkJob(array $action, array $values, array $user): array
+    {
+        $title = (string) $action['title'];
+        foreach (self::$jobChecks[$action['id']] ?? [] as $check) {
+            $result = $check($action, $values, $user);
+            if (is_array($result)) {
+                $values = $result['values'] ?? $values;
+                $title = (string) ($result['title'] ?? $title);
+            }
+        }
+        return [$values, $title];
+    }
+
     /** @return array<string,array<string,mixed>> kimlik → tanım */
     public static function all(): array
     {
