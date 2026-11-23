@@ -213,10 +213,14 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     color: #d2a8ff; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
   #empty { margin: 40px; color: #888; }
   .tile .title button.ctl.on { color: #fff; background: #c62828; border-radius: 3px; }
-  /* Sesi kapalı cihaz (Devices.js __previewList muted): Müdahale'nin solunda sessiz hoparlör; klasör = dosya yöneticisi. */
+  /* Sesi kapalı cihaz (Devices.js __previewList muted): klasörün ve Müdahale'nin solunda sessiz hoparlör; klasör = dosya yöneticisi. */
   .tile .title .mute { display: none; align-items: center; color: #ff6b5e; flex: 0 0 auto; }
   .tile.muted .title .mute { display: inline-flex; }
-  .tile .title button.fm { display: inline-flex; align-items: center; }
+  /* Sıra: ses, klasör, Müdahale (kullanıcı isteği 2026-11-23). Açık cihazda klasör sarısı; kapalıda soluk. */
+  .tile .title button.fm { display: inline-flex; align-items: center; color: #f5c518; }
+  .tile .title button.fm:hover { color: #ffd84d; }
+  .tile.offline .title button.fm { color: #8b949e; opacity: .55; }
+  .tile.offline .title button.fm:hover { opacity: .85; }
 </style>
 </head>
 <body>
@@ -305,8 +309,8 @@ class Tile {
       ${embed ? "" : `<button class="snd" title="Cihazın sesini bu bilgisayara aktar (kapalı)">${SPEAKER_OFF}</button>`}
       ${!embed && spec.input ? `<button class="lk" data-device="keyboard">${KEYBOARD_ICON}</button><button class="lk" data-device="mouse">${MOUSE_ICON}</button>` : ""}
       <span class="mute" title="Bilgisayarın sesi kapalı (sessizde). Açmak için: Komut çalıştır ▸ Ses — Sesi aç">${SPEAKER_OFF}</span>
-      ${spec.control ? '<button class="ctl" title="Fare ve klavye ile cihazı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
       ${embed && spec.files ? `<button class="fm">${FOLDER_ICON}</button>` : ""}
+      ${spec.control ? '<button class="ctl" title="Fare ve klavye ile cihazı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
       <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div><div class="sleep"><div>Ekran güç tasarrufu kipinde<div class="sd"></div>${embed ? '<div class="wk">Uyandırmak için tıklayın</div>' : ""}</div></div>
       <div class="whoami" hidden></div></div><div class="stats"></div>`;
     this.el.querySelector(".name").textContent = device.name || ("#" + device.id);

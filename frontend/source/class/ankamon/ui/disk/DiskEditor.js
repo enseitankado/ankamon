@@ -48,13 +48,12 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
     this.__device = device;
     this.__ops = [];
     const root = qx.core.Init.getApplication().getRoot();
-    const bounds = root.getBounds() || { width: 1200, height: 760 };
-    this.set({ layout: new qx.ui.layout.VBox(6), contentPadding: 8, showMaximize: true, allowMaximize: true,
-      width: Math.min(1120, bounds.width - 30), height: Math.min(700, bounds.height - 30) });
+    // Boyut verilmez: pencere içeriğin kırpılmadan sığdığı en küçük boyutta açılır (kullanıcı isteği 2026-11-23 — bkz. __fit).
+    this.set({ layout: new qx.ui.layout.VBox(4), contentPadding: [4, 6, 6, 6], showMaximize: true, allowMaximize: true });
 
     // Üst çubuk: disk seçimi + işlemler
     const bar = new qx.ui.container.Composite(new qx.ui.layout.HBox(4).set({ alignY: "middle" }));
-    this.__diskBox = new qx.ui.form.SelectBox().set({ width: 300 });
+    this.__diskBox = new qx.ui.form.SelectBox().set({ width: 280 });
     this.__diskBox.addListener("changeSelection", () => this.__selectDisk());
     bar.add(this.__diskBox);
     const devMenu = new qx.ui.menu.Menu();
@@ -69,7 +68,7 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
     bar.add(new qx.ui.core.Spacer(8));
     this.__buttons = {};
     const B = (id, label, tip, fn) => {
-      const b = new qx.ui.form.Button(label).set({ padding: [2, 8], toolTipText: tip });
+      const b = new qx.ui.form.Button(label).set({ padding: [2, 8], toolTipText: tip, showToolTipWhenDisabled: true });
       b.setUserData("tip", tip);
       b.addListener("execute", fn, this);
       this.__buttons[id] = b;
@@ -87,7 +86,7 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
       ["mount", "Bağla", () => this.__queue({ op: "mount" }, "Bağla")], ["umount", "Ayır", () => this.__queue({ op: "umount" }, "Ayır")],
       ["uuid", "Yeni UUID", () => this.__queue({ op: "uuid" }, "Yeni UUID")], ["info", "Bilgi", () => this.__info()]]
       .forEach(([id, label, fn]) => {
-        const item = new qx.ui.menu.Button(label);
+        const item = new qx.ui.menu.Button(label).set({ showToolTipWhenDisabled: true });
         item.addListener("execute", fn);
         this.__moreItems[id] = item;
         more.add(item);
@@ -112,11 +111,23 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
       disk: () => this.__disk,
       tools: () => (this.__scan && this.__scan.tools) || {},
       select: i => this.__select(i),
-      drop: (plan, res) => plan.mode === "create" ? this.__createDialog(res) : this.__resizeDialog(res)
+      drop: (plan, res) => plan.mode === "create" ? this.__createDialog(res) : this.__resizeDialog(res),
+      notify: text => this.__notify(text)
+    }));
+    // Bölüm kutusuna sağ tık: o bölümün işlemleri (kullanıcı isteği 2026-11-23 — tablo satırıyla aynı menü, bkz. __partMenu).
+    this.__graph.addListenerOnce("appear", () => this.__graph.getContentElement().getDomElement().addEventListener("contextmenu", e => {
+      const box = e.target.closest && e.target.closest("[data-i]");
+      e.preventDefault();
+      if (!box) {
+        return;
+      }
+      e.stopPropagation();
+      this.__select(parseInt(box.getAttribute("data-i"), 10));
+      this.__partMenu().openAtPoint({ left: e.clientX, top: e.clientY });
     }));
     this.add(this.__graph);
-    this.add(new qx.ui.basic.Label("Çubukta fareyle: bölümün kenarını sürükle = boyutlandır · bölümü sürükle = taşı · boş alanda sürükle = " +
-      "yeni bölüm. Bırakınca değerler pencereye dolar; işlem Kuyruğa ekle ve Uygula ile yapılır.").set({ textColor: "app-muted", font: "small" }));
+    this.__hint = new qx.ui.basic.Label(ankamon.ui.disk.DiskEditor.HINT).set({ rich: true, textColor: "app-muted", font: "small" });
+    this.add(this.__hint);
 
     // Bölüm tablosu
     const model = new qx.ui.table.model.Simple();
@@ -127,21 +138,37 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
     const cm = table.getTableColumnModel();
     cm.setDataCellRenderer(0, new qx.ui.table.cellrenderer.Html());
     const rb = cm.getBehavior();
-    [26, 130, 110, 120, 110, 170, 90, 90, 100, 150].forEach((w, i) => rb.setWidth(i, w));
+    ankamon.ui.disk.DiskEditor.COLUMN_WIDTHS.forEach((w, i) => rb.setWidth(i, w));
     table.getSelectionModel().setSelectionMode(qx.ui.table.selection.Model.SINGLE_SELECTION);
     table.getSelectionModel().addListener("changeSelection", () => {
       const sel = table.getSelectionModel().getSelectedRanges()[0];
       this.__select(sel ? sel.minIndex : -1, true);
+    });
+    // Satıra sağ tık: o bölümün işlemleri (çubuktaki kutuyla aynı menü).
+    table.addListener("cellContextmenu", e => {
+      const row = e.getRow();
+      if (row === null || row === undefined || row < 0) {
+        return;
+      }
+      table.getSelectionModel().setSelectionInterval(row, row);
+      this.__select(row, true);
+      this.__partMenu().openAtPointer(e);
     });
     this.add(table, { flex: 1 });
 
     // Bekleyen işlemler
     this.__opsLabel = new qx.ui.basic.Label("Bekleyen işlem yok").set({ font: "bold" });
     this.add(this.__opsLabel);
-    this.__opsList = new qx.ui.form.List().set({ height: 96 });
+    this.__opsList = new qx.ui.form.List().set({ height: 3 * 22 + 4 });
     this.add(this.__opsList);
 
-    this.addListener("close", () => qx.event.Timer.once(() => this.destroy(), null, 0));
+    this.addListener("close", () => qx.event.Timer.once(() => {
+      if (this.__menu) {
+        this.__menu.destroy();
+        this.__menu = null;
+      }
+      this.destroy();
+    }, null, 0));
     this.addListener("beforeClose", e => {
       if (this.__ops.length && !this.__closing) {
         e.preventDefault();
@@ -153,11 +180,17 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
         });
       }
     });
-    this.addListenerOnce("appear", () => this.center());
+    this.addListenerOnce("appear", () => this.__fit());
     root.add(this);
   },
 
   statics: {
+    /** Çubuğun altındaki kullanım notu (sürükleme bildirimi bir süre bunun yerinde görünür — bkz. __notify). */
+    HINT: "Çubukta fareyle: bölümün kenarını sürükle = boyutlandır · bölümü sürükle = taşı · boş alanda sürükle = yeni bölüm.<br>" +
+      "Sağ tık (çubukta ya da tabloda) = o bölümün işlemleri. Bırakınca değerler pencereye dolar; işlem Kuyruğa ekle ve Uygula ile yapılır.",
+    /** Bölüm tablosu sütun genişlikleri (pencerenin en küçük genişliği bunlardan hesaplanır). */
+    COLUMN_WIDTHS: [26, 120, 90, 105, 90, 140, 80, 80, 92, 120],
+
     /** Komut çalıştır / terminal Hazır komutlar ▸ Disk editörü. */
     open(device) {
       if (device.online === false) {
@@ -204,6 +237,11 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
     __undoBtn: null,
     __clearBtn: null,
     __applyBtn: null,
+    __hint: null,
+    __hintTimer: null,
+    __menu: null,
+    __fittedData: false,
+    __measure: null,
 
     /** Diskleri cihazdan (yeniden) okur: disk-editor görevi, sonucu beklenir. */
     async reload() {
@@ -242,6 +280,134 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
       }
       this.__ops = [];
       this.__selectDisk();
+      if (!this.__fittedData) {
+        this.__fittedData = true;
+        this.__fit();
+      }
+    },
+
+    /**
+     * Pencereyi içeriğin kırpılmadan sığdığı en küçük boyuta getirir (kullanıcı isteği 2026-11-23): tablo sütunları
+     * içeriğe göre daraltılır, tablo yüksekliği satır sayısına göre (en az 3, en çok 12 satır; fazlası kaydırılır), pencere
+     * genişlik/yüksekliği verilmez — qx boyut ipucundan (getSizeHint) gelir; ekrana sığmazsa ekran kadar.
+     */
+    __fit() {
+      const t = this.__table;
+      const Q = qx.ui.core.queue.Manager;
+      this.__autoColumns();
+      Q.flush();
+      const pane = t.getPaneScroller(0).getTablePane();
+      const clip = pane.getLayoutParent();
+      const tb = t.getBounds();
+      const cb = clip && clip.getBounds();
+      const chrome = tb && cb ? tb.height - cb.height : 30;
+      // Not satırı iki satırlık kullanım notu kadar yer tutsun: tek satırlık bildirim gelince tablo yukarı kaymasın.
+      const hb = this.__hint.getBounds();
+      if (hb && this.__hint.getValue() === ankamon.ui.disk.DiskEditor.HINT) {
+        this.__hint.setMinHeight(hb.height);
+      }
+      const rows = Math.max(3, Math.min(12, t.getTableModel().getRowCount()));
+      t.setHeight(chrome + rows * t.getRowHeight() + 2);
+      this.resetWidth();
+      this.resetHeight();
+      Q.flush();
+      const hint = this.getSizeHint(true);
+      const root = qx.core.Init.getApplication().getRoot().getBounds() || { width: 1200, height: 760 };
+      if (hint.width > root.width - 20) {
+        this.setWidth(root.width - 20);
+      }
+      if (hint.height > root.height - 20) {
+        this.setHeight(root.height - 20);
+      }
+      this.center();
+    },
+
+    /** Tablo sütunları: başlık ve hücre yazılarının en genişine göre (kırpılmasın, boşluk kalmasın); tablo genişliği bunların toplamı. */
+    __autoColumns() {
+      const t = this.__table;
+      const dom = t.getContentElement().getDomElement();
+      const widths = ankamon.ui.disk.DiskEditor.COLUMN_WIDTHS.slice();
+      if (dom) {
+        const ctx = (this.__measure = this.__measure || document.createElement("canvas")).getContext("2d");
+        const css = getComputedStyle(dom);
+        const font = `${css.fontSize} ${css.fontFamily}`;
+        const model = t.getTableModel();
+        for (let c = 1; c < widths.length; c++) {
+          ctx.font = "bold " + font;
+          let w = ctx.measureText(model.getColumnName(c)).width + 24;   // başlık: iç boşluk + sıralama oku
+          ctx.font = font;
+          for (let r = 0; r < model.getRowCount(); r++) {
+            w = Math.max(w, ctx.measureText(String(model.getValue(c, r) || "")).width + 14);
+          }
+          widths[c] = Math.ceil(Math.max(44, w));
+        }
+      }
+      const rb = t.getTableColumnModel().getBehavior();
+      widths.forEach((w, i) => rb.setWidth(i, w));
+      // + dikey kaydırma çubuğu ve kenarlık payı
+      t.setWidth(widths.reduce((x, y) => x + y, 0) + 18);
+    },
+
+    /** Kısa bildirim: çubuğun altındaki not satırında birkaç saniye (kırmızı) görünür, sonra kullanım notu geri gelir. */
+    __notify(text) {
+      if (!this.__hint) {
+        return;
+      }
+      this.__hint.set({ value: "⛔ " + qx.bom.String.escape(text), textColor: "app-error" });
+      if (this.__hintTimer) {
+        this.__hintTimer.stop();
+      }
+      this.__hintTimer = qx.event.Timer.once(() => {
+        this.__hintTimer = null;
+        if (!this.isDisposed()) {
+          this.__hint.set({ value: ankamon.ui.disk.DiskEditor.HINT, textColor: "app-muted" });
+        }
+      }, this, 8000);
+    },
+
+    /**
+     * Seçili bölümün (ya da boş alanın) sağ tık menüsü — çubuktaki kutu ve tablo satırı için ortak (kullanıcı isteği
+     * 2026-11-23). Araç çubuğu ve "Bölüm" menüsüyle aynı işlemler, aynı kurallar: yapılamayan soluk, nedeni ipucunda.
+     */
+    __partMenu() {
+      const M = ankamon.ui.disk.DiskModel;
+      const part = this.__part();
+      const tools = (this.__scan && this.__scan.tools) || {};
+      if (this.__menu) {
+        this.__menu.destroy();
+      }
+      const menu = this.__menu = new qx.ui.menu.Menu();
+      const add = (id, label, fn) => {
+        const why = !part ? "Önce bir bölüm seçin." : (id === "info" ? null : M.why(this.__disk, part, id, tools));
+        const item = new qx.ui.menu.Button(label).set({ enabled: !why, toolTipText: why || null, showToolTipWhenDisabled: true });
+        item.addListener("execute", fn, this);
+        menu.add(item);
+      };
+      if (part && part.kind === "free") {
+        add("create", "＋ Yeni bölüm…", () => this.__createDialog());
+        if (this.__mklabelBtn.getEnabled()) {
+          menu.add(new qx.ui.menu.Separator());
+          const mk = new qx.ui.menu.Button("Bölüm tablosu oluştur…");
+          mk.addListener("execute", () => this.__mklabelDialog());
+          menu.add(mk);
+        }
+        return menu;
+      }
+      add("resize", "Boyutlandır / Taşı…", () => this.__resizeDialog());
+      add("format", "Biçimlendir…", () => this.__formatDialog());
+      add("delete", "Sil", () => this.__queue({ op: "delete" }, "Sil"));
+      menu.add(new qx.ui.menu.Separator());
+      add("label", "Etiket…", () => this.__labelDialog());
+      add("name", "Bölüm adı…", () => this.__nameDialog());
+      add("flags", "Bayraklar…", () => this.__flagsDialog());
+      add("check", "Denetle (onar)", () => this.__queue({ op: "check" }, "Denetle"));
+      menu.add(new qx.ui.menu.Separator());
+      add("mount", "Bağla", () => this.__queue({ op: "mount" }, "Bağla"));
+      add("umount", "Ayır", () => this.__queue({ op: "umount" }, "Ayır"));
+      add("uuid", "Yeni UUID", () => this.__queue({ op: "uuid" }, "Yeni UUID"));
+      menu.add(new qx.ui.menu.Separator());
+      add("info", "Bilgi", () => this.__info());
+      return menu;
     },
 
     __selectDisk() {
@@ -320,7 +486,8 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
         const title = p.kind === "free" ? "ayrılmamış" : `${p.path || "yeni"}${p.label ? " — " + p.label : ""}`;
         const text = `<div style="position:relative;padding:2px 4px;font-size:11px;line-height:13px;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)}<br>${esc(F.bytes(bytes))}</div>`;
         const fill = p.kind === "free" ? "" : `<div style="position:absolute;left:0;top:0;bottom:0;width:${usedPct}%;background:#F8F8BA"></div>`;
-        return `<div data-i="${i}" title="${esc(title)} · ${esc(M.fsName(p.fs))} · ${esc(F.bytes(bytes))}" style="cursor:pointer;flex:${weight(p)} 1 0;min-width:0;` +
+        const tip = esc(`${title} · ${M.fsName(p.fs)} · ${F.bytes(bytes)}`);
+        return `<div data-i="${i}" title="${tip}" data-tip="${tip}" style="cursor:pointer;flex:${weight(p)} 1 0;min-width:0;` +
           `position:relative;box-sizing:border-box;border:3px solid ${M.color(p)};background:${p.kind === "free" ? "#e8e8e8" : "#fff"};${sel}${p.pending ? "border-style:dashed;" : ""}">${fill}${text}</div>`;
       };
       const html = top.map(({ p, i }) => {
@@ -471,7 +638,9 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
       const M = ankamon.ui.disk.DiskModel;
       const disk = this.__disk;
       const part = this.__part();
-      const L = M.resizeLimits(disk, part);
+      const tools = (this.__scan && this.__scan.tools) || {};
+      const L = M.resizeLimits(disk, part, tools);
+      const R = M.limitReasons(disk, part, tools);
       const a = M.align(disk);
       const cur = Math.round(L.size / a);
       const beforeNow = Math.round((part.start - L.minStart) / a);
@@ -488,11 +657,10 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
         if (!L.canMove) {
           notes.push("Bağlı bölüm taşınamaz (yalnız sonu değişir).");
         }
-        if (!L.canShrink) {
-          notes.push("Bu dosya sistemi şu durumda küçültülemez.");
-        }
+        // Neden daha fazla küçülmüyor / büyümüyor (kullanıcı isteği 2026-11-23).
+        notes.push("Küçültme: " + (L.canShrink ? R.floor : R.shrink || "yapılamaz."));
         if (!L.canGrow) {
-          notes.push("Bu dosya sistemi şu durumda büyütülemez.");
+          notes.push("Büyütme: " + (R.grow || "yapılamaz."));
         }
         notes.push("Taşıma, verinin tamamını kopyalar — büyük bölümde uzun sürer.");
         return new qx.ui.basic.Label(notes.join("<br>")).set({ rich: true, textColor: "app-muted" });
