@@ -139,6 +139,8 @@ final class DevicesApi
      * ?group=<varlık grubu id>: o grubun üyelerinin cihaz kayıtları (türünden bağımsız — Windows bilgisayar, akıllı tahta…;
      * MAC'i kablolu ya da kablosuz eşleşen) — sol menüde her grup bu sayfayı araç çubuğuyla açar (kullanıcı isteği
      * 2026-11-23). Grupsuz: eski Akıllı Tahtalar listesi (LISTED).
+     * ?all=1: LISTED süzgeci olmadan BÜTÜN cihaz kayıtları — Ağ ▸ Varlıklar araç çubuğu seçilen varlıkları MAC'leriyle
+     * cihaz kayıtlarına eşler (türü ne olursa olsun yönetilebilir varlık; kullanıcı isteği 2026-11-23).
      */
     public function index(Request $request): array
     {
@@ -147,7 +149,8 @@ final class DevicesApi
             ? Db::all('SELECT ' . self::COLUMNS . ' ' . self::FROM . ' WHERE EXISTS (SELECT 1 FROM net_device_group_members m
                   JOIN net_devices d ON d.id = m.device_id WHERE m.group_id = ? AND d.mac IN (b.mac, b.wifi_mac))
                   ORDER BY b.label, b.hostname, b.ip', [$group])
-            : Db::all('SELECT ' . self::COLUMNS . ' ' . self::FROM . ' WHERE ' . self::LISTED . ' ORDER BY b.label, b.hostname, b.ip');
+            : Db::all('SELECT ' . self::COLUMNS . ' ' . self::FROM . ' WHERE ' . ($request->query('all') ? 'TRUE' : self::LISTED)
+                . ' ORDER BY b.label, b.hostname, b.ip');
         // Sensörler sütunu (Varlıklar'la aynı ölçüt — bkz. Core\DeviceSensors::lastSeenAll).
         $sensors = \Ankamon\Core\DeviceSensors::lastSeenAll();
         $rows = array_map(static fn(array $b) => self::deviceRowForPanel($b) + ['sensors_at' => $sensors[(int) $b['id']] ?? null], $devices);

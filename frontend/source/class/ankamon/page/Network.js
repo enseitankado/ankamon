@@ -197,6 +197,19 @@ qx.Class.define("ankamon.page.Network", {
       const devices = checked.includes(device) && checked.length > 1 ? checked : [device];
       this.__table.setContextMenu(this.__rowMenu(device, devices));
     });
+    // Grup sayfalarındaki (page.Devices) araç çubuğunun aynısı, aynı kurallarla (kullanıcı isteği 2026-11-23): düğmeler
+    // yalnız YÖNETİLEBİLİR varlıklarda — cihaz kaydı olan (MAC'i devices satırına düşen) işaretli varlıklar; kaydı
+    // olmayan varlık (yazıcı, kamera…) çubuğa girmez, yalnız onlar seçiliyse düğmeler devre dışı. Menü page.Devices
+    // satır menüsünün ortak gövdesi (ui.DeviceOps.managedDeviceMenuBody); Düzenle/Sil/Cihaz ekle bu sayfada yok — Varlıklar'ın
+    // kendi sağ menüsü (__rowMenu) ayrı kalır. Cihaz kayıtları: /devices?all=1 (bkz. __loadManaged).
+    if (this._can("devices")) {
+      this.__actionBar = new ankamon.ui.devices.ActionBar(
+        (device, devices) => ankamon.ui.devices.Platforms.decorate(
+          ankamon.ui.DeviceOps.managedDeviceMenuBody(device, this._user, devices), devices),
+        () => this.__managedOf(this.__checkedDevices()),
+        { getAll: () => this.__managedOf(this.__currentAssets()) });
+      this.add(this.__actionBar);
+    }
     this.add(this.__table, { flex: 1 });
     this.__note = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true, wrap: true });
     this.add(this.__note);
@@ -282,6 +295,48 @@ qx.Class.define("ankamon.page.Network", {
     __groupButton: null,
     __groupMenuButton: null,
     __netNote: "",
+    __actionBar: null,
+    __managed: null,
+
+    /**
+     * Araç çubuğu için bütün cihaz kayıtları (LISTED süzgeci yok — türü ne olursa olsun; bkz. backend DevicesApi::index
+     * all=1). Yetki ya da ağ hatasında boş: çubuk devre dışı kalır, liste yine çizilir.
+     */
+    async __loadManaged() {
+      if (!this.__actionBar) {
+        return;
+      }
+      try {
+        const data = await ankamon.io.Api.get("/devices", { all: 1 });
+        this.__managed = data.devices || [];
+      } catch (e) {
+        this.__managed = [];
+      }
+    },
+
+    /** Varlıklar → cihaz kayıtları: varlığın bağlı cihaz kimliği (NetworkApi device_id) ya da kablolu/kablosuz MAC eşleşmesi. */
+    __managedOf(assets) {
+      if (!this.__managed || !assets.length) {
+        return [];
+      }
+      const byId = new Map(this.__managed.map(b => [b.id, b]));
+      const byMac = new Map();
+      this.__managed.forEach(b => [b.mac, b.wifi_mac].filter(Boolean).forEach(m => byMac.set(String(m).toLowerCase(), b)));
+      const out = new Map();
+      assets.forEach(d => {
+        const b = (d.device_id != null && byId.get(d.device_id)) || (d.mac && byMac.get(String(d.mac).toLowerCase()));
+        if (b) {
+          out.set(b.id, b);
+        }
+      });
+      return [...out.values()];
+    },
+
+    /** Görünümdeki (grup görünümünde grubun) bütün varlıklar — araç çubuğunun çevrim içi/dışı sayısı için. */
+    __currentAssets() {
+      const group = this.__currentGroup();
+      return (this.__rows || []).map(r => r.device).filter(d => !group || group.members.includes(d.id));
+    },
 
     /**
      * Sol ağaçtan ağ seçimi (0: bütün ağlar). Shell sayfayı göstermeden ÖNCE çağırır; liste
@@ -334,7 +389,8 @@ qx.Class.define("ankamon.page.Network", {
       const [nets, data] = await Promise.all([
         ankamon.io.Api.get("/network"),
         ankamon.io.Api.get("/network/devices", { network: this.__networkId || 0 }),
-        this.__loadGroups().catch(() => this.__groups)
+        this.__loadGroups().catch(() => this.__groups),
+        this.__loadManaged()
       ]);
       this.__networks = nets.networks;
       qx.event.message.Bus.dispatchByName(Ops.NETWORKS_CHANGED, { networks: nets.networks });
@@ -551,6 +607,9 @@ qx.Class.define("ankamon.page.Network", {
         button.setLabel(count ? `${button.getUserData("baseLabel")} (${count})` : button.getUserData("baseLabel"));
         button.setEnabled(count >= 1);
       });
+      if (this.__actionBar) {
+        this.__actionBar.refresh();
+      }
     },
 
     /** Tarayıcı durumu + sürüm; sürüm değiştiyse listeyi hemen tazeler. Sayfa görünmüyorsa çalışmaz. */

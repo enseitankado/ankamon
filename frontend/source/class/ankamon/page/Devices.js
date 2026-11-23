@@ -1653,45 +1653,22 @@ qx.Class.define("ankamon.page.Devices", {
      * açar — bkz. ui.Shell.OPEN_LOGS) ve hemen altında Bilgi kartı eklenir.
      */
     __rowMenu(device, devices = [device], sessionOps = null) {
-      const menu = ankamon.ui.DeviceOps.menu(device, this._user, devices, sessionOps) || new qx.ui.menu.Menu();
       const ICON = ankamon.ui.Shell.ICON;
-      const add = (icon, label, handler) => menu.add(ankamon.ui.DeviceOps.menuButton(icon, label, handler.bind(this)));
-      // Eklentilerin maddeleri (bkz. ankamon.ext.Extensions.addDeviceMenu): ortak işlemlerin ardında, kendi bölümünde.
-      // parent verilen madde o çekirdek grubunun alt menüsüne (ör. Komut çalıştır ▸ TiHA); grup yoksa kendi bölümüne.
-      const own = ankamon.ext.Extensions.deviceMenuItems(device, devices, this._user).filter(item => {
-        const parent = item.getUserData("ankamon.menuParent");
-        const host = parent && menu.getChildren().find(c => c instanceof qx.ui.menu.Button && c.getMenu()
-          && c.getUserData("ankamon.menuKey") === parent);
-        if (host) {
-          host.getMenu().add(item);
-        }
-        return !host;
-      });
-      if (own.length) {
-        if (menu.getChildren().length) {
-          menu.add(new qx.ui.menu.Separator());
-        }
-        own.forEach(item => menu.add(item));
-      }
-      // Bilgi kartı: ortak (bkz. DeviceOps.logsAndInfo). "Logları göster" burada yok (kullanıcı isteği 2026-11-11):
-      // Cihaz ayrıntıları penceresindeki "Loglar" düğmesinde.
-      const extra = ankamon.ui.DeviceOps.logsAndInfo(device, this._user, devices, { noLogs: true }).map(item => () => menu.add(item));
-      // Bilgisayarı aç (WoL) artık DeviceOps.menu'de "Bilgisayarı kapat"ın hemen yanında (kullanıcı
-      // isteği: ikisi komşu); çevrimiçi cihazda orada devre dışı görünür.
+      const button = (icon, label, handler) => ankamon.ui.DeviceOps.menuButton(icon, label, handler.bind(this));
+      // Ortak gövde (DeviceOps.menu + eklenti maddeleri + Bilgi kartı) — Ağ ▸ Varlıklar araç çubuğu da aynısını kullanır
+      // (bkz. ui.DeviceOps.managedDeviceMenuBody). Bilgisayarı aç (WoL) DeviceOps.menu'de "Bilgisayarı kapat"ın yanında.
+      // Bu sayfaya özgü: Düzenle / Sil (Bilgi kartı'yla aynı bölümde) ve Cihaz ekle….
+      const tail = [];
       if (this._can("devices.manage")) {
         // Çoklu seçimde toplu düzenleme (ui.network.DeviceBulkEdit — kullanıcı isteği 2026-11-10).
-        extra.push(() => add(ICON.edit, "Düzenle" + (devices.length > 1 ? ` (${devices.length} cihaz)` : ""), () => (devices.length > 1
+        tail.push(button(ICON.edit, "Düzenle" + (devices.length > 1 ? ` (${devices.length} cihaz)` : ""), () => (devices.length > 1
           ? ankamon.ui.network.DeviceBulkEdit.open({ devices, user: this._user, onSaved: () => this.refresh() })
           : this.__edit(device))));
-        extra.push(() => add(ICON.delete, "Sil" + (devices.length > 1 ? ` (${devices.length} cihaz)` : ""),
+        tail.push(button(ICON.delete, "Sil" + (devices.length > 1 ? ` (${devices.length} cihaz)` : ""),
           () => this.__delete(devices)));
       }
-      if (extra.length) {
-        if (menu.getChildren().length) {
-          menu.add(new qx.ui.menu.Separator());
-        }
-        extra.forEach(fn => fn());
-      }
+      const menu = ankamon.ui.DeviceOps.managedDeviceMenuBody(device, this._user, devices, sessionOps, tail);
+      const add = (icon, label, handler) => menu.add(button(icon, label, handler));
       // "Tümünü işaretle / İşaretleri kaldır" sağ menüden kalktı (kullanıcı isteği 2026-11-11): başlıktaki onay kutusu
       // görünen satırların hepsini işaretler/kaldırır. Elle cihaz ekleme kalır.
       if (this._can("devices.manage")) {

@@ -34,9 +34,9 @@
  * diye ağaçta "Oturumlar" adıyla ayrı bir yaprak — bkz. ui.Shell.PAGES.
  *
  * İki sekme, tek veri: sayfa /device-sessions'ı kısa aralıkla çeker ve iki sekmeye de verir.
- *  - "Oturumlar" (ui.sessions.List): tüm kayıtların süzülebilir grid'i.
- *  - "Zaman çizelgesi" (ui.sessions.Users): kullanıcı/cihaz bazında zaman çizelgesi ve özet. Grid'de
+ *  - "Zaman çizelgesi" (ui.sessions.Users, ilk sekme): kullanıcı/cihaz bazında zaman çizelgesi ve özet. Grid'de
  *    sağ tık → "Oturum geçmişi" buraya, o kullanıcı seçili olarak geçer (showUserHistory).
+ *  - "Oturumlar" (ui.sessions.List): tüm kayıtların süzülebilir grid'i.
  * Sıralamalar (eski "Şampiyonlar Ligi" / "Teneffüs Ligi") ayrı sayfada: Ligler (bkz. page.Leagues).
  *
  * Oturum kapanışı her zaman güvenilir biçimde loglanmaz (elektrik kesintisi, fiziksel güç
@@ -54,8 +54,10 @@ qx.Class.define("ankamon.page.Sessions", {
     this.__tabs = new qx.ui.tabview.TabView();
     this.__list = new ankamon.ui.sessions.List(this);
     this.__users = new ankamon.ui.sessions.Users(this);
-    this.__tabs.add(this.__list);
+    // Zaman çizelgesi ilk sekme (kullanıcı isteği 2026-11-23): Oturumlar düğümü — hatırlanan son sekme yoksa — onunla açılır;
+    // sol menüdeki sekme sırası da aynı (ui.Shell PAGES "sessions" tabs).
     this.__tabs.add(this.__users);
+    this.__tabs.add(this.__list);
     this.__movements = new ankamon.ui.sessions.Movements(this);
     this.__tabs.add(this.__movements);
     this.__chats = new ankamon.ui.sessions.Chats(this);
