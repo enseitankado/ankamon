@@ -239,11 +239,19 @@ qx.Class.define("ankamon.page.Metrics", {
       }
     },
 
+    /** Sol menüde grubun altından açıldıysa o grup (0: bütün cihazlar) — bkz. setGroup. */
+    __group: 0,
+
+    /** Sensörler her varlık grubunun altında (kullanıcı isteği 2026-11-23): cihaz seçici o grubun cihazlarıyla dolar. */
+    setGroup(id) {
+      this.__group = id || 0;
+    },
+
     async _refresh() {
       // Cihaz listesi her açılışta tazelenir (yeni eklenen / çevrim içi-dışı değişen cihazlar); seçim korunur.
       let devices = [];
       try {
-        devices = (await ankamon.io.Api.get("/devices")).devices;
+        devices = (await ankamon.io.Api.get("/devices" + (this.__group ? `?group=${this.__group}` : ""))).devices.filter(b => !b.passive);
       } catch (e) {
         // "devices" yetkisi yoksa yalnız "Tüm çevrim içi cihazlar" kalır.
       }

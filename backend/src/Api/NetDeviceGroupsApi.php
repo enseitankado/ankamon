@@ -45,20 +45,39 @@ final class NetDeviceGroupsApi
 {
     private const NAME_LIMIT = 80;
 
-    /** Bütün gruplar ve üye kimlikleri: {groups:[{id, name, members:[device id…]}]} — ada göre. */
+    /**
+     * Bütün gruplar, ada göre: {groups:[{id, name, members:[varlık id…], devices:[cihaz kaydı id…], smart, sensors}]}.
+     * devices: üyelerin Ankamon cihaz kayıtları (MAC'i — kablolu ya da kablosuz — eşleşen devices satırı) = yönetilebilir
+     * varlıklar; smart: Varlıklar'da türü "Akıllı tahta" olan üye sayısı; sensors: sensör verisi gelmiş cihaz kaydı sayısı.
+     * Sol menüde grubun altındaki düğümlerin görünürlüğü bunlara bağlı (kullanıcı isteği 2026-11-23: Ligler ve Oturumlar
+     * ≥1 yönetilebilir, Ahenk ≥1 akıllı tahta, Sensörler ≥1 veri gelen cihaz) — bkz. ui.Shell __syncAssetGroups.
+     */
     public function deviceGroups(): array
     {
         $rows = Db::all(
-            "SELECT g.id, g.name, COALESCE(array_agg(m.device_id ORDER BY m.device_id)
-                    FILTER (WHERE m.device_id IS NOT NULL), '{}') AS members
-             FROM net_device_groups g LEFT JOIN net_device_group_members m ON m.group_id = g.id
+            "SELECT g.id, g.name,
+                    COALESCE(array_agg(DISTINCT m.device_id) FILTER (WHERE m.device_id IS NOT NULL), '{}') AS members,
+                    COALESCE(array_agg(DISTINCT b.id) FILTER (WHERE b.id IS NOT NULL), '{}') AS devices,
+                    count(DISTINCT d.id) FILTER (WHERE COALESCE(NULLIF(d.device_type, ''), d.type_auto) = 'Akıllı tahta') AS smart
+             FROM net_device_groups g
+             LEFT JOIN net_device_group_members m ON m.group_id = g.id
+             LEFT JOIN net_devices d ON d.id = m.device_id
+             LEFT JOIN devices b ON d.mac IS NOT NULL AND d.mac IN (b.mac, b.wifi_mac)
              GROUP BY g.id ORDER BY lower(g.name)"
         );
-        return ['groups' => array_map(fn(array $r) => [
-            'id' => (int) $r['id'],
-            'name' => $r['name'],
-            'members' => array_map('intval', array_filter(explode(',', trim((string) $r['members'], '{}')), 'strlen')),
-        ], $rows)];
+        $ids = static fn($v) => array_map('intval', array_filter(explode(',', trim((string) $v, '{}')), 'strlen'));
+        $sensors = \Ankamon\Core\DeviceSensors::lastSeenAll();
+        return ['groups' => array_map(function (array $r) use ($ids, $sensors) {
+            $devices = $ids($r['devices']);
+            return [
+                'id' => (int) $r['id'],
+                'name' => $r['name'],
+                'members' => $ids($r['members']),
+                'devices' => $devices,
+                'smart' => (int) $r['smart'],
+                'sensors' => count(array_filter($devices, static fn(int $id) => !empty($sensors[$id]))),
+            ];
+        }, $rows)];
     }
 
     /** Gövde: {name, ids:[…]} — ids Tüm Varlıklar'da işaretli varlıklar. */

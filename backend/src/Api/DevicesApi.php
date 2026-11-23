@@ -133,12 +133,51 @@ final class DevicesApi
             AND COALESCE(NULLIF(d.device_type, ''), d.type_auto) = '" . self::DEVICE_TYPE . "')
         OR NOT EXISTS (SELECT 1 FROM net_devices d WHERE d.mac IN (b.mac, b.wifi_mac)))";
 
-    public function index(): array
+    /**
+     * ?group=<varlık grubu id>: o grubun üyelerinin cihaz kayıtları (türünden bağımsız — Windows bilgisayar, akıllı tahta…;
+     * MAC'i kablolu ya da kablosuz eşleşen) — sol menüde her grup bu sayfayı araç çubuğuyla açar (kullanıcı isteği
+     * 2026-11-23). Grupsuz: eski Akıllı Tahtalar listesi (LISTED).
+     */
+    public function index(Request $request): array
     {
-        $devices = Db::all('SELECT ' . self::COLUMNS . ' ' . self::FROM . ' WHERE ' . self::LISTED . ' ORDER BY b.label, b.hostname, b.ip');
+        $group = (int) ($request->query('group') ?? 0);
+        $devices = $group > 0
+            ? Db::all('SELECT ' . self::COLUMNS . ' ' . self::FROM . ' WHERE EXISTS (SELECT 1 FROM net_device_group_members m
+                  JOIN net_devices d ON d.id = m.device_id WHERE m.group_id = ? AND d.mac IN (b.mac, b.wifi_mac))
+                  ORDER BY b.label, b.hostname, b.ip', [$group])
+            : Db::all('SELECT ' . self::COLUMNS . ' ' . self::FROM . ' WHERE ' . self::LISTED . ' ORDER BY b.label, b.hostname, b.ip');
         // Sensörler sütunu (Varlıklar'la aynı ölçüt — bkz. Core\DeviceSensors::lastSeenAll).
         $sensors = \Ankamon\Core\DeviceSensors::lastSeenAll();
-        return ['devices' => array_map(static fn(array $b) => self::deviceRowForPanel($b) + ['sensors_at' => $sensors[(int) $b['id']] ?? null], $devices)];
+        $rows = array_map(static fn(array $b) => self::deviceRowForPanel($b) + ['sensors_at' => $sensors[(int) $b['id']] ?? null], $devices);
+        return ['devices' => $group > 0 ? array_merge($rows, self::passiveGroupRows($group)) : $rows];
+    }
+
+    /**
+     * Grubun cihaz kaydı OLMAYAN üyeleri (yazıcı, erişim noktası, kayıtsız bilgisayar…): listede görünür ama yönetilemez
+     * (passive: true, manageable: false — araç çubuğu ve sağ menü onlarda çalışmaz; Ekranlar'da kutucukları yok). Kimlik
+     * varlık kimliğinin EKSİSİ (cihaz kimlikleriyle çakışmaz, işe/göreve gitmez). Alanlar cihaz satırıyla aynı anahtarlarda.
+     */
+    private static function passiveGroupRows(int $group): array
+    {
+        $rows = Db::all(
+            "SELECT -d.id AS id, d.hostname, d.mac::text AS mac, host(d.ip) AS ip,
+                    COALESCE(NULLIF(d.label, ''), NULLIF(d.hostname, ''), host(d.ip), d.mac::text) AS label, d.location,
+                    COALESCE(NULLIF(d.device_type, ''), d.type_auto) AS device_type, d.os_guess AS os_name, d.online AS alive,
+                    extract(epoch FROM d.last_seen_at)::bigint AS last_seen_at, extract(epoch FROM d.last_log_at)::bigint AS last_log_at
+             FROM net_device_group_members m JOIN net_devices d ON d.id = m.device_id
+             WHERE m.group_id = ? AND NOT EXISTS (SELECT 1 FROM devices b WHERE d.mac IN (b.mac, b.wifi_mac))
+             ORDER BY 5",
+            [$group]
+        );
+        return array_map(static fn(array $r) => $r + [
+            'passive' => true, 'manageable' => false, 'online' => false, 'alive' => (bool) $r['alive'], 'net_online' => (bool) $r['alive'], 'wifi_mac' => null,
+            'notes' => '', 'source' => 'network', 'monitor_enabled' => false, 'smart_board' => false, 'exporter_port' => null,
+            'os_family' => null, 'os_source' => null, 'os_family_manual' => null, 'ssh_ok' => false, 'exporter_ok' => false,
+            'facts' => new \stdClass(), 'etap' => null, 'session_username' => null, 'session_locked' => false,
+            'session_checked_at' => null, 'no_session_since' => null, 'display_state' => null, 'netifs' => null,
+            'autoshutdown' => null, 'screen_locked' => false, 'input_locks' => [], 'relay_source' => null,
+            'relay_is_source' => false, 'sensors_at' => null,
+        ], $rows);
     }
 
     public function show(Request $request): array

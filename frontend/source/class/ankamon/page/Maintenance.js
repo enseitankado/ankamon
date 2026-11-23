@@ -85,6 +85,20 @@ qx.Class.define("ankamon.page.Maintenance", {
       }
     },
 
+    /**
+     * Sensörler ve eklenti sekmeleri (Ahenk) her varlık grubunun altında (kullanıcı isteği 2026-11-23): grup, setGroup'u olan
+     * sekme sayfalarına iletilir (olmayan — ör. eski sürüm eklenti — bütün cihazlarla çalışır).
+     * @param id {Integer} grup (0: hepsi) @param devices {Array} grubun cihaz kaydı kimlikleri
+     */
+    setGroup(id, devices) {
+      this.__tabs.getChildren().forEach(tab => {
+        const page = tab.getUserData("page");
+        if (page && typeof page.setGroup === "function") {
+          page.setGroup(id, devices);
+        }
+      });
+    },
+
     /** Bkz. ui.Shell OPEN_PAGE: {tab: "metrics"|"diagnose"|"ahenk"} o sekmeyi seçer (ve sayfasını yeniler). */
     openWith(opts) {
       if (opts && (opts.tab === "diagnose" || opts.tab === "help")) {

@@ -87,10 +87,32 @@ qx.Class.define("ankamon.page.Sessions", {
     __users: null,
     __movements: null,
 
+    /** Sol menüde grubun altından açıldıysa o grubun cihaz kayıtları (Set); null: bütün cihazlar. */
+    __groupDevices: null,
+    __sessions: null,
+
+    /**
+     * Oturumlar her varlık grubunun altında (kullanıcı isteği 2026-11-23 — kök menüden kalktı): liste ve zaman çizelgesi o
+     * grubun cihazlarına süzülür. @param id {Integer} grup (0: hepsi) @param devices {Array} grubun cihaz kaydı kimlikleri
+     */
+    setGroup(id, devices) {
+      this.__groupDevices = id ? new Set(devices || []) : null;
+      if (this.__sessions) {
+        this.__applySessions();
+      }
+    },
+
     async _refresh() {
       const data = await ankamon.io.Api.get("/device-sessions");
-      this.__list.setData(data.sessions);
-      this.__users.setData(data.sessions);
+      this.__sessions = data.sessions;
+      this.__applySessions();
+    },
+
+    __applySessions() {
+      const g = this.__groupDevices;
+      const sessions = g ? this.__sessions.filter(s => g.has(s.device_id)) : this.__sessions;
+      this.__list.setData(sessions);
+      this.__users.setData(sessions);
     },
 
     /**

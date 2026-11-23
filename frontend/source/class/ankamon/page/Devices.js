@@ -150,13 +150,16 @@ qx.Class.define("ankamon.page.Devices", {
     this.__table.getTableModel().addListener("metaDataChanged", this.__syncShownOrder, this);
     // Satır menüsünün simgeli karşılığı; liste ve ekran görünümünün üstünde (bkz. ui.devices.ActionBar).
     this.__actionBar = new ankamon.ui.devices.ActionBar((device, devices) => this.__rowMenu(device, devices, this.__barSessionOps()),
-      () => this._checkedIds(this.__table).map(id => this.__devices && this.__devices.get(id)).filter(Boolean),
-      { getAll: () => (this.__devices ? [...this.__devices.values()] : []) });
+      // Pasif satırlar (grubun cihaz kaydı olmayan üyeleri — bkz. setGroup) araç çubuğuna girmez: düğmeler yalnız
+      // yönetilebilir varlıklarda kullanılabilir (kullanıcı isteği 2026-11-23).
+      () => this._checkedIds(this.__table).map(id => this.__devices && this.__devices.get(id)).filter(b => b && !b.passive),
+      { getAll: () => (this.__devices ? [...this.__devices.values()].filter(b => !b.passive) : []) });
     this.add(this.__actionBar);
     this.__table.addListener("cellDbltap", e => {
-      if (this._can("devices.manage")) {
-        const id = this.__table.getTableModel().getValue(0, e.getRow());
-        this.__edit(this.__devices.get(id));
+      const id = this.__table.getTableModel().getValue(0, e.getRow());
+      const device = this.__devices.get(id);
+      if (this._can("devices.manage") && device && !device.passive) {
+        this.__edit(device);
       }
     });
     // Satır sağ menüsü: ağaçtaki cihaz düğümüyle aynı menü (Web terminal / Komut çalıştır / Kapat / WoL)
@@ -168,13 +171,13 @@ qx.Class.define("ankamon.page.Devices", {
       }
       const id = this.__table.getTableModel().getValue(0, e.getRow());
       const device = this.__devices.get(id);
-      if (!device) {
-        this.__table.setContextMenu(null);
+      if (!device || device.passive) {
+        this.__table.setContextMenu(null); // yönetilemeyen varlık (cihaz kaydı yok): menü yok — Varlıklar'da düzenlenir
         return;
       }
       const checkedIds = this._checkedIds(this.__table);
       const devices = checkedIds.includes(id) && checkedIds.length > 1
-        ? checkedIds.map(cid => this.__devices.get(cid)).filter(Boolean)
+        ? checkedIds.map(cid => this.__devices.get(cid)).filter(b => b && !b.passive)
         : [device];
       this.__table.setContextMenu(this.__rowMenu(device, devices));
     });
@@ -441,12 +444,43 @@ qx.Class.define("ankamon.page.Devices", {
     __applyingPreview: false,
     __metrics: null,
 
+    /** Sol menüde seçili varlık grubu (0: grupsuz — eski Akıllı Tahtalar listesi). */
+    __group: 0,
+
+    /**
+     * Sol menüde bir varlık grubu seçildi (kullanıcı isteği 2026-11-23: Akıllı Tahtalar sabit menü değil, her grup bu sayfayı
+     * araç çubuğu ve Ekranlar ile açar): liste o grubun üyeleri olur — cihaz kaydı olanlar yönetilebilir, olmayanlar pasif
+     * satır (GET /devices?group=). Grup değişince liste hemen boşaltılır (öteki grubun satırları görünmesin).
+     * @param id {Integer} varlık grubu (0: grupsuz)
+     */
+    setGroup(id) {
+      id = id || 0;
+      if (id === this.__group) {
+        return;
+      }
+      this.__group = id;
+      if (this.__table) {
+        this.__devices = new Map();
+        this.__rows = [];
+        this.__apply();
+      }
+    },
+
+    /** @return {Integer} seçili varlık grubu (0: yok). */
+    getGroup() {
+      return this.__group;
+    },
+
     async _refresh() {
       const F = ankamon.util.Format;
+      const group = this.__group;
       const [devices, metrics] = await Promise.all([
-        ankamon.io.Api.get("/devices"),
+        ankamon.io.Api.get("/devices" + (group ? `?group=${group}` : "")),
         ankamon.io.Api.get("/metrics/latest")
       ]);
+      if (group !== this.__group) {
+        return; // yanıt gelene dek başka gruba geçildi: eski grubun listesi yenisini ezmesin
+      }
       // Kendiliğinden tazelemede kullanıcının o anki işaretlemeleri kaybolmasın. İstek SONRASI okunur: önce okununca
       // istek sürerken yapılan işaretleme (fare, Ctrl+A) yanıt gelince eski listeyle geri alınıyordu (2026-11-05).
       const wasChecked = this.__table ? new Set(this._checkedIds(this.__table)) : new Set();
@@ -465,7 +499,7 @@ qx.Class.define("ankamon.page.Devices", {
             ankamon.page.Devices.statusText(device),
             ankamon.page.Devices.manageableText(device),
             device.label || device.hostname || device.ip,
-            device.hostname, device.ip, device.mac, device.wifi_mac || "", F.etap(device.etap, device.facts.cpu_model), ankamon.ui.devices.Platforms.label(ankamon.ui.devices.Platforms.familyOf(device)) + (device.os_name ? " — " + device.os_name : ""),
+            device.hostname, device.ip, device.mac, device.wifi_mac || "", F.etap(device.etap, device.facts.cpu_model), device.passive ? device.os_name || "" : ankamon.ui.devices.Platforms.label(ankamon.ui.devices.Platforms.familyOf(device)) + (device.os_name ? " — " + device.os_name : ""),
             ankamon.page.Devices.sessionText(device),
             ankamon.page.Devices.wifiText(device),
             ankamon.page.Devices.cableText(device),
@@ -485,10 +519,18 @@ qx.Class.define("ankamon.page.Devices", {
       });
       this.__apply();
       this.__actionBar.refresh();
-      this.__note.setValue(devices.devices.length ? "" :
-        "Henüz kayıtlı cihaz yok. Cihazlar log göndermeye başladığında kendiliğinden listelenir; elle de ekleyebilirsiniz.");
+      const passive = devices.devices.filter(b => b.passive).length;
+      let note = "";
+      if (!devices.devices.length) {
+        note = group ? "Bu grupta varlık yok. Ağ ▸ Varlıklar'da işaretleyip sağ menüden gruba ekleyebilirsiniz."
+          : "Henüz kayıtlı cihaz yok. Cihazlar log göndermeye başladığında kendiliğinden listelenir; elle de ekleyebilirsiniz.";
+      } else if (passive) {
+        note = `${passive} varlığın Ankamon'da cihaz kaydı yok (Yönetilebilir: Hayır): listede görünür, araç çubuğu ve sağ menü ` +
+          "yalnız yönetilebilir varlıklarda çalışır; Ekranlar'da kutucukları yoktur. Ayrıntıları Ağ ▸ Varlıklar'da.";
+      }
+      this.__note.setValue(note);
       // Boş not yer kaplamasın: tablo pencerenin altına kadar uzansın (kullanıcı isteği).
-      this.__note.setVisibility(devices.devices.length ? "excluded" : "visible");
+      this.__note.setVisibility(note ? "visible" : "excluded");
     },
 
     /** Her sütunun altındaki metin kutularını (Excel tarzı sütun filtresi) uygular. */
@@ -1065,7 +1107,8 @@ qx.Class.define("ankamon.page.Devices", {
           this.__closedNotes.set(id, Date.now());
         }
       });
-      return this.__orderedShown().map(b => {
+      // Pasif satırlar (cihaz kaydı yok) Ekranlar'da kutucuk almaz.
+      return this.__orderedShown().filter(b => !b.passive).map(b => {
         // WoL yazısı (bkz. __sessionOps wolSent) cihaz açılınca kalkar; "Kapanıyor…" (shutdownSent) cihaz kapanınca
         // (yukarıda) ya da kapanmadıysa SHUTDOWN_NOTE_MS sonra.
         const w = whoami.get(b.id);
