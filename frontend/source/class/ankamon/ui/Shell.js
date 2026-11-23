@@ -215,8 +215,11 @@ qx.Class.define("ankamon.ui.Shell", {
       // etiket, Zaman çizelgesinde userData "key" (eski adı "Kullanıcılar" — bkz. ui.sessions.Users).
       // groupScoped (kullanıcı isteği 2026-11-23): kökte değil, her varlık grubunun altında (grupta ≥1 yönetilebilir varlık
       // varsa) — sayfa o grubun cihazlarına süzülür (setGroup). Bkz. __groupNode.
+      // defaultTab: Oturumlar düğümüne basınca her zaman Zaman çizelgesi açılır (hatırlanan son sekme değil).
       { id: "sessions", label: "Oturumlar", feature: "logs", collapsed: true, groupScoped: true, noIcon: true, create: u => new ankamon.page.Sessions(u),
-        tabs: [{ key: "Oturumlar", label: "Oturumlar" }, { key: "timeline", label: "Zaman çizelgesi" }, { key: "movements", label: "Hareketler" },
+        defaultTab: "timeline",
+        // Zaman çizelgesi ilk alt seçenek (kullanıcı isteği 2026-11-23; sayfadaki sekme sırası da — page.Sessions).
+        tabs: [{ key: "timeline", label: "Zaman çizelgesi" }, { key: "Oturumlar", label: "Oturumlar" }, { key: "movements", label: "Hareketler" },
           { key: "chat", label: "Sohbet geçmişi" }] },
       // Ligler (kullanıcı isteği 2026-11-06): eskiden Oturumlar'ın "Şampiyonlar Ligi" / "Teneffüs Ligi" sekmeleri; adları
       // "Kullanım sıralaması" / "Ders arası sıralaması" oldu (bkz. page.Leagues). Eski bağlantılar __openPage'de yönlenir.
@@ -458,7 +461,8 @@ qx.Class.define("ankamon.ui.Shell", {
             widget.setGroup(group, this.__groupDevices(group));
           }
         }
-        const tab = item.getUserData("tab");
+        // defaultTab (PAGES): sekmesi seçilmeden düğümün kendisine basılınca hatırlanan son sekme değil o sekme açılır.
+        const tab = item.getUserData("tab") || (!item.getUserData("selfLeaf") && item.getUserData("page").defaultTab) || null;
         if (tab) {
           // Önce sekme seçilir, sonra sayfa gösterilir: sayfa açılınca doğrudan o sekmeyi yükler (tek yenileme).
           this.__widget(item.getUserData("page")).selectTab(tab);
@@ -473,6 +477,8 @@ qx.Class.define("ankamon.ui.Shell", {
             this.__tree.setSelection([self]);
             this.__silentTree = false;
           }, this, 0);
+        } else if (tab && !item.getUserData("tab")) {
+          qx.event.Timer.once(() => this.__selectTabLeaf(item.getUserData("page"), tab, group), this, 0);
         } else if (!tab && this.__tabsOf(item.getUserData("page")).length) {
           // Seçim olayının içinde ağaç seçimi değiştirilemiyor (geri alınıyor): bir sonraki turda.
           qx.event.Timer.once(() => this.__selectTabLeaf(item.getUserData("page"), widget.currentTab(), group), this, 0);
@@ -971,10 +977,10 @@ qx.Class.define("ankamon.ui.Shell", {
     },
 
     /**
-     * Sol menüdeki grup düğümünün "Grubu sil…" maddesi (kullanıcı isteği 2026-11-23): neyin silinip neyin kaldığını, olumlu ve
-     * olumsuz yanlarını anlatan onaydan sonra DELETE /network/groups/{id} (Varlıklar'daki "Grubu sil…" ile aynı uç), ardından
-     * grup listesi yeniden yüklenip GROUPS_CHANGED ile menü ve açık Varlıklar sayfası eşitlenir. Akıllı tahtası olan grupta,
-     * başka hiçbir grupta bulunmayan yönetilebilir cihazların araç çubuklu görünümü (page.Devices) kaybolacağı ayrıca uyarılır.
+     * Sol menüdeki grup düğümünün "Grubu sil…" maddesi (kullanıcı isteği 2026-11-23): neyin silinip neyin kaldığını ve
+     * dikkat edilecekleri tek mesajda anlatan onaydan sonra DELETE /network/groups/{id} (Varlıklar'daki "Grubu sil…" ile aynı uç), ardından
+     * grup listesi yeniden yüklenip GROUPS_CHANGED ile menü ve açık Varlıklar sayfası eşitlenir. Başka hiçbir grupta
+     * bulunmayan yönetilebilir cihazların araç çubuklu görünümünün (page.Devices) kaybolacağı kırmızıyla uyarılır.
      */
     async __deleteAssetGroup(id) {
       const group = this.__groupInfo && this.__groupInfo.get(id);
@@ -986,21 +992,17 @@ qx.Class.define("ankamon.ui.Shell", {
       const others = [...this.__groupInfo.values()].filter(g => g.id !== id);
       const orphan = devices.filter(d => !others.some(g => (g.devices || []).includes(d))).length;
       const subs = ["Oturumlar", "Ligler", "Sensörler", "Ahenk / eklenti sekmeleri"].join(", ");
-      let html = `<b>${esc(group.name)}</b> grubu silinsin mi?<br><br>` +
-        "<b>Silinen:</b> yalnız grup tanımı (adı) ve üyelik bağlantıları " +
-        `(${group.members.length} varlık bu gruptan çıkar).<br>` +
-        "<b>Silinmeyen:</b> varlıklar (Varlıklar listesinde kalır), cihaz kayıtları, loglar, oturum geçmişi, sensör verisi, " +
-        "envanter kartları ve öteki gruplar — hiçbir veri silinmez.<br><br>" +
-        "<b>Olumlu:</b> sol menü sadeleşir; kullanılmayan bir grup görünümü ortadan kalkar.<br>" +
-        `<b>Olumsuz:</b> bu grubun sol menü düğümü ve altındaki görünümler (${subs}) kaybolur; grubu yeniden kurmak için ` +
-        "varlıkları Varlıklar'da yeniden seçip grup oluşturmak gerekir (geri alma yok).";
-      if ((group.smart || 0) > 0 && orphan > 0) {
-        html += "<br><br><span style='color:#c5221f'><b>Dikkat — akıllı tahta grubu:</b> bu gruptaki " +
-          `${orphan} yönetilebilir cihaz başka hiçbir grupta yok. Silinince bu cihazların araç çubuklu görünümüne ` +
+      // Tek, akıcı mesaj (kullanıcı isteği 2026-11-23): başlıklı bölüm (Silinen/Silinmeyen/Olumlu/Olumsuz) yok, olumlu
+      // yanlar yazılmaz; yalnız ne silinir, ne kalır ve dikkat edilecekler. Başka grupta olmayan yönetilebilir cihaz uyarısı kırmızı.
+      let html = `<b>${esc(group.name)}</b> grubu silinsin mi? Yalnız grup tanımı ve ${group.members.length} varlıkla ` +
+        "üyelik bağlantıları silinir; varlıklar Varlıklar listesinde kalır, cihaz kayıtları, loglar, oturum geçmişi, " +
+        "sensör verisi, envanter kartları ve öteki gruplar silinmez. Grubun sol menü düğümü ve altındaki görünümler " +
+        `(${subs}) kaybolur. İşlem geri alınamaz: grubu yeniden kurmak için varlıkları Varlıklar'da yeniden seçip grup ` +
+        "oluşturmak gerekir.";
+      if (orphan > 0) {
+        html += "<br><br><span style='color:#c5221f'>Gruptaki " +
+          `${orphan} yönetilebilir cihaz başka hiçbir grupta yok: silinince bu cihazların araç çubuklu görünümüne ` +
           "(Liste/Ekranlar, toplu işlemler) sol menüden erişilemez; önce bu cihazları içeren başka bir grup kurun.</span>";
-      } else if (orphan > 0) {
-        html += `<br><br><b>Not:</b> gruptaki ${orphan} yönetilebilir cihaz başka hiçbir grupta yok; araç çubuklu ` +
-          "görünümlerine sol menüden erişim kalmaz.";
       }
       const D = ankamon.ui.Dialog;
       const win = D.window("Grubu sil", 560);

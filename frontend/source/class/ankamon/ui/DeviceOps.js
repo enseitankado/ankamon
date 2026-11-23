@@ -998,6 +998,42 @@ qx.Class.define("ankamon.ui.DeviceOps", {
       return items;
     },
 
+    /**
+     * Yönetilebilir cihazın sağ menüsünün sayfadan bağımsız ortak gövdesi — page.Devices satır/kutucuk menüsü ve araç
+     * çubuğu ile Ağ ▸ Varlıklar araç çubuğu (kullanıcı isteği 2026-11-23) aynı maddeleri buradan alır: menu() + eklenti
+     * maddeleri (ankamon.ext.Extensions.addDeviceMenu; parent verilen madde o çekirdek grubunun alt menüsüne) +
+     * logsAndInfo (Logları göster yok — Cihaz ayrıntıları ▸ Loglar). Sayfaya özgü maddeler `tail` ile son bölüme eklenir
+     * (Cihazlar: Düzenle / Sil). İşletim sistemine göre devre dışı bırakma (ui.devices.Platforms.decorate) çağıranda.
+     * @param tail {Array?} son bölüme, Bilgi kartı'nın ardına eklenecek menü maddeleri
+     * @return {qx.ui.menu.Menu}
+     */
+    managedDeviceMenuBody(device, user, devices = [device], sessionOps = null, tail = []) {
+      const menu = this.menu(device, user, devices, sessionOps) || new qx.ui.menu.Menu();
+      const own = ankamon.ext.Extensions.deviceMenuItems(device, devices, user).filter(item => {
+        const parent = item.getUserData("ankamon.menuParent");
+        const host = parent && menu.getChildren().find(c => c instanceof qx.ui.menu.Button && c.getMenu()
+          && c.getUserData("ankamon.menuKey") === parent);
+        if (host) {
+          host.getMenu().add(item);
+        }
+        return !host;
+      });
+      if (own.length) {
+        if (menu.getChildren().length) {
+          menu.add(new qx.ui.menu.Separator());
+        }
+        own.forEach(item => menu.add(item));
+      }
+      const last = this.logsAndInfo(device, user, devices, { noLogs: true }).concat(tail);
+      if (last.length) {
+        if (menu.getChildren().length) {
+          menu.add(new qx.ui.menu.Separator());
+        }
+        last.forEach(item => menu.add(item));
+      }
+      return menu;
+    },
+
     /** Devre dışı sağ menü maddelerinin opaklığı (bkz. menuButton). */
     DISABLED_OPACITY: 0.38,
 
