@@ -150,7 +150,8 @@ qx.Class.define("ankamon.ui.ssh.TerminalActions", {
         }
         const w = targets[i];
         try {
-          if (!w || !w.wssh || typeof w.wssh.send !== "function") {
+          // Bağlanamayan pano (webssh bağlantı formunda kalmış) wssh.send'i sessizce yutar: xterm yoksa bağlı değil.
+          if (!w || !w.wssh || typeof w.wssh.send !== "function" || !w.document.querySelector(".xterm")) {
             throw new Error("terminal bağlı değil");
           }
           w.wssh.send(JSON.stringify({ data: c.text + "\r" }));
