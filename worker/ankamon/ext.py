@@ -4,7 +4,7 @@
 """Eklentilerin (ext/<ad>) worker tarafındaki yardımcıları.
 
 Ayarlar: değerler çekirdeğin settings tablosunda "ext.<ad>.<key>" anahtarlarıyla durur (bkz. backend
-Core\\Extensions ve Api\\ExtensionsApi; arayüzde Ayarlar ▸ Eklentiler düzenler). Eklenti worker
+Core\\Extensions ve Api\\ExtensionsApi; arayüzde Sistem ▸ Eklentiler düzenler). Eklenti worker
 görevi değeri şöyle okur:
 
     from ankamon.ext import setting

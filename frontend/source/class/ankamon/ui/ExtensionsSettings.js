@@ -26,7 +26,7 @@
  */
 
 /**
- * Ayarlar ▸ Eklentiler sekmesinin gövdesi: yüklü eklentileri (GET /extensions) KATLANIR bölümler olarak listeler
+ * Sistem ▸ Eklentiler sekmesinin gövdesi: yüklü eklentileri (GET /extensions) KATLANIR bölümler olarak listeler
  * (kullanıcı isteği 2026-11-12: bölümler alt alta uzayıp sayfayı dikeyde kaplıyordu). Bölüm başlığına tıklayınca açılır/
  * kapanır; açık bölümler kullanıcı başına hatırlanır (ui_prefs "settings.extOpen"). Ayar şeması bildiren her eklenti
  * için şema-güdümlü bir form (ankamon.ui.Form) ve kendi "Kaydet" düğmesi üretir (PUT /extensions/settings {name,

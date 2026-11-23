@@ -34,7 +34,9 @@
  *   - SSH denetimi: Ankamon cihaza SSH ile girip ölçer (haftalık otomatik ya da Denetle sekmesinden elle). Her cihazın EN SON
  *     denetiminin Acil/Dikkat bulguları ve denetlenemeyen cihazlar.
  *
- * Üst tablo cihaz başına bir satır (en kötü düzey, iki yolun özeti); alttaki tablo seçili cihazın (seçim yoksa hepsinin)
+ * Üst tablo cihaz başına bir satır (sadeleştirildi, kullanıcı isteği 2026-11-23): Durum = en kötü düzey VE o düzeyin uyarıları
+ * ("Acil: SMART hatası"), iki yolun bulguları tek "Bulgular" sütununda; varsayılan Acil → Dikkat → Sorun yok sıralı; "Açık mı"
+ * ve "Bulgu" (sayı) sütunları varsayılan gizli (sütun menüsünden açılır). Alttaki tablo seçili cihazın (seçim yoksa hepsinin)
  * bulguları: Yol, Kaynak, Nasıl bakıldı, Sıklık, Zaman. Çift tık: sürekli izleme bulgusu → o cihazın Geçmiş'i; SSH denetimi
  * bulgusu → Denetle (o cihaza süzülmüş). İki tablo da sütun süzgeçli (az çeşitli sütunlarda hazır değer listesi).
  * İki yolun açıklaması yalnız ipucunda: sekme kulakçığı ve özet satırının solundaki "ⓘ Bulgular nereden gelir?" (kullanıcı
@@ -69,16 +71,15 @@ qx.Class.define("ankamon.ui.health.Status", {
 
     this.__deviceColumns = [
       { id: "device", label: "Cihaz", width: 200 },
-      { id: "online", label: "Açık mı", width: 90 },
-      { id: "level", label: "Durum", width: 90 },
-      // Durum = iki yolun EN KÖTÜSÜ; her yolun kendi sütunu düzeyiyle yazılır (kullanıcı isteği 2026-11-10: Durum "Acil"
-      // iken sürekli izleme "Sorun yok" diyordu — acil bulgu SSH denetimindendi ve hiçbir sütunda görünmüyordu).
-      { id: "watch", label: "Sürekli izleme (şu an)", width: 260 },
-      { id: "ssh", label: "SSH denetimi (son)", width: 260, hint: "Cihazın en son SSH denetiminin Acil/Dikkat bulguları" },
+      { id: "online", label: "Açık mı", width: 90, hidden: true },
+      // Durum = iki yolun EN KÖTÜSÜ ve o düzeydeki uyarılar ("Acil: SMART hatası, Disk doluluğu") — kullanıcı isteği 2026-11-23.
+      { id: "level", label: "Durum", width: 320, hint: "En kötü düzey ve o düzeydeki uyarılar (Log ya da Uzak bağlantı yolundan)" },
+      // İki yolun (Log = sürekli izleme şu an, Uzak bağlantı = en son SSH denetimi) bulguları tek sütunda (eskiden iki sütun).
+      { id: "findings", label: "Bulgular", width: 360, hint: "Cihazın Log (sürekli izleme) ve Uzak bağlantı (son SSH denetimi) bulguları, düzeyleriyle" },
       // İki yolun en yeni bakışı (SSH denetimi zamanı ya da sürekli izlemenin en yeni bulgusu) ve toplam bulgu sayıları;
       // 10 saatten yeniyse geçen süre ("2 saat 23 dk önce" — kullanıcı isteği).
       { id: "last", label: "Son denetim / bulgu", width: 300, hint: "Son SSH denetimi ya da sürekli izlemenin en yeni bulgusu" },
-      { id: "count", label: "Bulgu", width: 70 }
+      { id: "count", label: "Bulgu", width: 70, hidden: true }
     ];
     this.__deviceTable = page._createTable(this.__deviceColumns, { prefsKey: "health.status.devices.columns", persistSort: true });
     this.__deviceFilters = page._addColumnFilters(this.__deviceTable, this.__deviceColumns, () => this.__applyDevices(),
@@ -147,9 +148,10 @@ qx.Class.define("ankamon.ui.health.Status", {
       return (h ? `${h} saat ` : "") + `${m} dk önce`;
     },
 
+    // Yol adları kısa (kullanıcı isteği 2026-11-23): sürekli izleme = "Log", SSH denetimi = "Uzak bağlantı".
     PATH: {
-      watch: { text: "Sürekli izleme", color: "#1a73e8" },
-      ssh: { text: "SSH denetimi", color: "#7b1fa2" }
+      watch: { text: "Log", color: "#1a73e8" },
+      ssh: { text: "Uzak bağlantı", color: "#7b1fa2" }
     },
 
     /** Düzey adları Bakım raporuyla aynı (bkz. page.Diagnose LEVEL). */
@@ -175,10 +177,10 @@ qx.Class.define("ankamon.ui.health.Status", {
     __shownFindings: null,
     __data: null,
 
-    /** Düzey sütunu renkli ve kalın (metin süzgeç için düz kalır). */
+    /** Düzey sütunu renkli ve kalın (metin süzgeç için düz kalır); hücre düzey adıyla başlar ("Acil: …" da olur). */
     __levelRenderer(table, column) {
       const r = new qx.ui.table.cellrenderer.Conditional();
-      Object.values(ankamon.page.Diagnose.LEVEL).forEach(L => r.addRegex(`^${L.text}$`, null, L.color, null, "bold"));
+      Object.values(ankamon.page.Diagnose.LEVEL).forEach(L => r.addRegex(`^${L.text}(:|$)`, null, L.color, null, "bold"));
       table.getTableColumnModel().setDataCellRenderer(column, r);
     },
 
@@ -224,17 +226,12 @@ qx.Class.define("ankamon.ui.health.Status", {
         const worst = list.reduce((w, f) => (order[f.level] > order[w] ? f.level : w), "ok");
         const ssh = paths.includes("ssh") ? b.ssh || false : null;
         const last = this.__lastText(list, ssh, when);
-        const watchText = paths.includes("watch") ? this.__pathText(list.filter(f => f.path === "watch")) : "—";
-        let sshText = "—";
-        if (ssh === false) {
-          sshText = "Hiç denetlenmedi";
-        } else if (ssh) {
-          // Denetlenemeyen cihazda "Denetlenemedi" bilgi bulgusu ayrıca sayılmaz (nedeni ipucunda/alt tabloda).
-          const sshFindings = list.filter(f => f.path === "ssh" && f.check !== "Denetlenemedi");
-          sshText = ssh.status === "ok" ? this.__pathText(sshFindings)
-            : ["Denetlenemedi"].concat(sshFindings.length ? [this.__pathText(sshFindings)] : []).join(" · ");
-        }
-        return { id: b.id, name: b.name, cells: [b.id, b.name, b.online ? "Açık" : "Kapalı", text(worst), watchText, sshText, last, list.length] };
+        // Denetlenemeyen cihazda "Denetlenemedi" bilgi bulgusu ayrıca yazılmaz; Uzak bağlantı durumu sona eklenir.
+        const shown = list.filter(f => f.check !== "Denetlenemedi");
+        const notes = ssh === false ? ["Uzak bağlantı: hiç denetlenmedi"] : ssh && ssh.status !== "ok" ? ["Uzak bağlantı: denetlenemedi"] : [];
+        const findings = [shown.length || !notes.length ? this.__pathText(shown) : ""].concat(notes).filter(Boolean).join(" · ");
+        return { id: b.id, name: b.name, level: worst,
+          cells: [b.id, b.name, b.online ? "Açık" : "Kapalı", this.__statusText(worst, list), findings, last, list.length] };
       });
       // Kaydı silinmiş cihazın süren bulguları da görünsün.
       byDevice.forEach((list, key) => {
@@ -242,11 +239,11 @@ qx.Class.define("ankamon.ui.health.Status", {
           return;
         }
         const worst = list.reduce((w, f) => (order[f.level] > order[w] ? f.level : w), "ok");
-        this.__deviceRows.push({ id: key, name: list[0].device, cells: [key, list[0].device || "?", "—", text(worst),
-          this.__pathText(list.filter(f => f.path === "watch")), this.__pathText(list.filter(f => f.path === "ssh")),
-          this.__lastText(list, null, when), list.length] });
+        this.__deviceRows.push({ id: key, name: list[0].device, level: worst, cells: [key, list[0].device || "?", "—",
+          this.__statusText(worst, list), this.__pathText(list), this.__lastText(list, null, when), list.length] });
       });
-      this.__deviceRows.sort((a, b) => (order[this.__levelKey(b.cells[3])] - order[this.__levelKey(a.cells[3])]) ||
+      // Varsayılan sıra: Acil → Dikkat → Bilgi → Sorun yok (kullanıcı başka sütunla sıralarsa o geçerli — persistSort).
+      this.__deviceRows.sort((a, b) => (order[b.level] - order[a.level]) ||
         String(a.name).localeCompare(String(b.name), "tr", { numeric: true }));
 
       this.__findingRows = (data.findings || []).map(f => ({
@@ -256,8 +253,8 @@ qx.Class.define("ankamon.ui.health.Status", {
           (f.text || "") + (f.advice ? ` — Öneri: ${f.advice}` : "")]
       }));
 
-      const devicesBad = this.__deviceRows.filter(r => r.cells[3] === text("bad")).length;
-      const devicesWarn = this.__deviceRows.filter(r => r.cells[3] === text("warn")).length;
+      const devicesBad = this.__deviceRows.filter(r => r.level === "bad").length;
+      const devicesWarn = this.__deviceRows.filter(r => r.level === "warn").length;
       const color = devicesBad ? "#c5221f" : devicesWarn ? "#e37400" : "#1e8e3e";
       this.__summary.setValue(`<span style="font-size:14px;font-weight:bold;color:${color}">` +
         (devicesBad || devicesWarn
@@ -300,6 +297,13 @@ qx.Class.define("ankamon.ui.health.Status", {
         return checks.length ? `${text(level)}: ${checks.join(", ")}` : "";
       }).filter(Boolean);
       return parts.length ? parts.join(" · ") : "Sorun yok";
+    },
+
+    /** Durum hücresi: en kötü düzey ve o düzeydeki uyarılar — "Acil: SMART hatası, Disk doluluğu"; sorun yoksa "Sorun yok". */
+    __statusText(worst, list) {
+      const text = ankamon.ui.health.Status.levelText;
+      const checks = [...new Set(list.filter(f => f.level === worst && f.check !== "Denetlenemedi").map(f => f.check))];
+      return worst === "ok" || !checks.length ? text(worst) : `${text(worst)}: ${checks.join(", ")}`;
     },
 
     __levelKey(label) {

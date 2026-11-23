@@ -71,6 +71,51 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
      */
     NIGHT_HOURS: { from: 18, to: 7 },
 
+    /** Satırın tek şeridinin ve her ek şeridin yüksekliği (px; tema/CSS ile ölçüldü — bkz. assignLanes). */
+    ROW_PX: 31,
+    LANE_PX: 28,
+
+    /**
+     * Ctrl+tekerlek yalnız zaman eksenini ölçekler, satır yükseklikleri değişmez (kullanıcı isteği 2026-11-23). vis'in kendi
+     * yığması (stack: true) çubukların PİKSEL çakışmasına bakar: uzaklaşınca kısa oturumlar üst üste biniyor, satırlar 29 px'ten
+     * 116 px'e büyüyordu; satır yüksekliği yalnız görünen çubuklara göre de hesaplanıyordu. Bunun yerine şeritler GERÇEK zaman
+     * çakışmasından, bütün veri üzerinden bir kez atanır (item.subgroup "l<n>", stack: false + stackSubgroups) ve her satırın
+     * etiketine en çok şerit sayısına göre sabit en az yükseklik verilir (vis group.style → .vis-label) — yakınlaştırma ve
+     * görünen aralık satır yüksekliğini değiştirmez. Arka plan öğeleri (cihaz kapalı) şeritsiz, bütün satırı kaplar.
+     * @param groups {Array} {id, content} — style eklenir  @param items {Array} {group, start, end?, type?} — subgroup eklenir
+     */
+    assignLanes(groups, items) {
+      const T = ankamon.ui.sessions.Timeline;
+      const byGroup = new Map();
+      items.filter(i => i.type !== "background").forEach(i => {
+        if (!byGroup.has(i.group)) {
+          byGroup.set(i.group, []);
+        }
+        byGroup.get(i.group).push(i);
+      });
+      const lanesOf = new Map();
+      byGroup.forEach((list, group) => {
+        list.sort((a, b) => a.start - b.start);
+        const ends = [];
+        list.forEach(i => {
+          const start = +i.start;
+          const end = +(i.end || i.start);
+          let lane = ends.findIndex(e => e <= start);
+          if (lane < 0) {
+            lane = ends.length;
+            ends.push(end);
+          } else {
+            ends[lane] = end;
+          }
+          i.subgroup = "l" + lane;
+        });
+        lanesOf.set(group, ends.length);
+      });
+      groups.forEach(g => {
+        g.style = `min-height: ${T.ROW_PX + (Math.max(1, lanesOf.get(g.id) || 1) - 1) * T.LANE_PX}px`;
+      });
+    },
+
     /** NIGHT_HOURS'u kısa metin olarak verir: "18:00–07:00". */
     nightHoursText() {
       const H = ankamon.ui.sessions.Timeline.NIGHT_HOURS;
@@ -240,6 +285,7 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
      * @param groups {Array} [{id, content, title?}]  @param items {Array} vis öğeleri
      */
     setData(groups, items) {
+      ankamon.ui.sessions.Timeline.assignLanes(groups, items);
       if (!this.__timeline) {
         this.__pending = { groups, items };
         return;
@@ -305,7 +351,9 @@ qx.Class.define("ankamon.ui.sessions.Timeline", {
       const now = Date.now();
       this.__timeline = new vis.Timeline(this.getContentElement().getDomElement(), this.__items, this.__groups, {
         height: "100%",
-        stack: true,
+        // Şeritler zaman çakışmasından atanır (bkz. assignLanes): vis'in piksel çakışmasına göre yığması kapalı.
+        stack: false,
+        stackSubgroups: true,
         orientation: { axis: "top", item: "top" },
         groupOrder: "content",
         // Tekerlek dikey kaydırır, Ctrl+tekerlek yakınlaştırır/uzaklaştırır (kullanıcı isteği; vis: zoomKey basılı değilken

@@ -31,19 +31,16 @@
  *
  * Veri, Oturumlar sekmesiyle aynı (/device-sessions — page.Sessions çeker, setData ile verir);
  * süzme ve özetleme tamamen istemcide yapılır.
- *  - Üstteki tablo (kullanıcı isteği 2026-11-06: eski Kullanıcı/Cihaz/Tür seçicileri tabloya girdi): her satır bir
- *    cihaz × kullanıcı × tür (cihaz oturumu / web terminal) birleşimi. Cihaz, Kullanıcı ve Tür sütunları hazır listeyle
- *    ya da elle yazarak süzülür ve bu süzgeç ZAMAN ÇİZELGESİNİ de süzer; öteki sütun süzgeçleri yalnız tabloyu.
- *    Sütunlar sıralanır, genişlikler içeriğe göre ayarlanır (storageKey), her başlık ve hücre ipuçlu.
- *  - "Satırlar" (çizelgede cihazlar / kullanıcılar) ve "Yalnız düzgün kapanmayanlar" tablonun üstünde yer kaplamasın diye
- *    alttaki aralık düğmelerinin satırında.
+ *  - Süzgeçler (Cihaz, Kullanıcı, Tür) aralık düğmelerinin satırında; zaman çizelgesini süzer. Eski özet tablosu
+ *    (cihaz × kullanıcı × tür) kaldırıldı (kullanıcı isteği 2026-11-23) — süzgeç arayüzü aynı kaldı (__filters).
+ *  - "Satırlar" (çizelgede cihazlar / kullanıcılar) ve "Yalnız düzgün kapanmayanlar" aralık düğmelerinin satırında.
  *  - Aralık: hazır düğmeler + çizelgede sürükleme; tekerlek dikey kaydırır, Ctrl+tekerlek yakınlaştırır (bkz. Timeline).
- *    Özet ve tablo HER ZAMAN görünen aralığa göre hesaplanır (aralığı taşan oturumların yalnız aralık içindeki süresi).
+ *    Özet HER ZAMAN görünen aralığa göre hesaplanır (aralığı taşan oturumların yalnız aralık içindeki süresi).
  *  - "Satırlar: Cihazlar" görünümünde cihazın KAPALI olduğu aralıklar satırda gri taralı arka plan
  *    olarak görünür (kurum kapalıyken boşluk ile "kimse oturum açmadı"yı ayırır — bkz. __loadUptime).
- *  - Tablo satırına çift tıklama o cihazı ve kullanıcıyı süzgece alır; çubuğa sağ tıklama süzme
+ *  - Çubuğa sağ tıklama süzme
  *    ve (açık cihaz oturumunda, "devices.login" yetkisiyle) oturumu kapat/kilitle menüsü açar.
- *  - Satır (tablo satırı ya da çizelgedeki satır adı) sağ menüsü: süzgece alma; Cihazlar'a kayıtlı olmayan
+ *  - Satır (çizelgedeki satır adı) sağ menüsü: süzgece alma; Cihazlar'a kayıtlı olmayan
  *    bilgisayarda ("sessions.hosts" yetkisiyle) onaylı "Bu bilgisayarın kayıtlarını sil".
  *
  * "Düzgün kapanmadı": kapanış mesajı gelmeden cihaz çevrimdışı oldu (offline — elektrik kesintisi,
@@ -102,12 +99,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
 
     this.__summary = new qx.ui.basic.Label("").set({ rich: true });
 
-    // Yerleşim (kullanıcı isteği): süzgeç barı → cihaz grid'i → aralık düğmeleri + özet + zaman
-    // çizelgesi (aralık düğmeleri çizelgeyi yönettiği için onunla aynı bölümde). Grid ile alt bölüm
-    // arasındaki ayraç sürüklenebilir.
-    const split = new qx.ui.splitpane.Pane("vertical");
-    // Ayraç ince olunca fareyle tutmak zordu (kullanıcı bildirimi): temanın görünümü korunur, yalnız kalınlaşır.
-    split.getChildControl("splitter").setHeight(ankamon.ui.sessions.Users.SPLITTER_HEIGHT);
+    // Yerleşim: aralık düğmeleri + süzgeçler + özet + zaman çizelgesi (özet tablosu 2026-11-23'te kaldırıldı).
     this.__timeline = new ankamon.ui.sessions.Timeline();
     this.__timeline.addListener("changeRange", e => this.__summarize(e.getData()));
     this.__timeline.addListener("itemContextmenu", e => this.__itemMenu(e.getData()));
@@ -137,53 +129,37 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     lower.add(summaryRow);
     lower.add(this.__timeline, { flex: 1 });
 
-    const C = ankamon.ui.sessions.Users.COL;
-    this.__columns = [
-      { id: "device", label: "Cihaz", choices: true, hint: "Oturumun açıldığı cihaz (Cihazlar'a kayıtlı değilse bilgisayar adı). Süzgeç zaman çizelgesini de süzer." },
-      { id: "user", label: "Kullanıcı", choices: true, hint: "Oturumu açan kullanıcı: cihazda giriş ekranından oturum açan kişi ya da web terminal açan Ankamon kullanıcısı. Süzgeç zaman çizelgesini de süzer." },
-      { id: "kind", label: "Tür", choices: true, hint: "Cihaz oturumu: cihazın giriş ekranından açılan oturum · Web terminal: Ankamon üzerinden açılan uzak terminal. Süzgeç zaman çizelgesini de süzer." },
-      { id: "count", label: "Oturum", hint: "Görünen aralıktaki oturum sayısı" },
-      { id: "total", label: "Toplam süre", hint: "Görünen aralıkta toplam açık kalma süresi (aralığı taşan oturumların yalnız aralık içindeki kısmı)" },
-      { id: "avg", label: "Ortalama", hint: "Oturum başına ortalama süre (görünen aralıkta)" },
-      { id: "bad", label: "Düzgün kapanmayan", hint: "Kapanış kaydı gelmeden biten oturumlar: elektrik kesintisi, güç düğmesi, ağ kopması, kapanmadan yeni oturum…" },
-      { id: "first", label: "İlk oturum", hint: "Görünen aralıktaki ilk oturumun başlangıcı" },
-      { id: "last", label: "Son oturum", hint: "Görünen aralıktaki son oturumun başlangıcı" }
-    ];
-    // storageKey: genişlikler içeriğe göre kendiliğinden (kullanıcının elle ayarladığı korunur) — kullanıcı isteği.
-    this.__table = page._createTable(this.__columns, { storageKey: "timeline.grid.columns" });
-    this.__filters = page._addColumnFilters(this.__table, this.__columns, () => this.__filtersChanged(),
-      { rows: () => this.__allRows || [] });
-    // Varsayılan (eski "Tür: Cihaz oturumu" seçimi gibi): yalnız cihaz oturumları.
-    this.__filters.kind.setValue(`"${ankamon.ui.sessions.Users.KIND.device}"`);
-    // Süre/tarih sütunları ekranda metin; sıralama satır sonundaki ham sayılarla yapılır (bkz. __summarize).
-    const model = this.__table.getTableModel();
-    [[C.total, C.rawTotal], [C.avg, C.rawAvg], [C.first, C.rawFirst], [C.last, C.rawLast]].forEach(([col, raw]) =>
-      model.setSortMethods(col, (a, b) => (a[raw] - b[raw]) || 0));
-    // Hücre ipuçları: satırın kendi değerleriyle (bkz. ui.table.HintRenderer).
-    const hints = this.__cellHints();
-    this.__columns.forEach((column, index) => this.__table.getTableColumnModel().setDataCellRenderer(index + 1,
-      new ankamon.ui.table.HintRenderer(info => (info.rowData ? hints[column.id](info.rowData) : null))));
-    this.__table.addListener("cellDbltap", e => this.__pickRow(e.getRow()));
-    this.__table.addListener("cellContextmenu", e => {
-      const row = e.getRow() === null ? null : this.__table.getTableModel().getRowData(e.getRow());
-      this.__table.setContextMenu(row ? this.__tableMenu(row) : null);
-    });
-    this.__table.setToolTipText("Çift tıklayınca o cihaz ve kullanıcı süzgece alınır");
-    // SplitPane.add() ÇIPLAK SAYI flex bekler (genel Widget.add'in aksine — bkz. ankamon-architecture notu).
-    split.add(this.__table, 2);
-    split.add(lower, 3);
-    this.add(split, { flex: 1 });
+    // Süzgeçler (eski özet tablosunun Cihaz/Kullanıcı/Tür sütun süzgeçleri — aynı arayüz: getValue/setValue, Base.filterMatch
+    // sözdizimi; sağ menüdeki "Yalnız bu …" ve "Oturum geçmişi" bunları ayarlar).
+    const KIND = ankamon.ui.sessions.Users.KIND;
+    const textFilter = (placeholder, hint) => {
+      const field = new qx.ui.form.TextField().set({ placeholder, width: 140, liveUpdate: true, toolTipText: hint, alignY: "middle" });
+      field.addListener("changeValue", () => this.__filtersChanged());
+      return field;
+    };
+    const kindBox = this.__select([["device", KIND.device], ["webshell", KIND.webshell], ["", "Tüm türler"]]).set({ width: 130 });
+    kindBox.addListener("changeSelection", () => this.__filtersChanged());
+    this.__filters = {
+      device: textFilter("Cihaz süz…", "Cihaz (ya da kayıtlı olmayan bilgisayar) adına göre süzer"),
+      user: textFilter("Kullanıcı süz…", "Oturumu açan kullanıcıya göre süzer"),
+      kind: {
+        getValue: () => {
+          const k = this.__value(kindBox);
+          return k ? `"${KIND[k]}"` : "";
+        },
+        setValue: v => this.__selectValue(kindBox, Object.keys(KIND).find(k => `"${KIND[k]}"` === v) || "")
+      }
+    };
+    ranges.add(new qx.ui.basic.Label("Süz:").set({ alignY: "middle", marginLeft: 12 }));
+    ranges.add(this.__filters.device);
+    ranges.add(this.__filters.user);
+    ranges.add(kindBox);
+    this.add(lower, { flex: 1 });
   },
 
   statics: {
-    /** Tablo modeli sütunları (0 = satır anahtarı); raw* sıralama için ham değerler. */
-    COL: { device: 1, user: 2, kind: 3, count: 4, total: 5, avg: 6, bad: 7, first: 8, last: 9,
-      rawTotal: 10, rawAvg: 11, rawFirst: 12, rawLast: 13, deviceKey: 14, kindKey: 15, username: 16 },
-    /** Tür sütununun metinleri. */
+    /** Tür süzgecinin metinleri. */
     KIND: { device: "Cihaz oturumu", webshell: "Web terminal" },
-
-    /** Tablo ile çizelge arasındaki sürüklenebilir ayracın kalınlığı (px). */
-    SPLITTER_HEIGHT: 8,
 
     /** ui_prefs anahtarı: true = gece saatleri de gösterilsin (varsayılan: gizli). */
     PREF_SHOW_NIGHTS: "timeline.nights.show",
@@ -221,14 +197,11 @@ qx.Class.define("ankamon.ui.sessions.Users", {
   members: {
     __page: null,
     __filters: null,
-    __allRows: null,
     __pendingDevice: null,
     __groupBy: null,
     __badOnly: null,
     __summary: null,
     __timeline: null,
-    __table: null,
-    __columns: null,
     __sessions: null,
     __shown: null,
     __rows: null,
@@ -448,7 +421,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       this.__filters[id].setValue(value ? `"${value}"` : "");
     },
 
-    /** Tablonun Cihaz / Kullanıcı / Tür süzgeç metinleri (çizelgeyi de süzenler). */
+    /** Cihaz / Kullanıcı / Tür süzgeç metinleri (çizelgeyi süzenler). */
     __textFilters() {
       const get = id => (this.__filters[id].getValue() || "").trim();
       return { device: get("device"), user: get("user"), kind: get("kind") };
@@ -466,16 +439,13 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         M(ankamon.ui.sessions.Users.KIND[s.kind] || s.kind, f.kind);
     },
 
-    /** Tablo süzgeci değişti: Cihaz/Kullanıcı/Tür çizelgeyi de süzer, öteki sütunlar yalnız tabloyu. */
+    /** Süzgeç değişti: çizelge yeniden çizilir. */
     __filtersChanged() {
       if (this.__updatingOptions) {
         return;
       }
-      const f = JSON.stringify(this.__textFilters());
-      if (f !== this.__lastText) {
+      if (JSON.stringify(this.__textFilters()) !== this.__lastText) {
         this.__render();
-      } else {
-        this.__applyTable();
       }
     },
 
@@ -503,7 +473,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const badOnly = this.__badOnly.getValue();
       const now = Date.now() / 1000;
 
-      // Tablo satırları (ve hazır listeler) için süzgeçsiz oturumlar; çizelge için Cihaz/Kullanıcı/Tür süzgeçlileri.
+      // Süzgeçsiz (yalnız "düzgün kapanmayanlar") oturumlar ve çizelge için Cihaz/Kullanıcı/Tür süzgeçlileri.
       this.__base = this.__sessions.filter(s => !badOnly || S.isBad(s));
       this.__shown = this.__base.filter(s => this.__sessionMatches(s, f));
 
@@ -564,7 +534,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     },
 
     /**
-     * Görünen aralıktaki oturumların özeti (üst satır) ve satır başına (cihaz/kullanıcı) tablo.
+     * Görünen aralıktaki oturumların özeti (çizelgenin üstündeki satır).
      * @param range {Map|null} {start, end: Date}
      */
     __summarize(range) {
@@ -582,21 +552,8 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       const to = this.__range.end.getTime() / 1000;
       const now = Date.now() / 1000;
 
-      const KIND = S.KIND;
-      const per = new Map();
       const inRange = s => !((s.ended_at || now) < from || s.started_at > to);
       const seconds = s => Math.max(0, Math.min(s.ended_at || now, to) - Math.max(s.started_at, from));
-      (this.__base || []).filter(inRange).forEach(s => {
-        const key = this.__deviceKey(s) + "|" + s.kind + ":" + s.username;
-        const row = per.get(key) || { key, device: s.device || s.host || "?", user: s.username, kind: s.kind,
-          deviceKey: this.__deviceKey(s), count: 0, total: 0, bad: 0, first: Infinity, last: 0 };
-        row.count++;
-        row.total += seconds(s);
-        row.bad += S.isBad(s) ? 1 : 0;
-        row.first = Math.min(row.first, s.started_at);
-        row.last = Math.max(row.last, s.started_at);
-        per.set(key, row);
-      });
       // Özet: çizelgede görünenler (Cihaz/Kullanıcı/Tür süzgeçli).
       let count = 0, total = 0, bad = 0;
       const groupsSeen = new Set();
@@ -614,46 +571,9 @@ qx.Class.define("ankamon.ui.sessions.Users", {
           `<b>${groupsSeen.size}</b> ${byDevice ? "cihaz" : "kullanıcı"} <span style="color:#5f6368">(${span})</span>`
         : `<span style="color:#5f6368">Bu aralıkta süzgece uyan oturum yok (${span}). "Tümü" ile bütün kayıtları görebilirsiniz.</span>`);
 
-      this.__allRows = [...per.values()].sort((a, b) => b.total - a.total).map(r => [
-        r.key, r.device, r.user, KIND[r.kind] || r.kind, r.count, F.duration(r.total), F.duration(r.total / r.count), r.bad,
-        F.dateTime(r.first * 1000), F.dateTime(r.last * 1000),
-        r.total, r.total / r.count, r.first, r.last, r.deviceKey, r.kind, r.user
-      ]);
-      this.__applyTable();
-    },
-
-    /** Bütün sütun süzgeçleri → tablo (sıralama korunur — bkz. Base.keepSortOnReload). */
-    __applyTable() {
-      if (!this.__allRows) {
-        return;
-      }
-      const M = ankamon.page.Base.filterMatch;
-      const filters = this.__columns.map((c, i) => ({ i: i + 1, text: (this.__filters[c.id].getValue() || "").trim() }))
-        .filter(x => x.text);
-      this.__table.getTableModel().setData(this.__allRows.filter(cells => filters.every(x => M(cells[x.i], x.text))));
     },
 
     __base: null,
-
-    /** Hücre ipuçları (sütun kimliği → (satır) → metin). */
-    __cellHints() {
-      const F = ankamon.util.Format;
-      const C = ankamon.ui.sessions.Users.COL;
-      return {
-        device: r => `${r[C.device]} — çift tık: yalnız bu cihaz ve ${r[C.user]}`,
-        user: r => r[C.kindKey] === "webshell" ? `${r[C.user]}: web terminal açan Ankamon kullanıcısı`
-          : `${r[C.user]}: cihazda giriş ekranından oturum açan kullanıcı`,
-        kind: r => r[C.kindKey] === "webshell" ? "Web terminal: Ankamon üzerinden cihaza açılan uzak terminal"
-          : "Cihaz oturumu: cihazın giriş ekranından açılan oturum",
-        count: r => `Görünen aralıkta ${r[C.count]} oturum`,
-        total: r => `Görünen aralıkta toplam ${F.duration(r[C.rawTotal])} açık kaldı (aralığı taşan oturumların yalnız aralık içindeki kısmı)`,
-        avg: r => `Oturum başına ortalama ${F.duration(r[C.rawAvg])}`,
-        bad: r => r[C.bad] ? `${r[C.bad]} oturum düzgün kapanmadı (elektrik kesintisi, güç düğmesi, ağ kopması ya da kapanmadan yeni oturum)`
-          : "Bütün oturumlar düzgün kapandı",
-        first: r => `Görünen aralıktaki ilk oturum ${F.dateTime(r[C.rawFirst] * 1000)} tarihinde başladı (${F.ago(r[C.rawFirst])})`,
-        last: r => `Görünen aralıktaki son oturum ${F.dateTime(r[C.rawLast] * 1000)} tarihinde başladı (${F.ago(r[C.rawLast])})`
-      };
-    },
 
     /**
      * Cihazların açık aralıkları (GET /device-uptime — worker'ın loglardan ARTIMLI doldurduğu tablo,
@@ -724,24 +644,6 @@ qx.Class.define("ankamon.ui.sessions.Users", {
       return out;
     },
 
-    /** Tablo satırına çift tıklama: o cihazı ve kullanıcıyı (ve türü) süzgece al. */
-    __pickRow(rowIndex) {
-      const row = this.__table.getTableModel().getRowData(rowIndex);
-      if (!row) {
-        return;
-      }
-      const C = ankamon.ui.sessions.Users.COL;
-      this.__updatingOptions = true;
-      try {
-        this.__setFilter("device", row[C.device]);
-        this.__setFilter("user", row[C.user]);
-        this.__setFilter("kind", row[C.kind]);
-      } finally {
-        this.__updatingOptions = false;
-      }
-      this.__render();
-    },
-
     /** Çizelge satır anahtarını (bkz. __groupMenu) süzgece alır. */
     __pickKey(key) {
       if (!key) {
@@ -760,15 +662,6 @@ qx.Class.define("ankamon.ui.sessions.Users", {
         }
         this.__setFilter("user", key.slice(i + 1));
       }
-    },
-
-    /** Tablo satırı sağ menüsü: cihaz (bilgisayar) menüsü + kullanıcı süzgeci. */
-    __tableMenu(row) {
-      const C = ankamon.ui.sessions.Users.COL;
-      const menu = this.__groupMenu(row[C.deviceKey], true);
-      menu.add(ankamon.ui.DeviceOps.menuButton(ankamon.ui.Shell.ICON.sessions, `Yalnız bu kullanıcı (${row[C.user]})`,
-        () => this.__pickKey(row[C.kindKey] + ":" + row[C.username])));
-      return menu;
     },
 
     /** Çubuğa sağ tıklama menüsü. @param data {Map} {item, event} */
@@ -823,7 +716,7 @@ qx.Class.define("ankamon.ui.sessions.Users", {
     },
 
     /**
-     * Satır (zaman çizelgesindeki satır adı ya da üstteki tablonun satırı) sağ menüsü: süzgece alma ve —
+     * Satır (zaman çizelgesindeki satır adı) sağ menüsü: süzgece alma ve —
      * Cihazlar'a kayıtlı olmayan bilgisayarda (anahtar "h<ad>"), "sessions.hosts" yetkisiyle — kayıtlarını
      * silme. @param key {String} satır anahtarı (cihaz satırlarında "b<id>"/"h<ad>", kullanıcıda "<tür>:<ad>")
      * @return {qx.ui.menu.Menu|null}

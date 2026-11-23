@@ -41,6 +41,12 @@ qx.Class.define("ankamon.page.System", {
     [ankamon.ui.system.Overview, ankamon.ui.system.Services, ankamon.ui.system.Schedules,
       ankamon.ui.system.Database, ankamon.ui.system.Config]
       .forEach(Tab => this.__tabs.add(new Tab(this)));
+    // Eklentiler (ext/<ad>; Ayarlar'dan taşındı — kullanıcı isteği 2026-11-23): yüklü eklentiler, etkinleştirme ve ayar
+    // şemalarının formu (ui.ExtensionsSettings görününce kendini yükler, kendi "Kaydet"i vardır).
+    const ext = new qx.ui.tabview.Page("Eklentiler").set({ layout: new qx.ui.layout.VBox(), padding: 8 });
+    ext.add(new ankamon.ui.ExtensionsSettings(user), { flex: 1 });
+    ext.load = () => null; // _refresh seçili sekmenin load'unu çağırır
+    this.__tabs.add(ext);
     this._rememberTab(this.__tabs, "system"); // son seçili sekme (bkz. Base._rememberTab)
     this.add(this.__tabs, { flex: 1 });
   },
@@ -51,7 +57,8 @@ qx.Class.define("ankamon.page.System", {
     /** Shell OPEN_PAGE: {tab: "database"} → Veritabanı sekmesini seçer (Genel bakış "Veritabanı" kartı). */
     openWith(opts) {
       const Tab = { database: ankamon.ui.system.Database }[opts.tab];
-      const tab = Tab && this.__tabs.getChildren().find(t => t instanceof Tab);
+      const tab = Tab ? this.__tabs.getChildren().find(t => t instanceof Tab)
+        : this.__tabs.getChildren().find(t => t.getLabel() === opts.tab);
       if (tab) {
         this.__tabs.setSelection([tab]); // sekme görününce kendini yükler (ui.system.Tab "appear")
       }

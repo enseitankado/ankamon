@@ -38,14 +38,14 @@
  * döndürürse olay "işlendi" sayılır ve çekirdek kendi varsayılan davranışını atlar. Kancalar:
  *  - "devices.statusFilter" (metin, sayfa): Cihazlar grid'inin Durum süzgeç kutusuna yazılan metin.
  *    İşlendi ise kutu temizlenir, süzme yapılmaz.
- *  - "settings.extensionHidden" (eklenti adı): Ayarlar ▸ Eklentiler listesi. İşlendi ise (true) o eklentinin
+ *  - "settings.extensionHidden" (eklenti adı): Sistem ▸ Eklentiler listesi. İşlendi ise (true) o eklentinin
  *    bölümü gösterilmez (yalnız arayüz; API yönetici yetkisiyle yine erişilebilir).
  *  - "statusBar.usersVisible" (): alt çubuktaki oturum açmış kullanıcılar göstergesi (👤 + ipucu).
  *    Varsayılan gizli; işlendi ise (true) görünür.
  * Kanca dışındaki eklenti noktaları: addMaintenanceTab (Bakım sekmesi), addDeviceMenu (Cihazlar sağ menüsü
  * maddesi ve isteğe bağlı araç çubuğu düğmesi), addPage (sol menüde eklentinin kendi sayfası), addWifiTrustedAction
  * (Wi-Fi Monitör güvenilir listesinde işaretli kayıtlara düğme), addDiskUsageTab (Sistem ▸ Disk kullanımı'nda eklentinin
- * verisi için sekme), addSettingsTab (Ayarlar ▸ Eklentiler'de eklentinin bölümüne ayar formunun yanında ek sekme).
+ * verisi için sekme), addSettingsTab (Sistem ▸ Eklentiler'de eklentinin bölümüne ayar formunun yanında ek sekme).
  *
  * Bir eklentinin durumu değişip kanca yanıtları farklılaşınca changed() çağrılır (CHANGED mesajı): kancayı
  * sürekli gösterilen bir öğe için soran çekirdek bileşenleri (ör. alt çubuk) yanıtı yeniden değerlendirir.
@@ -65,7 +65,7 @@ qx.Class.define("ankamon.ext.Extensions", {
     __wifiTrustedActions: [], // eklentilerin Wi-Fi Monitör güvenilir listesi düğmeleri (bkz. addWifiTrustedAction)
     __deviceMenus: [],       // eklentilerin Cihazlar sağ menüsü maddeleri (bkz. addDeviceMenu)
     __diskUsageTabs: [],    // eklentilerin Disk kullanımı sekme tanımı üreticileri (bkz. addDiskUsageTab)
-    __settingsTabs: {},     // {eklenti-adı: [{key, label, create}]} Ayarlar ▸ Eklentiler ek sekmeleri (bkz. addSettingsTab)
+    __settingsTabs: {},     // {eklenti-adı: [{key, label, create}]} Sistem ▸ Eklentiler ek sekmeleri (bkz. addSettingsTab)
 
     /**
      * Oturum açıldığında BİR KEZ, Shell oluşturulmadan ÖNCE (bkz. ankamon.Application): önce eklentilerin
@@ -210,7 +210,7 @@ qx.Class.define("ankamon.ext.Extensions", {
     },
 
     /**
-     * Ayarlar ▸ Eklentiler'de eklentinin bölümüne ek sekme: {key, label, create()} — create bir qx widget'ı döndürür
+     * Sistem ▸ Eklentiler'de eklentinin bölümüne ek sekme: {key, label, create()} — create bir qx widget'ı döndürür
      * (bölüm her açılışta yeniden kurulur). Ek sekmesi olan eklentinin bölümünde ilk sekme "Ayarlar" (şema formu) olur.
      * Eklenti devre dışıyken de görünmesi istenen sekme (ör. veri yönetimi) etkinlik denetimi olmadan kaydedilebilir.
      * @param name {String} eklentinin adı (ext/<ad>)
@@ -219,7 +219,7 @@ qx.Class.define("ankamon.ext.Extensions", {
       (this.__settingsTabs[name] = this.__settingsTabs[name] || []).push(spec);
     },
 
-    /** @return {Array} eklentinin Ayarlar ▸ Eklentiler ek sekmeleri. */
+    /** @return {Array} eklentinin Sistem ▸ Eklentiler ek sekmeleri. */
     settingsTabs(name) {
       return this.__settingsTabs[name] || [];
     },

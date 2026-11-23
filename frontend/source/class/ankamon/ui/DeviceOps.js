@@ -323,7 +323,8 @@ qx.Class.define("ankamon.ui.DeviceOps", {
      * önizlemesini durdurup "Ayrı pencerede izleniyor" yazar (bkz. Devices.js, screen/index.html "tm-popped").
      */
     screen(devices, user, manage = false) {
-      const list = devices.map(b => ({ id: b.id, name: b.label || b.hostname || b.ip || "#" + b.id, locks: b.input_locks || [] }));
+      const list = devices.map(b => ({ id: b.id, name: b.label || b.hostname || b.ip || "#" + b.id, locks: b.input_locks || [],
+        session: b.session_username || "" }));
       if (!list.length) {
         return;
       }
@@ -348,7 +349,7 @@ qx.Class.define("ankamon.ui.DeviceOps", {
       const spec = { devices: list, q: list.length > 1 ? "thumb" : "view", control, manage, input, chat: ankamon.ui.chat.Window.openIds() };
       const hash = btoa(unescape(encodeURIComponent(JSON.stringify(spec))));
       const caption = list.length > 1 ? `Ekranlar (${list.length} cihaz)`
-        : (manage ? "Ekran yönetimi — " : "Ekran — ") + list[0].name;
+        : this.__screenCaption(manage, list[0].name, list[0].session);
 
       const root = qx.core.Init.getApplication().getRoot();
       const bounds = root.getBounds() || { width: 1024, height: 700 };
@@ -411,13 +412,21 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         win.maximize();
       }
       if (single !== null) {
-        this.__screenWins.set(single, { win, manage, frame });
+        this.__screenWins.set(single, { win, manage, frame, name: list[0].name });
         this.__announceScreenWindows();
       }
     },
 
     /** Cihaz kimliği → {win, manage}: açık tek cihazlık ekran pencereleri (bkz. screen). */
     __screenWins: new Map(),
+
+    /**
+     * Tek cihazlık ekran penceresinin başlığı: "Ekran yönetimi — A2-4 / ali oturumu" — cihazda oturum açmış kullanıcı varsa
+     * adın sağında "/" ile (kullanıcı isteği 2026-11-23); birden çok oturum "ali, veli oturumu".
+     */
+    __screenCaption(manage, name, session) {
+      return (manage ? "Ekran yönetimi — " : "Ekran — ") + name + (session ? ` / ${session} oturumu` : "");
+    },
 
     /** Message Bus konusu: açık ekran pencerelerinin cihaz kimlikleri (veri: Array). */
     SCREEN_WINDOWS: "ankamon.screenWindows",
@@ -463,6 +472,10 @@ qx.Class.define("ankamon.ui.DeviceOps", {
     syncScreenLocks(devices) {
       this.__screenWins.forEach((open, id) => {
         const device = devices.find(b => b.id === id);
+        if (device) {
+          // Başlıktaki "/ ali oturumu" cihaz listesi her tazelendiğinde güncellenir (oturum açılır/kapanır).
+          open.win.setCaption(this.__screenCaption(open.manage, open.name, device.session_username || ""));
+        }
         const target = open.frame.getWindow();
         if (device && target) {
           target.postMessage({ type: "tm-locks", id, locks: device.input_locks || [] }, location.origin);

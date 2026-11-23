@@ -36,7 +36,13 @@
  *  - "Sağlık — acil bulgular" (yetki "anomalies" ya da "diagnose"): Sağlık ▸ Durum'daki Acil bulgular
  *    (GET /api/device-health). Çift tık: Sağlık ▸ Durum.
  *
- * Düzen (kullanıcı isteği 2026-11-10: daha kompakt, basit; "Son görevler" altta kırpılıyordu): üstte küçük kartlar (geniş
+ * Sade görünüm (kullanıcı isteği 2026-11-23): varsayılan olarak yalnız "Kayıtlı cihaz", "Çevrimiçi", "Sensör verisi gelen" ve
+ * hemen yanında aynı boyutta "Toplam disk kullanımı" kartı (eski disk daire grafiği paneli karta dönüştü; grafik kartın
+ * ipucunda) ve "Sağlık — acil bulgular" görünür. Öteki kartlar ile "Son 24 saatte hata düzeyindeki kayıtlar" ve "Son görevler"
+ * panelleri varsayılan gizli; kart satırının sonundaki "⚙ Görünüm" menüsünden açılır (ui_prefs "dashboard.cards",
+ * "dashboard.panels" — bkz. CARDS, PANELS). Bütün kartlar aynı genişlikte (CARD_WIDTH).
+ *
+ * Eski düzen (kullanıcı isteği 2026-11-10: daha kompakt, basit; "Son görevler" altta kırpılıyordu): üstte küçük kartlar (geniş
  * ekranda tek satır), ortada disk + acil bulgular (sabit, alçak), altta "Son hatalar" ve "Son görevler" YAN YANA —
  * ikisi de kalan yüksekliğin tamamını alır, biri ötekini aşağı itmez.
  *
@@ -64,13 +70,11 @@ qx.Class.define("ankamon.page.Dashboard", {
       }
     });
 
-    // Paneller (disk, acil bulgular, son hatalar, son görevler) kenarlıklı kutularda; aralarındaki ayırıcılar
-    // fareyle sürüklenir, boyutlar kullanıcı başına sunucuda saklanır (bkz. __remember, PANE_PREFS).
-    const health = this.__createHealthRow();
+    // Paneller (acil bulgular, son hatalar, son görevler) kenarlıklı kutularda; aralarındaki ayırıcılar fareyle sürüklenir,
+    // boyutlar kullanıcı başına sunucuda saklanır (bkz. __remember). Hangi panellerin görüneceği "⚙ Görünüm"den (__layoutPanels).
+    this.__healthRow = this.__createHealthRow();
 
-    // Son hatalar | Son görevler: yan yana, kalan yüksekliğin tamamı (bkz. sınıf açıklaması).
-    const bottom = this.__split("horizontal").set({ minHeight: 160 });
-    const errorsBox = this.__panel("Son 24 saatte hata düzeyindeki kayıtlar");
+    this.__errorsBox = this.__panel("Son 24 saatte hata düzeyindeki kayıtlar");
     this.__errors = this._createTable([
       { id: "time", label: "Zaman", width: 160 },
       { id: "label", label: "Takma ad", width: 150 },
@@ -79,38 +83,32 @@ qx.Class.define("ankamon.page.Dashboard", {
       { id: "program", label: "Program", width: 140 },
       { id: "message", label: "Mesaj" }
     ], { prefsKey: "dashboard.errors.columns", filterable: true });
-    errorsBox.add(this.__errors, { flex: 1 });
-    this.__remember(errorsBox, "dashboard.errors.width", "width", () => Math.round(bottom.getBounds().width * 0.6));
-    bottom.add(errorsBox, 0);
+    this.__errorsBox.add(this.__errors, { flex: 1 });
+    this.__remember(this.__errorsBox, "dashboard.errors.width", "width", () => Math.round((this.__holder.getBounds() || { width: 1000 }).width * 0.6));
     this.__addLogsMenu(this.__errors, id => {
       const row = this.__errorRows && this.__errorRows[id];
       return row && row.device_id ? [{ id: row.device_id, name: row.device_label || row.host }] : [];
     });
 
-    const jobsBox = this.__panel("Son görevler");
+    this.__jobsBox = this.__panel("Son görevler");
     this.__jobs = this._createTable([
       { id: "time", label: "Zaman", width: 140 },
       { id: "title", label: "Görev", width: 200 },
       { id: "status", label: "Durum", width: 100 },
       { id: "summary", label: "Özet" }
     ], { prefsKey: "dashboard.jobs.columns", filterable: true });
-    jobsBox.add(this.__jobs, { flex: 1 });
-    bottom.add(jobsBox, 1);
+    this.__jobsBox.add(this.__jobs, { flex: 1 });
     this.__addLogsMenu(this.__jobs, id => {
       const job = (this.__jobRows || []).find(j => j.id === id);
       return job ? job.targets || [] : [];
     });
-
-    if (health) {
-      // Üst (disk + acil bulgular) | alt (hatalar + görevler): dikey ayırıcıyla.
-      const main = this.__split("vertical");
-      this.__remember(health, "dashboard.health.height", "height", () => ankamon.page.Dashboard.HEALTH_ROW_HEIGHT);
-      main.add(health, 0);
-      main.add(bottom, 1);
-      this.add(main, { flex: 1 });
-    } else {
-      this.add(bottom, { flex: 1 });
+    if (this.__healthRow) {
+      this.__remember(this.__healthRow, "dashboard.health.height", "height", () => ankamon.page.Dashboard.HEALTH_ROW_HEIGHT);
     }
+
+    this.__holder = new qx.ui.container.Composite(new qx.ui.layout.Grow());
+    this.add(this.__holder, { flex: 1 });
+    this.__layoutPanels();
   },
 
   statics: {
@@ -158,17 +156,45 @@ qx.Class.define("ankamon.page.Dashboard", {
         `<div><b>Toplam ${F.bytes(total)}</b></div>${free}</div>`;
     },
 
-    /** Disk ve acil bulgular satırının varsayılan yüksekliği (px; kullanıcı sürükleyince "dashboard.health.height"). */
+    /**
+     * Kartlar (sırayla) ve varsayılan görünürlükleri (kullanıcı isteği 2026-11-23: yalnız ilk dördü). Kullanıcının seçimi
+     * ui_prefs "dashboard.cards" (görünen anahtarların dizisi); yoksa default'u true olanlar.
+     */
+    CARDS: [
+      { key: "devices", label: "Kayıtlı cihaz", default: true },
+      { key: "online", label: "Çevrimiçi", default: true },
+      { key: "exporter", label: "Sensör verisi gelen", default: true },
+      { key: "disk", label: "Toplam disk kullanımı", default: true },
+      { key: "logging", label: "Log gönderen (24 sa)" },
+      { key: "logs", label: "Log (24 sa)" },
+      { key: "errors", label: "Hata (24 sa)" },
+      { key: "metrics", label: "Sensör kaydı" },
+      { key: "queue", label: "Log kuyruğu" },
+      { key: "db", label: "Veritabanı" },
+      { key: "backups", label: "Yedekler" }
+    ],
+    /** Alt paneller; varsayılan gizli (ui_prefs "dashboard.panels" {errors, jobs: Boolean}). */
+    PANELS: [
+      { key: "errors", label: "Son 24 saatte hata düzeyindeki kayıtlar" },
+      { key: "jobs", label: "Son görevler" }
+    ],
+    /** Bütün kartların ortak genişliği (px) — kartlar aynı boyutta (kullanıcı isteği 2026-11-23). */
+    CARD_WIDTH: 168,
+
+    /** Acil bulgular satırının varsayılan yüksekliği (px; kullanıcı sürükleyince "dashboard.health.height"). */
     HEALTH_ROW_HEIGHT: 250,
-    /** Disk panelinin varsayılan genişliği (px; "dashboard.disk.width"). */
-    DISK_WIDTH: 280,
     /** Paneller arası ayırıcının kalınlığı (px). */
     SPLITTER: 10
   },
 
   members: {
-    __diskHtml: null,
-    __diskNote: null,
+    __disk: null,
+    __dashData: null,
+    __healthRow: null,
+    __holder: null,
+    __errorsBox: null,
+    __jobsBox: null,
+    __splits: null,
     __urgent: null,
     __urgentRows: null,
     __urgentTitle: null,
@@ -178,37 +204,9 @@ qx.Class.define("ankamon.page.Dashboard", {
     __errorRows: null,
     __jobRows: null,
 
-    /** Kartların altındaki satır: toplam disk kullanımı + Sağlık acil bulguları (yetkiye göre). */
+    /** Kartların altındaki panel: Sağlık acil bulguları (yetkiye göre; disk artık kart — bkz. CARDS "disk"). */
     __createHealthRow() {
-      const disk = this._can("logs.manage");
       const health = this._can("anomalies") || this._can("diagnose");
-      if (!disk && !health) {
-        return;
-      }
-      // Tek panel varsa ayırıcı yok; ikisi varsa disk | acil bulgular yatay ayırıcıyla.
-      const row = disk && health ? this.__split("horizontal") : new qx.ui.container.Composite(new qx.ui.layout.Grow());
-      row.set({ minHeight: 120 });
-      if (disk) {
-        const box = this.__panel("Toplam disk kullanımı");
-        this.__diskNote = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true });
-        box.getChildren()[0].add(this.__diskNote);
-        this.__diskHtml = new qx.ui.embed.Html("").set({ overflowY: "auto", minWidth: 220 });
-        this.__diskHtml.addListenerOnce("appear", () => {
-          this.__diskHtml.getContentElement().getDomElement().addEventListener("click", e => {
-            const hit = e.target.closest && e.target.closest("[data-mode]");
-            if (hit) {
-              qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { diskUsage: hit.getAttribute("data-mode") });
-            }
-          });
-        });
-        box.add(this.__diskHtml, { flex: 1 });
-        if (health) {
-          this.__remember(box, "dashboard.disk.width", "width", () => ankamon.page.Dashboard.DISK_WIDTH);
-          row.add(box, 0);
-        } else {
-          row.add(box);
-        }
-      }
       if (health) {
         const box = this.__panel("Sağlık — acil bulgular");
         this.__urgentTitle = box.getChildren()[0].getChildren()[0];
@@ -217,19 +215,99 @@ qx.Class.define("ankamon.page.Dashboard", {
           { id: "check", label: "Bulgu", width: 220 },
           { id: "path", label: "Yol", width: 110 },
           { id: "at", label: "Zaman", width: 140 },
-          { id: "text", label: "Ayrıntı" }
+          // Ayrıntı varsayılan gizli (kullanıcı isteği 2026-11-23); sütun menüsünden açılır.
+          { id: "text", label: "Ayrıntı", hidden: true }
         ], { prefsKey: "dashboard.urgent.columns", filterable: true });
         this.__urgent.setToolTipText("Çift tıklayın: Sağlık ▸ Durum");
         this.__urgent.addListener("cellDbltap", () =>
           qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "anomalies", tab: "status" }));
         box.add(this.__urgent, { flex: 1 });
-        if (disk) {
-          row.add(box, 1);
-        } else {
-          row.add(box);
-        }
+        return box.set({ minHeight: 120 });
       }
-      return row;
+      return null;
+    },
+
+    /** Görünür paneller (⚙ Görünüm): {errors, jobs}. */
+    __panelPrefs() {
+      const saved = (this._user.ui_prefs || {})["dashboard.panels"] || {};
+      return { errors: saved.errors === true, jobs: saved.jobs === true };
+    },
+
+    /** Görünür kart anahtarları (⚙ Görünüm). */
+    __cardKeys() {
+      const saved = (this._user.ui_prefs || {})["dashboard.cards"];
+      return Array.isArray(saved) ? saved : ankamon.page.Dashboard.CARDS.filter(c => c.default).map(c => c.key);
+    },
+
+    /**
+     * Panelleri görünürlük seçimine göre yerleştirir: acil bulgular üstte, hatalar | görevler altta (ikisi birden açıksa yan
+     * yana, ayırıcıyla). Seçim değişince yeniden çağrılır — paneller yeniden kurulmaz, yalnız ayırıcılar.
+     */
+    __layoutPanels() {
+      (this.__splits || []).forEach(split => {
+        split.getChildren().slice().forEach(child => split.remove(child));
+        split.dispose();
+      });
+      this.__splits = [];
+      this.__holder.removeAll();
+      const P = this.__panelPrefs();
+      const lower = [P.errors ? this.__errorsBox : null, P.jobs ? this.__jobsBox : null].filter(Boolean);
+      let bottom = lower[0] || null;
+      if (lower.length === 2) {
+        bottom = this.__split("horizontal").set({ minHeight: 160 });
+        this.__splits.push(bottom);
+        bottom.add(this.__errorsBox, 0);
+        bottom.add(this.__jobsBox, 1);
+      }
+      if (this.__healthRow && bottom) {
+        const main = this.__split("vertical");
+        this.__splits.push(main);
+        main.add(this.__healthRow, 0);
+        main.add(bottom, 1);
+        this.__holder.add(main);
+      } else if (this.__healthRow || bottom) {
+        this.__holder.add(this.__healthRow || bottom);
+      }
+    },
+
+    /** "⚙ Görünüm" menüsü: kartlar ve alt panellerin görünürlüğü (kullanıcı başına, sunucuda). */
+    __viewMenu() {
+      const D = ankamon.page.Dashboard;
+      const menu = new qx.ui.menu.Menu();
+      const keys = new Set(this.__cardKeys());
+      menu.add(new qx.ui.menu.Button("Kartlar").set({ enabled: false }));
+      D.CARDS.filter(c => c.key !== "disk" || this._can("logs.manage")).forEach(c => {
+        const item = new qx.ui.menu.CheckBox(c.label).set({ value: keys.has(c.key) });
+        item.addListener("changeValue", e => {
+          const now = new Set(this.__cardKeys());
+          e.getData() ? now.add(c.key) : now.delete(c.key);
+          ankamon.page.Base.savePref(this._user, "dashboard.cards", D.CARDS.map(x => x.key).filter(k => now.has(k)));
+          this.__renderCards();
+        });
+        menu.add(item);
+      });
+      menu.add(new qx.ui.menu.Separator());
+      menu.add(new qx.ui.menu.Button("Paneller").set({ enabled: false }));
+      const panels = this.__panelPrefs();
+      D.PANELS.forEach(p => {
+        const item = new qx.ui.menu.CheckBox(p.label).set({ value: panels[p.key] });
+        item.addListener("changeValue", e => {
+          const now = Object.assign(this.__panelPrefs(), { [p.key]: e.getData() });
+          ankamon.page.Base.savePref(this._user, "dashboard.panels", now);
+          this.__layoutPanels();
+        });
+        menu.add(item);
+      });
+      menu.add(new qx.ui.menu.Separator());
+      const reset = new qx.ui.menu.Button("Varsayılan görünüm");
+      reset.addListener("execute", () => {
+        ankamon.page.Base.savePref(this._user, "dashboard.cards", null);
+        ankamon.page.Base.savePref(this._user, "dashboard.panels", null);
+        this.__renderCards();
+        this.__layoutPanels();
+      });
+      menu.add(reset);
+      return menu;
     },
 
     /**
@@ -295,9 +373,9 @@ qx.Class.define("ankamon.page.Dashboard", {
       });
     },
 
-    /** Toplam disk kullanımı: tampondan hemen; tampon yok ya da eskiyse arkada yeniden hesaplanıp çizilir. */
+    /** Toplam disk kullanımı (kart): tampondan hemen; tampon yok ya da eskiyse arkada yeniden hesaplanıp kart yenilenir. */
     __refreshDisk() {
-      if (!this.__diskHtml) {
+      if (!this._can("logs.manage") || !this.__cardKeys().includes("disk")) {
         return;
       }
       const S = ankamon.ui.DiskUsageSummary;
@@ -305,18 +383,18 @@ qx.Class.define("ankamon.page.Dashboard", {
         if (this.isDisposed() || !res) {
           return;
         }
-        this.__diskHtml.setHtml(ankamon.page.Dashboard.diskPie(res.items, res.disk));
-        this.__diskNote.setValue(`hesaplandı: ${ankamon.util.Format.ago(Math.floor(res.at / 1000))}`);
+        this.__disk = res;
+        this.__renderCards();
       };
       const cached = S.cached();
-      draw(cached);
-      if (!cached) {
-        this.__diskHtml.setHtml(`<div style="padding:12px;opacity:.7">Hesaplanıyor… (veri türlerinin boyutları toplanıyor)</div>`);
+      if (cached) {
+        this.__disk = cached;
       }
       if (!cached || Date.now() - cached.at > S.CACHE_MS) {
         S.compute(ankamon.ui.DiskUsage.specs()).then(draw).catch(() => {
           if (!cached && !this.isDisposed()) {
-            this.__diskHtml.setHtml(`<div style="padding:12px;opacity:.7">Disk kullanımı alınamadı.</div>`);
+            this.__disk = { failed: true };
+            this.__renderCards();
           }
         });
       }
@@ -354,29 +432,8 @@ qx.Class.define("ankamon.page.Dashboard", {
       const logs = data.log_histogram.reduce((sum, bucket) => sum + bucket.total, 0);
       const errors = data.log_histogram.reduce((sum, bucket) => sum + bucket.errors, 0);
 
-      const b = data.backups;
-      const n = v => Number(v).toLocaleString("tr-TR");
-      const bt = data.devices;
-      this.__stats.removeAll().forEach(card => card.dispose());
-      // [başlık, değer, renk, alt satır, ipucu anahtarı] — ipucu her kartın KENDİ konusunu anlatır
-      // (bkz. __tip); her yenilemede güncel değerlerle yeniden kurulur.
-      [
-        ["Kayıtlı cihaz", n(bt.total), null, `${n(bt.total - bt.online)} kapalı`, "devices"],
-        ["Çevrimiçi", n(bt.online), "app-ok", bt.total ? `%${Math.round(bt.online * 100 / bt.total)}` : null, "online"],
-        ["Sensör verisi gelen", n(bt.exporter_ok), null, `${n(bt.total - bt.exporter_ok)} cihazdan gelmiyor`, "exporter"],
-        ["Log gönderen (24 sa)", n(bt.logging), null, `${n(bt.total - bt.logging)} cihazdan gelmiyor`, "logging"],
-        ["Log (24 sa)", n(logs), null, F.bytes(data.storage.tables.logs.bytes) + " (tümü)", "logs"],
-        ["Hata (24 sa)", n(errors), errors ? "error" : null, logs ? `logların %${(errors * 100 / logs).toFixed(1)}'i` : null, "errors"],
-        ["Sensör kaydı", this.__millions(data.metrics_rows), null, F.bytes(data.metrics_bytes), "metrics"],
-        // rsyslog disk kuyruğu: büyüyorsa loglar veritabanına yazılamıyor demektir.
-        ["Log kuyruğu", F.bytes(data.log_queue.bytes), null, `${data.log_queue.files} dosya`, "queue"],
-        ["Veritabanı", F.bytes(data.database_bytes), null, "PostgreSQL + TimescaleDB", "db"],
-        b
-          ? ["Yedekler", F.bytes(b.bytes), null,
-            `${b.files} dosya` + (b.latest.full ? ` · son tam ${F.bytes(b.latest.full.bytes)}` : ""), "backups"]
-          : ["Yedekler", "—", null, "özet henüz yok", "backups"]
-      ].forEach(([label, value, color, sub, key]) =>
-        this.__stats.add(this.__card(label, value, color, sub, this.__tip(key, data, { logs, errors }), this.__target(key))));
+      this.__dashData = { data, logs, errors };
+      this.__renderCards();
 
       this.__errorRows = data.recent_errors;
       this.__jobRows = data.recent_jobs;
@@ -386,6 +443,58 @@ qx.Class.define("ankamon.page.Dashboard", {
       this.__jobs.getTableModel().setData(data.recent_jobs.map(job => [
         job.id, F.dateTime(job.created_at * 1000), job.title, F.jobStatus(job.status), job.summary
       ]));
+    },
+
+    /**
+     * Kartları çizer (görünür olanlar, CARDS sırasıyla) ve satırın sonuna "⚙ Görünüm" düğmesi. Veri: son /dashboard yanıtı
+     * (__dashData) ve disk özeti (__disk); disk hesabı bitince yeniden çağrılır.
+     */
+    __renderCards() {
+      if (!this.__dashData || this.isDisposed()) {
+        return;
+      }
+      const F = ankamon.util.Format;
+      const { data, logs, errors } = this.__dashData;
+      const b = data.backups;
+      const n = v => Number(v).toLocaleString("tr-TR");
+      const bt = data.devices;
+      const disk = this.__disk;
+      const diskTotal = disk && disk.items ? disk.items.reduce((sum, it) => sum + (it.bytes || 0), 0) : null;
+      this.__stats.removeAll().forEach(card => card.dispose());
+      // [başlık, değer, renk, alt satır, ipucu] — ipucu her kartın KENDİ konusunu anlatır (bkz. __tip).
+      const all = {
+        devices: ["Kayıtlı cihaz", n(bt.total), null, `${n(bt.total - bt.online)} kapalı`],
+        online: ["Çevrimiçi", n(bt.online), "app-ok", bt.total ? `%${Math.round(bt.online * 100 / bt.total)}` : null],
+        exporter: ["Sensör verisi gelen", n(bt.exporter_ok), null, `${n(bt.total - bt.exporter_ok)} cihazdan gelmiyor`],
+        disk: ["Toplam disk kullanımı", diskTotal === null ? (disk && disk.failed ? "—" : "…") : F.bytes(diskTotal), null,
+          disk && disk.disk && disk.disk.free != null ? `boş ${F.bytes(disk.disk.free)} / ${F.bytes(disk.disk.total)}`
+            : (disk && disk.failed ? "alınamadı" : "hesaplanıyor…")],
+        logging: ["Log gönderen (24 sa)", n(bt.logging), null, `${n(bt.total - bt.logging)} cihazdan gelmiyor`],
+        logs: ["Log (24 sa)", n(logs), null, F.bytes(data.storage.tables.logs.bytes) + " (tümü)"],
+        errors: ["Hata (24 sa)", n(errors), errors ? "error" : null, logs ? `logların %${(errors * 100 / logs).toFixed(1)}'i` : null],
+        metrics: ["Sensör kaydı", this.__millions(data.metrics_rows), null, F.bytes(data.metrics_bytes)],
+        // rsyslog disk kuyruğu: büyüyorsa loglar veritabanına yazılamıyor demektir.
+        queue: ["Log kuyruğu", F.bytes(data.log_queue.bytes), null, `${data.log_queue.files} dosya`],
+        db: ["Veritabanı", F.bytes(data.database_bytes), null, "PostgreSQL + TimescaleDB"],
+        backups: b
+          ? ["Yedekler", F.bytes(b.bytes), null, `${b.files} dosya` + (b.latest.full ? ` · son tam ${F.bytes(b.latest.full.bytes)}` : "")]
+          : ["Yedekler", "—", null, "özet henüz yok"]
+      };
+      const visible = new Set(this.__cardKeys());
+      ankamon.page.Dashboard.CARDS.filter(c => visible.has(c.key) && (c.key !== "disk" || this._can("logs.manage"))).forEach(c => {
+        const [label, value, color, sub] = all[c.key];
+        const tip = c.key === "disk"
+          ? (disk && disk.items ? `<b>Toplam disk kullanımı</b> — veri türlerine göre${ankamon.page.Dashboard.diskPie(disk.items, disk.disk)}` +
+            `<div style="opacity:.7">hesaplandı: ${F.ago(Math.floor(disk.at / 1000))}</div>` : "Veri türlerinin boyutları toplanıyor…")
+          : this.__tip(c.key, data, { logs, errors });
+        this.__stats.add(this.__card(label, value, color, sub, tip, this.__target(c.key)));
+      });
+      const view = new qx.ui.form.MenuButton("⚙ Görünüm").set({
+        alignY: "middle", font: "small", padding: [3, 8], toolTipText: "Hangi kartların ve panellerin görüneceğini seçin"
+      });
+      view.addListener("pointerdown", () => view.setMenu(this.__viewMenu()), this, true);
+      view.setMenu(this.__viewMenu());
+      this.__stats.add(view);
     },
 
     /**
@@ -452,6 +561,7 @@ qx.Class.define("ankamon.page.Dashboard", {
         case "queue": return disk("Disk kullanımı — Log kuyruğu", "queue");
         case "db": return page("Sistem — Veritabanı", { page: "system", tab: "database" }, true);
         case "backups": return disk("Disk kullanımı — Yedekler", "backups");
+        case "disk": return disk("Disk kullanımı — Özet", "summary");
         default: return null;
       }
     },
@@ -620,7 +730,8 @@ qx.Class.define("ankamon.page.Dashboard", {
       // Kompakt (kullanıcı isteği 2026-11-10: göstergeler küçük): az dolgu, küçük yazı.
       const card = new qx.ui.container.Composite(new qx.ui.layout.VBox(1)).set({
         padding: [6, 10],
-        minWidth: 112,
+        // Bütün kartlar aynı genişlikte (kullanıcı isteği 2026-11-23: disk kartı sensör kartıyla aynı boyutta).
+        width: ankamon.page.Dashboard.CARD_WIDTH,
         backgroundColor: "surface",
         decorator: border
       });
