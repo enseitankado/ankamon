@@ -23,6 +23,9 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   // Kimlik bilgisi tarayıcıya hiç gelmez — bağlama köprüsü onu kendisi veritabanından okur.
   var q = new URLSearchParams(location.search);
   var device = q.get("device"), hostname = q.get("hostname"), title = q.get("title") || hostname || device;
+  // user: dosya yöneticisi bu kullanıcının masaüstünde açılır (Ekranlar kutucuğundaki klasör simgesi — bkz.
+  // DeviceOps.filemanager); dizini köprü bulur (yanıttaki "start"), bulunamazsa /home.
+  var user = q.get("user") || "";
   document.title = "Dosya yöneticisi — " + title;
   var msg = document.getElementById("msg");
   function fail(text) { msg.className = "err"; msg.textContent = text; }
@@ -56,7 +59,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   }
 
   // 1) Cihazı bu makineye bağla (sshfs; idempotent — zaten bağlıysa anında döner).
-  fetch("/filemanager-mount/mount/" + encodeURIComponent(device), {
+  fetch("/filemanager-mount/mount/" + encodeURIComponent(device) + (user ? "?user=" + encodeURIComponent(user) : ""), {
     method: "POST",
     headers: { "X-Requested-With": "ankamon" }
   }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
@@ -72,8 +75,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later
       // "cihazlar" kaynağın adı (bkz. services/filemanager.sh), res.data.path "<takma ad>/" (boşluk,
       // Türkçe karakter içerebilir; kodlanır). Açılış dizini cihazın /home'u (kullanıcı isteği);
       // kökten yukarı gezinmek yine serbest.
+      // Kullanıcının masaüstü istendiyse köprünün bulduğu dizin ("home/ogretmen/Masaüstü/" — her parça ayrı kodlanır).
+      var start = res.data.start ? res.data.start.split("/").map(encodeURIComponent).join("/") : "home/";
       location.replace("/filemanager/files/cihazlar/" +
-        encodeURIComponent(res.data.path.replace(/\/$/, "")) + "/home/");
+        encodeURIComponent(res.data.path.replace(/\/$/, "")) + "/" + start);
     })
     .catch(function (e) {
       fail("Dosya yöneticisi açılamadı: " + e.message);

@@ -87,6 +87,9 @@ qx.Class.define("ankamon.page.Devices", {
       { id: "wifi", label: "Wi-Fi", width: 110 },
       // Cihaz yerel ağa kablolu kartıyla bağlı mı (internet değil) — bkz. Devices.cableText.
       { id: "cable", label: "Kablo", hint: "Yerel ağa kablolu ağ kartıyla bağlı mı", width: 100 },
+      // Ses durumu (kullanıcı isteği 2026-11-23; göç 059, worker executor/soundstate.py — oturum yoklamasında okunur):
+      // "Kapalı" (sessizde) ya da düzey "%45"; oturum/ölçüm yoksa boş. Bkz. Devices.soundText.
+      { id: "sound", label: "Ses", hint: "Bilgisayarın sesi: Kapalı (sessizde) ya da ses düzeyi — oturum açık kullanıcının ses ayarından", width: 80, choices: true },
       // Donanım bilgisi (bkz. worker/ankamon/executor/hwfacts.py): cihaz ilk kez tanınırken (MAC
       // öğrenilirken) bir kez SSH ile toplanır; satır sağ menüsündeki "Bilgi kartı" bunu canlı
       // tazeler (60dk önbellekli). Değer yoksa (henüz toplanmadıysa) hücre boş kalır.
@@ -314,6 +317,28 @@ qx.Class.define("ankamon.page.Devices", {
     },
 
     /**
+     * "Ses" sütunu (kullanıcı isteği 2026-11-23): oturum açık kullanıcının ses sunucusunda varsayılan çıkış sessizdeyse
+     * "Kapalı", değilse düzey ("%45"). Kaynak oturum yoklaması (30 sn — göç 059, worker executor/soundstate.py); cihaz
+     * yönetilemiyorsa, yoklama eskiyse (CABLE_FRESH_S) ya da oturum/ses çıkışı yoksa boş (bilinmiyor).
+     */
+    soundText(device) {
+      if (!ankamon.page.Devices.soundKnown(device)) {
+        return "";
+      }
+      if (device.sound_muted) {
+        return "Kapalı";
+      }
+      return device.sound_volume === null || device.sound_volume === undefined ? "" : "%" + device.sound_volume;
+    },
+
+    /** Ses durumu güncel mi (bkz. soundText): cihaz yönetilebilir ve oturum yoklaması taze. */
+    soundKnown(device) {
+      return !!device.online && !!device.session_checked_at &&
+        Date.now() / 1000 - device.session_checked_at < ankamon.page.Devices.CABLE_FRESH_S &&
+        (device.sound_muted !== null && device.sound_muted !== undefined || device.sound_volume !== null && device.sound_volume !== undefined);
+    },
+
+    /**
      * "Oturum" sütununun metni: çevrimdışı ya da henüz yoklanmamış cihazda boş (bilinmiyor), oturum
      * yoksa "Oturum kapalı", varsa kullanıcı adı — oturum kilitliyse (dm-tool lock) "(kilitli)" ekiyle.
      * Ankamon ekran kilidi (Ekran ▸ Kilitle) ayrıca " / Kilitli" ile eklenir (bkz. worker executor/screenlock.py).
@@ -503,6 +528,7 @@ qx.Class.define("ankamon.page.Devices", {
             ankamon.page.Devices.sessionText(device),
             ankamon.page.Devices.wifiText(device),
             ankamon.page.Devices.cableText(device),
+            ankamon.page.Devices.soundText(device),
             device.facts.disk_total_bytes ? F.bytes(device.facts.disk_total_bytes) : "",
             device.facts.mem_installed_bytes || device.facts.mem_total_bytes ? ankamon.ui.FactsView.ramText(device.facts, false) : "",
             device.facts.bios_version || "", device.facts.kernel_version || "", device.facts.motherboard_model || "",
@@ -519,6 +545,7 @@ qx.Class.define("ankamon.page.Devices", {
       });
       this.__apply();
       this.__actionBar.refresh();
+      this.__syncScreensButton(devices.devices);
       const passive = devices.devices.filter(b => b.passive).length;
       let note = "";
       if (!devices.devices.length) {
@@ -672,6 +699,19 @@ qx.Class.define("ankamon.page.Devices", {
           if (device && device.online && this._can("screen") && this._can("screen.control")) {
             ankamon.ui.DeviceOps.screen([device], this._user, true);
           }
+        } else if (e.data.type === "tm-files") {
+          // Kutucuktaki klasör simgesi = sağ menü Dosyalar ▸ Dosya yöneticisi; oturum açık kullanıcı varsa onun masaüstünde
+          // açılır (kullanıcı isteği 2026-11-23 — bkz. DeviceOps.filemanager desktopOf).
+          const device = this.__devices.get(e.data.id);
+          const P = ankamon.ui.devices.Platforms;
+          if (!device || !device.online || !this._can("filemanager")) {
+            return;
+          }
+          if (!P.supports("Dosya yöneticisi", P.familyOf(device))) {
+            ankamon.ui.Dialog.alert(`${P.label(P.familyOf(device))} cihazlarda dosya yöneticisi tanımlı değil.`);
+            return;
+          }
+          ankamon.ui.DeviceOps.filemanager(device, device.session_username || null);
         } else if (e.data.type === "tm-wake") {
           // Güç tasarrufundaki kutucuğa basıldı = sağ menü Ekran ▸ Uyandır (yalnız o cihaz).
           const device = this.__devices.get(e.data.id);
@@ -743,7 +783,9 @@ qx.Class.define("ankamon.page.Devices", {
         }
         if (id === "list") {
           this.__showListView(on);
-          ankamon.page.Base.savePref(this._user, "devices.listView", on);
+          if (!this.__screensForced) {   // yönetilebilir varlık olmadığı için zorunlu geçiş kullanıcının seçimi sayılmaz
+            ankamon.page.Base.savePref(this._user, "devices.listView", on);
+          }
         } else if (id === "stats" || id === "perf") {
           this.__screenView[id] = on;
           this.__saveScreenView();
@@ -759,6 +801,48 @@ qx.Class.define("ankamon.page.Devices", {
       this.__viewButtons.get(list ? "list" : "screens").setValue(true);
       this.__viewReady = true;
       return list;
+    },
+
+    /** Ekranlar düğmesinin ipucu (yönetilebilir varlık varken). */
+    SCREENS_TIP: "Cihazların canlı ekran kutucukları",
+
+    /** Yönetilebilir varlık olmadığı için Liste'ye zorla geçiliyor (kullanıcının görünüm tercihi kaydedilmez). */
+    __screensForced: false,
+
+    /**
+     * Sayfada (grup) hiç yönetilebilir varlık yoksa — hepsi cihaz kaydı olmayan pasif satır ya da liste boş — Ekranlar
+     * düğmesi devre dışı, ipucu nedenini söyler ve görünüm Liste'ye geçer (kullanıcı isteği 2026-11-23; pasif satırlar
+     * Ekranlar'da kutucuk almaz). Yönetilebilir varlık gelince düğme açılır; kullanıcının kayıtlı tercihi Ekranlar ise
+     * görünüm geri döner. Tercih (ui_prefs devices.listView) bu zorunlu geçişte değişmez.
+     */
+    __syncScreensButton(list) {
+      const btn = this.__viewButtons && this.__viewButtons.get("screens");
+      if (!btn) {
+        return;
+      }
+      const usable = list.some(b => !b.passive);
+      const wasForced = btn.getUserData("ankamon.forcedOff");
+      if (usable) {
+        btn.set({ enabled: true, toolTipText: this.SCREENS_TIP });
+        btn.setUserData("ankamon.forcedOff", false);
+        if (wasForced && (this._user.ui_prefs || {})["devices.listView"] === false) {
+          btn.setValue(true);
+        }
+        return;
+      }
+      btn.setToolTipText(list.length
+        ? "Ekranlar kullanılamıyor: bu gruptaki varlıkların hiçbiri yönetilebilir değil (Ankamon'da cihaz kaydı yok) — ekran kutucukları yalnız yönetilebilir cihazlarda gösterilir."
+        : "Ekranlar kullanılamıyor: listede yönetilebilir cihaz yok.");
+      btn.setUserData("ankamon.forcedOff", true);
+      if (btn.getValue()) {
+        this.__screensForced = true;
+        try {
+          this.__viewButtons.get("list").setValue(true);
+        } finally {
+          this.__screensForced = false;
+        }
+      }
+      btn.setEnabled(false);
     },
 
     /** Liste / ekran görünümü arasında geçer; kutucuğa ait düğmeler Liste'de devre dışı. */
@@ -1127,6 +1211,10 @@ qx.Class.define("ankamon.page.Devices", {
           refresh: (this.__tileRefresh && this.__tileRefresh.get(b.id)) || 0,
           // Monitör DPMS ile kapalı (bkz. 025_device_display_state.sql): kutucukta "Ekran güç tasarrufu kipinde".
           powersave: !!b.online && ["Off", "Standby", "Suspend"].includes(b.display_state),
+          // Ses kapalı (sessizde): başlıkta Müdahale'nin solunda sessiz hoparlör simgesi (kullanıcı isteği 2026-11-23).
+          muted: ankamon.page.Devices.soundKnown(b) && b.sound_muted === true,
+          // Başlıktaki klasör simgesinin ipucu: oturum açık kullanıcı varsa dosya yöneticisi onun masaüstünde açılır.
+          session: b.online ? b.session_username || "" : "",
           // Alt bardaki ağ simgeleri ve güç tasarrufu yazısının altındaki TiHA otomatik kapatma geri sayımı
           // (bkz. migration 026, worker executor/netif.py + autoshutdown.py) — yalnız çevrimiçi cihazda.
           net: b.online ? b.netifs || null : null,
@@ -1178,7 +1266,8 @@ qx.Class.define("ankamon.page.Devices", {
 
     __startPreview() {
       const control = this._user.is_admin || this._user.features.includes("screen.control");
-      const spec = { devices: this.__previewList(), q: "thumb", control, embed: true };
+      // files: kutucuk başlığındaki klasör simgesi (dosya yöneticisi — sağ menüdeki "Dosya yöneticisi" ile aynı yetki).
+      const spec = { devices: this.__previewList(), q: "thumb", control, embed: true, files: this._can("filemanager") };
       this.__screensRunning = true;
       this.__previewKey = JSON.stringify(spec.devices);
       const url = "/screen/#" + btoa(unescape(encodeURIComponent(JSON.stringify(spec))));

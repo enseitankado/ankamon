@@ -100,6 +100,9 @@ qx.Class.define("ankamon.ui.network.AssetCellHints", {
       wifi: "Cihazın Wi-Fi kartı açık mı, bir ağa bağlı mı. Donanım bilgisi toplanırken SSH ile cihaza sorulur.",
       cable: "Cihaz yerel ağa kabloyla bağlı mı. Cihazın ağ kartlarının durumu SSH ile okunur; okunamazsa logların " +
         "hangi karttan geldiğine bakılır.",
+      sound: "Bilgisayarın sesi açık mı, düzeyi kaç. Ankamon 30 saniyede bir SSH ile oturum açık kullanıcının ses ayarına bakar. " +
+        "'Kapalı': ses kapatılmış (sessizde). Oturum yoksa ya da ekran kapalıyken (ses çıkışı görünmez) boş kalır. " +
+        "Komut çalıştır ▸ Ses ile kapatılıp kısılabilir.",
       disk_total: "Cihazın disk kapasitesi. Cihaz ilk tanındığında SSH ile donanım bilgisi toplanırken okunur.",
       ram_total: "Cihazın bellek (RAM) miktarı. Donanım bilgisi toplanırken SSH ile okunur.",
       bios: "Anakartın yazılımı olan BIOS'un sürümü. Donanım bilgisi toplanırken cihazın kendisinden okunur.",

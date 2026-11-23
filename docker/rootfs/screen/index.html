@@ -213,6 +213,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     color: #d2a8ff; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
   #empty { margin: 40px; color: #888; }
   .tile .title button.ctl.on { color: #fff; background: #c62828; border-radius: 3px; }
+  /* Sesi kapalı cihaz (Devices.js __previewList muted): Müdahale'nin solunda sessiz hoparlör; klasör = dosya yöneticisi. */
+  .tile .title .mute { display: none; align-items: center; color: #ff6b5e; flex: 0 0 auto; }
+  .tile.muted .title .mute { display: inline-flex; }
+  .tile .title button.fm { display: inline-flex; align-items: center; }
 </style>
 </head>
 <body>
@@ -276,6 +280,8 @@ if (!embed) {
 // Kilit düğmesi simgeleri: Tabler Icons (MIT, github.com/tabler/tabler-icons, © 2020-2026 Paweł Kuna; LICENSES/MIT.txt).
 const LINE_ICON = paths => `<svg viewBox='0 0 24 24' width='18' height='18' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'>${paths}</svg>`;
 const KEYBOARD_ICON = LINE_ICON("<path d='M2 8a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2l0 -8'/><path d='M6 10l0 .01'/><path d='M10 10l0 .01'/><path d='M14 10l0 .01'/><path d='M18 10l0 .01'/><path d='M6 14l0 .01'/><path d='M18 14l0 .01'/><path d='M10 14l4 .01'/>");
+// Klasör simgesi (kutucuk başlığı — dosya yöneticisi): Tabler Icons "folder".
+const FOLDER_ICON = LINE_ICON("<path d='M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2'/>");
 const MOUSE_ICON = LINE_ICON("<path d='M6 7a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-4a4 4 0 0 1 -4 -4l0 -10'/><path d='M12 7l0 4'/>");
 // Hoparlör simgeleri: yazı tipi emojisi CSS rengini almaz, sarı görünmesi için çizim.
 const SPEAKER_OFF = "<svg viewBox='0 0 24 24' width='18' height='18' fill='currentColor' aria-hidden='true'><path d='M3 9v6h4l5 5V4L7 9H3z'/><path d='M16 9l5 6m0-6l-5 6' stroke='currentColor' stroke-width='2' fill='none'/></svg>";
@@ -298,7 +304,9 @@ class Tile {
     this.el.innerHTML = `<div class="title"><span class="dot"></span><span class="name"></span>
       ${embed ? "" : `<button class="snd" title="Cihazın sesini bu bilgisayara aktar (kapalı)">${SPEAKER_OFF}</button>`}
       ${!embed && spec.input ? `<button class="lk" data-device="keyboard">${KEYBOARD_ICON}</button><button class="lk" data-device="mouse">${MOUSE_ICON}</button>` : ""}
+      <span class="mute" title="Bilgisayarın sesi kapalı (sessizde). Açmak için: Komut çalıştır ▸ Ses — Sesi aç">${SPEAKER_OFF}</span>
       ${spec.control ? '<button class="ctl" title="Fare ve klavye ile cihazı yönet (aç/kapat)">🖱 Müdahale</button>' : ""}
+      ${embed && spec.files ? `<button class="fm">${FOLDER_ICON}</button>` : ""}
       <button class="fs" title="Tam ekran">⛶</button></div><div class="view"><div class="perf" hidden><div class="in"></div></div><div class="msg">Bağlanıyor…</div><div class="sleep"><div>Ekran güç tasarrufu kipinde<div class="sd"></div>${embed ? '<div class="wk">Uyandırmak için tıklayın</div>' : ""}</div></div>
       <div class="whoami" hidden></div></div><div class="stats"></div>`;
     this.el.querySelector(".name").textContent = device.name || ("#" + device.id);
@@ -321,6 +329,11 @@ class Tile {
     if (snd) snd.addEventListener("click", () => this.setAudio(!this.audioWs));
     this.locks = device.locks || [];
     this.el.querySelectorAll("button.lk").forEach(btn => btn.addEventListener("click", () => this.toggleLock(btn)));
+    // Klasör: o cihazın dosya yöneticisi (üst sayfa açar — bkz. Devices.js "tm-files"); oturum açık kullanıcı varsa
+    // onun masaüstünde (kullanıcı isteği 2026-11-23).
+    const fm = this.el.querySelector("button.fm");
+    if (fm) fm.addEventListener("click", () => window.parent.postMessage({ type: "tm-files", id: this.device.id }, location.origin));
+    this.showSound();
     this.showLocks();
     const ctl = this.el.querySelector("button.ctl");
     // Müdahale tam ekranda yapılır (kullanıcı isteği): Ekranlar sekmesinde (gömülü) kutucuğun kendisi değil,
@@ -565,6 +578,7 @@ class Tile {
     this.setWhoami(device.whoami);
     this.setStats(device.stats);
     this.el.classList.toggle("powersave", !!device.powersave);
+    this.showSound();
     this.tickShutdown();
     this.refreshWanted();
     if ((device.refresh || 0) !== this.refreshNonce) {
@@ -572,6 +586,15 @@ class Tile {
       this.refreshStream();
     }
     if (this.closedUntil > Date.now()) this.paintClosed();
+  }
+
+  /** Başlıktaki ses kapalı simgesi ve klasör düğmesinin ipucu (Devices.js __previewList: muted, session). */
+  showSound() {
+    this.el.classList.toggle("muted", !!this.device.muted);
+    const fm = this.el.querySelector("button.fm");
+    if (fm) fm.title = this.device.session
+      ? `Dosya yöneticisi — ${this.device.session} kullanıcısının masaüstünde açılır`
+      : "Dosya yöneticisi (oturum açık kullanıcı yok: /home dizininde açılır)";
   }
 
   /**

@@ -1,0 +1,39 @@
+{
+  "title": "Sesi kıs",
+  "description": "Bilgisayarın ses düzeyini düşürür (sessize almaz): belirli bir adım kadar ya da sabit bir düzeye. Oturum açık kullanıcı varsa onun ses sunucusunda (PipeWire/PulseAudio) varsayılan çıkış, yoksa ses kartının ana kanalı (ALSA Master) değişir.",
+  "category": "Ses",
+  "feature": "actions",
+  "confirm": false,
+  "timeout": 30,
+  "params": [
+    {
+      "key": "DUZEY",
+      "label": "Ne kadar",
+      "type": "select",
+      "default": "adim10",
+      "required": true,
+      "options": [
+        {
+          "value": "adim10",
+          "label": "10 puan kıs"
+        },
+        {
+          "value": "adim20",
+          "label": "20 puan kıs"
+        },
+        {
+          "value": "30",
+          "label": "%30'a getir"
+        },
+        {
+          "value": "50",
+          "label": "%50'ye getir"
+        },
+        {
+          "value": "10",
+          "label": "%10'a getir"
+        }
+      ]
+    }
+  ]
+}

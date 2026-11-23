@@ -1,0 +1,9 @@
+{
+  "title": "Sesi kapat",
+  "description": "Bilgisayarın sesini kapatır (sessize alır; düzey korunur). Oturum açık kullanıcı varsa onun ses sunucusunda (PipeWire/PulseAudio) varsayılan çıkış sessize alınır — kullanıcı ses simgesinden yeniden açabilir; oturum yoksa ses kartının ana kanalı (ALSA Master) kapatılır. Geri almak için \"Sesi aç\".",
+  "category": "Ses",
+  "feature": "actions",
+  "confirm": false,
+  "timeout": 30,
+  "params": []
+}
