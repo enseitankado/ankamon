@@ -58,7 +58,8 @@ qx.Class.define("ankamon.page.Sessions", {
     this.__tabs.add(this.__users);
     this.__movements = new ankamon.ui.sessions.Movements(this);
     this.__tabs.add(this.__movements);
-    this.__tabs.add(new ankamon.ui.sessions.Chats(this));
+    this.__chats = new ankamon.ui.sessions.Chats(this);
+    this.__tabs.add(this.__chats);
     this._rememberTab(this.__tabs, "sessions"); // son seçili sekme (bkz. Base._rememberTab)
     this.add(this.__tabs, { flex: 1 });
 
@@ -97,10 +98,15 @@ qx.Class.define("ankamon.page.Sessions", {
      */
     setGroup(id, devices) {
       this.__groupDevices = id ? new Set(devices || []) : null;
+      // Hareketler ve Sohbet geçmişi de aynı grubun cihazlarıyla (satırlar device_id'ye göre süzülür).
+      this.__movements.setGroupDevices(this.__groupDevices);
+      this.__chats.setGroupDevices(this.__groupDevices);
       if (this.__sessions) {
         this.__applySessions();
       }
     },
+
+    __chats: null,
 
     async _refresh() {
       const data = await ankamon.io.Api.get("/device-sessions");

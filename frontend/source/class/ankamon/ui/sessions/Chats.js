@@ -68,10 +68,25 @@ qx.Class.define("ankamon.ui.sessions.Chats", {
     __fields: null,
     __rows: null,
 
+    /** Sol menüde grubun altından açıldıysa o grubun cihaz kayıtları (Set); null: bütün cihazlar (bkz. page.Sessions setGroup). */
+    __groupDevices: null,
+
+    setGroupDevices(set) {
+      const changed = String(set ? [...set] : null) !== String(this.__groupDevices ? [...this.__groupDevices] : null);
+      this.__groupDevices = set;
+      if (changed && this.__rows) {
+        this.load();
+      }
+    },
+
     async load() {
       try {
         const F = ankamon.util.Format;
         const data = await ankamon.io.Api.get("/chat/messages");
+        const g = this.__groupDevices;
+        if (g) {
+          data.messages = data.messages.filter(m => g.has(m.device_id)); // grubun altında: yalnız o grubun cihazları
+        }
         this.__rows = data.messages.map(m => [
           m.id, F.dateTime(m.sent_at * 1000), m.device_name, m.session_username || "",
           m.direction === "out" ? "Ankamon → cihaz" : "Cihaz → Ankamon", m.author, m.body

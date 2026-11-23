@@ -166,6 +166,17 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
       this.__quiet = false;
     },
 
+    /** Sol menüde grubun altından açıldıysa o grubun cihaz kayıtları (Set); null: bütün cihazlar (bkz. page.Sessions setGroup). */
+    __groupDevices: null,
+
+    setGroupDevices(set) {
+      const changed = String(set ? [...set] : null) !== String(this.__groupDevices ? [...this.__groupDevices] : null);
+      this.__groupDevices = set;
+      if (changed && this.__rows) {
+        this.load();
+      }
+    },
+
     async load() {
       const seq = ++this.__seq;
       const days = this.__value(this.__period);
@@ -195,7 +206,14 @@ qx.Class.define("ankamon.ui.sessions.Movements", {
       if (seq !== this.__seq || this.isDisposed()) {
         return;
       }
-      this.__fill(this.__device, data.devices.filter(b => b.device_id).map(b => [String(b.device_id), b.device_name]), "Tüm bilgisayarlar");
+      const g = this.__groupDevices;
+      if (g) {
+        // Grubun altında: yalnız o grubun cihazlarının olayları ve seçicide yalnız onlar.
+        data.devices = data.devices.filter(b => g.has(b.device_id));
+        data.events = data.events.filter(e => g.has(e.device_id));
+      }
+      this.__fill(this.__device, data.devices.filter(b => b.device_id).map(b => [String(b.device_id), b.device_name]),
+        g ? "Gruptaki bütün bilgisayarlar" : "Tüm bilgisayarlar");
       this.__fill(this.__user, [["-", "(oturumsuz)"]].concat(data.users.map(u => [u, u])), "Tüm kullanıcılar");
       const F = ankamon.util.Format;
       const K = ankamon.ui.sessions.Movements.KINDS;
