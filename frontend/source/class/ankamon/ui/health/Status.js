@@ -154,6 +154,16 @@ qx.Class.define("ankamon.ui.health.Status", {
       ssh: { text: "Uzak bağlantı", color: "#7b1fa2" }
     },
 
+    /**
+     * Düzey sütunu renkli ve kalın (metin süzgeç için düz kalır); hücre düzey adıyla başlar ("Acil: …" da olur).
+     * Genel bakış'ın acil/dikkat panelinde de kullanılır (page.Dashboard).
+     */
+    installLevelRenderer(table, column) {
+      const r = new qx.ui.table.cellrenderer.Conditional();
+      Object.values(ankamon.page.Diagnose.LEVEL).forEach(L => r.addRegex(`^${L.text}(:|$)`, null, L.color, null, "bold"));
+      table.getTableColumnModel().setDataCellRenderer(column, r);
+    },
+
     /** Düzey adları Bakım raporuyla aynı (bkz. page.Diagnose LEVEL). */
     levelText(level) {
       const L = ankamon.page.Diagnose.LEVEL[level];
@@ -177,11 +187,9 @@ qx.Class.define("ankamon.ui.health.Status", {
     __shownFindings: null,
     __data: null,
 
-    /** Düzey sütunu renkli ve kalın (metin süzgeç için düz kalır); hücre düzey adıyla başlar ("Acil: …" da olur). */
+    /** Düzey sütunu renkli ve kalın — bkz. installLevelRenderer. */
     __levelRenderer(table, column) {
-      const r = new qx.ui.table.cellrenderer.Conditional();
-      Object.values(ankamon.page.Diagnose.LEVEL).forEach(L => r.addRegex(`^${L.text}(:|$)`, null, L.color, null, "bold"));
-      table.getTableColumnModel().setDataCellRenderer(column, r);
+      ankamon.ui.health.Status.installLevelRenderer(table, column);
     },
 
     /** İki yolun açıklaması (ipucu): yalnız kullanıcının gördüğü yollar. */

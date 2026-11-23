@@ -75,11 +75,32 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     this.__mainSplit = split;
     outer.add(split, 0);
     split.addListener("changeHeight", e => this.__saveSplit("top", e.getData()));
+    this.__topSaved = !!saved.top;
+    if (!saved.top) {
+      // Varsayılan: ① ile ③ eşit yükseklikte (kullanıcı isteği 2026-11-23) — pencere boyu değişince de, kullanıcı ayırıcıyı
+      // sürükleyene dek (sürüklerse onun yüksekliği saklanır ve o kullanılır). Ayırıcının kalınlığı ilk görünümde
+      // __matchScrollbar'la değiştiğinden ölçüm yerleşim bittikten sonra yapılır.
+      const equalize = () => {
+        const height = !outer.isDisposed() && !this.__topSaved && (outer.getBounds() || {}).height;
+        if (!height) {
+          return;
+        }
+        const across = outer.getChildControl("splitter");
+        const thick = (across.getBounds() || {}).height || across.getSizeHint().height;
+        const top = Math.floor((height - thick) / 2);
+        if (top > 0 && Math.abs((split.getBounds() || {}).height - top) > 1) {
+          this.__splitDefaulting = true;
+          split.setHeight(top);
+          this.__splitDefaulting = false;
+        }
+      };
+      outer.addListener("resize", () => qx.event.Timer.once(equalize, this, 50));
+    }
     const devices = this.__createDevicesPane().set({ width: saved.left || null });
     if (!saved.left) {
       // İlk açılış: eskisi gibi 2/5 genişlik (kullanıcı sürüklemediği için kaydedilmez).
-      this.__splitDefaulting = true;
       split.addListenerOnce("resize", e => {
+        this.__splitDefaulting = true;
         devices.setWidth(Math.round(e.getData().width * 0.4));
         this.__splitDefaulting = false;
       });
@@ -95,7 +116,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
 
   statics: {
     POLL_MS: 1000,
-    /** Üst bölümün (① | ②) ilk yüksekliği; kullanıcı sürükleyince kayıtlı değer kullanılır. */
+    /** Üst bölümün (① | ②) yüksekliği, ilk yerleşimden önce (sonra ③ ile eşitlenir); kullanıcı sürükleyince kayıtlı değer. */
     TOP_HEIGHT: 290,
     /** Ayırıcı konumlarının ui_prefs anahtarı. */
     SPLIT_PREF: "anomalies.denetle.split",
@@ -180,6 +201,9 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       if (!value || this.__splitDefaulting) {
         return;
       }
+      if (key === "top") {
+        this.__topSaved = true; // kullanıcı sürükledi: artık eşitlenmez
+      }
       const user = this.__page._user;
       const pref = ankamon.ui.anomaly.Scan.SPLIT_PREF;
       const current = Object.assign({}, (user.ui_prefs || {})[pref] || {}, { [key]: value });
@@ -189,6 +213,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
 
     __splitTimer: null,
     __splitDefaulting: false,
+    __topSaved: false,
 
     /**
      * Tür listesinin dikey kaydırma çubuğu ve üst bölümle 3 arasındaki YATAY ayırıcı 1/2 ayırıcısıyla aynı kalınlıkta ve
@@ -276,6 +301,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       this.__resultFields = this.__page._addColumnFilters(this.__resultTable, this.__resultColumns, () => this.__applyResults(),
         { rows: () => (this.__mergedRows || []).map(r => r.cells), persist: true });
       this.__resultTable.getTableColumnModel().setDataCellRenderer(3, new qx.ui.table.cellrenderer.Html());
+      this.__resultTable.getTableColumnModel().setDataCellRenderer(4, new qx.ui.table.cellrenderer.Html());
       this.__resultTable.addListener("cellDbltap", e => {
         const id = this.__resultTable.getTableModel().getValue(0, e.getRow());
         const row = (this.__mergedRows || []).find(r => r.cells[0] === id);
@@ -329,9 +355,8 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
             value: this.__sshPref
           });
           this.__sshCheck.addListener("changeValue", () => this.__updateButton());
-          this.__kindBox.add(this.__sshCheck);
-          this.__kindBox.add(new qx.ui.basic.Label("Haftada bir kendiliğinden de yapılır; cihazda yalnız okuma yapılır, " +
-            "cihaz başına 1-2 sn sürer.").set({ rich: true, wrap: true, allowGrowX: true, textColor: "app-muted", marginLeft: 22, marginBottom: 6 }));
+          this.__addFoldedKind(this.__sshCheck, "Haftada bir kendiliğinden de yapılır; cihazda yalnız okuma yapılır, " +
+            "cihaz başına 1-2 sn sürer.");
         }
         scannable.forEach(kind => {
           const check = new qx.ui.form.CheckBox(kinds[kind].label).set({
@@ -339,10 +364,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
           });
           check.addListener("changeValue", () => this.__updateButton());
           this.__kindChecks[kind] = check;
-          this.__kindBox.add(check);
-          this.__kindBox.add(new qx.ui.basic.Label(esc(kinds[kind].description)).set({
-            rich: true, wrap: true, allowGrowX: true, textColor: "app-muted", marginLeft: 22, marginBottom: 4
-          }));
+          this.__addFoldedKind(check, esc(kinds[kind].description || ""));
         });
         this.__kindLabels = Object.fromEntries(scannable.map(k => [k, kinds[k].label]));
         this.__updateButton();
@@ -354,6 +376,33 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
     },
 
     __kindLabels: null,
+
+    /**
+     * ② denetim türü satırı: onay kutusu + katlı açıklama (kullanıcı isteği 2026-11-23: açıklamalar varsayılan katlı).
+     * Satırın sonundaki ▸/▾ düğmesi açıklamayı açar/kapar; açıklama yoksa düğme konmaz.
+     * @param check {qx.ui.form.CheckBox}
+     * @param descHtml {String} açıklama (kaçışlı HTML)
+     */
+    __addFoldedKind(check, descHtml) {
+      const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(4).set({ alignY: "middle" }));
+      row.add(check);
+      this.__kindBox.add(row);
+      if (!descHtml) {
+        return;
+      }
+      const desc = new qx.ui.basic.Label(descHtml).set({ rich: true, wrap: true, allowGrowX: true, textColor: "app-muted",
+        marginLeft: 22, marginBottom: 4, visibility: "excluded" });
+      const fold = new qx.ui.basic.Label("▸").set({ textColor: "app-muted", cursor: "pointer", padding: [0, 4],
+        toolTipText: "Açıklamayı göster" });
+      fold.setUserData("ankamonScanKindFold", true);
+      fold.addListener("tap", () => {
+        const open = desc.getVisibility() !== "visible";
+        desc.setVisibility(open ? "visible" : "excluded");
+        fold.set({ value: open ? "▾" : "▸", toolTipText: open ? "Açıklamayı gizle" : "Açıklamayı göster" });
+      });
+      row.add(fold);
+      this.__kindBox.add(desc);
+    },
 
     async __loadDevices() {
       let data;
@@ -566,10 +615,13 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       const esc = qx.bom.String.escape;
       const SRC = ankamon.ui.anomaly.Scan.SOURCE;
       const rows = [];
+      // Süzgeç/hazır değer/dışa aktarım düz metinle çalışır (cells); grid'e renkli HTML (html/detailHtml) konur, Html çizicisiyle
+      // çizilir (kullanıcı isteği 2026-11-23: Ayrıntı'da ham HTML görünüyordu — çizici yanlışlıkla yalnız Sonuç'taydı).
       const add = (id, rank, plain, resultHtml, detailHtml) => {
+        const detailText = qx.bom.String.unescape(String(detailHtml || "").replace(/<[^>]*>/g, ""));
         rows.push({ rank, plain, problem: rank < 4,
-          cells: [id, plain.device, plain.check, plain.result, detailHtml, plain.source, plain.at],
-          html: resultHtml });
+          cells: [id, plain.device, plain.check, plain.result, detailText, plain.source, plain.at],
+          html: resultHtml, detailHtml });
       };
       // 1) Tam denetim raporu (seçili rapor).
       const report = this.__reports ? this.__reports.getReport() : null;
@@ -645,6 +697,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         if (r.html) {
           cells[3] = r.html;
         }
+        cells[4] = r.detailHtml || "";
         return cells;
       }));
       const problems = all.filter(r => r.problem).length;

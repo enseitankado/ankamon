@@ -65,11 +65,14 @@ qx.Class.define("ankamon.ui.anomaly.Summary", {
       last: g => `En son ${F.dateTime(g.lastAt * 1000)} tarihinde başladı (${F.ago(g.lastAt)})`,
       now: g => (g.open ? "Bu bulgu şu an sürüyor (henüz bitmedi)" : "Şu an sürmüyor: dönemdeki bütün kayıtları bitti")
     };
+    // "Şu an" = Sürüyor: Denetle ▸ ③ Sonuç'taki "Sürüyor" ile aynı kırmızı işaret (kullanıcı isteği 2026-11-23).
+    const red = ankamon.ui.table.StatusRenderer.colorOf("Çevrim dışı");
+    const dots = { now: info => (info.value === "Sürüyor" ? red : null) };
     this.__columns.forEach((column, index) => {
       this.__table.getTableColumnModel().setDataCellRenderer(index + 1, new ankamon.ui.table.HintRenderer(info => {
         const g = this.__raw && info.rowData ? this.__raw[info.rowData[0]] : null;
         return g ? hints[column.id](g) : null;
-      }));
+      }, dots[column.id]));
     });
     // Sayı ve süre sütunları metin değil değere göre sıralansın (hücre metni "1 sa 5 dk" gibi).
     const model = this.__table.getTableModel();

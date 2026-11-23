@@ -42,6 +42,8 @@ qx.Class.define("ankamon.ui.anomaly.History", {
     this.__columns = [
       { id: "device", label: "Cihaz", width: 200 },
       { id: "kind", label: "Bulgu", width: 160 },
+      // Denetle ▸ ③ Sonuç sütunuyla aynı renkler (kullanıcı isteği 2026-11-23): sürüyor kırmızı, bitti yeşil.
+      { id: "state", label: "Durum", width: 90, choices: true },
       { id: "source", label: "Kaynak", width: 90 },
       { id: "started", label: "Başlangıç", width: 150 },
       { id: "ended", label: "Bitiş", width: 150 },
@@ -49,6 +51,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
       { id: "detail", label: "Ayrıntı" }
     ];
     this.__table = page._createTable(this.__columns, { storageKey: "anomalies.history.columns" });
+    this.__table.getTableColumnModel().setDataCellRenderer(3, new qx.ui.table.cellrenderer.Html());
     this.__filterFields = page._addColumnFilters(this.__table, this.__columns, this.__apply.bind(this),
       { rows: () => (this.__rows || []).map(r => r.cells) });
     this.__table.addListener("cellDbltap", e => {
@@ -81,7 +84,7 @@ qx.Class.define("ankamon.ui.anomaly.History", {
           seconds,
           anomaly: a,
           cells: [
-            a.id, a.device, a.kindLabel, a.source || "", F.dateTime(a.started_at * 1000),
+            a.id, a.device, a.kindLabel, a.ended_at ? "Bitti" : "Sürüyor", a.source || "", F.dateTime(a.started_at * 1000),
             a.ended_at ? F.dateTime(a.ended_at * 1000) : "—",
             F.span(seconds) + (a.ended_at ? "" : " (sürüyor)"),
             a.text
@@ -98,11 +101,12 @@ qx.Class.define("ankamon.ui.anomaly.History", {
       ankamon.ui.anomaly.RowDetail.open(`${a.kindLabel} — ${a.device}`, [
         ["Cihaz", c[1]],
         ["Bulgu", c[2]],
-        ["Kaynak", c[3]],
-        ["Başlangıç", c[4]],
-        ["Bitiş", c[5]],
-        ["Süre", c[6]],
-        ["Ayrıntı", c[7]],
+        ["Durum", c[3]],
+        ["Kaynak", c[4]],
+        ["Başlangıç", c[5]],
+        ["Bitiş", c[6]],
+        ["Süre", c[7]],
+        ["Ayrıntı", c[8]],
         ["Bu bulgu nedir?", a.kindDesc]
       ]);
     },
@@ -123,7 +127,15 @@ qx.Class.define("ankamon.ui.anomaly.History", {
         .filter(f => f.text);
       const shown = this.__rows.filter(({ cells }) =>
         filters.every(f => ankamon.page.Base.filterMatch(cells[f.index], f.text)));
-      this.__table.getTableModel().setData(shown.map(r => r.cells));
+      // Süzgeç düz metinle; grid'e Durum renkli (Denetle ▸ ③ Sonuç'taki StatusRenderer.html işaretiyle aynı).
+      const S = ankamon.ui.table.StatusRenderer;
+      const color = { "Sürüyor": S.colorOf("Çevrim dışı"), "Bitti": S.colorOf("Çevrim içi") };
+      this.__table.getTableModel().setData(shown.map(r => {
+        const cells = r.cells.slice();
+        // Değer sabit metin ("Sürüyor"/"Bitti"): kaçışa gerek yok; kaçış ü→&uuml; yapıp otomatik genişliği şişiriyordu.
+        cells[3] = S.html(cells[3], color[cells[3]] || null);
+        return cells;
+      }));
       const total = shown.reduce((sum, r) => sum + r.seconds, 0);
       this.__count.setValue(`${shown.length} / ${this.__rows.length} kayıt · toplam süre ${ankamon.util.Format.span(total)}`);
     }

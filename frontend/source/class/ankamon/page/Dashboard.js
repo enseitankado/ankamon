@@ -33,8 +33,9 @@
  *  - "Toplam disk kullanımı" (yetki "logs.manage"): Disk kullanımı ▸ Özet'in daire grafiği, küçük. Hesabı yavaş
  *    olduğundan tampondan çizilir; tampon CACHE_MS'ten eskiyse arkada yeniden hesaplanır (bkz. ui.DiskUsageSummary).
  *    Dilime/satıra tıklama o veri türünün sekmesini açar.
- *  - "Sağlık — acil bulgular" (yetki "anomalies" ya da "diagnose"): Sağlık ▸ Durum'daki Acil bulgular
- *    (GET /api/device-health). Çift tık: Sağlık ▸ Durum.
+ *  - "Sağlık — acil ve dikkat gerektiren bulgular" (yetki "anomalies" ya da "diagnose"): Sağlık ▸ Durum'daki Acil ve Dikkat
+ *    bulguları (GET /api/device-health; kullanıcı isteği 2026-11-23: Dikkat de listelenir, Düzey sütunu Durum'daki renkle,
+ *    varsayılan sıra Acil önce sonra en yeni; sütun genişlikleri içeriğe göre — storageKey). Çift tık: Sağlık ▸ Durum.
  *
  * Sade görünüm (kullanıcı isteği 2026-11-23): varsayılan olarak yalnız "Kayıtlı cihaz", "Çevrimiçi", "Sensör verisi gelen" ve
  * hemen yanında aynı boyutta "Toplam disk kullanımı" kartı (eski disk daire grafiği paneli karta dönüştü; grafik kartın
@@ -208,16 +209,21 @@ qx.Class.define("ankamon.page.Dashboard", {
     __createHealthRow() {
       const health = this._can("anomalies") || this._can("diagnose");
       if (health) {
-        const box = this.__panel("Sağlık — acil bulgular");
+        const box = this.__panel("Sağlık — acil ve dikkat gerektiren bulgular");
         this.__urgentTitle = box.getChildren()[0].getChildren()[0];
+        // Genişlikler içeriğe göre kendiliğinden (storageKey — kullanıcının elle ayarladığı korunur; gizli/sıra anahtarları
+        // eski prefsKey'inkiyle aynı: "dashboard.urgent.columns.hidden/.order").
         this.__urgent = this._createTable([
           { id: "device", label: "Cihaz", width: 150 },
+          { id: "level", label: "Düzey", width: 70, choices: true },
           { id: "check", label: "Bulgu", width: 220 },
           { id: "path", label: "Yol", width: 110 },
           { id: "at", label: "Zaman", width: 140 },
           // Ayrıntı varsayılan gizli (kullanıcı isteği 2026-11-23); sütun menüsünden açılır.
           { id: "text", label: "Ayrıntı", hidden: true }
-        ], { prefsKey: "dashboard.urgent.columns", filterable: true });
+        ], { storageKey: "dashboard.urgent.columns", filterable: true });
+        // Düzey (Acil/Dikkat) Sağlık ▸ Durum'daki renkli düzey çizicisiyle aynı.
+        ankamon.ui.health.Status.installLevelRenderer(this.__urgent, 2);
         this.__urgent.setToolTipText("Çift tıklayın: Sağlık ▸ Durum");
         this.__urgent.addListener("cellDbltap", () =>
           qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "anomalies", tab: "status" }));
@@ -416,11 +422,17 @@ qx.Class.define("ankamon.page.Dashboard", {
       if (this.isDisposed()) {
         return;
       }
-      const bad = (data.findings || []).filter(f => f.level === "bad");
-      const devices = new Set(bad.map(f => f.device_id ?? f.device));
-      this.__urgentTitle.setValue(bad.length ? `Sağlık — acil bulgular (${devices.size} cihazda ${bad.length})`
-        : "Sağlık — acil bulgu yok");
-      this.__urgent.getTableModel().setData(bad.map((f, i) => [i, f.device || "?", f.check, P[f.path] ? P[f.path].text : f.path,
+      // Acil ve Dikkat (kullanıcı isteği 2026-11-23); varsayılan sıra: Acil önce, düzey içinde en yeni üstte.
+      const rank = { bad: 0, warn: 1 };
+      const shown = (data.findings || []).filter(f => f.level in rank)
+        .sort((a, b) => rank[a.level] - rank[b.level] || (b.since || 0) - (a.since || 0));
+      const count = level => shown.filter(f => f.level === level).length;
+      const devices = new Set(shown.map(f => f.device_id ?? f.device));
+      const parts = [count("bad") && `${count("bad")} acil`, count("warn") && `${count("warn")} dikkat`].filter(Boolean).join(", ");
+      this.__urgentTitle.setValue(shown.length ? `Sağlık — acil ve dikkat gerektiren bulgular (${devices.size} cihazda ${parts})`
+        : "Sağlık — acil ya da dikkat gerektiren bulgu yok");
+      this.__urgent.getTableModel().setData(shown.map((f, i) => [i, f.device || "?", ankamon.ui.health.Status.levelText(f.level),
+        f.check, P[f.path] ? P[f.path].text : f.path,
         f.since ? ankamon.ui.health.Status.when(f.since) : "", (f.text || "") + (f.advice ? ` — Öneri: ${f.advice}` : "")]));
     },
 
