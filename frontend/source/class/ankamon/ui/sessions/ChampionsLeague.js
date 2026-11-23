@@ -45,6 +45,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
    */
   construct(page, by) {
     super("Kullanım sıralaması"); // eski adı "Şampiyonlar Ligi" (Ligler sayfası — bkz. page.Leagues)
+    this.__leaguePage = page; // grup kapsamı (bkz. page.Leagues groupQuery)
     this.__byFixed = by === "devices" ? "devices" : "users";
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
@@ -118,6 +119,7 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
   },
 
   members: {
+    __leaguePage: null,
     __status: null,
     __html: null,
     __byFixed: null,
@@ -135,7 +137,8 @@ qx.Class.define("ankamon.ui.sessions.ChampionsLeague", {
       this.__reloadAfter = false;
       try {
         const by = this.__byKey();
-        const data = await ankamon.io.Api.get(`/session-league?by=${by}` + (this.__out.withExcluded() ? "&with_excluded=1" : ""));
+        const data = await ankamon.io.Api.get(`/session-league?by=${by}` + (this.__out.withExcluded() ? "&with_excluded=1" : "") +
+          this.__leaguePage.groupQuery());
         this.__out.setInfo(data.excluded);
         this.__renderLeague(data.periods || [], by === "devices");
         this.__status.setValue("Cihazlarda açık kalınan toplam oturum süresine göre · etapadmin ve root sayılmaz · " +

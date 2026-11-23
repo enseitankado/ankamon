@@ -47,6 +47,28 @@ qx.Class.define("ankamon.page.Leagues", {
   members: {
     __tabs: null,
 
+    /** Varlık grubunun cihaz kayıtları (Ligler her grubun altında — kullanıcı isteği 2026-11-23); null: bütün cihazlar. */
+    __groupDevices: null,
+
+    /** Sol menüde grubun altından açıldı: sıralamalar o grubun cihazlarıyla (GET ...&devices=). */
+    setGroup(id, devices) {
+      // Boş grup "0" (hiçbir cihaz): boş değer sunucuda "kapsam yok" sayılır.
+      const next = id ? (devices || []).join(",") || "0" : null;
+      if (next === this.__groupDevices) {
+        return;
+      }
+      this.__groupDevices = next;
+      const tab = this.__tabs.getSelection()[0];
+      if (tab && tab.isSeeable() && typeof tab.load === "function") {
+        tab.load();
+      }
+    },
+
+    /** Sekmelerin isteğine eklenecek grup kapsamı ("&devices=1,2" ya da ""). */
+    groupQuery() {
+      return this.__groupDevices === null ? "" : "&devices=" + this.__groupDevices;
+    },
+
     async _refresh() {
       // Sekmeler kendi verisini kendisi çeker (bkz. o sınıflar).
     }

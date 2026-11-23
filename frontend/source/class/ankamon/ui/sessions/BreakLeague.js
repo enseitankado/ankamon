@@ -49,6 +49,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
    */
   construct(page, by) {
     super("Teneffüsler"); // eski adları "Teneffüs Ligi", "Ders arası sıralaması" (Ligler sayfası — bkz. page.Leagues)
+    this.__leaguePage = page; // grup kapsamı (bkz. page.Leagues groupQuery)
     this.__byFixed = by === "users" ? "users" : "devices";
     this.setLayout(new qx.ui.layout.VBox(8));
     this.setPadding(8);
@@ -103,6 +104,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
   },
 
   members: {
+    __leaguePage: null,
     __byFixed: null,
     __legend: null,
     __sort: null,
@@ -149,7 +151,7 @@ qx.Class.define("ankamon.ui.sessions.BreakLeague", {
         const sort = this.__sortKey();
         const by = this.__byKey();
         const data = await ankamon.io.Api.get("/break-league?sort=" + encodeURIComponent(sort) + "&by=" + by +
-          (this.__out.withExcluded() ? "&with_excluded=1" : ""));
+          (this.__out.withExcluded() ? "&with_excluded=1" : "") + this.__leaguePage.groupQuery());
         this.__out.setInfo(data.excluded);
         const breaks = data.breaks || [];
         if (!breaks.length) {

@@ -53,6 +53,7 @@ final class SessionLeagueApi
     public function index(Request $request): array
     {
         $limit = $request->queryInt('limit', 10, 1, 50);
+        self::setDeviceScope($request);
         $by = $request->query('by') === 'devices' ? 'devices' : 'users';
         $withOut = $request->query('with_excluded') === '1';
         $leagueOut = LeagueExclusionsApi::leagueExcludedValues('session', $by === 'devices' ? 'device' : 'user');
@@ -114,8 +115,34 @@ final class SessionLeagueApi
      * cihazda kullanıcı sayısı ve en çok kullanan kullanıcı. Ayrıca katılımcı sayısı, toplam süre ve dönemde süresi
      * olan lig dışı sayısı (excluded_count). Lig dışılar $withOut değilse ne sıralamaya ne toplamlara girer.
      */
+    /**
+     * Varlık grubu kapsamı (kullanıcı isteği 2026-11-23: Ligler her grubun altında, o grubun cihazlarıyla): ?devices=1,2,3 —
+     * grubun cihaz kaydı kimlikleri; yoksa null (bütün cihazlar). Kimlikler tamsayıya çevrilir (sorguya doğrudan yazılır).
+     */
+    private static ?string $deviceScope = null;
+
+    public static function setDeviceScope(Request $request): void
+    {
+        $raw = $request->query('devices');
+        self::$deviceScope = $raw === null ? null
+            : '{' . implode(',', array_map('intval', array_filter(explode(',', $raw), 'is_numeric'))) . '}';
+    }
+
+    /**
+     * Tablo kaynağı: kapsam yoksa tablonun kendisi, varsa yalnız o cihazların satırları (aynı adla — sorgunun geri kalanı
+     * değişmez). @param alias sorgudaki takma ad (yoksa tablo adı)
+     */
+    public static function scoped(string $table, ?string $alias = null): string
+    {
+        $alias ??= $table;
+        return self::$deviceScope === null ? "$table $alias"
+            : "(SELECT * FROM $table WHERE device_id = ANY('" . self::$deviceScope . "'::int[])) $alias";
+    }
+
     private static function leagueStandings(string $by, string $from, string $to, int $limit, array $leagueOut, bool $withOut): array
     {
+        $parts = self::scoped('session_league_parts', 'p');
+        $partsAll = self::scoped('session_league_parts');
         $users = $by === 'users';
         // Gruplama anahtarı ve "en çok" eşi: kullanıcının en çok kullandığı cihaz / cihazı en çok kullanan kullanıcı.
         $key = $users ? 'username' : 'host';
@@ -137,7 +164,7 @@ final class SessionLeagueApi
                LEFT JOIN devices b ON b.id = r.device_id LEFT JOIN top t ON t.k = r.host";
         $rows = Db::all(
             "WITH parts AS (
-                 SELECT p.* FROM session_league_parts p
+                 SELECT p.* FROM $parts
                  WHERE p.day >= ?::date AND p.day < ?::date AND lower(p.username) <> ALL(?::text[])
              ), totals AS (
                  SELECT $key, sum(seconds)::bigint AS seconds, count(DISTINCT day) AS days,
@@ -154,7 +181,7 @@ final class SessionLeagueApi
             [$from, $to, Db::textArray(self::LEAGUE_EXCLUDED_USERS), Db::textArray($leagueOut), $withOut ? 'true' : 'false', $limit]
         );
         $hidden = $leagueOut ? (int) Db::value(
-            "SELECT count(DISTINCT $outMatch) FROM session_league_parts
+            "SELECT count(DISTINCT $outMatch) FROM $partsAll
              WHERE day >= ?::date AND day < ?::date AND lower(username) <> ALL(?::text[]) AND $outMatch = ANY(?::text[])
                AND seconds > 0",
             [$from, $to, Db::textArray(self::LEAGUE_EXCLUDED_USERS), Db::textArray($leagueOut)]

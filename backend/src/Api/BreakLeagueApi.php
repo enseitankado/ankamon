@@ -67,6 +67,7 @@ final class BreakLeagueApi
         $lessons = Settings::get('lesson_times');
         $withOut = $request->query('with_excluded') === '1';
         $by = $request->query('by') === 'users' ? 'users' : 'devices';
+        SessionLeagueApi::setDeviceScope($request); // varlık grubu kapsamı (?devices=) — bkz. SessionLeagueApi::scoped
         $leagueOut = LeagueExclusionsApi::leagueExcludedValues('break', $by === 'users' ? 'user' : 'device');
         $periods = [];
         foreach (SessionLeagueApi::leaguePeriods($today, Settings::get('school_calendar')) as $period) {
@@ -108,6 +109,8 @@ final class BreakLeagueApi
      */
     private static function breakStandings(string $from, string $to, string $column, int $limit, array $leagueOut, bool $withOut): array
     {
+        $days = SessionLeagueApi::scoped('break_league_days');
+        $userDays = SessionLeagueApi::scoped('break_league_user_days');
         $out = Db::textArray($leagueOut);
         $shown = $withOut ? 'true' : 'false';
         $rows = Db::all(
@@ -116,7 +119,7 @@ final class BreakLeagueApi
                         sum(session_seconds)::bigint AS session_seconds,
                         sum(on_seconds - session_seconds)::bigint AS idle_seconds,
                         sum(break_seconds)::bigint AS break_seconds, count(*) AS days
-                 FROM break_league_days WHERE day >= ?::date AND day < ?::date AND (?::boolean OR host <> ALL(?::text[]))
+                 FROM $days WHERE day >= ?::date AND day < ?::date AND (?::boolean OR host <> ALL(?::text[]))
                  GROUP BY host HAVING sum(on_seconds) > 0
              ), ranked AS (
                  SELECT * FROM days WHERE $column > 0 ORDER BY $column DESC, on_seconds DESC, host LIMIT ?
@@ -129,12 +132,12 @@ final class BreakLeagueApi
         $all = Db::one(
             'SELECT count(DISTINCT host) AS devices, COALESCE(sum(on_seconds), 0)::bigint AS on_seconds,
                     COALESCE(sum(session_seconds), 0)::bigint AS session_seconds
-             FROM break_league_days WHERE day >= ?::date AND day < ?::date AND on_seconds > 0
+             FROM ' . $days . ' WHERE day >= ?::date AND day < ?::date AND on_seconds > 0
                AND (?::boolean OR host <> ALL(?::text[]))',
             [$from, $to, $shown, $out]
         ) ?: [];
         $hidden = $leagueOut ? (int) Db::value(
-            'SELECT count(DISTINCT host) FROM break_league_days
+            'SELECT count(DISTINCT host) FROM ' . $days . '
              WHERE day >= ?::date AND day < ?::date AND on_seconds > 0 AND host = ANY(?::text[])',
             [$from, $to, $out]
         ) : 0;
@@ -164,10 +167,12 @@ final class BreakLeagueApi
      */
     private static function breakUserStandings(string $from, string $to, string $column, int $limit, array $leagueOut, bool $withOut): array
     {
+        $days = SessionLeagueApi::scoped('break_league_days');
+        $userDays = SessionLeagueApi::scoped('break_league_user_days');
         $out = Db::textArray($leagueOut);
         $system = Db::textArray(SessionLeagueApi::LEAGUE_EXCLUDED_USERS);
         $shown = $withOut ? 'true' : 'false';
-        $base = 'SELECT * FROM break_league_user_days WHERE day >= ?::date AND day < ?::date
+        $base = 'SELECT * FROM ' . $userDays . ' WHERE day >= ?::date AND day < ?::date
                    AND lower(username) <> ALL(?::text[])';
         $rows = Db::all(
             "WITH parts AS ($base AND (?::boolean OR lower(username) <> ALL(?::text[]))),
@@ -203,9 +208,9 @@ final class BreakLeagueApi
         // Kimseye yazılamayan oturumsuz süre (cihaz açıldığından beri kimse oturum açmamış): cihaz bazındaki toplamdan
         // kullanıcılara (etapadmin/root dahil) yazılan kısım düşülür; lig dışılardan bağımsız, yalnız bilgi.
         $unassigned = (int) Db::value(
-            'SELECT GREATEST(0, (SELECT COALESCE(sum(on_seconds - session_seconds), 0) FROM break_league_days
+            'SELECT GREATEST(0, (SELECT COALESCE(sum(on_seconds - session_seconds), 0) FROM ' . $days . '
                                  WHERE day >= ?::date AND day < ?::date)
-                              - (SELECT COALESCE(sum(idle_seconds), 0) FROM break_league_user_days
+                              - (SELECT COALESCE(sum(idle_seconds), 0) FROM ' . $userDays . '
                                  WHERE day >= ?::date AND day < ?::date))::bigint',
             [$from, $to, $from, $to]
         );
