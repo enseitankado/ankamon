@@ -25,10 +25,14 @@
 
 """Cihazda çalışan sohbet penceresi (python3-gi, Gtk 3; kurulum yok, SSH oturumuyla yaşar).
 
-Satır başına JSON: stdin'den {"t":"msg","author","text"} / {"t":"end"}; stdout'a {"t":"ready"} / {"t":"msg","text"} /
+Satır başına JSON: stdin'den {"t":"msg","author","text"} / {"t":"opts","reply","size","font"} / {"t":"end"}; stdout'a {"t":"ready"} / {"t":"msg","text"} /
 {"t":"closed"}. Yeni ileti gelince pencere öne çıkar. Etkin VT değişirse (oturum açıldı, kullanıcı değişti) 75 koduyla çıkar:
 köprü doğru ekranda yeniden başlatır. {"t":"end"} (yönetici sohbeti kapattı) pencereyi hemen kapatır; stdin kapanırsa (köprü
 bitti) kısa bir bildirimden sonra kapanır.
+
+{"t":"opts"} (Ankamon'daki sohbet penceresinden, canlı): reply=false → yazma kutusu ve Gönder düğmesi gizlenir (salt okunur);
+size=small|medium|large|full → ekranın oranıyla boyut (full: tam ekran); font>0 → punto (0: sistemin). Ajan her sohbette
+köprüden yeniden gönderilir (cihazda kurulu sürüm yok): opts bilmeyen eski ajan söz konusu olmaz.
 """
 
 import json
@@ -61,13 +65,38 @@ def send(obj):
         pass
 
 
+# Boyut ön ayarları: ekranın genişlik/yükseklik oranı ve en küçük piksel (sağ altta, görev çubuğunun üstünde).
+CHAT_SIZES = {"small": (0.24, 0.30, 360, 280), "medium": (0.32, 0.42, 460, 380), "large": (0.50, 0.62, 640, 480)}
+
 win = Gtk.Window(title="Yönetici ile sohbet")
-win.set_default_size(460, 380)
 win.set_keep_above(True)
 win.set_icon_name("mail-message-new")
-win.set_gravity(Gdk.Gravity.SOUTH_EAST)
 scr = Gdk.Screen.get_default()
-win.move(max(scr.get_width() - 500, 0), max(scr.get_height() - 460, 0))
+state = {"size": None, "full": False, "reply": True, "font": 0}
+
+
+def apply_size(size):
+    if size == state["size"]:
+        return              # aynı ön ayar: kişinin elle taşıdığı/boyutladığı pencereye dokunma
+    state["size"] = size
+    if size == "full":
+        # Pencere yöneticisi yoksa/tam ekranı reddederse de ekranı kaplasın.
+        win.move(0, 0)
+        win.resize(scr.get_width(), scr.get_height())
+        win.fullscreen()
+        state["full"] = True
+        return
+    if state["full"]:
+        win.unfullscreen()
+        state["full"] = False
+    fw, fh, mw, mh = CHAT_SIZES.get(size, CHAT_SIZES["medium"])
+    sw, sh = scr.get_width(), scr.get_height()
+    w, h = min(max(int(sw * fw), mw), sw), min(max(int(sh * fh), mh), sh)
+    win.resize(w, h)
+    win.move(max(sw - w - 40, 0), max(sh - h - 80, 0))
+
+
+apply_size("medium")
 
 box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin=8)
 scroll = Gtk.ScrolledWindow()
@@ -86,6 +115,25 @@ row.pack_start(entry, True, True, 0)
 row.pack_start(button, False, False, 0)
 box.pack_start(row, False, False, 0)
 win.add(box)
+css = Gtk.CssProvider()
+Gtk.StyleContext.add_provider_for_screen(scr, css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+
+def apply_opts(msg):
+    reply = msg.get("reply", True) is not False
+    if reply != state["reply"]:
+        state["reply"] = reply
+        row.set_visible(reply and not ended)
+        if reply:
+            entry.grab_focus()
+    try:
+        font = int(msg.get("font") or 0)
+    except (TypeError, ValueError):
+        font = 0
+    if font != state["font"]:
+        state["font"] = font
+        css.load_from_data((f"* {{ font-size: {max(6, min(72, font))}pt; }}" if font > 0 else "").encode())
+    apply_size(msg.get("size") or "medium")
 
 
 def append(who, text, tag="who"):
@@ -141,9 +189,12 @@ def on_stdin(_fd, _cond):
         msg = json.loads(line)
     except ValueError:
         return True
-    if msg.get("t") == "msg":
+    if msg.get("t") == "opts":
+        apply_opts(msg)
+    elif msg.get("t") == "msg":
         append(msg.get("author") or "Yönetici", msg.get("text") or "")
         win.show_all()
+        row.set_visible(state["reply"])
         win.present()
     elif msg.get("t") == "end":
         # Yönetici penceresini kapattı: cihazdaki pencere de hemen kapanır.
@@ -166,6 +217,17 @@ win.connect("delete-event", on_close)
 GLib.io_add_watch(sys.stdin.fileno(), GLib.IO_IN | GLib.IO_HUP, on_stdin)
 GLib.timeout_add_seconds(2, watch_vt)
 append(None, "Yönetici bu bilgisayarla sohbet başlattı.")
+# Yazma satırı show_all'dan muaf: görünürlüğü yalnız "reply" ayarı belirler (salt okunurda bir an bile görünmesin).
+entry.show()
+button.show()
+row.set_no_show_all(True)
+row.set_visible(True)
+if len(sys.argv) > 2:
+    # Köprünün ilk ayarları (argv): pencere ilk çizimden önce doğru boyut/punto/yanıt durumunda açılır.
+    try:
+        apply_opts(json.loads(sys.argv[2]))
+    except ValueError:
+        pass
 win.show_all()
 send({"t": "ready"})
 Gtk.main()

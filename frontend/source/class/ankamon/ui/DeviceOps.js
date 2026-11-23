@@ -1235,9 +1235,12 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         }
         // Wi-Fi Monitör artık ankamon-wifi eklentisinde (kullanıcı isteği 2026-11-23): yüklü ve etkinse maddeyi kendisi ekler
         // (Extensions.addDeviceMenu — araç çubuğunda "Wi-Fi" düğmesiyle).
-        // Sohbet: her bilgisayar için ayrı pencere; çoklu seçimde sağ tıklanan cihaz (bkz. ui.chat.Window).
+        // Sohbet: tek cihazda o cihazın penceresi; çoklu seçimde seçili çevrim içi cihazların HEPSİNE tek pencere (kullanıcı isteği
+        // 2026-11-23 — karşı taraf varsayılan salt okur; bkz. ui.chat.Window).
         if (can("devices.chat")) {
-          add(ICON.chat, "Sohbet", () => ankamon.ui.chat.Window.open(device));
+          const chatTargets = os("Sohbet", online);
+          const chatCount = chatTargets.length > 1 ? ` (${chatTargets.length} cihaz)` : "";
+          add(ICON.chat, "Sohbet" + chatCount, () => ankamon.ui.chat.Window.open(chatTargets.length ? chatTargets : [device]));
         }
       } else {
         // Kapalı cihazda en olası iş onu açmak: Bilgisayarı aç (WoL) ve güç seçenekleri EN ÜSTTE (kullanıcı

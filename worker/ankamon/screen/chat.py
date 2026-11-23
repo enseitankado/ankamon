@@ -30,9 +30,18 @@ SSH oturumu) açılır. Cihaza port açılmaz, kurulum yapılmaz: ajan SSH üst�
 gönderilmez `chat_messages`'a yazılır (Oturumlar ▸ Sohbet geçmişi). Son pencere kapanınca cihazdaki pencere de kapanır.
 Ajan düşerse (oturum değişti → 75, cihaz kapandı) pencere açık kaldıkça birkaç saniyede bir yeniden başlatılır.
 
-Yetki: nginx /screen/ws/chat/ → "devices.chat". Tarayıcı iletileri: {"text": "..."}. Sunucu iletileri:
-{"t":"msg", id, direction, author, text, at} / {"t":"status", "state":"online|closed|offline", "detail"}.
-Kapanış kodları: 4001 cihaz yok · 4029 sınır aşıldı.
+Çoklu cihaz sohbeti (kullanıcı isteği 2026-11-23): tarayıcıdaki tek pencere her cihaza ayrı bağlantı açar; merkez cihaz başına
+kalır, geçmiş her cihaz için ayrı yazılır.
+
+Cihazdaki pencerenin ayarları (`opts`): reply — karşı taraf yanıt yazabilir mi (kapalıyken yazma kutusu ve Gönder düğmesi
+görünmez); size — small|medium|large|full; font — punto (0: sistemin). Bağlantı adresinin sorgusunda (?reply=0&size=…&font=…)
+ilk değer, sohbet sırasında {"t":"opts", …} ile değişiklik gelir; merkez son değeri tutar, ajana hemen ve her yeniden
+başlamada iletir, bütün pencerelere {"t":"opts", …} yayar. Sorgusuz eski arayüz bugünkü davranışı alır (yanıt açık).
+
+Yetki: nginx /screen/ws/chat/ → "devices.chat". Tarayıcı iletileri: {"text": "...", "k": "<isteğe bağlı eş anahtarı>"} /
+{"t":"opts", reply, size, font}. Sunucu iletileri: {"t":"msg", id, direction, author, text, at[, k]} (k: aynı gönderimin
+öteki cihazlardaki kopyalarını çoklu pencere tek satırda toplar) / {"t":"status", "state":"online|closed|offline", "detail"} /
+{"t":"opts", reply, size, font}. Kapanış kodları: 4001 cihaz yok · 4029 sınır aşıldı.
 """
 
 from __future__ import annotations
@@ -42,6 +51,7 @@ import base64
 import json
 import logging
 import os
+import shlex
 
 import tornado.websocket
 
@@ -55,6 +65,8 @@ HISTORY = 100
 RETRY_SECONDS = 5
 EXIT_VT_CHANGED = 75
 EXIT_NO_GUI = 46
+CHAT_WINDOW_SIZES = ("small", "medium", "large", "full")
+CHAT_FONT_RANGE = (6, 72)
 
 _AGENT = open(os.path.join(os.path.dirname(__file__), "chat_agent.py"), encoding="utf-8").read()
 _REMOTE = _FIND_DISPLAY + r"""
@@ -63,6 +75,11 @@ export DISPLAY="$D" HOME=/tmp NO_AT_BRIDGE=1
 [ -n "$A" ] && export XAUTHORITY="$A"
 echo "U $U"
 exec python3 -u -c "import base64,sys;exec(compile(base64.b64decode(sys.argv[1]),'ankamon-chat','exec'))" """ + base64.b64encode(_AGENT.encode()).decode()
+
+
+def _remote_cmd(opts: dict) -> str:
+    """Uzak komut + ajanın ilk pencere ayarları (argv[2], JSON): pencere ilk çizimde doğru boyut/punto/yanıt durumunda açılır."""
+    return _REMOTE + " " + shlex.quote(json.dumps(opts, separators=(",", ":")))
 
 _hubs: dict[int, "Hub"] = {}
 
@@ -85,6 +102,22 @@ def _history(device_id: int) -> list[dict]:
             for r in reversed(rows)]
 
 
+def chat_window_opts(raw: dict, base: dict | None = None) -> dict:
+    """Tarayıcıdan gelen pencere ayarlarını süzer; eksik alanlar `base`ten (yoksa bugünkü davranıştan) gelir."""
+    out = dict(base or {"reply": True, "size": "medium", "font": 0})
+    if "reply" in raw:
+        out["reply"] = str(raw["reply"]).lower() not in ("0", "false", "no", "")
+    if raw.get("size") in CHAT_WINDOW_SIZES:
+        out["size"] = raw["size"]
+    if "font" in raw:
+        try:
+            font = int(raw["font"])
+        except (TypeError, ValueError):
+            font = out["font"]
+        out["font"] = 0 if font <= 0 else max(CHAT_FONT_RANGE[0], min(CHAT_FONT_RANGE[1], font))
+    return out
+
+
 def _opened(name: str, user: str) -> None:
     with db.connect() as conn:
         activity.record(conn, f"Sohbet: {user} → {name}")
@@ -102,6 +135,13 @@ class Hub:
         self.task = None
         self.status = {"t": "status", "state": "offline", "detail": "Bağlanılıyor…"}
         self.sent_now: list[dict] = []   # bu oturumun iletileri: ajan yeniden başlarsa pencereye yeniden yazılır
+        self.opts = chat_window_opts({})
+
+    def set_opts(self, raw: dict) -> None:
+        """Cihazdaki pencerenin ayarları değişti: ajana hemen, bütün tarayıcı pencerelerine bilgi olarak."""
+        self.opts = chat_window_opts(raw, self.opts)
+        self._write_agent({"t": "opts", **self.opts})
+        self.broadcast({"t": "opts", **self.opts})
 
     def broadcast(self, msg: dict) -> None:
         text = json.dumps(msg, ensure_ascii=False)
@@ -145,7 +185,7 @@ class Hub:
         self.name = device["name"]
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "SSHPASS": password}
         proc = await asyncio.create_subprocess_exec(
-            "sshpass", "-e", "ssh", *self._ssh_opts, f"{ssh_user}@{device['ip']}", _REMOTE,
+            "sshpass", "-e", "ssh", *self._ssh_opts, f"{ssh_user}@{device['ip']}", _remote_cmd(self.opts),
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=env,
         )
         self.proc = proc
@@ -175,6 +215,7 @@ class Hub:
         if msg.get("t") == "ready":
             who = f" — oturum: {self.session}" if self.session else " — giriş ekranı"
             self.set_status("online", "Cihazda sohbet penceresi açık" + who)
+            self._write_agent({"t": "opts", **self.opts})
             for old in self.sent_now[-20:]:
                 self._write_agent({"t": "msg", "author": old["author"], "text": old["text"]})
         elif msg.get("t") == "closed":
@@ -190,10 +231,10 @@ class Hub:
         if proc and proc.returncode is None and proc.stdin and not proc.stdin.is_closing():
             proc.stdin.write((json.dumps(msg, ensure_ascii=False) + "\n").encode())
 
-    async def from_browser(self, user: str, text: str) -> None:
+    async def from_browser(self, user: str, text: str, key: str = "") -> None:
         saved = await asyncio.to_thread(_save, self.device_id, self.name, self.session, "out", user, text)
         self.sent_now.append(saved)
-        self.broadcast(saved)
+        self.broadcast({**saved, "k": key} if key else saved)
         self._write_agent({"t": "msg", "author": user, "text": text})
 
     def client_left(self, client) -> None:
@@ -226,11 +267,18 @@ class ChatSocket(tornado.websocket.WebSocketHandler):
         if hub is None:
             hub = _hubs[device_id] = Hub(device_id, self._lookup, self._ssh_opts)
         hub.name = found[0]["name"]
-        for msg in await asyncio.to_thread(_history, device_id):
-            await self.write_message(json.dumps(msg, ensure_ascii=False))
+        query = {k: self.get_argument(k) for k in ("reply", "size", "font") if self.get_argument(k, None) is not None}
+        if query:
+            # Ajan henüz başlamadıysa ilk penceresi doğrudan bu ayarlarla açılır (salt okunurda yazma kutusu hiç görünmez).
+            hub.set_opts(query)
+        # Çoklu cihaz penceresi (?history=0) geçmişi almaz: cihazların ayrı geçmişleri tek akışta karışırdı.
+        if self.get_argument("history", "1") != "0":
+            for msg in await asyncio.to_thread(_history, device_id):
+                await self.write_message(json.dumps(msg, ensure_ascii=False))
         self.hub = hub
         hub.clients.add(self)
         await self.write_message(json.dumps(hub.status, ensure_ascii=False))
+        await self.write_message(json.dumps({"t": "opts", **hub.opts}, ensure_ascii=False))
         hub.ensure_running()
         await asyncio.to_thread(_opened, hub.name, self.user)
 
@@ -238,11 +286,14 @@ class ChatSocket(tornado.websocket.WebSocketHandler):
         if not self.hub:
             return
         try:
-            text = str(json.loads(message).get("text") or "").strip()
+            msg = json.loads(message)
+            text = str(msg.get("text") or "").strip()
         except (ValueError, AttributeError):
             return
-        if text:
-            await self.hub.from_browser(self.user, text[:4000])
+        if msg.get("t") == "opts":
+            self.hub.set_opts(msg)
+        elif text:
+            await self.hub.from_browser(self.user, text[:4000], str(msg.get("k") or "")[:64])
 
     def on_close(self):
         if self.hub:

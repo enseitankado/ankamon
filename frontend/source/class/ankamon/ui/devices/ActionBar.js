@@ -102,9 +102,9 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
     },
 
     /** Menüde tek cihaza uygulanan maddeler: çoklu seçimde her cihaz için ayrı açılır (pencere başına cihaz). Görev
-     * yöneticisi çoklu seçimde tek pencerede bütün cihazları gösterir (bilgisayar süzgeciyle), burada değil. */
+     * yöneticisi ve Sohbet (2026-11-23) çoklu seçimde tek pencerede bütün cihazlarladır, burada değil. */
     // "Düzenle" yok: çoklu seçimde sağ menünün kendisi toplu düzenleme penceresini açar (ui.network.DeviceBulkEdit).
-    PER_DEVICE: ["Bilgisayarı yönet", "Sohbet", "Dosya yöneticisi"],
+    PER_DEVICE: ["Bilgisayarı yönet", "Dosya yöneticisi"],
     PER_DEVICE_CONFIRM: 6
   },
 
