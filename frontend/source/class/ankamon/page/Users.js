@@ -147,59 +147,32 @@ qx.Class.define("ankamon.page.Users", {
       win.add(form);
 
       // etapadmin her şeye yetkilidir ve kapatılamaz.
-      const boxes = [];
+      let picker = null;
       let active = null;
       if (!target.is_admin) {
         active = new qx.ui.form.CheckBox("Hesap etkin").set({ value: target.is_active });
         win.add(active);
+        // Hazır roller + konu gruplarına ayrılmış, katlanır yetki listesi; bağımlılıklar (feature.parent) orada
+        // korunur — bkz. ui.users.FeatureRolePicker (kullanıcı isteği 2026-11-23).
+        picker = new ankamon.ui.users.FeatureRolePicker(this.__features, target.features);
+        win.add(picker.getRoleBar());
         win.add(new qx.ui.basic.Label("Kullanabileceği özellikler").set({ font: "bold" }));
-        // Alt özellikler (feature.parent, bkz. backend/config/feature_deps.php) üstlerinin hemen altında
-        // girintili; üst kapalıyken işaretsiz ve devre dışı — üstü olmadan arayüzde kullanılamazlar.
-        const list = new qx.ui.container.Composite(new qx.ui.layout.VBox(2));
-        const byKey = new Map();
-        const keys = new Set(this.__features.map(f => f.key));
-        const parentOf = f => (f.parent && keys.has(f.parent) ? f.parent : null);
-        const children = parent => this.__features.filter(f => parentOf(f) === parent);
-        const addTree = (parent, depth) => children(parent).forEach(feature => {
-          const box = new qx.ui.form.CheckBox(feature.label).set({
-            value: target.features.includes(feature.key), marginLeft: depth * 22, rich: true
-          });
-          box.setUserData("key", feature.key);
-          box.setUserData("parent", parentOf(feature) ? byKey.get(parentOf(feature)) : null);
-          byKey.set(feature.key, box);
-          boxes.push(box);
-          list.add(box);
-          addTree(feature.key, depth + 1);
-        });
-        addTree(null, 0);
-        const sync = () => boxes.forEach(box => {
-          const parent = box.getUserData("parent");
-          const on = !parent || (parent.getValue() && parent.getEnabled());
-          box.setEnabled(on);
-          if (!on) {
-            box.setValue(false);
-          }
-        });
-        // Eski kayıtta alt özellik açık ama üstü kapalıysa üst açılır (sunucu da kaydederken aynısını yapar).
-        boxes.slice().reverse().forEach(box => {
-          if (box.getValue() && box.getUserData("parent")) {
-            box.getUserData("parent").setValue(true);
-          }
-        });
-        boxes.forEach(box => box.addListener("changeValue", sync));
-        sync();
-        // Liste tamamı görünecek yükseklikte (kullanıcı isteği); pencere ekrana sığmazsa — kalan yer kadar —
-        // kaydırılır. Scroll kendiliğinden içeriği kadar büyümez ve uzun etiketler satır kaydırdığından boyut
-        // ipucu gerçek boyu vermez: pencere göründükten sonra listenin GERÇEK yüksekliği ölçülüp uygulanır.
+        const list = picker.getList();
+        // Liste tamamı (bütün gruplar açık) görünecek yükseklikte (kullanıcı isteği); pencere ekrana sığmazsa — kalan
+        // yer kadar — kaydırılır. Scroll kendiliğinden içeriği kadar büyümez ve uzun etiketler satır kaydırdığından
+        // boyut ipucu gerçek boyu vermez: pencere göründükten sonra listenin GERÇEK yüksekliği ölçülüp uygulanır;
+        // seçimi olmayan gruplar ölçümden SONRA katlanır (açıldıklarında pencere boyu oynamasın).
         const scroll = new qx.ui.container.Scroll(list).set({ height: 200 });
         win.addListenerOnce("appear", () => qx.event.Timer.once(() => {
           const listHeight = (list.getBounds() || {}).height || 0;
           const winHeight = (win.getBounds() || {}).height || 0;
           const rest = winHeight - ((scroll.getBounds() || {}).height || 0); // form + düğmeler + çerçeve
           scroll.setHeight(Math.max(160, Math.min(listHeight + 4, rootBounds.height - 24 - rest)));
+          picker.collapseEmptyGroups();
           qx.ui.core.queue.Manager.flush();
           win.center();
         }, this, 0));
+        win.addListener("close", () => picker.dispose());
         win.add(scroll, { flex: 1 });
       }
 
@@ -210,7 +183,7 @@ qx.Class.define("ankamon.page.Users", {
         const values = form.values();
         if (!target.is_admin) {
           values.is_active = active.getValue();
-          values.features = boxes.filter(box => box.getValue()).map(box => box.getUserData("key"));
+          values.features = picker.getSelected();
         }
         try {
           if (isNew) {
@@ -225,6 +198,11 @@ qx.Class.define("ankamon.page.Users", {
         }
       });
       ankamon.ui.Dialog.buttons(win, [cancel, save]);
+      // ESC'de onay (bkz. ui.WindowEscClose): rol/grup düğmeleri yetkileri toplu değiştirdiğinden yalnız dokunulan
+      // alanlara bakan varsayılan denetim yetmez — form, "Hesap etkin" ve yetki seçimi açılıştakiyle karşılaştırılır.
+      const snapshot = () => JSON.stringify([form.values(), active && active.getValue(), picker && picker.getSelected()]);
+      const initial = snapshot();
+      win.setUserData("escDirty", () => (picker && picker.isDisposed() ? false : snapshot() !== initial));
       win.open();
     },
 
