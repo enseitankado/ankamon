@@ -1,0 +1,13 @@
+{
+  "title": "Disk editörü — işlemleri uygula",
+  "description": "Disk editöründe kuyruğa alınan bölüm/dosya sistemi işlemlerini sırayla uygular (yalnız Disk editörü penceresinden başlatılır).",
+  "category": "Disk",
+  "feature": "shell",
+  "hidden": true,
+  "confirm": true,
+  "timeout": 7200,
+  "params": [
+    {"key": "DISK_OPS", "label": "İşlem listesi", "type": "text", "required": true, "max": 20000,
+     "pattern": "^[A-Za-z0-9+/=]+$", "pattern_error": "geçersiz işlem listesi"}
+  ]
+}

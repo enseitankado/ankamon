@@ -65,6 +65,22 @@ final class Actions
         return $actions;
     }
 
+    /** Hazır işlemin dizini (çekirdek ACTIONS_DIR ya da eklenti ext/<ad>/actions/<kimlik>); yoksa null. */
+    public static function dir(string $id): ?string
+    {
+        if (!preg_match('/^[a-z0-9][a-z0-9._-]*$/', $id)) {
+            return null;
+        }
+        $core = (getenv('ACTIONS_DIR') ?: '/app/actions') . '/' . $id;
+        if (is_file($core . '/action.json')) {
+            return $core;
+        }
+        foreach (glob(Extensions::dir() . '/*/actions/' . $id . '/action.json') ?: [] as $file) {
+            return dirname($file);
+        }
+        return null;
+    }
+
     /**
      * Kullanıcının girdiği değerleri işlem tanımına göre doğrular.
      * @return array<string,string> run.sh'a ortam değişkeni olarak geçecek değerler
@@ -78,7 +94,8 @@ final class Actions
             if ($value === '' && !empty($param['required'])) {
                 throw ApiError::badRequest($param['label'] . ' boş bırakılamaz.');
             }
-            if (strlen($value) > 500 || preg_match('/[\x00-\x1f]/', $value)) {
+            // Uzunluk sınırı varsayılan 500; action.json "max" ile büyütülür (ör. disk-editor-apply'ın işlem listesi).
+            if (strlen($value) > (int) ($param['max'] ?? 500) || preg_match('/[\x00-\x1f]/', $value)) {
                 throw ApiError::badRequest($param['label'] . ' geçersiz karakter içeriyor.');
             }
             $type = $param['type'] ?? 'text';

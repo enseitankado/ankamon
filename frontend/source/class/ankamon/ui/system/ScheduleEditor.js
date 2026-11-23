@@ -26,7 +26,7 @@
  */
 
 /**
- * Zamanlanmış görev ekleme/düzenleme penceresi (Sistem ▸ Zamanlanmış işler ▸ Görevler; kullanıcı isteği 2026-11-13).
+ * Zamanlanmış görev ekleme/düzenleme penceresi (Sistem ▸ Zamanlanmış görevler ▸ Görevler; kullanıcı isteği 2026-11-13).
  * Bölümler: ad · görev (tür + türe göre ayarlar: hazır işlem ve alanları, serbest komut (Linux/Windows/macOS), anomali
  * türleri) · hedef (seçili cihazlar — aranabilir onay kutulu liste — ya da çalışma anında çevrimiçi tüm cihazlar) ·
  * zaman (bir kez / seçili günlerde saatinde / aralıkla). Kaydederken sunucu görevi elle başlatılanla AYNI kurallarla
@@ -259,7 +259,7 @@ qx.Class.define("ankamon.ui.system.ScheduleEditor", {
       const esc = qx.bom.String.escape;
       const select = new qx.ui.form.SelectBox();
       const secret = a => (a.params || []).some(p => p.type === "password");
-      actions.forEach(a => {
+      actions.filter(a => !a.ui).forEach(a => {   // kendi penceresi olan hazır komut (Disk editörü) zamanlanmaz
         const item = new qx.ui.form.ListItem(`${a.category} — ${a.title}`, null, a);
         if (secret(a)) {
           item.set({ enabled: false, toolTipText: "Parola isteyen işlemler zamanlanamaz (gizli değer saklanmaz)." });

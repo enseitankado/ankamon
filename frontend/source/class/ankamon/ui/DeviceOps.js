@@ -176,7 +176,7 @@ qx.Class.define("ankamon.ui.DeviceOps", {
      * pencerede iframe gösterir. webshell/webshellMulti ortak kullanır (bkz. screen()/filemanager() ile
      * aynı Grow+Iframe deseni; buradaki fark üstteki yazı boyutu çubuğu).
      */
-    __terminalWindow(caption, url) {
+    __terminalWindow(caption, url, devices) {
       const root = qx.core.Init.getApplication().getRoot();
       const bounds = root.getBounds() || { width: 1024, height: 700 };
       const win = new qx.ui.window.Window(caption).set({
@@ -230,9 +230,19 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         btn.addListener("execute", () => step(delta));
         bar.add(btn);
       });
+      // Hazır komutlar (kullanıcı isteği 2026-11-23): seçilen işlem terminale yazılıp çalıştırılır; çoklu terminalde
+      // her panoya kendi cihazının komutu gider (bkz. ui.ssh.TerminalActions).
+      const actionsBtn = devices && devices.length ? ankamon.ui.ssh.TerminalActions.button(devices, frame) : null;
+      if (actionsBtn) {
+        bar.addAt(actionsBtn, 0);
+        bar.addAt(new qx.ui.core.Spacer(12), 1);
+      }
       win.add(bar);
       win.add(frame, { flex: 1 });
       win.addListener("close", () => {
+        if (actionsBtn && actionsBtn.getMenu()) {
+          actionsBtn.getMenu().destroy(); // menü köke bağlıdır, pencereyle birlikte gitmez
+        }
         frame.setSource("about:blank");
         win.destroy();
       });
@@ -262,7 +272,7 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         const url = "/webshell/?hostname=" + encodeURIComponent(c.hostname) +
           "&port=" + c.port + "&username=" + encodeURIComponent(c.username) +
           "&password=" + encodeURIComponent(c.password) + "&title=" + encodeURIComponent(name);
-        this.__terminalWindow("Web terminal — " + name, url);
+        this.__terminalWindow("Web terminal — " + name, url, [device]);
       } catch (e) {
         ankamon.ui.Dialog.error(e);
       }
@@ -919,7 +929,7 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         return;
       }
       const hash = btoa(unescape(encodeURIComponent(JSON.stringify(panes))));
-      this.__terminalWindow(`Web terminal (${devices.length} cihaz)`, "/multishell/#" + hash);
+      this.__terminalWindow(`Web terminal (${devices.length} cihaz)`, "/multishell/#" + hash, devices);
     },
 
     /**
@@ -1668,27 +1678,15 @@ qx.Class.define("ankamon.ui.DeviceOps", {
           desc.setValue(qx.bom.String.escape(action.description) +
             `<br><span style="opacity:.8">Tanımlı olduğu sistemler: ${qx.bom.String.escape(famText(action))}` +
             (skipped.length ? ` — <b>${skipped.length} cihaz (${qx.bom.String.escape(P.summary(skipped))}) atlanır</b>` : "") + "</span>");
-          if (action.params.length) {
-            form = new ankamon.ui.Form();
-            action.params.forEach(p => {
-              if (p.type === "select") {
-                form.select(p.key, p.label, p.options, p.default);
-              } else if (p.type === "password") {
-                // Gizli değer (ör. BIOS parolası): maskeli; tarayıcı kayıtlı oturum parolasını buraya
-                // kendiliğinden doldurmasın diye "new-password" (Ankamon parolası BIOS'a yazılmasın).
-                const field = form.password(p.key, p.label, null, p.boot_wipe_note ? { note: this.BOOT_WIPE_NOTE, hint: this.BOOT_WIPE_HINT } : null);
-                field.getContentElement().setAttribute("autocomplete", "new-password");
-              } else {
-                form.text(p.key, p.label, p.default);
-              }
-            });
-            // Salt okunur, başka alandan üretilen alan: yazıldıkça dolar (bkz. user-add "derive").
-            action.params.filter(p => p.derive === "etap_username").forEach(p => {
-              const target = form.getField(p.key).set({ readOnly: true, focusable: false });
-              const source = form.getField(p.from).set({ liveUpdate: true });
-              source.addListener("changeValue", e => target.setValue(this.etapUsername(e.getData())));
-            });
-            body.add(form);
+          if (action.ui) {
+            // Kendi arayüzü olan hazır komut (ör. Disk editörü): Çalıştır o pencereyi açar.
+            desc.setValue(desc.getValue() + `<br><b>${ids.length === 1 ? "Çalıştır, işlemin penceresini açar."
+              : "Bu hazır komut tek cihazda çalışır — yalnız bir cihaz işaretleyin."}</b>`);
+          } else {
+            form = this.actionForm(action);
+            if (form) {
+              body.add(form);
+            }
           }
         }
       };
@@ -1721,12 +1719,66 @@ qx.Class.define("ankamon.ui.DeviceOps", {
           this.__job({ type: "command", commands, device_ids: ids }, "Komut çıktısı");
           return;
         }
+        if (action.ui) {
+          if (ids.length !== 1) {
+            ankamon.ui.Dialog.alert(`${action.title} tek cihazda çalışır — yalnız bir cihaz işaretleyin.`);
+            return;
+          }
+          win.close();
+          this.openActionUi(action, devices[0]);
+          return;
+        }
         win.close();
         this.__job({ type: "action", action: action.id, device_ids: ids, values: form ? form.values() : {} },
           `Komut çıktısı — ${action.title}`);
       });
       ankamon.ui.Dialog.buttons(win, [runBtn]);
       win.open();
+    },
+
+    /**
+     * Hazır işlemin parametre formu (parametresi yoksa null) — Komut çalıştır ve web terminalin Hazır komutlar menüsü
+     * (ui.ssh.TerminalActions) ortak kullanır.
+     * @param action {Map} /api/actions öğesi
+     * @return {ankamon.ui.Form|null}
+     */
+    actionForm(action) {
+      if (!action.params.length) {
+        return null;
+      }
+      const form = new ankamon.ui.Form();
+      action.params.forEach(p => {
+        if (p.type === "select") {
+          form.select(p.key, p.label, p.options, p.default);
+        } else if (p.type === "password") {
+          // Gizli değer (ör. BIOS parolası): maskeli; tarayıcı kayıtlı oturum parolasını buraya
+          // kendiliğinden doldurmasın diye "new-password" (Ankamon parolası BIOS'a yazılmasın).
+          const field = form.password(p.key, p.label, null, p.boot_wipe_note ? { note: this.BOOT_WIPE_NOTE, hint: this.BOOT_WIPE_HINT } : null);
+          field.getContentElement().setAttribute("autocomplete", "new-password");
+        } else {
+          form.text(p.key, p.label, p.default);
+        }
+      });
+      // Salt okunur, başka alandan üretilen alan: yazıldıkça dolar (bkz. user-add "derive").
+      action.params.filter(p => p.derive === "etap_username").forEach(p => {
+        const target = form.getField(p.key).set({ readOnly: true, focusable: false });
+        const source = form.getField(p.from).set({ liveUpdate: true });
+        source.addListener("changeValue", e => target.setValue(this.etapUsername(e.getData())));
+      });
+      return form;
+    },
+
+    /**
+     * Kendi arayüzü olan hazır komutu (action.json "ui") tek cihazda açar — ör. "disk-editor" → ui.disk.DiskEditor.
+     * @param action {Map} /api/actions öğesi
+     * @param device {Map} hedef cihaz
+     */
+    openActionUi(action, device) {
+      if (action.ui === "disk-editor") {
+        ankamon.ui.disk.DiskEditor.open(device);
+      } else {
+        ankamon.ui.Dialog.alert(`${action.title}: bu sürümde arayüzü yok.`);
+      }
     },
 
     /** Görevi kuyruğa yazar ve canlı çıktı penceresini İSTEK SÜRERKEN açar (beklemeden). */

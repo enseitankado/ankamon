@@ -26,7 +26,7 @@
  */
 
 /**
- * Sistem ▸ Zamanlanmış işler'in "Görevler" ve "Sonuçlar" bölümleri (kullanıcı isteği 2026-11-13; API SchedulesApi,
+ * Sistem ▸ Zamanlanmış görevler'in "Görevler" ve "Sonuçlar" bölümleri (kullanıcı isteği 2026-11-13; API SchedulesApi,
  * worker tasks/user_schedules.py):
  *   - Görevler: kullanıcı tanımlı zamanlamalar — Yeni / Düzenle (çift tık) / Şimdi çalıştır / Etkinleştir-Durdur / Sil.
  *   - Sonuçlar: zamanlanmış görevlerin her çalıştırması ve Ankamon'un kendi otomatik görevleri (ör. haftalık otomatik

@@ -166,7 +166,7 @@ return [
     ['POST',   '/api/system/services',   [Api\ServicesApi::class, 'control'],   'admin'],
     ['GET',    '/api/system/jobs',       [Api\SystemInfoApi::class, 'jobs'],     'admin'],
     ['POST',   '/api/system/jobs/run',   [Api\SystemInfoApi::class, 'runJob'],   'admin'],
-    // Kullanıcı tanımlı zamanlanmış görevler (Sistem ▸ Zamanlanmış işler ▸ Görevler/Sonuçlar; worker tasks/user_schedules.py).
+    // Kullanıcı tanımlı zamanlanmış görevler (Sistem ▸ Zamanlanmış görevler ▸ Görevler/Sonuçlar; worker tasks/user_schedules.py).
     ['GET',    '/api/schedules',         [Api\SchedulesApi::class, 'index'],     'admin'],
     ['POST',   '/api/schedules',         [Api\SchedulesApi::class, 'save'],      'admin'],
     ['PUT',    '/api/schedules/{id}/enabled', [Api\SchedulesApi::class, 'setEnabled'], 'admin'],
@@ -181,6 +181,8 @@ return [
     ['GET',    '/api/metrics/coverage',  [Api\MetricsApi::class, 'coverage'], 'metrics'],
 
     ['GET',    '/api/actions',           [Api\ActionsApi::class, 'index'],     'user'],
+    // Hazır komutu web terminalde uygula (cihaz başına tek satır; bkz. ActionsApi::terminal, ui/ssh/TerminalActions).
+    ['POST',   '/api/actions/terminal',  [Api\ActionsApi::class, 'terminal'],  'shell'],
     ['GET',    '/api/platforms',         [Api\ActionsApi::class, 'platforms'], 'user'],
     ['GET',    '/api/diagnose',          [Api\DiagnoseApi::class, 'runs'],    'diagnose'],
     ['GET',    '/api/diagnose/latest',   [Api\DiagnoseApi::class, 'latest'],  'diagnose'],

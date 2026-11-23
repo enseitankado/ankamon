@@ -1,0 +1,9 @@
+{
+  "title": "Disk editörü",
+  "description": "GParted benzeri disk/bölüm düzenleyici: diskleri ve bölümleri grafikle gösterir; yeni bölüm, sil, yeniden boyutlandır/taşı, biçimlendir, etiket, bölüm adı, bayraklar, denetle, bağla/ayır, yeni UUID ve bölüm tablosu oluşturma. İşlemler önce kuyruğa alınır, Uygula ile sırayla cihazda çalışır. Tek cihazda ve cihaz açıkken çalışır; bağlı (kullanımdaki) bölümlerde yalnız çevrimiçi yapılabilenlere izin verilir.",
+  "category": "Disk",
+  "feature": "shell",
+  "ui": "disk-editor",
+  "timeout": 90,
+  "params": []
+}

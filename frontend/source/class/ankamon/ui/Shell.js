@@ -271,7 +271,7 @@ qx.Class.define("ankamon.ui.Shell", {
       // Ankamon'un kendi bakımı (servisler, zamanlanmış işler, veritabanı, yapılandırma) — yalnız yönetici.
       // Sistem sayfasının sekmeleri ağaçta da alt seçenek (kullanıcı isteği 2026-11-13); anahtar = sekme etiketi (Base._rememberTab).
       { id: "system", label: "Sistem", admin: true, retap: true, create: u => new ankamon.page.System(u),
-        tabs: ["Genel", "Servisler", "Zamanlanmış işler", "Veritabanı", "Yapılandırma", "Eklentiler"].map(label => ({ key: label, label })) },
+        tabs: ["Genel", "Servisler", "Zamanlanmış görevler", "Veritabanı", "Yapılandırma", "Eklentiler"].map(label => ({ key: label, label })) },
       // Kullanıcılar ve Ayarlar "Sistem"in altında (kullanıcı isteği).
       // Disk kullanımı ve veri silme (eski açılır pencere — kullanıcı isteği: Sistem altında sayfa).
       // Sistem'in alt seçenekleri simgesiz (kullanıcı isteği 2026-11-10: noIcon).

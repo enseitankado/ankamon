@@ -38,7 +38,7 @@ use Ankamon\Core\Storage;
 use Ankamon\Core\Supervisor;
 
 /**
- * Sistem sayfası (yalnız yönetici): Genel / Zamanlanmış işler / Veritabanı / Yapılandırma sekmeleri.
+ * Sistem sayfası (yalnız yönetici): Genel / Zamanlanmış görevler / Veritabanı / Yapılandırma sekmeleri.
  * Servisler ayrı: ServicesApi. Hepsi salt-okunurdur; tek yazma, bir TimescaleDB politikasını
  * "şimdi çalıştır"maktır (runJob).
  */

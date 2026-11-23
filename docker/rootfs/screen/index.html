@@ -656,16 +656,28 @@ class Tile {
    * gri = değil. Üzerine gelince ipucu (title) kartın özelliklerini ve yapılandırmasını gösterir.
    */
   netIcons(net) {
-    if (!net || !net.ifaces || !net.ifaces.length) return;
+    if (!net || !((net.ifaces && net.ifaces.length) || (net.usb && net.usb.length))) return;
     const box = document.createElement("span");
     box.className = "net";
-    for (const it of net.ifaces) {
+    for (const it of net.ifaces || []) {
       const tmp = document.createElement("span");
       tmp.innerHTML = NET_ICON[it.kind] || NET_ICON.other;
       const svg = tmp.firstElementChild;
       svg.classList.toggle("up", !!it.up);
       const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
       title.textContent = netHint(it, net.wifi_radio);
+      svg.appendChild(title);
+      box.appendChild(svg);
+    }
+    // Wi-Fi'nin sağında USB bellek (kullanıcı isteği 2026-11-23): yalnız takılı USB disk/flaş bellek varken, yeşil;
+    // ipucunda aygıt ve bölüm özellikleri (bkz. worker executor/netif.py "usb").
+    if (net.usb && net.usb.length) {
+      const tmp = document.createElement("span");
+      tmp.innerHTML = USB_ICON;
+      const svg = tmp.firstElementChild;
+      svg.classList.add("up", "usb");
+      const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      title.textContent = usbHint(net.usb);
       svg.appendChild(title);
       box.appendChild(svg);
     }
@@ -1428,6 +1440,27 @@ const NET_ICON = {
   ethernet: '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M3 4h18v11h-4v3h-3v2h-4v-2H7v-3H3zm4 3v4h2V7zm4 0v4h2V7zm4 0v4h2V7z"/></svg>',
   other: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 2h4v5h-4zM3 17h4v5H3zm14 0h4v5h-4zM11 7h2v4h7v6h-2v-4H6v4H4v-6h7z"/></svg>'
 };
+// USB flaş bellek simgesi (renk currentColor — takılıyken her zaman yeşil, .up).
+const USB_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M8 2h8v6h1.5a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2V9a1 1 0 0 1 1-1H8zm2 2v4h1.2V5.5h1.6V8H14V4z"/></svg>';
+
+/** USB simgesinin ipucu: her aygıt (üretici/model, boyut, seri) ve bölümleri (dosya sistemi, etiket, bağlama, dolu/boş). */
+function usbHint(list) {
+  const gb = b => b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : Math.round(b / 1e6) + " MB";
+  const lines = [list.length > 1 ? `Takılı USB depolama: ${list.length} aygıt` : "Takılı USB depolama"];
+  for (const d of list) {
+    lines.push("", `${[d.vendor, d.model].filter(Boolean).join(" ") || "USB disk"} — /dev/${d.name}, ${gb(d.size)}` +
+      (d.removable ? " (çıkarılabilir)" : ""));
+    if (d.serial) lines.push(`Seri: ${d.serial}`);
+    if (!d.parts || !d.parts.length) lines.push("Bölüm/dosya sistemi yok");
+    for (const p of d.parts || []) {
+      let t = `• ${p.name}: ${p.fs ? p.fs.toUpperCase() : "dosya sistemi yok"}` + (p.label ? ` "${p.label}"` : "") + (p.size ? `, ${gb(p.size)}` : "");
+      if (p.mount) t += `\n   bağlı: ${p.mount}` + (p.used != null && p.avail != null ? ` — dolu ${gb(p.used)}, boş ${gb(p.avail)}` : "");
+      else t += " (bağlı değil)";
+      lines.push(t);
+    }
+  }
+  return lines.join("\n");
+}
 const NET_KIND = { wifi: "Kablosuz (Wi-Fi)", ethernet: "Kablolu (Ethernet)", other: "Ağ arabirimi" };
 const NET_METHOD = { auto: "DHCP (otomatik)", manual: "Elle (sabit IP)", disabled: "IPv4 kapalı", "link-local": "Yalnız yerel ağ", shared: "Paylaşılan (yönlendirici)" };
 

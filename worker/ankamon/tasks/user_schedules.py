@@ -23,7 +23,7 @@
 # korunmalıdır; değiştirilmiş sürüm ağ üzerinden hizmet olarak sunulursa
 # kullanıcılarına kaynak kodu sunulmalıdır (AGPLv3 madde 4, 5, 7(b) ve 13).
 
-"""Kullanıcı tanımlı zamanlanmış görevler (Sistem ▸ Zamanlanmış işler ▸ Görevler; göç 057, API SchedulesApi).
+"""Kullanıcı tanımlı zamanlanmış görevler (Sistem ▸ Zamanlanmış görevler ▸ Görevler; göç 057, API SchedulesApi).
 
 Zamanlama, JobsApi'nin kaydederken doğruladığı görev tanımını (tür/başlık/parametreler) saklar. Zamanı gelince bu
 görev jobs + job_targets'a ELLE BAŞLATILANLA AYNI biçimde yazılır (pg_notify) — runner onu aynı yoldan çalıştırır,

@@ -26,7 +26,7 @@
  */
 
 /**
- * Sistem → Zamanlanmış işler — üç bölüm (üstte düğmeyle seçilir):
+ * Sistem → Zamanlanmış görevler — üç bölüm (iç sekmeler):
  *   - Görevler / Sonuçlar (kullanıcı isteği 2026-11-13): kullanıcı tanımlı zamanlanmış görevler ve bütün zamanlanmış /
  *     otomatik görevlerin sonuçları — bkz. ui.system.UserSchedules, ScheduleEditor (/api/schedules).
  *   - Sistem işleri (/api/system/jobs): TimescaleDB politikaları (sıkıştırma, saklama, özet yenileme — son çalışma,
@@ -37,21 +37,19 @@ qx.Class.define("ankamon.ui.system.Schedules", {
   extend: ankamon.ui.system.Tab,
 
   construct(page) {
-    super(page, "Zamanlanmış işler");
-    // Bölüm seçici: Görevler · Sonuçlar · Sistem işleri (seçim tarayıcı sekmesinde hatırlanır).
+    super(page, "Zamanlanmış görevler");
+    // Bölümler iç sekmelerde (kullanıcı isteği 2026-11-23; önceden üstte düğme grubuydu): Görevler · Sonuçlar ·
+    // Sistem işleri — seçim tarayıcı sekmesinde hatırlanır.
     this.__user = new ankamon.ui.system.UserSchedules(page);
-    this.__stack = new qx.ui.container.Stack();
+    this.__views = new qx.ui.tabview.TabView().set({ contentPadding: [6, 0, 0, 0] });
     const system = new qx.ui.container.Composite(new qx.ui.layout.VBox(8));
-    const views = [["tasks", "Görevler", this.__user.tasks], ["results", "Sonuçlar", this.__user.results],
+    const sections = [["tasks", "Görevler", this.__user.tasks], ["results", "Sonuçlar", this.__user.results],
       ["system", "Sistem işleri", system]];
-    const switcher = new qx.ui.container.Composite(new qx.ui.layout.HBox(0));
-    const group = new qx.ui.form.RadioGroup();
-    views.forEach(([key, label, widget]) => {
-      this.__stack.add(widget);
-      const b = new qx.ui.form.ToggleButton(label).set({ padding: [3, 12] });
-      b.setUserData("key", key);
-      group.add(b);
-      switcher.add(b);
+    sections.forEach(([key, label, widget]) => {
+      const tab = new qx.ui.tabview.Page(label).set({ layout: new qx.ui.layout.Grow() });
+      tab.setUserData("key", key);
+      tab.add(widget);
+      this.__views.add(tab);
     });
     let saved = "tasks";
     try {
@@ -59,26 +57,25 @@ qx.Class.define("ankamon.ui.system.Schedules", {
     } catch (e) {
       // sessionStorage yok: Görevler
     }
-    const start = group.getItems().find(b => b.getUserData("key") === saved) || group.getItems()[0];
-    group.setSelection([start]);
-    this.__stack.setSelection([views.find(v => v[0] === start.getUserData("key"))[2]]);
-    group.addListener("changeSelection", e => {
+    const pages = this.__views.getChildren();
+    this.__views.setSelection([pages.find(t => t.getUserData("key") === saved) || pages[0]]);
+    this.__views.addListener("changeSelection", e => {
       const key = e.getData()[0].getUserData("key");
-      this.__stack.setSelection([views.find(v => v[0] === key)[2]]);
       try {
         sessionStorage.setItem(ankamon.ui.system.Schedules.VIEW_KEY, key);
       } catch (err) {
         // yok sayılır
       }
-      this.__run.setVisibility(key === "system" ? "visible" : "excluded");
       this.load();
     });
-    this._bar.addAt(switcher, 0);
-    this.__run = new qx.ui.form.Button("▸ Şimdi çalıştır").set({ enabled: false,
-      visibility: start.getUserData("key") === "system" ? "visible" : "excluded" });
+    this.add(this.__views, { flex: 1 });
+
+    // Sistem işleri sekmesinin kendi düğme satırı.
+    const systemBar = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" }));
+    this.__run = new qx.ui.form.Button("▸ Şimdi çalıştır").set({ enabled: false });
     this.__run.addListener("execute", () => this.__runNow());
-    this._bar.addAt(this.__run, 1);
-    this.add(this.__stack, { flex: 1 });
+    systemBar.add(this.__run);
+    system.add(systemBar);
 
     this.__table = page._createTable([
       { id: "kind", label: "İş", width: 170 },
@@ -104,7 +101,7 @@ qx.Class.define("ankamon.ui.system.Schedules", {
 
   members: {
     __user: null,
-    __stack: null,
+    __views: null,
     __table: null,
     __run: null,
     __info: null,
@@ -112,8 +109,7 @@ qx.Class.define("ankamon.ui.system.Schedules", {
     __systemLoaded: false,
 
     async _load() {
-      const view = this.__stack.getSelection()[0];
-      if (view !== this.__user.tasks && view !== this.__user.results) {
+      if (this.__view() === "system") {
         return this.__loadSystem();
       }
       return this.__user.load();
@@ -149,12 +145,18 @@ qx.Class.define("ankamon.ui.system.Schedules", {
     },
 
     _statusText() {
-      if (!this.__systemLoaded || this.__stack.getSelection()[0] !== this.__table.getLayoutParent()) {
+      if (!this.__systemLoaded || this.__view() !== "system") {
         return "";
       }
       const failed = (this.__policies || []).filter(p => p.last_run_status === "Failed").length;
       return (failed ? ankamon.ui.system.Html.badge(`${failed} iş son çalışmada hata verdi`, "bad") + " · " : "") +
         "TimescaleDB politikaları veritabanının kendi zamanlayıcısıyla çalışır";
+    },
+
+    /** Seçili iç sekmenin anahtarı: "tasks" | "results" | "system". */
+    __view() {
+      const tab = this.__views.getSelection()[0];
+      return tab ? tab.getUserData("key") : "tasks";
     },
 
     __selected() {

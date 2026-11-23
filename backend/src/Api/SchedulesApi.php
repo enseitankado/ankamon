@@ -37,7 +37,7 @@ use Ankamon\Core\Db;
 use Ankamon\Core\Request;
 
 /**
- * Kullanıcı tanımlı zamanlanmış görevler (Sistem ▸ Zamanlanmış işler ▸ Görevler / Sonuçlar — yalnız yönetici;
+ * Kullanıcı tanımlı zamanlanmış görevler (Sistem ▸ Zamanlanmış görevler ▸ Görevler / Sonuçlar — yalnız yönetici;
  * kullanıcı isteği 2026-11-13). Görev tanımı kaydedilirken JobsApi::spec ile elle başlatılan görevin AYNI kurallarıyla
  * doğrulanır; zamanı gelince worker (tasks/user_schedules.py) görevi kuyruğa yazar — sonucu olağan yerlerine yansır
  * (SSH denetimi Sağlık ▸ Denetle/Durum, anomali taraması Sağlık). Sonuçlar listesi zamanlanmış görevlerin
@@ -131,6 +131,10 @@ final class SchedulesApi
         if ($job['type'] === 'action') {
             // Parola gibi gizli değer isteyen hazır işlemler zamanlanmaz: gizli değer veritabanında açık saklanmasın.
             $action = Actions::all()[(string) ($job['action'] ?? '')] ?? null;
+            if (!empty($action['ui'])) {
+                // Kendi penceresi olan hazır komut (ör. Disk editörü) zamanlanmaz.
+                throw ApiError::badRequest($action['title'] . ' kendi penceresinde çalışır; zamanlanamaz.');
+            }
             foreach ($action['params'] ?? [] as $param) {
                 if (($param['type'] ?? 'text') === 'password') {
                     throw ApiError::badRequest('Parola isteyen hazır işlemler zamanlanamaz (gizli değer saklanmaz).');

@@ -33,6 +33,10 @@ Yapılandırma NetworkManager'dan (`nmcli`, ETAP'ta kurulu) okunur; yoksa yalnı
 Satırlar:  NI ad|tür|operstate|carrier|mac|hız|sürücü|kalıcı_mac      ND ad|ANAHTAR:değer  (nmcli dev show)
            NM ad|ipv4.method                               NW ad|ssid|sinyal|hız   (bağlı Wi-Fi)
            NR enabled|disabled  (Wi-Fi radyosu)
+           UB NAME="sdb" TRAN="usb" …  (lsblk -P: takılı USB disk/flaş bellek)   UV sdb NAME="sdb1" …  (bölümleri)
+
+USB depolama (kullanıcı isteği 2026-11-23): Ekranlar alt barında Wi-Fi'nin sağında yeşil USB bellek simgesi, ipucunda
+aygıt ve bölüm özellikleri — yalnız takılıyken (ortamı olmayan kart okuyucu, boyut 0, sayılmaz). parse() → "usb": […].
 
 mac = arabirimin O ANKİ adresi; Wi-Fi'de NetworkManager tarama sırasında rastgele (yerel yönetimli) adres
 takar. kalıcı_mac (perm_mac) yalnız Wi-Fi'de: kartın fabrika adresi (/sys/class/ieee80211/<phy>/macaddress) —
@@ -42,6 +46,7 @@ Cihazlar ▸ "Kablosuz MAC" (devices.wifi_mac, göç 043) bundan yazılır (bkz.
 from __future__ import annotations
 
 import re
+import shlex
 
 SCRIPT = r"""
 for p in /sys/class/net/*; do
@@ -56,6 +61,12 @@ for p in /sys/class/net/*; do
   [ $k = wifi ] && [ -n "$c" ] && nmcli -t -f IN-USE,SSID,SIGNAL,RATE dev wifi list ifname "$i" --rescan no 2>/dev/null | awk -F: -v i="$i" '$1 == "*" { print "NW " i "|" $2 "|" $3 "|" $4; exit }'
 done
 command -v nmcli >/dev/null 2>&1 && echo "NR $(nmcli radio wifi 2>/dev/null)"
+command -v lsblk >/dev/null 2>&1 && lsblk -dnP -b -o NAME,TRAN,TYPE,SIZE,VENDOR,MODEL,SERIAL,RM 2>/dev/null | while read -r l; do
+  case "$l" in *'TRAN="usb"'*'TYPE="disk"'*) ;; *) continue ;; esac
+  echo "UB $l"
+  n=${l#NAME=\"}; n=${n%%\"*}
+  lsblk -nP -b -o NAME,TYPE,SIZE,LABEL,FSTYPE,MOUNTPOINT,FSUSED,FSAVAIL "/dev/$n" 2>/dev/null | sed "s|^|UV $n |"
+done
 """
 
 # nmcli GENERAL.STATE sayısal kodları (NMDeviceState): 20 unavailable (rfkill/kapalı), 30 disconnected, 100 connected.
@@ -67,8 +78,12 @@ def parse(output: str) -> dict | None:
     """Betik çıktısından {"wifi_radio": bool|None, "ifaces": [{...}]}; hiç arabirim yoksa None."""
     ifaces: dict[str, dict] = {}
     radio = None
+    usb: dict[str, dict] = {}
     for line in output.splitlines():
         tag, _, rest = line.partition(" ")
+        if tag in ("UB", "UV"):
+            _usb_line(usb, tag, rest)
+            continue
         if tag == "NI":
             f = (rest.split("|") + [""] * 8)[:8]
             if f[1] not in _KINDS:
@@ -109,12 +124,53 @@ def parse(output: str) -> dict | None:
                     it["ipv6"].append(val)
         elif tag == "NR":
             radio = {"enabled": True, "disabled": False}.get(rest.strip())
+    usb_list = [d for d in usb.values() if d["size"]]
     if not ifaces:
-        return None
+        return {"wifi_radio": radio, "ifaces": [], "usb": usb_list} if usb_list else None
     for it in ifaces.values():
         it["up"] = _is_up(it, radio)
     order = {k: n for n, k in enumerate(_KINDS)}
-    return {"wifi_radio": radio, "ifaces": sorted(ifaces.values(), key=lambda x: (order[x["kind"]], x["name"]))}
+    out = {"wifi_radio": radio, "ifaces": sorted(ifaces.values(), key=lambda x: (order[x["kind"]], x["name"]))}
+    if usb_list:
+        out["usb"] = usb_list
+    return out
+
+
+def _kv(text: str) -> dict:
+    """lsblk -P satırı (AD="değer" …) → sözlük."""
+    out = {}
+    try:
+        for token in shlex.split(text):
+            key, _, value = token.partition("=")
+            out[key] = value.strip()
+    except ValueError:
+        pass
+    return out
+
+
+def _int(value) -> int | None:
+    return int(value) if str(value or "").isdigit() else None
+
+
+def _usb_line(usb: dict, tag: str, rest: str) -> None:
+    """UB: USB disk; UV <disk>: diskin kendisi ve bölümleri (boyut, etiket, dosya sistemi, bağlama, dolu/boş)."""
+    if tag == "UB":
+        f = _kv(rest)
+        if f.get("NAME"):
+            usb[f["NAME"]] = {"name": f["NAME"], "size": _int(f.get("SIZE")) or 0, "vendor": f.get("VENDOR", ""),
+                              "model": f.get("MODEL", ""), "serial": f.get("SERIAL", ""), "removable": f.get("RM") == "1",
+                              "parts": []}
+        return
+    disk, _, rest = rest.partition(" ")
+    f = _kv(rest)
+    d = usb.get(disk)
+    if d is None or not f.get("NAME"):
+        return
+    if f.get("TYPE") == "disk" and not f.get("FSTYPE"):
+        return   # bölüm tablolu diskin kendisi (bölümleri ayrıca gelir)
+    d["parts"].append({"name": f["NAME"], "size": _int(f.get("SIZE")), "label": f.get("LABEL", ""),
+                       "fs": f.get("FSTYPE", ""), "mount": f.get("MOUNTPOINT", ""),
+                       "used": _int(f.get("FSUSED")), "avail": _int(f.get("FSAVAIL"))})
 
 
 def permanent_mac(value: str | None) -> str | None:
