@@ -110,6 +110,10 @@ qx.Class.define("ankamon.ui.FactsView", {
         return { text: "Devre dışı", kind: "idle" };
       }
       if (f.wifi_radio === "enabled") {
+        // Kart erişim noktası kipinde (ör. Wi-Fi eklentisinin «Kablosuz erişim noktası»): ağ adı yayınlanan ağ.
+        if (f.wifi_mode === "AP" && f.wifi_state === "connected") {
+          return { text: f.wifi_ssid ? `Erişim noktası (${f.wifi_ssid})` : "Erişim noktası", kind: "ok" };
+        }
         if (f.wifi_state === "connected") { // bağlıysa "Etkin" yazılmaz, ağ adı yazılır (kullanıcı isteği 2026-11-11)
           return { text: f.wifi_ssid ? `Bağlı (${f.wifi_ssid})` : "Bağlı", kind: "ok" };
         }
@@ -561,7 +565,10 @@ qx.Class.define("ankamon.ui.FactsView", {
         // Kartın kalıcı (fabrika) adresi (bkz. worker hwfacts.py WIFI_MAC — taramadaki rastgele adres değil).
         row("Kablosuz MAC", f.wifi_mac);
         const state = this.WIFI_STATE[f.wifi_state] || f.wifi_state;
-        if (f.wifi_state === "connected") {
+        if (f.wifi_state === "connected" && f.wifi_mode === "AP") {
+          row("Durum", { html: this.__badge(join("Erişim noktası", f.wifi_ssid ? `"${f.wifi_ssid}"` : null), "ok") });
+          row("IP adresi", f.wifi_ip);
+        } else if (f.wifi_state === "connected") {
           row("Durum", {
             html: this.__badge(join("Bağlı", f.wifi_ssid ? `"${f.wifi_ssid}"` : null,
               f.wifi_signal ? `sinyal %${f.wifi_signal}` : null,

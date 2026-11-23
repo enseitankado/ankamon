@@ -169,6 +169,12 @@ if [ -n "$wifi" ]; then
                         printf "WIFI_SSID=%s\nWIFI_SIGNAL=%s\nWIFI_FREQ=%s\n", ssid, $2, $3}
         END{printf "WIFI_VISIBLE=%.0f\n", n}'
     echo "WIFI_IP=$(ip -o -4 addr show dev $wifi 2>/dev/null | awk '{print $4; exit}')"
+    # Kartın kipi (managed | AP | monitor …): AP'de (ör. Wi-Fi eklentisinin «Kablosuz erişim noktası») yukarıdaki tarama
+    # listesinde etkin ağ olmaz; yayınlanan ağ adı iw'den okunur (Wi-Fi sütunu "Erişim noktası (ad)" gösterir).
+    winfo=$(iw dev "$wifi" info 2>/dev/null)
+    wmode=$(echo "$winfo" | awk '$1 == "type" {print $2; exit}')
+    echo "WIFI_MODE=$wmode"
+    [ "$wmode" = AP ] && echo "$winfo" | sed -n 's/^[[:space:]]*ssid //p' | head -n1 | sed 's/^/WIFI_SSID=/'
 fi
 # SMART: ilk (sistem) diskinin sağlık özeti ve öznitelikleri, smartctl'nin JSON çıktısı tek satır
 # olarak (ayrıştırma Python'da — SATA ve NVMe aynı yoldan; bkz. _smart). ETAP imajında smartmontools kurulu.
@@ -297,6 +303,7 @@ _FIELDS = {
     "WIFI_FREQ": "wifi_freq",
     "WIFI_VISIBLE": "wifi_visible",
     "WIFI_IP": "wifi_ip",
+    "WIFI_MODE": "wifi_mode",
 }
 
 # Tam sayıya ayrıştırılacak (metin değil) alanlar. wifi_visible ve disk_rotational 0 olabilir —
