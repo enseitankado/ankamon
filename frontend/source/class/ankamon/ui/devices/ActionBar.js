@@ -74,7 +74,7 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
       { id: "files", label: "Dosyalar", icon: "folders", primary: "Dosya yöneticisi", menuOnly: true },
       { id: "taskmgr", label: "Görevler", icon: "activity", primary: "Görev yöneticisi" },
       { id: "web", label: "Web sitesi", icon: "worldWww", primary: "Web sitesi aç…", sep: true },
-      { id: "wifi", label: "Wi-Fi", icon: "wifi", primary: "Wi-Fi Monitör" },
+      // "Wi-Fi" düğmesi ankamon-wifi eklentisinden gelir (yüklü ve etkinse — Extensions.addDeviceMenu bar).
       { id: "chat", label: "Sohbet", icon: "messages", primary: "Sohbet" },
       { id: "power", label: "Güç", icon: "power", sep: true },
       { id: "info", label: "Bilgi", icon: "infoCircle", primary: "Bilgi kartı" },
@@ -93,7 +93,7 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
       "Ekranı kilitle": "lock", "Ekran kilidini aç": "lock", "Klavyeyi kilitle": "lock", "Klavye kilidini aç": "lock", "Fareyi kilitle": "lock",
       "Fare kilidini aç": "lock", "Dokunmatiği kilitle": "lock", "Dokunmatik kilidini aç": "lock",
       "Ekranımı yansıt": "watch", "Ekranı başka bilgisayara aktar…": "watch", "Ekran aktarımını durdur": "watch",
-      "Görev yöneticisi": "taskmgr", "Web sitesi aç…": "web", "Wi-Fi Monitör": "wifi", "Sohbet": "chat",
+      "Görev yöneticisi": "taskmgr", "Web sitesi aç…": "web", "Sohbet": "chat",
       "Bilgisayarı aç (WoL)": "power", "Bilgisayarı kapat": "power", "Bilgisayarı yeniden başlat": "power",
       "Bilgi kartı": "info", "Logları göster": "info",
       "Düzenle": "record", "Sil": "record", "Cihaz ekle…": "record",

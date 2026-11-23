@@ -72,6 +72,9 @@ ext/<ad>/
 
 - **Wi-Fi Monitör güvenilir listesi:** `ankamon.ext.Extensions.addWifiTrustedAction({label, hint, run(rows)})` — pencerenin
   düğme satırına düğme; `run` işaretli kayıtlarla (`{id, kind, value, label, device_id, device_name}`) çağrılır.
+- **Ekran köprüsü yolları:** `worker/screen_routes.py` içinde `ROUTES(lookup, ssh_opts)` → `[(desen, handler, kwargs), …]`
+  ekran köprüsüne (`/screen/ws/...`, tornado) WebSocket yolu ekler; eklentinin `worker/` dizini import yoluna eklenir.
+  Bkz. worker `ankamon.ext.screen_routes` (örnek: ankamon-wifi, `/screen/ws/wifi/<id>`).
 - **Cihaz kimliği satırları (kilit ekranı):** `worker/device_identity.py` içinde `ROWS(conn, device_ids)` →
   `{device_id: [[ad, değer], …]}` — Ekranı kilitle'de cihazın kilit ekranındaki kimlik bilgisine satır eklenir (kod adının
   altına; boş değerler atlanır). Bkz. worker `ankamon.ext.device_identity_rows`.

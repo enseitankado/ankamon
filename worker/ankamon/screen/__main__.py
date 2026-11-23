@@ -54,7 +54,8 @@ from psycopg.types.json import Jsonb
 
 from .. import activity, db
 from ..executor.jobs import _device_access
-from . import audio, chat, perf, remote, shared_feed, taskmgr, wifi
+from . import audio, chat, perf, remote, shared_feed, taskmgr
+from .. import ext
 
 log = logging.getLogger("ankamon.screen")
 
@@ -352,9 +353,9 @@ async def main():
          (r"/screen/ws/taskmgr/(\d+)", taskmgr.TaskMgrSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),
          # Ekran penceresindeki hoparlör düğmesi (bkz. audio.py) ve sağ menü "Sohbet" (bkz. chat.py).
          (r"/screen/ws/audio/(\d+)", audio.AudioSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),
-         (r"/screen/ws/chat/(\d+)", chat.ChatSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS}),
-         # Sağ menü "Wi-Fi Monitör" (kapalı radyoyu geçici açıp geri kapatır, bkz. wifi.py).
-         (r"/screen/ws/wifi/(\d+)", wifi.WifiSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS})],
+         (r"/screen/ws/chat/(\d+)", chat.ChatSocket, {"lookup": _lookup, "ssh_opts": _SSH_OPTS})]
+        # Eklentilerin ek yolları (ör. Wi-Fi Monitör — ext/wifi): ext/<ad>/worker/screen_routes.py ROUTES(lookup, ssh_opts).
+        + ext.screen_routes(_lookup, _SSH_OPTS),
         # Ölü tarayıcı bağlantıları (sekme çökmesi, ağ kopması) ssh süreçlerini sonsuza dek tutmasın.
         websocket_ping_interval=30,
         websocket_ping_timeout=60,

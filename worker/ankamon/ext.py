@@ -41,6 +41,28 @@ def setting(conn, name: str, key: str, default=None):
     return default if value is None else value
 
 
+def screen_routes(lookup, ssh_opts) -> list:
+    """Ekran köprüsüne eklentilerin ek WebSocket yolları (ör. Wi-Fi Monitör — ankamon-wifi): her ext/<ad>/worker/screen_routes.py
+    ROUTES(lookup, ssh_opts) → [(desen, handler, kwargs), …]. Eklentinin worker/ dizini import yoluna eklenir (paketini
+    kendisi taşır). Hatalı eklenti atlanır; çekirdek hiçbir eklentiyi adıyla bilmez."""
+    import sys
+
+    routes: list = []
+    for path in sorted(glob.glob(os.path.join(EXT_DIR, "*", "worker", "screen_routes.py"))):
+        name = os.path.basename(os.path.dirname(os.path.dirname(path)))
+        worker_dir = os.path.dirname(path)
+        if worker_dir not in sys.path:
+            sys.path.insert(0, worker_dir)
+        try:
+            spec = importlib.util.spec_from_file_location(f"ext_screen_routes_{name}", path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            routes.extend(mod.ROUTES(lookup, ssh_opts))
+        except Exception:
+            log.exception("eklenti ekran köprüsü yolları yüklenemedi: %s", name)
+    return routes
+
+
 def _load_identity_modules() -> list:
     """ext/*/worker/device_identity.py modülleri (bir kez yüklenir; hatalı eklenti atlanır)."""
     global _identity_modules

@@ -332,6 +332,9 @@ qx.Class.define("ankamon.page.Devices", {
     TILE_REFRESH_MS: 8000,
     // "Kapanıyor…" yazısı (bkz. __sessionOps shutdownSent) cihaz bu süre içinde kapanmadıysa kalkar.
     SHUTDOWN_NOTE_MS: 3 * 60 * 1000,
+    // Cihazın Wi-Fi radyosu değişti (Wi-Fi Monitör eklentisi geçici açıp kapattı): liste bir kez tazelenir. Ad eklentideki
+    // ankamonext.wifi.WifiMonitor.RADIO_CHANGED ile aynı (çekirdek eklentiyi adıyla bilmez).
+    WIFI_RADIO_CHANGED: "ankamon.wifimon.radio",
     // "Kapanıyor…" yazan cihaz kapanınca kutucukta bu süre "Kapandı" görünür, sonra kutucuk kalkar/kapalıya döner
     // (kullanıcı isteği 2026-11-13; süre iframe'de: screen/index.html CLOSED_NOTE_MS). Bilgi biraz daha uzun gönderilir.
     CLOSED_NOTE_MS: 3000,
@@ -370,7 +373,7 @@ qx.Class.define("ankamon.page.Devices", {
       qx.event.message.Bus.unsubscribe(ankamon.ui.chat.Window.CHANGED, this.__onChatWindows, this);
     }
     if (this.__onWifiRadio) {
-      qx.event.message.Bus.unsubscribe(ankamon.ui.devices.WifiMonitor.RADIO_CHANGED, this.__onWifiRadio, this);
+      qx.event.message.Bus.unsubscribe(ankamon.page.Devices.WIFI_RADIO_CHANGED, this.__onWifiRadio, this);
     }
   },
 
@@ -665,7 +668,7 @@ qx.Class.define("ankamon.page.Devices", {
           }, this, 300);
         }
       };
-      qx.event.message.Bus.subscribe(ankamon.ui.devices.WifiMonitor.RADIO_CHANGED, this.__onWifiRadio, this);
+      qx.event.message.Bus.subscribe(ankamon.page.Devices.WIFI_RADIO_CHANGED, this.__onWifiRadio, this);
 
       // Görünürlük yoklaması: hem görünüm değişimini hem Shell'deki sayfa değişimini yakalar.
       this.__screensTimer = new qx.event.Timer(1000);
