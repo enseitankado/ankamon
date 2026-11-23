@@ -27,6 +27,8 @@
 
 POST /mount/<cihaz id>  → cihazı /run/ankamon/filemanager/<takma ad>/ altına sshfs ile bağlar
                           (zaten bağlıysa anında döner), {"ok": true, "path": "<takma ad>/"} döner.
+                          ?user=<ad>: yanıta "start" de eklenir — o kullanıcının masaüstü dizini, bağlama kökünden
+                          göreli ("home/ogretmen/Masaüstü/"; bulunamazsa ev dizini, o da yoksa null). Bkz. _desktop_start.
                           Dizin adı FileBrowser'da cihazın adı olarak görünür (ör. "A Blok - Lab 1");
                           aynı adlı iki cihaz bağlıysa ikincisine " (<ip>)" eklenir.
 
@@ -203,6 +205,48 @@ async def _sweep() -> None:
                 log.exception("ayırma başarısız: #%s", device_id)
 
 
+_USER_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$")
+_XDG_DESKTOP_RE = re.compile(r'^\s*XDG_DESKTOP_DIR\s*=\s*"?([^"\n]*)"?\s*$', re.M)
+
+
+def _desktop_start(mount: str, user: str) -> str | None:
+    """Ekranlar kutucuğundaki klasör simgesi (kullanıcı isteği 2026-11-23): dosya yöneticisi oturum açık kullanıcının
+    masaüstünde açılsın. Bağlanmış cihaz dosya sisteminden (sshfs, birkaç küçük okuma) bulunur: ev dizini /etc/passwd'den,
+    masaüstü ~/.config/user-dirs.dirs XDG_DESKTOP_DIR'den (ETAP Türkçe: "Masaüstü"), yoksa Masaüstü/Desktop denenir.
+    Döner: bağlama kökünden göreli, "/" ile biten yol; masaüstü yoksa ev dizini; ikisi de yoksa None."""
+    if not _USER_NAME_RE.match(user):
+        return None
+    home = None
+    try:
+        with open(os.path.join(mount, "etc/passwd"), encoding="utf-8", errors="replace") as f:
+            for line in f:
+                parts = line.rstrip("\n").split(":")
+                if len(parts) >= 6 and parts[0] == user:
+                    home = parts[5]
+                    break
+    except OSError:
+        pass
+    home = posixpath.normpath(home or f"/home/{user}")
+    if not home.startswith("/") or home == "/":
+        return None
+    local = lambda remote: os.path.join(mount, remote.lstrip("/"))   # noqa: E731
+    candidates = []
+    try:
+        with open(local(home + "/.config/user-dirs.dirs"), encoding="utf-8", errors="replace") as f:
+            m = _XDG_DESKTOP_RE.search(f.read())
+        if m:
+            candidates.append(m.group(1).replace("$HOME", home))
+    except OSError:
+        pass
+    candidates += [home + "/Masaüstü", home + "/Desktop"]
+    for c in candidates:
+        c = posixpath.normpath(c)
+        # Yalnız ev dizininin altı (XDG_DESKTOP_DIR="$HOME" ise ev dizininin kendisi aşağıda).
+        if c.startswith(home + "/") and os.path.isdir(local(c)):
+            return c.lstrip("/") + "/"
+    return home.lstrip("/") + "/" if os.path.isdir(local(home)) else None
+
+
 class MountHandler(tornado.web.RequestHandler):
     # Oturum/yetki denetimi nginx auth_request'te zaten yapıldı; köprü yalnız 127.0.0.1'i dinler.
     # X-Auth-User nginx tarafından oturumdan doldurulur (istemcininki varsa ezilir).
@@ -213,7 +257,15 @@ class MountHandler(tornado.web.RequestHandler):
             self.set_status(502)
             self.write({"ok": False, "error": res})
             return
-        self.write({"ok": True, "path": os.path.basename(res) + "/"})
+        out = {"ok": True, "path": os.path.basename(res) + "/"}
+        user = self.get_argument("user", "")
+        if user:
+            try:
+                out["start"] = await asyncio.wait_for(asyncio.to_thread(_desktop_start, res, user), 10)
+            except Exception:
+                log.exception("masaüstü dizini bulunamadı: #%s %s", device_id, user)
+                out["start"] = None
+        self.write(out)
 
 
 def _locate(fb_path: str):

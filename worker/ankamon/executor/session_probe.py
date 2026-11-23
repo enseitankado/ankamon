@@ -40,7 +40,7 @@ import json
 import os
 import subprocess
 
-from . import autoshutdown, inputlock, netif, screenlock
+from . import autoshutdown, inputlock, netif, screenlock, soundstate
 
 # Son satır: etkin VT'deki X'in monitör güç durumu ("M On|Off|Standby|Suspend" — bkz. 025_device_display_state.sql;
 # X seçimi screen/remote.py ile aynı).
@@ -55,10 +55,10 @@ set -- $(ps -eo args= | awk -v vt="vt${vt#tty}" '
     for (i = 2; i <= NF; i++) { if ($i ~ /^:[0-9]+$/) d = $i; if ($i == "-auth") a = $(i + 1); if ($i == vt) m = 1 }
     if (m && d != "") { print d, a; exit } }')
 [ -n "$1" ] && echo "M $(DISPLAY="$1" XAUTHORITY="$2" xset q 2>/dev/null | awk '/Monitor is/ { print $3 }')"
-""" + netif.SCRIPT + autoshutdown.SCRIPT + screenlock.SCRIPT + inputlock.SCRIPT
+""" + netif.SCRIPT + autoshutdown.SCRIPT + screenlock.SCRIPT + inputlock.SCRIPT + soundstate.SCRIPT
 # Aynı SSH turunda: ağ arabirimleri (NI/ND/NM/NW/NR satırları, bkz. executor/netif.py), TiHA otomatik
 # kapatma geri sayımı (SD satırı, bkz. executor/autoshutdown.py) — Ekranlar önizlemesinin alt barı için —
-# ve Ankamon ekran kilidi (L satırı, bkz. executor/screenlock.py).
+# Ankamon ekran kilidi (L satırı, bkz. executor/screenlock.py) ve ses durumu (A satırı, bkz. executor/soundstate.py).
 
 _SSH_OPTS = [
     "-T",
@@ -116,19 +116,22 @@ def probe(device: dict, user: str, password: str, timeout: int = 8) -> dict:
     name, locked = parse(out)
     return {"ok": True, "user": name, "locked": locked, "display": display_state(out),
             "netifs": netif.parse(out), "shutdown": autoshutdown.parse(out),
-            "screen_locked": "L 1" in out.splitlines(), "input_locks": inputlock.parse(out), "error": ""}
+            "screen_locked": "L 1" in out.splitlines(), "input_locks": inputlock.parse(out),
+            "sound": soundstate.parse(out), "error": ""}
 
 
 def store_extras(conn, device_id: int, res: dict) -> None:
-    """Ağ arabirimleri, otomatik kapatma ve ekran kilidi durumunu yazar (bkz. göç 026, 035; None =
+    """Ağ arabirimleri, otomatik kapatma, ekran kilidi ve ses durumunu yazar (bkz. göç 026, 035, 059; None =
     bilinmiyor/yok). Wi-Fi kartının kalıcı MAC'i okunduysa Cihazlar ▸ Kablosuz MAC'e (devices.wifi_mac, göç 043)
     de yazılır — donanımdan okunan değer elle girileni günceller; kart okunamadıysa eski değer kalır."""
+    sound = res.get("sound") or {}
     conn.execute(
         "UPDATE devices SET netifs = %s::jsonb, autoshutdown = %s::jsonb, screen_locked = %s, input_locks = %s,"
-        " wifi_mac = COALESCE(%s::macaddr, wifi_mac) WHERE id = %s",
+        " wifi_mac = COALESCE(%s::macaddr, wifi_mac), sound_muted = %s, sound_volume = %s WHERE id = %s",
         (json.dumps(res.get("netifs")) if res.get("netifs") else None,
          json.dumps(res.get("shutdown")) if res.get("shutdown") else None,
-         bool(res.get("screen_locked")), res.get("input_locks") or [], netif.wifi_mac(res.get("netifs")), device_id))
+         bool(res.get("screen_locked")), res.get("input_locks") or [], netif.wifi_mac(res.get("netifs")),
+         sound.get("muted"), sound.get("volume"), device_id))
 
 
 def store_screen_lock(conn, device_id: int, locked: bool) -> None:

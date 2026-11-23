@@ -283,8 +283,11 @@ qx.Class.define("ankamon.ui.DeviceOps", {
      * açar (yeni sekme yerine — bkz. screen() ile aynı iframe/Window deseni). Açılış köprüsü
      * (/filemanager-open/) önce cihazı bu makineye bağlar (sshfs), sonra gezinmeye başlar.
      * @param device {Map} en az {id, label|hostname|ip}
+     * @param desktopOf {String?} bu kullanıcının masaüstü dizininde açılır (Ekranlar kutucuğundaki klasör simgesi, kullanıcı
+     *   isteği 2026-11-23): köprü dizini cihazın xdg-user-dirs ayarından bulur (Masaüstü/Desktop); bulunamazsa ev dizini,
+     *   o da yoksa /home. Verilmezse /home'da açılır.
      */
-    async filemanager(device) {
+    async filemanager(device, desktopOf = null) {
       let c;
       try {
         c = await ankamon.io.Api.get("/devices/" + device.id + "/filemanager");
@@ -295,7 +298,8 @@ qx.Class.define("ankamon.ui.DeviceOps", {
       const name = device.label || device.hostname || device.ip;
       // Kimlik bilgisi URL'ye konmaz (API de döndürmez): bağlama köprüsü onu kendisi okur.
       const url = "/filemanager-open/?device=" + c.device +
-        "&hostname=" + encodeURIComponent(c.hostname) + "&title=" + encodeURIComponent(name);
+        "&hostname=" + encodeURIComponent(c.hostname) + "&title=" + encodeURIComponent(name) +
+        (desktopOf ? "&user=" + encodeURIComponent(desktopOf) : "");
 
       const root = qx.core.Init.getApplication().getRoot();
       const bounds = root.getBounds() || { width: 1024, height: 700 };
