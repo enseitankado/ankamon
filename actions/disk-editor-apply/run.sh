@@ -520,6 +520,13 @@ def op_umount(op):
         if target in ("/", "/boot", "/boot/efi", "/usr", "/var", "/home"):
             raise Fail(f"{target} sistem bağlama noktası — ayrılamaz.")
         run("umount", target)
+        if target.startswith("/media/ankamon/"):
+            # Bağla'nın açtığı boş dizin kalmasın (doluysa rmdir zaten dokunmaz).
+            for d in (target, "/media/ankamon"):
+                try:
+                    os.rmdir(d)
+                except OSError:
+                    break
 
 def op_uuid(op):
     n, p, t = find(op)
