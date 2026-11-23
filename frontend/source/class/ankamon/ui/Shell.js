@@ -947,6 +947,12 @@ qx.Class.define("ankamon.ui.Shell", {
       node.setToolTipText(`${group.name}: ${group.members.length} varlık, ${(group.devices || []).length} yönetilebilir ` +
         "(Varlıklar'dan türer; sürükleyerek yeri değişir)");
       this.__addRetap(node);
+      // Grup işlemleri (gruptan çıkar, yeniden adlandır, sil) Varlıklar'ın grup görünümünde: sağ menüden oraya.
+      const menu = new qx.ui.menu.Menu();
+      const edit = new qx.ui.menu.Button("Grubu düzenle (Varlıklar'da)…");
+      edit.addListener("execute", () => this.__openPage({ page: "network", group: group.id }));
+      menu.add(edit);
+      node.setContextMenu(menu);
       subs.forEach(sub => {
         node.add(sub);
         [sub].concat(sub.getItems ? sub.getItems(true) : []).forEach(n => n.setUserData("assetGroup", group.id));
