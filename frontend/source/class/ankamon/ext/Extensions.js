@@ -120,8 +120,9 @@ qx.Class.define("ankamon.ext.Extensions", {
      *     ActionBar yetkiyi sınamak için sentetik cihazla da çağırır ({id: 0, online, label: ""}).
      *   parent: isteğe bağlı çekirdek grubunun etiketi (ör. "Komut çalıştır"): madde o grubun alt menüsüne girer;
      *     araç çubuğunda da o grubun düğmesinde görünür (grup yoksa — yetki/çevrimdışı — eklentinin kendi bölümüne).
-     *   bar: {id, label, iconSvg|icon, mirror?, primary?, sep?, single?, hint?} — isteğe bağlı ayrı araç çubuğu düğmesi;
-     *     mirror maddenin etiketiyse düğmenin menüsü maddenin alt menüsünün aynısıdır.
+     *   bar: {id, label, iconSvg|icon, mirror?, primary?, items?, sep?, single?, hint?} — isteğe bağlı ayrı araç çubuğu düğmesi;
+     *     mirror maddenin etiketiyse düğmenin menüsü maddenin alt menüsünün aynısıdır. items: eklentinin başka addDeviceMenu
+     *     kayıtlarıyla eklediği maddelerin etiketleri — onlar da bu düğmenin menüsünde durur ("Diğer"e düşmez).
      *   platforms: isteğe bağlı — maddenin (ve alt maddelerinin) çalıştığı işletim sistemi aileleri: ["linux", "windows",
      *     "macos", "other"] ya da "*" (hepsi; ör. yalnız Ankamon kaydı tutan işlevler). Verilmezse katalogdaki menü anahtarına,
      *     o da yoksa yalnız Linux'a göre (bkz. ui.devices.Platforms, platforms/README.md).

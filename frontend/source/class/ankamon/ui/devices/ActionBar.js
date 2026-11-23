@@ -142,6 +142,10 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
           } else if (g.primary) {
             this.__items[g.primary] = g.id;
           }
+          // Eklentinin ayrı kaydettiği öteki maddeleri de bu düğmede ("Diğer"e düşmez).
+          (g.items || []).forEach(k => {
+            this.__items[k] = g.id;
+          });
         });
       }
     }
