@@ -202,7 +202,8 @@ final class AnomaliesApi
                 . 'Çözüm: cihazın başında firmware (BIOS/UEFI) kurulumuna girip HİÇBİR ayarı değiştirmeden "Save & Exit" — çoğu firmware kaydetmeden önce toplar; ayarlar ve açılış girdileri korunur. İşletim sisteminden uzaktan tetiklemek dolu depoda genellikle işe yaramaz. '
                 . 'Önlem: cihaz UEFI kipinde açılıyorsa firmware\'de CSM/legacy desteği kapatılırsa eski tip açılış girdisi yazmaları biter, depo çok daha yavaş dolar. '
                 . 'Değer Bilgi kartı, ilk tanıma ve haftalık otomatik sorun taramasında toplanır.',
-            'level' => 'warn',
+            // Varsayılan düzey Bilgi (kullanıcı isteği 2026-11-23): doluluk tek başına arıza değil, bakımda bakılacak bilgi.
+            'level' => 'info',
             'scan' => true,
             'source' => 'SSH verisi',
             'source_detail' => 'Daha önce SSH ile toplanan donanım bilgisi: cihaz ilk tanındığında ve Bilgi kartı açıldığında (1 sa önbellek) tazelenir. Kural 60 sn\'de bir bakar ama veri bu kadar güncel değildir.',

@@ -106,13 +106,17 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
 
     // Grafik çubuk
     this.__graph = new qx.ui.embed.Html("").set({ height: 74, minHeight: 74, allowGrowY: false, overflowX: "hidden", overflowY: "hidden" });
-    this.__graph.addListener("appear", () => this.__graph.getContentElement().getDomElement().addEventListener("click", e => {
-      const el = e.target.closest("[data-i]");
-      if (el) {
-        this.__select(parseInt(el.getAttribute("data-i"), 10));
-      }
+    // Tıklama seçer; sürükleme fareyle boyutlandırır/taşır/yeni bölüm alanı seçer (kullanıcı isteği 2026-11-23) — bırakınca
+    // ilgili pencere aynı değerlerle dolu açılır, işlem yine "Kuyruğa ekle" + "Uygula" ile (bkz. ui.disk.DiskBarDrag).
+    this.__graph.addListenerOnce("appear", () => ankamon.ui.disk.DiskBarDrag.attach(this.__graph.getContentElement().getDomElement(), {
+      disk: () => this.__disk,
+      tools: () => (this.__scan && this.__scan.tools) || {},
+      select: i => this.__select(i),
+      drop: (plan, res) => plan.mode === "create" ? this.__createDialog(res) : this.__resizeDialog(res)
     }));
     this.add(this.__graph);
+    this.add(new qx.ui.basic.Label("Çubukta fareyle: bölümün kenarını sürükle = boyutlandır · bölümü sürükle = taşı · boş alanda sürükle = " +
+      "yeni bölüm. Bırakınca değerler pencereye dolar; işlem Kuyruğa ekle ve Uygula ile yapılır.").set({ textColor: "app-muted", font: "small" }));
 
     // Bölüm tablosu
     const model = new qx.ui.table.model.Simple();
@@ -414,7 +418,8 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
         .map(f => ({ value: f, label: M.fsName(f) }));
     },
 
-    __createDialog() {
+    /** @param preset {Map?} fareyle seçilen {before, size} (MiB — bkz. ui.disk.DiskBarDrag) */
+    __createDialog(preset) {
       const M = ankamon.ui.disk.DiskModel;
       const disk = this.__disk;
       const free = this.__part();
@@ -431,8 +436,9 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
         return;
       }
       this.__dialog("Yeni bölüm", form => {
-        form.addField("before", "Önündeki boşluk (MiB)", this.__mib(0, 0, maxMib - 1));
-        form.addField("size", "Boyut (MiB)", this.__mib(maxMib, 1, maxMib));
+        const pre = preset ? Math.min(Math.max(0, preset.before), maxMib - 1) : 0;
+        form.addField("before", "Önündeki boşluk (MiB)", this.__mib(pre, 0, maxMib - 1));
+        form.addField("size", "Boyut (MiB)", this.__mib(preset ? Math.min(Math.max(1, preset.size), maxMib - pre) : maxMib, 1, maxMib));
         if (can.kinds.length > 1 || can.kinds[0] !== "primary") {
           form.select("kind", "Bölüm türü", can.kinds.map(k => ({ value: k, label: { primary: "Birincil", extended: "Genişletilmiş", logical: "Mantıksal" }[k] })), can.kinds[0]);
         }
@@ -460,7 +466,8 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
       });
     },
 
-    __resizeDialog() {
+    /** @param preset {Map?} fareyle seçilen {before, size} (MiB — bkz. ui.disk.DiskBarDrag) */
+    __resizeDialog(preset) {
       const M = ankamon.ui.disk.DiskModel;
       const disk = this.__disk;
       const part = this.__part();
@@ -472,9 +479,11 @@ qx.Class.define("ankamon.ui.disk.DiskEditor", {
       const minMib = Math.max(1, Math.ceil(L.minSize / a));
       const maxMib = Math.floor(L.maxSize / a);
       this.__dialog(`Yeniden boyutlandır / Taşı — ${part.path || "yeni bölüm"}`, form => {
-        const before = form.addField("before", "Önündeki boşluk (MiB)", this.__mib(beforeNow, 0, L.canMove ? Math.max(0, total - minMib) : beforeNow));
+        const beforeMax = L.canMove ? Math.max(0, total - minMib) : beforeNow;
+        const pre = preset && L.canMove ? Math.min(Math.max(0, preset.before), beforeMax) : beforeNow;
+        const before = form.addField("before", "Önündeki boşluk (MiB)", this.__mib(pre, 0, beforeMax));
         before.setEnabled(L.canMove);
-        form.addField("size", "Yeni boyut (MiB)", this.__mib(cur, minMib, maxMib));
+        form.addField("size", "Yeni boyut (MiB)", this.__mib(preset ? Math.min(Math.max(minMib, preset.size), maxMib) : cur, minMib, maxMib));
         const notes = [`Şu an ${cur} MiB · en az ${minMib} · en çok ${maxMib} MiB`];
         if (!L.canMove) {
           notes.push("Bağlı bölüm taşınamaz (yalnız sonu değişir).");
