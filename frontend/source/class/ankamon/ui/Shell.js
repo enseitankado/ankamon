@@ -841,8 +841,8 @@ qx.Class.define("ankamon.ui.Shell", {
     /**
      * Varlık gruplarının düğümlerini sunucudaki gruplarla eşitler: Ağ düğümünün DOĞRUDAN altında, Varlıklar'ın ardında (ada
      * göre; kullanıcının kayıtlı alt seçenek sırası uygulanır). 2026-11-23 (kullanıcı isteği): grup düğümü Akıllı Tahtalar
-     * sayfasını (page.Devices — araç çubuğu, Liste/Ekranlar) o grubun üyeleriyle açar; altında koşullu Ligler, Ahenk,
-     * Oturumlar, Sensörler (bkz. __groupNode). Koşullar (yönetilebilir/akıllı tahta/sensör sayıları) değişince düğüm yeniden kurulur.
+     * sayfasını (page.Devices — araç çubuğu, Liste/Ekranlar) o grubun üyeleriyle açar; altında koşullu Oturumlar, Ligler,
+     * Ahenk, Sensörler (bkz. __groupNode). Koşullar (yönetilebilir/akıllı tahta/sensör sayıları) değişince düğüm yeniden kurulur.
      */
     __syncAssetGroups(groups) {
       this.__groupInfo = new Map(groups.map(g => [g.id, g]));
@@ -902,8 +902,8 @@ qx.Class.define("ankamon.ui.Shell", {
 
     /**
      * Bir varlık grubunun düğümü (kullanıcı isteği 2026-11-23): kendisi page.Devices'ı o grupla açar; altında — yetki ve koşul
-     * sağlanırsa, bu sırayla — Ligler (≥1 yönetilebilir varlık, yani cihaz kaydı olan üye), Ahenk ve öteki eklenti sekmeleri
-     * (≥1 akıllı tahta), Oturumlar (≥1 yönetilebilir), Sensörler (≥1 cihazdan sensör verisi gelmiş). Bütün alt düğümler grubu
+     * sağlanırsa, bu sırayla — Oturumlar (≥1 yönetilebilir varlık, yani cihaz kaydı olan üye), Ligler (≥1 yönetilebilir), Ahenk
+     * ve öteki eklenti sekmeleri (≥1 akıllı tahta), Sensörler (≥1 cihazdan sensör verisi gelmiş). Bütün alt düğümler grubu
      * taşır (assetGroup): seçilince sayfa o grubun cihazlarına süzülür. "Yönetilebilir" = Ankamon'da cihaz kaydı var (anlık SSH
      * durumu değil — akşam tahtalar kapanınca menüler kaybolmasın).
      */
@@ -921,6 +921,11 @@ qx.Class.define("ankamon.ui.Shell", {
         this.__addRetap(n);
         return n;
       };
+      // Sıra (kullanıcı isteği 2026-11-23): Oturumlar, Ligler, eklenti sekmeleri (Ahenk…), Sensörler.
+      const sessions = pageOf("sessions");
+      if (managed && allowed(sessions)) {
+        subs.push(this.__buildNode(sessions, () => []));
+      }
       const leagues = pageOf("leagues");
       if (managed && allowed(leagues)) {
         subs.push(this.__buildNode(leagues, () => []));
@@ -929,10 +934,6 @@ qx.Class.define("ankamon.ui.Shell", {
       const diagTabs = allowed(diag) ? this.__tabsOf(diag) : [];
       if ((group.smart || 0) > 0) {
         diagTabs.filter(t => t.key !== "metrics").forEach(t => subs.push(leaf(diag, t.key, t.label)));
-      }
-      const sessions = pageOf("sessions");
-      if (managed && allowed(sessions)) {
-        subs.push(this.__buildNode(sessions, () => []));
       }
       const metrics = diagTabs.find(t => t.key === "metrics");
       if (metrics && (group.sensors || 0) > 0) {
@@ -947,11 +948,17 @@ qx.Class.define("ankamon.ui.Shell", {
       node.setToolTipText(`${group.name}: ${group.members.length} varlık, ${(group.devices || []).length} yönetilebilir ` +
         "(Varlıklar'dan türer; sürükleyerek yeri değişir)");
       this.__addRetap(node);
-      // Grup işlemleri (gruptan çıkar, yeniden adlandır, sil) Varlıklar'ın grup görünümünde: sağ menüden oraya.
+      // Grup işlemleri (gruptan çıkar, yeniden adlandır, sil) Varlıklar'ın grup görünümünde: sağ menüden oraya. Silme
+      // buradan da (kullanıcı isteği 2026-11-23) — Varlıklar'daki "Grubu sil…" ile aynı yetki (network.manage).
       const menu = new qx.ui.menu.Menu();
       const edit = new qx.ui.menu.Button("Grubu düzenle (Varlıklar'da)…");
       edit.addListener("execute", () => this.__openPage({ page: "network", group: group.id }));
       menu.add(edit);
+      if (this.__user.is_admin || (this.__user.features || []).includes("network.manage")) {
+        const del = new qx.ui.menu.Button("Grubu sil…");
+        del.addListener("execute", () => this.__deleteAssetGroup(group.id));
+        menu.add(del);
+      }
       node.setContextMenu(menu);
       subs.forEach(sub => {
         node.add(sub);
@@ -961,6 +968,70 @@ qx.Class.define("ankamon.ui.Shell", {
         this.__rememberOpen(node, `group.${group.id}`);
       }
       return node;
+    },
+
+    /**
+     * Sol menüdeki grup düğümünün "Grubu sil…" maddesi (kullanıcı isteği 2026-11-23): neyin silinip neyin kaldığını, olumlu ve
+     * olumsuz yanlarını anlatan onaydan sonra DELETE /network/groups/{id} (Varlıklar'daki "Grubu sil…" ile aynı uç), ardından
+     * grup listesi yeniden yüklenip GROUPS_CHANGED ile menü ve açık Varlıklar sayfası eşitlenir. Akıllı tahtası olan grupta,
+     * başka hiçbir grupta bulunmayan yönetilebilir cihazların araç çubuklu görünümü (page.Devices) kaybolacağı ayrıca uyarılır.
+     */
+    async __deleteAssetGroup(id) {
+      const group = this.__groupInfo && this.__groupInfo.get(id);
+      if (!group) {
+        return;
+      }
+      const esc = qx.bom.String.escape;
+      const devices = group.devices || [];
+      const others = [...this.__groupInfo.values()].filter(g => g.id !== id);
+      const orphan = devices.filter(d => !others.some(g => (g.devices || []).includes(d))).length;
+      const subs = ["Oturumlar", "Ligler", "Sensörler", "Ahenk / eklenti sekmeleri"].join(", ");
+      let html = `<b>${esc(group.name)}</b> grubu silinsin mi?<br><br>` +
+        "<b>Silinen:</b> yalnız grup tanımı (adı) ve üyelik bağlantıları " +
+        `(${group.members.length} varlık bu gruptan çıkar).<br>` +
+        "<b>Silinmeyen:</b> varlıklar (Varlıklar listesinde kalır), cihaz kayıtları, loglar, oturum geçmişi, sensör verisi, " +
+        "envanter kartları ve öteki gruplar — hiçbir veri silinmez.<br><br>" +
+        "<b>Olumlu:</b> sol menü sadeleşir; kullanılmayan bir grup görünümü ortadan kalkar.<br>" +
+        `<b>Olumsuz:</b> bu grubun sol menü düğümü ve altındaki görünümler (${subs}) kaybolur; grubu yeniden kurmak için ` +
+        "varlıkları Varlıklar'da yeniden seçip grup oluşturmak gerekir (geri alma yok).";
+      if ((group.smart || 0) > 0 && orphan > 0) {
+        html += "<br><br><span style='color:#c5221f'><b>Dikkat — akıllı tahta grubu:</b> bu gruptaki " +
+          `${orphan} yönetilebilir cihaz başka hiçbir grupta yok. Silinince bu cihazların araç çubuklu görünümüne ` +
+          "(Liste/Ekranlar, toplu işlemler) sol menüden erişilemez; önce bu cihazları içeren başka bir grup kurun.</span>";
+      } else if (orphan > 0) {
+        html += `<br><br><b>Not:</b> gruptaki ${orphan} yönetilebilir cihaz başka hiçbir grupta yok; araç çubuklu ` +
+          "görünümlerine sol menüden erişim kalmaz.";
+      }
+      const D = ankamon.ui.Dialog;
+      const win = D.window("Grubu sil", 560);
+      win.add(new qx.ui.basic.Label(html).set({ rich: true, wrap: true }));
+      let sure = false;
+      const cancel = new qx.ui.form.Button("Vazgeç");
+      const ok = new qx.ui.form.Button("Grubu sil");
+      cancel.addListener("execute", () => win.close());
+      ok.addListener("execute", () => {
+        sure = true;
+        win.close();
+      });
+      const closed = new Promise(resolve => win.addListener("close", resolve));
+      D.buttons(win, [cancel, ok]);
+      win.open();
+      cancel.focus();
+      await closed;
+      if (!sure) {
+        return;
+      }
+      try {
+        await ankamon.io.Api.del("/network/groups/" + id);
+        const selected = this.__tree.getSelection()[0];
+        if (selected && selected.getUserData("assetGroup") === id) {
+          this.__openPage({ page: "network" }); // silinen grubun görünümü açıktı: Varlıklar (Network'teki silmeyle aynı)
+        }
+        const data = await ankamon.io.Api.get("/network/groups");
+        qx.event.message.Bus.dispatchByName(ankamon.ui.network.Ops.GROUPS_CHANGED, { groups: data.groups || [] });
+      } catch (e) {
+        D.error(e);
+      }
     },
 
     /**
