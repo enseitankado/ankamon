@@ -392,6 +392,22 @@ qx.Class.define("ankamon.ui.Shell", {
       });
       const root = new qx.ui.tree.TreeFolder("root");
       this.__tree.setRoot(root);
+      // Gizli kök HER ZAMAN açık (2026-11-24, Chrome'da sol menü bomboş): qx kökü yalnız bir öğe seçilince açar
+      // (Tree._onChangeSelection); açılışta seçim olmazsa ya da birinci düzeyde klavyeyle ← iki kez basılınca
+      // (seçim gizli köke çıkar, sonra kök kapanır) bütün menü görünmez kalıyordu — kökün oku gizli, geri açılamaz.
+      root.setOpen(true);
+      root.addListener("changeOpen", e => {
+        if (!e.getData()) {
+          root.setOpen(true);
+        }
+      });
+      this.__tree.addListener("changeSelection", e => {
+        const sel = e.getData()[0];
+        if (sel === root) {
+          const first = root.getChildren()[0];
+          this.__tree.setSelection(first ? [first] : []);
+        }
+      });
 
       // __nodes: yalnız KÖK düğümler (sürükle-bırak sırası, nav_order). Alt düğümler (PAGES parent)
       // üstlerinin altında PAGES'teki sabit sırayla durur; sıralanamaz.
