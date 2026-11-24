@@ -111,7 +111,7 @@ qx.Class.define("ankamon.ui.health.Catalog", {
       if (paths.includes("watch")) {
         Object.entries(health.kinds || {}).forEach(([kind, k]) => {
           const origin = k.origin ? ` (${k.origin} eklentisi)` : "";
-          const cells = [kind, k.label + origin, P.watch.text, k.source || "Log", mark(k, "every_s", k.every || ""),
+          const cells = [kind, k.label + origin, ankamon.ui.health.Status.pathText("watch", k.source || "Log"), k.source || "Log", mark(k, "every_s", k.every || ""),
             mark(k, "level", text(k.level || "warn")), mark(k, "scan", k.scan ? "Evet" : "Hayır"), k.source_detail || "", k.description || ""];
           rows.push({ cells, meta: { type: "watch", kind, k, check: cells[1], path: cells[2], source: cells[3], how: cells[7], what: cells[8] } });
         });

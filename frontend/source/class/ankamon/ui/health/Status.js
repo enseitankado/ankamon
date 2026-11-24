@@ -158,7 +158,19 @@ qx.Class.define("ankamon.ui.health.Status", {
     // Yol adları kısa (kullanıcı isteği 2026-11-23): sürekli izleme = "Log", SSH denetimi = "Uzak bağlantı".
     PATH: {
       watch: { text: "Log", color: "#1a73e8" },
-      ssh: { text: "Uzak bağlantı", color: "#7b1fa2" }
+      ssh: { text: "Uzak bağlantı", color: "#7b1fa2" },
+      // Sürekli izlenip logdan beslenmeyen kurallar (ör. "ETAP adı farklı" — ETAP sunucusunun kaydı): "Log" yanıltıcıydı
+      // (kullanıcı isteği 2026-11-24). Renk sürekli izlemeyle aynı.
+      watchOther: { text: "İzleme", color: "#1a73e8" }
+    },
+
+    /** Bulgunun Yol yazısı: sürekli izleme kuralı logdan beslenmiyorsa (Kaynak "Log" değilse) "İzleme". */
+    pathText(path, source) {
+      const P = ankamon.ui.health.Status.PATH;
+      if (path === "watch" && source && !/^log\b/i.test(String(source))) {
+        return P.watchOther.text;
+      }
+      return P[path] ? P[path].text : path;
     },
 
     /**
@@ -296,7 +308,7 @@ qx.Class.define("ankamon.ui.health.Status", {
 
       this.__findingRows = (data.findings || []).map(f => {
         // Zaman: üst tablodaki gibi (1 günden eskiyse yalnız tarih, saniye/dakika hassasiyeti yok — kullanıcı isteği 2026-11-24).
-        const cells = [f.device_id ?? f.device, f.device || "?", text(f.level), f.check, P[f.path] ? P[f.path].text : f.path,
+        const cells = [f.device_id ?? f.device, f.device || "?", text(f.level), f.check, ankamon.ui.health.Status.pathText(f.path, f.source),
           f.source || "", f.how || "", f.every || "", f.since ? when(f.since) : "",
           (f.text || "") + (f.advice ? ` — Öneri: ${f.advice}` : "")];
         this.__rowTimes.set(cells, f.since || 0);
