@@ -338,7 +338,7 @@ qx.Class.define("ankamon.ui.DeviceOps", {
      */
     screen(devices, user, manage = false) {
       const list = devices.map(b => ({ id: b.id, name: b.label || b.hostname || b.ip || "#" + b.id, locks: b.input_locks || [],
-        session: b.session_username || "" }));
+        session: b.session_username || "", sound: ankamon.ui.devices.SoundControl.state(b) }));
       if (!list.length) {
         return;
       }
@@ -360,7 +360,10 @@ qx.Class.define("ankamon.ui.DeviceOps", {
       }
       // input: başlıktaki klavye ve fare/dokunmatik kilidi düğmeleri. chat: sohbeti açık cihazlar yüksek çözünürlükte akar.
       const input = !!user && (user.is_admin || user.features.includes("screen.input"));
-      const spec = { devices: list, q: list.length > 1 ? "thumb" : "view", control, manage, input, chat: ankamon.ui.chat.Window.openIds() };
+      // sound: başlıktaki ses simgesine basınca Yönet ▸ Ses kontrolü alt menüsü (bkz. ui.devices.SoundControl).
+      const sound = !!user && (user.is_admin || user.features.includes("devices.sound"));
+      const spec = { devices: list, q: list.length > 1 ? "thumb" : "view", control, manage, input, sound,
+        chat: ankamon.ui.chat.Window.openIds() };
       const hash = btoa(unescape(encodeURIComponent(JSON.stringify(spec))));
       const caption = list.length > 1 ? `Ekranlar (${list.length} cihaz)`
         : this.__screenCaption(manage, list[0].name, list[0].session);
@@ -388,6 +391,12 @@ qx.Class.define("ankamon.ui.DeviceOps", {
           win.maximize();
         } else if (e.data.type === "tm-inputlock" && input) {
           this.__toggleInputLock(e.data.id, e.data.device, e.data.lock, e.data.locks || [], frame);
+        } else if (e.data.type === "tm-soundmenu" && sound) {
+          const open = single !== null && this.__screenWins.get(single);
+          const target = (open && open.device) || devices.find(b => b.id === e.data.id);
+          if (target) {
+            ankamon.ui.devices.SoundControl.openMenuAt([target], user, frame.getContentElement().getDomElement(), e.data.x, e.data.y);
+          }
         }
       };
       window.addEventListener("message", onMessage);
@@ -493,6 +502,9 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         const target = open.frame.getWindow();
         if (device && target) {
           target.postMessage({ type: "tm-locks", id, locks: device.input_locks || [] }, location.origin);
+          // Başlıktaki ses simgesi (kullanıcı isteği 2026-11-24): durum her tazelemede; simgenin menüsü güncel cihazla açılır.
+          open.device = device;
+          target.postMessage({ type: "tm-sound", id, sound: ankamon.ui.devices.SoundControl.state(device) }, location.origin);
         }
       });
     },
@@ -1183,6 +1195,12 @@ qx.Class.define("ankamon.ui.DeviceOps", {
             stateAdd(screens, ICON.unlockInput, off + n(unlockable), unlockable, list => this.__job(
               { type: "input_lock", device: inputDev, lock: false, device_ids: list.map(b => b.id) }, off));
           });
+        }
+        // Yönet ▸ Ses kontrolü (kullanıcı isteği 2026-11-24): sessize al/aç, düzey, en yüksek düzey sınırı (cihazda bekçi) —
+        // bkz. ui.devices.SoundControl. Ekranlar kutucuğundaki ses simgesi aynı alt menüyü açar; araç çubuğunda Yönet aynası.
+        const sound = ankamon.ui.devices.SoundControl.menu(os("Ses kontrolü", online), user);
+        if (sound) {
+          screens.add(this.menuButton(ankamon.ui.devices.SoundControl.ICON.sound, "Ses kontrolü", null, sound));
         }
         // Yönet ▸ Web filtresi (kullanıcı isteği): ETAP Pardus'taki eta-kisit ile kara/beyaz liste ve DNS sayıları (bkz.
         // ui.devices.EtaKisitWebFilter). Maddeler ne yaptıklarını söyler (kullanıcı: "kara liste" tek başına anlaşılmıyordu);

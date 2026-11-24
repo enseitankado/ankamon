@@ -75,8 +75,8 @@ qx.Class.define("ankamon.ui.users.FeatureRolePicker", {
         hint: "Genel bakış, cihaz listesi, ekranları canlı izleme — cihaz yetkilerinin çoğu 'Cihazları görüntüleme'yi gerektirir (kendiliğinden seçilir)",
         keys: ["dashboard", "devices", "screen", "screen.screenshot"] },
       { id: "sinif", label: "Sınıf etkileşimi (ekran ve iletişim)",
-        hint: "Sohbet, ekran yansıtma, web sitesi açma, ekran/klavye kilidi, ekran aktarımı, uzaktan müdahale",
-        keys: ["devices.chat", "cast", "screen.web", "screen.lock", "screen.input", "screen.relay", "screen.control"] },
+        hint: "Sohbet, ekran yansıtma, web sitesi açma, ekran/klavye kilidi, ses kontrolü, ekran aktarımı, uzaktan müdahale",
+        keys: ["devices.chat", "cast", "screen.web", "screen.lock", "screen.input", "devices.sound", "screen.relay", "screen.control"] },
       { id: "yonetim", label: "Cihaz yönetimi ve komut",
         hint: "Kayıt düzenleme, aç/kapat, hazır işlemler, görev yöneticisi, web filtresi, root komut ve dosya erişimi",
         keys: ["devices.manage", "power", "actions", "taskmgr", "devices.webfilter", "devices.login", "shell", "filemanager", "tiha"] },
@@ -107,9 +107,10 @@ qx.Class.define("ankamon.ui.users.FeatureRolePicker", {
     ROLES: [
       { id: "ogretmen", label: "Ders öğretmeni",
         hint: "Sınıftaki tahtayı izler ve öğrenciyle etkileşir: ekranı izleme ve görüntüsünü alma, sohbet, kendi ekranını "
-          + "yansıtma, web sitesi açma, ekran ve klavye/fare kilidi. Komut çalıştıramaz, cihazı kapatamaz, ayar değiştiremez.",
+          + "yansıtma, web sitesi açma, ekran ve klavye/fare kilidi, sesi kapatma/ayarlama/sınırlama. Komut çalıştıramaz, cihazı "
+          + "kapatamaz, ayar değiştiremez.",
         keys: ["dashboard", "devices", "screen", "screen.screenshot", "screen.web", "screen.lock", "screen.input",
-          "devices.chat", "cast"] },
+          "devices.chat", "cast", "devices.sound"] },
       { id: "idareci", label: "İdareci / müdür yardımcısı",
         hint: "Yalnız izleme ve raporlar: genel bakış, ekranları izleme, oturumlar / ligler / loglar, sağlık ve sensörler, "
           + "Varlıklar, Ankamon oturum denetimi, envanter raporları ve arıza kaydı. Cihaza müdahale etmez.",
@@ -126,7 +127,7 @@ qx.Class.define("ankamon.ui.users.FeatureRolePicker", {
           + "arıza kaydı. Serbest root komut, dosya sistemi, TiHA ve kalıcı silme yok.",
         keys: ["dashboard", "devices", "devices.manage", "power", "actions", "taskmgr", "diagnose", "anomalies", "metrics",
           "logs", "screen", "screen.control", "screen.screenshot", "network", "devices.backup", "devices.restore",
-          "devices.users", "devices.passwords", "devices.login", "envanter", "ariza"] },
+          "devices.users", "devices.passwords", "devices.login", "devices.sound", "envanter", "ariza"] },
       { id: "bt", label: "Bilişim öğretmeni / BT sorumlusu",
         hint: "Okulun günlük işletmesi: cihaz ve ağ yönetiminin tamamı (root komut, dosya sistemi, TiHA, parolalar, web "
           + "filtresi, bildirimler dahil). Kalıcı veri silme (loglar/oturum kayıtları/envanter ve arıza kayıtları) ve "

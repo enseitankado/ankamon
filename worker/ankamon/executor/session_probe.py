@@ -121,17 +121,18 @@ def probe(device: dict, user: str, password: str, timeout: int = 8) -> dict:
 
 
 def store_extras(conn, device_id: int, res: dict) -> None:
-    """Ağ arabirimleri, otomatik kapatma, ekran kilidi ve ses durumunu yazar (bkz. göç 026, 035, 059; None =
+    """Ağ arabirimleri, otomatik kapatma, ekran kilidi ve ses durumunu (düzey, sessiz, sınır) yazar (bkz. göç 026, 035, 059, 060; None =
     bilinmiyor/yok). Wi-Fi kartının kalıcı MAC'i okunduysa Cihazlar ▸ Kablosuz MAC'e (devices.wifi_mac, göç 043)
     de yazılır — donanımdan okunan değer elle girileni günceller; kart okunamadıysa eski değer kalır."""
     sound = res.get("sound") or {}
     conn.execute(
         "UPDATE devices SET netifs = %s::jsonb, autoshutdown = %s::jsonb, screen_locked = %s, input_locks = %s,"
-        " wifi_mac = COALESCE(%s::macaddr, wifi_mac), sound_muted = %s, sound_volume = %s WHERE id = %s",
+        " wifi_mac = COALESCE(%s::macaddr, wifi_mac), sound_muted = %s, sound_volume = %s,"
+        " sound_limit = %s WHERE id = %s",
         (json.dumps(res.get("netifs")) if res.get("netifs") else None,
          json.dumps(res.get("shutdown")) if res.get("shutdown") else None,
          bool(res.get("screen_locked")), res.get("input_locks") or [], netif.wifi_mac(res.get("netifs")),
-         sound.get("muted"), sound.get("volume"), device_id))
+         sound.get("muted"), sound.get("volume"), sound.get("limit"), device_id))
 
 
 def store_screen_lock(conn, device_id: int, locked: bool) -> None:

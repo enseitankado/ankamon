@@ -31,7 +31,10 @@ ses sunucusu kullanıcının oturumunda çalışır (pipewire-pulse, /run/user/<
 sokete bağlanıp pactl ile okur (bkz. executor/cast.py — sesli yansıtma da aynı yolla düzey değiştirir). Seat0'daki
 kullanıcı oturumu seçilir (etkin olan önce; dm-tool lock ile kilitliyken pasif oturum). Oturum yoksa, ses sunucusu ya da
 gerçek çıkış yoksa (ekran DPMS ile kapalıyken HDMI çıkışı kaybolur, varsayılan "auto_null" kalır) satır yazılmaz:
-değer bilinmiyor (NULL) sayılır. Sesi değiştirmek: actions/sound-mute, sound-volume-down, sound-unmute.
+değer bilinmiyor (NULL) sayılır. Sesi değiştirmek: actions/sound-control (sağ menü Yönet ▸ Ses kontrolü).
+
+Ses sınırı (kullanıcı isteği 2026-11-24, göç 060): sound-control "limit" cihaza bekçi kurar
+(/var/lib/ankamon-sound-limit/limit + ankamon-sound-limit.service); "AL <yüzde>" satırı oturumdan bağımsız okunur.
 """
 
 from __future__ import annotations
@@ -53,21 +56,27 @@ if [ -n "$snd_uid" ] && [ -S "/run/user/$snd_uid/pulse/native" ] && command -v p
     echo "A $(PULSE_SERVER="unix:/run/user/$snd_uid/pulse/native" timeout 3 pactl get-sink-mute "$snd_s" 2>/dev/null | awk '{print $2}') $(PULSE_SERVER="unix:/run/user/$snd_uid/pulse/native" timeout 3 pactl get-sink-volume "$snd_s" 2>/dev/null | grep -o '[0-9]*%' | head -n 1 | tr -d %)" ;;
   esac
 fi
+if [ -s /var/lib/ankamon-sound-limit/limit ] && [ -e /etc/systemd/system/ankamon-sound-limit.service ]; then
+  echo "AL $(head -c 4 /var/lib/ankamon-sound-limit/limit)"
+fi
 """
 
 
 def parse(output: str) -> dict | None:
-    """Betik çıktısındaki "A" satırından {"muted": bool|None, "volume": int|None}; satır yoksa ya da ikisi de
-    okunamadıysa None (bilinmiyor)."""
+    """Betik çıktısındaki "A" (sessiz mi, düzey) ve "AL" (sınır) satırlarından {"muted": bool|None, "volume": int|None,
+    "limit": int|None}; hiçbiri okunamadıysa None (bilinmiyor)."""
+    muted = volume = limit = None
     for line in output.splitlines():
         parts = line.split()
-        if not parts or parts[0] != "A":
+        if not parts:
             continue
-        muted = {"yes": True, "no": False}.get(parts[1]) if len(parts) > 1 else None
-        volume = next((int(p) for p in parts[1:] if p.isdigit()), None)
-        if volume is not None:
-            volume = max(0, min(volume, 1000))   # pactl %100'ün üstüne (yükseltme) çıkabilir
-        if muted is None and volume is None:
-            return None
-        return {"muted": muted, "volume": volume}
-    return None
+        if parts[0] == "AL" and len(parts) > 1 and parts[1].isdigit():
+            limit = max(0, min(int(parts[1]), 100))
+        elif parts[0] == "A":
+            muted = {"yes": True, "no": False}.get(parts[1]) if len(parts) > 1 else None
+            volume = next((int(p) for p in parts[1:] if p.isdigit()), None)
+            if volume is not None:
+                volume = max(0, min(volume, 1000))   # pactl %100'ün üstüne (yükseltme) çıkabilir
+    if muted is None and volume is None and limit is None:
+        return None
+    return {"muted": muted, "volume": volume, "limit": limit}

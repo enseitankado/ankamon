@@ -84,7 +84,7 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
 
     /** Alt menüsü düğmelere dağıtılan üst maddeler → içindeki bilinmeyen maddenin grubu. */
     CONTAINERS: { "Komut çalıştır": "command", "Yönet": "manage", "Ekran": "watch", "Oturumlar": "users", "Dosyalar": "files",
-      "Web filtresi": "manage" },
+      "Web filtresi": "manage", "Ses kontrolü": "manage" },
 
     /** Menü maddesi → grup (menüdeki etiket, cihaz sayısı eki olmadan — bkz. DeviceOps.menuButton). */
     ITEMS: {

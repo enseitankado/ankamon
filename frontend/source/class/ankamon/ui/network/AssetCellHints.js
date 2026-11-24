@@ -102,7 +102,8 @@ qx.Class.define("ankamon.ui.network.AssetCellHints", {
         "hangi karttan geldiğine bakılır.",
       sound: "Bilgisayarın sesi açık mı, düzeyi kaç. Ankamon 30 saniyede bir SSH ile oturum açık kullanıcının ses ayarına bakar. " +
         "'Kapalı': ses kapatılmış (sessizde). Oturum yoksa ya da ekran kapalıyken (ses çıkışı görünmez) boş kalır. " +
-        "Komut çalıştır ▸ Ses ile kapatılıp kısılabilir.",
+        "'(sınır %70)': Yönet ▸ Ses kontrolü ▸ Sesi sınırla ile konan en yüksek düzey — cihazdaki kullanıcı sesi bunun " +
+        "üstüne çıkaramaz. Yönet ▸ Ses kontrolü ile kapatılır, ayarlanır, sınırlanır.",
       disk_total: "Cihazın disk kapasitesi. Cihaz ilk tanındığında SSH ile donanım bilgisi toplanırken okunur.",
       ram_total: "Cihazın bellek (RAM) miktarı. Donanım bilgisi toplanırken SSH ile okunur.",
       bios: "Anakartın yazılımı olan BIOS'un sürümü. Donanım bilgisi toplanırken cihazın kendisinden okunur.",

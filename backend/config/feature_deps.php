@@ -33,6 +33,7 @@ $ozellikBagimliliklari = [
     'anomalies.notify' => 'anomalies',
     'screen.web' => 'screen',
     'devices.webfilter' => 'devices',
+    'devices.sound' => 'devices',
     'devices.passwords' => 'devices',
     'devices.passwords.etapadmin' => 'devices.passwords',
     'devices.passwords.root' => 'devices.passwords',

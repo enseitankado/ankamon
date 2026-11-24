@@ -88,8 +88,9 @@ qx.Class.define("ankamon.page.Devices", {
       // Cihaz yerel ağa kablolu kartıyla bağlı mı (internet değil) — bkz. Devices.cableText.
       { id: "cable", label: "Kablo", hint: "Yerel ağa kablolu ağ kartıyla bağlı mı", width: 100 },
       // Ses durumu (kullanıcı isteği 2026-11-23; göç 059, worker executor/soundstate.py — oturum yoklamasında okunur):
-      // "Kapalı" (sessizde) ya da düzey "%45"; oturum/ölçüm yoksa boş. Bkz. Devices.soundText.
-      { id: "sound", label: "Ses", hint: "Bilgisayarın sesi: Kapalı (sessizde) ya da ses düzeyi — oturum açık kullanıcının ses ayarından", width: 80, choices: true },
+      // "Kapalı" (sessizde) ya da düzey "%45", ses sınırı varsa "(sınır %70)" (göç 060); oturum/ölçüm yoksa boş. Bkz. Devices.soundText.
+      { id: "sound", label: "Ses", hint: "Bilgisayarın sesi: Kapalı (sessizde) ya da ses düzeyi — oturum açık kullanıcının ses ayarından; "
+        + "Yönet ▸ Ses kontrolü ▸ Sesi sınırla ile konan en yüksek düzey parantez içinde", width: 110, choices: true },
       // Donanım bilgisi (bkz. worker/ankamon/executor/hwfacts.py): cihaz ilk kez tanınırken (MAC
       // öğrenilirken) bir kez SSH ile toplanır; satır sağ menüsündeki "Bilgi kartı" bunu canlı
       // tazeler (60dk önbellekli). Değer yoksa (henüz toplanmadıysa) hücre boş kalır.
@@ -318,24 +319,11 @@ qx.Class.define("ankamon.page.Devices", {
 
     /**
      * "Ses" sütunu (kullanıcı isteği 2026-11-23): oturum açık kullanıcının ses sunucusunda varsayılan çıkış sessizdeyse
-     * "Kapalı", değilse düzey ("%45"). Kaynak oturum yoklaması (30 sn — göç 059, worker executor/soundstate.py); cihaz
-     * yönetilemiyorsa, yoklama eskiyse (CABLE_FRESH_S) ya da oturum/ses çıkışı yoksa boş (bilinmiyor).
+     * "Kapalı", değilse düzey ("%45"); ses sınırı varsa "(sınır %70)" eki (2026-11-24). Kaynak oturum yoklaması (30 sn — göç
+     * 059/060, worker executor/soundstate.py); bkz. ui.devices.SoundControl.text.
      */
     soundText(device) {
-      if (!ankamon.page.Devices.soundKnown(device)) {
-        return "";
-      }
-      if (device.sound_muted) {
-        return "Kapalı";
-      }
-      return device.sound_volume === null || device.sound_volume === undefined ? "" : "%" + device.sound_volume;
-    },
-
-    /** Ses durumu güncel mi (bkz. soundText): cihaz yönetilebilir ve oturum yoklaması taze. */
-    soundKnown(device) {
-      return !!device.online && !!device.session_checked_at &&
-        Date.now() / 1000 - device.session_checked_at < ankamon.page.Devices.CABLE_FRESH_S &&
-        (device.sound_muted !== null && device.sound_muted !== undefined || device.sound_volume !== null && device.sound_volume !== undefined);
+      return ankamon.ui.devices.SoundControl.text(device);
     },
 
     /**
@@ -685,6 +673,14 @@ qx.Class.define("ankamon.page.Devices", {
           qx.ui.menu.Manager.getInstance().hideAll();
         } else if (e.data.type === "tm-menu") {
           this.__openPreviewMenu(e.data.id, e.data.x, e.data.y, e.data.ids);
+        } else if (e.data.type === "tm-soundmenu") {
+          // Kutucuktaki ses simgesi = sağ menü Yönet ▸ Ses kontrolü (seçimin parçasıysa bütün seçime — kullanıcı isteği 2026-11-24).
+          const device = this.__devices.get(e.data.id);
+          const ids = e.data.ids && e.data.ids.includes(e.data.id) ? e.data.ids : [e.data.id];
+          if (device) {
+            ankamon.ui.devices.SoundControl.openMenuAt(ids.map(i => this.__devices.get(i)).filter(Boolean), this._user,
+              this.__iframeEl(), e.data.x, e.data.y);
+          }
         } else if (e.data.type === "tm-statsmenu") {
           this.__openStatsMenu(e.data.id, e.data.x, e.data.y, e.data.ids);
         } else if (e.data.type === "tm-show") {
@@ -1211,8 +1207,9 @@ qx.Class.define("ankamon.page.Devices", {
           refresh: (this.__tileRefresh && this.__tileRefresh.get(b.id)) || 0,
           // Monitör DPMS ile kapalı (bkz. 025_device_display_state.sql): kutucukta "Ekran güç tasarrufu kipinde".
           powersave: !!b.online && ["Off", "Standby", "Suspend"].includes(b.display_state),
-          // Ses kapalı (sessizde): başlıkta Müdahale'nin solunda sessiz hoparlör simgesi (kullanıcı isteği 2026-11-23).
-          muted: ankamon.page.Devices.soundKnown(b) && b.sound_muted === true,
+          // Ses durumu (sessiz/düzey/sınır): başlıkta klasörün ve Müdahale'nin solunda ses simgesi, müdahale kipinden bağımsız
+          // hep görünür (kullanıcı isteği 2026-11-23/24 — bkz. screen/index.html Tile.showSound); null = bilinmiyor.
+          sound: ankamon.ui.devices.SoundControl.state(b),
           // Başlıktaki klasör simgesinin ipucu: oturum açık kullanıcı varsa dosya yöneticisi onun masaüstünde açılır.
           session: b.online ? b.session_username || "" : "",
           // Alt bardaki ağ simgeleri ve güç tasarrufu yazısının altındaki TiHA otomatik kapatma geri sayımı
@@ -1267,7 +1264,9 @@ qx.Class.define("ankamon.page.Devices", {
     __startPreview() {
       const control = this._user.is_admin || this._user.features.includes("screen.control");
       // files: kutucuk başlığındaki klasör simgesi (dosya yöneticisi — sağ menüdeki "Dosya yöneticisi" ile aynı yetki).
-      const spec = { devices: this.__previewList(), q: "thumb", control, embed: true, files: this._can("filemanager") };
+      // sound: ses simgesine basınca Yönet ▸ Ses kontrolü alt menüsü açılır (yetki devices.sound — bkz. "tm-soundmenu").
+      const spec = { devices: this.__previewList(), q: "thumb", control, embed: true, files: this._can("filemanager"),
+        sound: this._can("devices.sound") };
       this.__screensRunning = true;
       this.__previewKey = JSON.stringify(spec.devices);
       const url = "/screen/#" + btoa(unescape(encodeURIComponent(JSON.stringify(spec))));
