@@ -223,7 +223,7 @@ qx.Class.define("ankamon.page.Network", {
         (device, devices) => ankamon.ui.devices.Platforms.decorate(
           ankamon.ui.DeviceOps.managedDeviceMenuBody(device, this._user, devices), devices),
         () => this.__managedOf(this.__checkedDevices()),
-        { getAll: () => this.__managedOf(this.__currentAssets()) });
+        { getAll: () => this.__managedOf(this.__currentAssets()), getListed: () => this.__currentAssets() });
       barRow.add(this.__actionBar, { flex: 1 });
     } else {
       barRow.add(new qx.ui.core.Spacer(), { flex: 1 });

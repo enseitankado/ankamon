@@ -161,7 +161,8 @@ qx.Class.define("ankamon.page.Devices", {
       // Pasif satırlar (grubun cihaz kaydı olmayan üyeleri — bkz. setGroup) araç çubuğuna girmez: düğmeler yalnız
       // yönetilebilir varlıklarda kullanılabilir (kullanıcı isteği 2026-11-23).
       () => this._checkedIds(this.__table).map(id => this.__devices && this.__devices.get(id)).filter(b => b && !b.passive),
-      { getAll: () => (this.__devices ? [...this.__devices.values()].filter(b => !b.passive) : []) });
+      { getAll: () => (this.__devices ? [...this.__devices.values()].filter(b => !b.passive) : []),
+        getListed: () => (this.__devices ? [...this.__devices.values()] : []) });
     this.add(this.__actionBar);
     this.__table.addListener("cellDbltap", e => {
       const id = this.__table.getTableModel().getValue(0, e.getRow());

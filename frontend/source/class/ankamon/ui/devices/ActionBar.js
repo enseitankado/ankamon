@@ -157,7 +157,9 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
    * @param getMenu {Function} (cihaz, cihazlar) → qx.ui.menu.Menu|null: sağ menüyü kurar
    * @param getSelected {Function} () → seçili cihazlar
    * @param config {Map?} groups/items/containers/perDevice (eklenti araç çubuğu); getAll: () → tüm cihazlar (verilirse
-   *   durum yazısı iki satır: "● N çevrim içi (k seçili)" / "● M çevrim dışı (j seçili)"; ipucunda toplam)
+   *   durum yazısı iki satır: "● N çevrim içi (k seçili)" / "● M çevrim dışı (j seçili)"; ipucunda toplam);
+   *   getListed: () → listede görünen bütün satırlar (cihaz kaydı olmayan pasif varlıklar dahil; verilirse sayılar
+   *   bunlardan — grid'in Durum sütunuyla aynı —, ipucu kaçının yönetilebilir cihaz olduğunu söyler)
    */
   construct(getMenu, getSelected, config) {
     super(new qx.ui.layout.Flow(1, 2).set({ alignY: "middle" }));
@@ -196,6 +198,7 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
     }
     this.__perDevice = config.perDevice || Bar.PER_DEVICE;
     this.__getAll = config.getAll || null;
+    this.__getListed = config.getListed || null;
     this.__widgets = new Map();
     this.__tools = [];
     this.set({ padding: [3, 6], margin: [6, 8, 8, 8] });
@@ -221,6 +224,7 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
     __containers: null,
     __perDevice: null,
     __getAll: null,
+    __getListed: null,
     __totals: null,
     __widgets: null,
     __count: null,
@@ -290,6 +294,7 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
         this.__count.set({
           value, visibility: "visible",
           toolTipText: `Toplam ${t.on + t.off} cihaz: ${t.on} çevrim içi, ${t.off} çevrim dışı` +
+            (t.managed !== t.on + t.off ? ` — ${t.managed} tanesi yönetilebilir cihaz (araç çubuğu işlemleri yalnız bunlara uygulanır)` : "") +
             (chosen ? ` — ${chosen} seçili (${t.onSel} çevrim içi, ${t.offSel} çevrim dışı)` : "")
         });
         return;
@@ -500,9 +505,12 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
         const chosen = new Set(devices.map(b => b.id));
         // Çevrim içi = ağda canlı (alive — Akıllı Tahtalar Durum sütunuyla aynı; SSH erişimi ayrı "Yönetilebilir").
         const isOn = b => !!(b.alive ?? b.online);
-        const online = all.filter(isOn);
-        this.__totals = { on: online.length, off: all.length - online.length,
-          onSel: online.filter(b => chosen.has(b.id)).length, offSel: all.filter(b => !isOn(b) && chosen.has(b.id)).length };
+        // Sayılar listede görünen bütün satırlardan (kullanıcı isteği 2026-11-24: Kod-LAB gibi yalnız pasif üyeli grupta
+        // "0 / 0" yazıyordu, grid 12 çevrim içi gösterirken); seçim sayıları yalnız cihazlardan (işlemler onlara uygulanır).
+        const listed = this.__getListed ? this.__getListed() : all;
+        const online = listed.filter(isOn);
+        this.__totals = { on: online.length, off: listed.length - online.length, managed: all.length,
+          onSel: all.filter(b => isOn(b) && chosen.has(b.id)).length, offSel: all.filter(b => !isOn(b) && chosen.has(b.id)).length };
       }
       const key = JSON.stringify([this.__totals, devices.map(b => [b.id, b.online, b.session_username, b.session_locked, b.screen_locked, b.input_locks,
         b.display_state, b.relay_source, b.relay_is_source])]);
