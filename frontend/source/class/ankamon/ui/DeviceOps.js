@@ -39,7 +39,7 @@ qx.Class.define("ankamon.ui.DeviceOps", {
      * orta tonlar — kullanıcı isteği 2026-11-24).
      */
     CATEGORY_COLORS: ["#2b7bd6", "#2e9a57", "#c46a12", "#9b51d6", "#cf3f63", "#11949a", "#9a8414", "#5c6ce0",
-      "#b8508e", "#5f8f1f", "#d0532c", "#3a8fb7"],
+      "#b8508e", "#5f8f1f", "#d0532c", "#3a8fb7", "#a0522d", "#7a6fd0", "#c2408f", "#2f8f7a"],
 
     /**
      * Cihaz ekle (device null) / Düzenle. Düzenle artık Cihaz ayrıntıları penceresi (kullanıcı isteği 2026-11-09):
@@ -970,7 +970,9 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         qx.bom.String.escape(label), null, null, submenu);
       btn.getChildControl("label").setRich(true);
       // Araç çubuğu maddeyi bu anahtarla tanır (etiket, cihaz sayısı eki olmadan — bkz. ui.devices.ActionBar).
-      btn.setUserData("ankamon.menuKey", label.replace(/ \(\d+( cihaz)?\)$/, ""));
+      // "(N tahta)" da silinir: Ahenk eklentisi akıllı tahta kapsamında bu eki kullanır; silinmeyince sayı ekli
+      // maddeler (Veritabanı, Yapılandırma, Paket Güncelle …) çubukta hiç düğme olmuyordu (2026-11-12 terim geçişi).
+      btn.setUserData("ankamon.menuKey", label.replace(/ \(\d+( cihaz| tahta)?\)$/, ""));
       btn.setUserData("ankamon.menuIcon", icon);
       if (handler) {
         btn.addListener("execute", handler, this);
@@ -1709,7 +1711,7 @@ qx.Class.define("ankamon.ui.DeviceOps", {
       select.getChildControl("list").addListener("changeSelection", e => {
         const sel = e.getData();
         select.getChildren().forEach(i => i.getUserData("ankamon.color") &&
-          i.setTextColor(sel.includes(i) ? null : i.getUserData("ankamon.color")));
+          i.getChildControl("label").setTextColor(sel.includes(i) ? null : i.getUserData("ankamon.color")));
       });
       const famText = a => (a.platforms || ["linux"]).map(f => P.label(f)).join(", ");
       // Seçim satırının metni: sabitse başında ★ (sabitleme değişince yeniden yazılır — bkz. pinBtn).
@@ -1719,7 +1721,8 @@ qx.Class.define("ankamon.ui.DeviceOps", {
         const item = new qx.ui.form.ListItem(itemText(category, title, model), null, model).set({ padding: ROW_PADDING });
         item.setUserData("ankamon.itemText", () => itemText(category, title, model));
         item.setUserData("ankamon.color", colorOf(category));
-        item.setTextColor(colorOf(category));
+        // Renk etikete verilir: temalar (ör. Fluent) etiketin rengini kendisi atar, ListItem'ınki geçmez.
+        item.getChildControl("label").setTextColor(colorOf(category));
         if (!usable.length) {
           // Açık renk verildiğinden temanın soluk "devre dışı" rengi geçmez: saydamlıkla soluklaştırılır.
           item.set({ enabled: false, opacity: 0.5, toolTipText: `Seçili cihazların sisteminde (${present.map(f => P.label(f)).join(", ")}) bu işlemin uygulaması yok.` });
