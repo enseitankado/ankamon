@@ -34,6 +34,12 @@
  * ve alt satır açma/kapama (Ağ, Görev yöneticisi) "cellTap" dinler — sağ tıklama da işareti değiştiriyordu.
  * Burada sağ tuşla gelen (ya da macOS'ta Ctrl+tıklama gibi "contextmenu" olan) dokunuşta yalnız "cellTap"
  * yayılmaz: satırın seçilip vurgulanması (sağ menü o satıra uygulanır) ve "cellContextmenu" olduğu gibi kalır.
+ *
+ * İkinci yol (2026-11-24, Varlıklar/grup grid'lerinde işaretli satıra sağ tıklayınca işaret kalkıyordu): Scroller odak
+ * göstergesinin (odaklı hücrenin çerçevesi) "pointerup" olayında da — tuşa bakmadan — "cellTap" yayar
+ * (_onPointerupFocusIndicator). Windows'ta "contextmenu" tuş BIRAKILINCA gelir: odaklı (son tıklanan) hücreye sağ tıklamada
+ * bırakma odak göstergesine düşer, cellTap yayılır ve "ışıklı satıra ikinci tıklama" kuralı işareti kaldırırdı. Artık
+ * yayılan her cellTap'in kaynak olayına bakılır: sağ/orta tuş ya da contextmenu ise yutulur.
  */
 qx.Class.define("ankamon.ui.table.RightClickPatch", {
   type: "static",
@@ -59,8 +65,15 @@ qx.Class.define("ankamon.ui.table.RightClickPatch", {
           this.$$ankamonNoCellTap = false;
         }
       };
-      proto.fireEvent = function (type) {
-        if (type === "cellTap" && this.$$ankamonNoCellTap) {
+      const secondaryEvent = e => {
+        try {
+          return !!e && (e.getType() === "contextmenu" || (!!e.getButton && e.getButton() !== "left" && e.getButton() !== "none"));
+        } catch (err) {
+          return false;
+        }
+      };
+      proto.fireEvent = function (type, clazz, args) {
+        if (type === "cellTap" && (this.$$ankamonNoCellTap || secondaryEvent(args && args[1]))) {
           return true;
         }
         return fire.apply(this, arguments);

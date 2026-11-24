@@ -110,13 +110,17 @@ qx.Class.define("ankamon.ui.StatusBar", {
     // Oturum açmış Ankamon kullanıcıları (kullanıcı isteği): sayı + üzerine gelince ayrıntı (bkz. __pollUsers).
     // Varsayılan gizli; bir eklenti "statusBar.usersVisible" kancasıyla açar (bkz. ext.Extensions). Gizliyken
     // de yoklama sürer: bu oturumun durumu (odak, açık sayfa) göstergeyi gören başkalarına bildirilir.
-    this.__usersTip = new qx.ui.tooltip.ToolTip("").set({ rich: true, showTimeout: 300 });
+    // Ayrıntı balonda değil, tıklanınca açılan kendiliğinden tazelenen kipli pencerede (kullanıcı isteği 2026-11-24: balon
+    // kırpılıyordu) — bkz. ui.LoginPresenceWindow.
     this.__usersLabel = new qx.ui.basic.Label("").set({
-      font: "app-mono", textColor: "app-muted", rich: true, toolTip: this.__usersTip, marginRight: 12
+      font: "app-mono", textColor: "app-muted", rich: true, marginRight: 12, cursor: "pointer",
+      toolTipText: "Bağlı Ankamon kullanıcıları — tıklayın: canlı liste"
     });
+    this.__usersLabel.addListener("tap", () => ankamon.ui.LoginPresenceWindow.open());
     head.add(this.__usersLabel);
     this.__updateUsersVisibility();
     qx.event.message.Bus.subscribe(ankamon.ext.Extensions.CHANGED, this.__updateUsersVisibility, this);
+    qx.event.message.Bus.subscribe(ankamon.ext.Extensions.CHANGED, this.__updatePanelGates, this);
     // Mini paneller (CPU/RAM/Disk/Ağ trafiği, Ağ taraması, SSH), sağa hizalı — bkz. __buildPanels.
     // minWidth 0: panellerin toplamı (~960 px) çubuğa — dolayısıyla bütün arayüze — en küçük genişlik dayatıyordu; pencere
     // ondan darken arayüz taşıyor, Chrome kök katmanı sağa kaydırıp sol menüyü ekran dışına itiyordu (2026-11-24). Artık
@@ -207,6 +211,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
 
   destruct() {
     qx.event.message.Bus.unsubscribe(ankamon.ext.Extensions.CHANGED, this.__updateUsersVisibility, this);
+    qx.event.message.Bus.unsubscribe(ankamon.ext.Extensions.CHANGED, this.__updatePanelGates, this);
     if (this.__timer) {
       this.__timer.stop();
       this.__timer.dispose();
@@ -297,7 +302,8 @@ qx.Class.define("ankamon.ui.StatusBar", {
         if (entry.w) {
           panel.setWidth(entry.w);
         }
-        panel.setVisibility(entry.on ? "visible" : "excluded");
+        panel.setUserData("userOn", entry.on);
+        this.__applyPanelGate(panel);
         panel.addListener("dragStart", e => this.__onPanelDragStart(panel, e.getData()));
         panel.addListener("resized", () => this.__savePanels());
         panel.addListener("activate", () => this.__onPanelActivate(id));
@@ -321,9 +327,11 @@ qx.Class.define("ankamon.ui.StatusBar", {
       menu.add(new qx.ui.menu.Button("Alt çubukta gösterilecek paneller").set({ enabled: false }));
       Object.values(this.__panels).forEach(panel => {
         const check = new qx.ui.menu.CheckBox(panel.getTitle());
-        check.setValue(panel.getVisibility() === "visible");
+        check.setValue(panel.getUserData("userOn") !== false);
+        check.setVisibility(this.__panelGateOpen(panel.getPanelId()) ? "visible" : "excluded");
         check.addListener("changeValue", e => {
-          panel.setVisibility(e.getData() ? "visible" : "excluded");
+          panel.setUserData("userOn", e.getData());
+          this.__applyPanelGate(panel);
           this.__savePanels();
           this.__updatePanelFeeds();
         });
@@ -343,7 +351,8 @@ qx.Class.define("ankamon.ui.StatusBar", {
             this.__panelBox.remove(panel);
             this.__panelBox.add(panel);
             panel.setWidth(width);
-            panel.setVisibility("visible");
+            panel.setUserData("userOn", true);
+            this.__applyPanelGate(panel);
             this.__menuChecks[id].setValue(true);
           }
         });
@@ -357,7 +366,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
     __savePanels() {
       const value = this.__panelBox.getChildren().map(panel => ({
         id: panel.getPanelId(),
-        on: panel.getVisibility() === "visible",
+        on: panel.getUserData("userOn") !== false, // kancayla gizli (SSH, kanca kapalı) panelin tercihi korunur
         w: panel.getWidth() !== panel.getDefaultWidth() ? panel.getWidth() : null
       }));
       // Yetkisiz olduğu için kurulmamış panellerin kaydı korunur (yetki gelince yeri bilinsin).
@@ -434,6 +443,34 @@ qx.Class.define("ankamon.ui.StatusBar", {
       } else if (id === "scan") {
         qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "network" });
       }
+    },
+
+    /**
+     * Kancalı paneller: SSH paneli yalnız bir eklenti "statusBar.sshVisible" kancasını üstlenirse
+     * görünür (kullanıcı isteği 2026-11-24). Kullanıcının panel tercihi (userOn) ayrıca saklanır.
+     */
+    __panelGateOpen(id) {
+      return id !== "ssh" || !!ankamon.ext.Extensions.handle("statusBar.sshVisible");
+    },
+
+    __applyPanelGate(panel) {
+      const on = panel.getUserData("userOn") !== false && this.__panelGateOpen(panel.getPanelId());
+      panel.setVisibility(on ? "visible" : "excluded");
+    },
+
+    /** Eklenti durumu değişti (aç/kapa): kancalı panelleri ve menü maddelerini yeniden uygula. */
+    __updatePanelGates() {
+      if (!this.__panels) {
+        return;
+      }
+      Object.values(this.__panels).forEach(panel => {
+        this.__applyPanelGate(panel);
+        const check = this.__menuChecks && this.__menuChecks[panel.getPanelId()];
+        if (check) {
+          check.setVisibility(this.__panelGateOpen(panel.getPanelId()) ? "visible" : "excluded");
+        }
+      });
+      this.__updatePanelFeeds();
     },
 
     __panelOn(id) {
@@ -527,7 +564,6 @@ qx.Class.define("ankamon.ui.StatusBar", {
     __statsTimer: null,
     __usersTimer: null,
     __usersLabel: null,
-    __usersTip: null,
     __dock: null,
     __onFocusChange: null,
     __sentFocused: null,
@@ -581,7 +617,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
       const visible = ankamon.ext.Extensions.handle("statusBar.usersVisible");
       this.__usersLabel.setVisibility(visible ? "visible" : "excluded");
       if (!visible) {
-        this.__usersTip.hide();
+        ankamon.ui.LoginPresenceWindow.closeIfOpen();
       }
     },
 
@@ -591,7 +627,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
     },
 
     /**
-     * Oturum açmış Ankamon kullanıcıları (/api/login-sessions/active): sayı her oturum sahibine; ipucundaki
+     * Oturum açmış Ankamon kullanıcıları (/api/login-sessions/active): sayı her oturum sahibine; penceredeki (ui.LoginPresenceWindow)
      * ayrıntı (kullanıcı, giriş zamanı, bilgisayar, son etkinlik, açık sayfa) yalnız 'logins' yetkisine (sunucu süzer).
      */
     async __pollUsers() {
@@ -606,37 +642,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
       } catch (e) {
         return; // bir sonraki turda yeniden denenir
       }
-      const F = ankamon.util.Format;
-      const esc = qx.bom.String.escape;
       this.__usersLabel.setValue(`👤 ${res.users}`);
-      if (!res.sessions) {
-        this.__usersTip.setLabel(`Bağlı Ankamon kullanıcısı: <b>${res.users}</b>`);
-        return;
-      }
-      // Satır = kullanıcı + IP (sunucu gruplar); aynı yerden birden çok açık oturum varsa sayısı yazılır.
-      // Bilgisayar: cihaz/ağ envanterindeki takma ad (sunucu eşler), yoksa IP adresi.
-      const rows = res.sessions.map(s => {
-        const who = esc(s.username) + (s.full_name ? ` <span style="opacity:.7">(${esc(s.full_name)})</span>` : "");
-        // Sunucu yalnız BAĞLI oturumları verir (çıkış yapmadan kapanmış tarayıcılar sayılmaz — bkz.
-        // LoginSessionsApi::PRESENCE_MINUTES); odakta olmayan bağlı oturum "arka planda".
-        const flags = [s.mine ? "siz" : "", s.active ? "" : "arka planda", s.sessions > 1 ? `${s.sessions} oturum` : ""]
-          .filter(Boolean).join(", ");
-        // Aktif = Ankamon o kişinin tarayıcısında görünür sekmede ve pencere odakta (bkz. __isFocused).
-        // Sağında o an açık sayfa/sekme/pencere (bkz. __currentView); arka plandaki oturumda soluk.
-        const state = (s.active ? "<span style=\"color:#2e9d4a;font-weight:bold\">Aktif</span>" : "") +
-          (s.view ? ` <span style="opacity:${s.active ? .85 : .6}">${s.active ? "— " : ""}${esc(s.view)}</span>` : "");
-        const pc = s.computer ? `<span title="${esc(s.ip || "")}">${esc(s.computer)}</span>` : esc(s.ip || "");
-        return `<tr><td><b>${who}</b>${flags ? ` <i>${flags}</i>` : ""}</td>` +
-          `<td>${F.dateTime(s.started_ts)}</td><td>${pc}</td>` +
-          `<td>${s.last_seen_ts ? F.ago(Math.round(s.last_seen_ts / 1000)) : "—"}</td><td>${state}</td></tr>`;
-      });
-      const th = "style=\"text-align:left;padding-right:14px\"";
-      this.__usersTip.setLabel(
-        `<b>Bağlı Ankamon kullanıcıları: ${res.users}</b> (${res.total} oturum)` +
-        `<table style="margin-top:4px;border-spacing:0 2px"><tr><th ${th}>Kullanıcı</th><th ${th}>Son giriş</th>` +
-        `<th ${th}>Bilgisayar</th><th ${th}>Son etkinlik</th><th ${th}>Durum</th></tr>` +
-        rows.join("").replace(/<td>/g, "<td style=\"padding-right:14px\">") + "</table>"
-      );
     },
     __lastId: null,
     __folded: true,

@@ -63,6 +63,15 @@ return [
 
     ['GET',    '/api/devices',            [Api\DevicesApi::class, 'index'],      'devices'],
     ['POST',   '/api/devices',            [Api\DevicesApi::class, 'create'],     'devices.manage'],
+    // Yönetilemeyen cihazın katılımı (kullanıcı isteği 2026-11-24): süreli kod + cihazda tek komutla çekilen betik.
+    // Kısa adres nginx'te /k/<kod> → script, /k/<kod>/done → done (düz HTTP; kod sorgu parametresinde — {id} yalnız sayı).
+    // Genel bakış ▸ Öneriler (kullanıcı isteği 2026-11-24): kurallar Api/RecommendationsApi::RULES; her öneri kendi yetkisine bakar.
+    ['GET',    '/api/recommendations',    [Api\RecommendationsApi::class, 'index'], 'dashboard'],
+    ['GET',    '/api/enroll',             [Api\EnrollApi::class, 'status'],      'devices.manage'],
+    ['POST',   '/api/enroll',             [Api\EnrollApi::class, 'create'],      'devices.manage'],
+    ['POST',   '/api/enroll/revoke',      [Api\EnrollApi::class, 'revoke'],      'devices.manage'],
+    ['GET',    '/api/enroll/script',      [Api\EnrollApi::class, 'script'],      'public'],
+    ['POST',   '/api/enroll/done',        [Api\EnrollApi::class, 'done'],        'public'],
     ['GET',    '/api/devices/{id}',       [Api\DevicesApi::class, 'show'],       'devices'],
     ['PATCH',  '/api/devices/{id}',       [Api\DevicesApi::class, 'update'],     'devices.manage'],
     ['DELETE', '/api/devices/{id}',       [Api\DevicesApi::class, 'delete'],     'devices.manage'],

@@ -71,6 +71,15 @@ qx.Class.define("ankamon.page.Dashboard", {
       }
     });
 
+    // Öneriler (kullanıcı isteği 2026-11-24): kullanıcıya gerektiğinde bilgi verilen yer — öneri yoksa görünmez.
+    // Kurallar sunucuda (backend Api/RecommendationsApi.php RULES); bkz. __refreshRecommendations.
+    this.__recoBox = this.__panel("Öneriler");
+    this.__recoTitle = this.__recoBox.getChildren()[0].getChildren()[0];
+    this.__recoList = new qx.ui.container.Composite(new qx.ui.layout.VBox(6));
+    this.__recoBox.add(this.__recoList);
+    this.__recoBox.exclude();
+    this.add(this.__recoBox);
+
     // Paneller (acil bulgular, son hatalar, son görevler) kenarlıklı kutularda; aralarındaki ayırıcılar fareyle sürüklenir,
     // boyutlar kullanıcı başına sunucuda saklanır (bkz. __remember). Hangi panellerin görüneceği "⚙ Görünüm"den (__layoutPanels).
     this.__healthRow = this.__createHealthRow();
@@ -190,6 +199,10 @@ qx.Class.define("ankamon.page.Dashboard", {
 
   members: {
     __disk: null,
+    __recoBox: null,
+    __recoTitle: null,
+    __recoList: null,
+    __recoSig: null,
     __dashData: null,
     __healthRow: null,
     __holder: null,
@@ -406,6 +419,76 @@ qx.Class.define("ankamon.page.Dashboard", {
       }
     },
 
+    /**
+     * Öneriler paneli (GET /api/recommendations): her öneri bir satır — düzey rengi (dikkat turuncu, bilgi mavi), başlık,
+     * açıklama, ilgili cihazların adları (ilk birkaçı; tamamı ipucunda) ve önerinin işlem düğmesi. Öneri yoksa panel gizli.
+     */
+    async __refreshRecommendations() {
+      let res;
+      try {
+        res = await ankamon.io.Api.get("/recommendations");
+      } catch (e) {
+        return;
+      }
+      if (this.isDisposed()) {
+        return;
+      }
+      const items = res.items || [];
+      const sig = JSON.stringify(items);
+      if (sig === this.__recoSig) {
+        return;
+      }
+      this.__recoSig = sig;
+      this.__recoList.removeAll().forEach(w => w.dispose());
+      if (!items.length) {
+        this.__recoBox.exclude();
+        return;
+      }
+      this.__recoTitle.setValue(`Öneriler (${items.length})`);
+      this.__recoBox.show();
+      const esc = qx.bom.String.escape;
+      items.forEach(item => {
+        const color = item.level === "warn" ? "#e08a00" : "#1e88e5";
+        const row = new qx.ui.container.Composite(new qx.ui.layout.HBox(10).set({ alignY: "middle" })).set({
+          padding: [6, 8], decorator: new qx.ui.decoration.Decorator().set({ widthLeft: 4, colorLeft: color, radius: 4 })
+        });
+        const names = (item.devices || item.assets || []).map(d => d.label + (d.ip && d.label !== d.ip ? ` (${d.ip})` : ""));
+        const shown = names.slice(0, 6).map(esc).join(", ") + (names.length > 6 ? ` … +${names.length - 6}` : "");
+        const text = new qx.ui.basic.Label(`<b>${esc(item.title)}</b><br><span style="opacity:.85">${esc(item.text)}</span>` +
+          (shown ? `<br><span style="opacity:.7">${shown}</span>` : "")).set({
+          rich: true, wrap: true, selectable: true,
+          toolTipText: names.length > 6 ? names.map(esc).join("<br>") : null
+        });
+        row.add(text, { flex: 1 });
+        const action = this.__recoAction(item);
+        if (action) {
+          row.add(action);
+        }
+        this.__recoList.add(row);
+      });
+    },
+
+    /** Önerinin işlem düğmesi (bkz. RecommendationsApi action türleri). */
+    __recoAction(item) {
+      const a = item.action;
+      if (!a) {
+        return null;
+      }
+      const button = new qx.ui.form.Button(a.label).set({ allowGrowY: false, alignY: "middle" });
+      button.addListener("execute", () => {
+        if (a.type === "settings") {
+          qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "settings", tab: a.tab });
+        } else if (a.type === "page") {
+          qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: a.page, tab: a.tab });
+        } else if (a.type === "enroll") {
+          ankamon.ui.devices.EnrollDialog.open();
+        } else if (a.type === "ready") {
+          ankamon.ui.DeviceOps.run(item.devices || [], this._user, a.id);
+        }
+      });
+      return button;
+    },
+
     /** Sağlık ▸ Durum'daki Acil bulgular. */
     async __refreshUrgent() {
       if (!this.__urgent) {
@@ -440,6 +523,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       const F = ankamon.util.Format;
       this.__refreshDisk();
       this.__refreshUrgent();
+      this.__refreshRecommendations();
       const data = await ankamon.io.Api.get("/dashboard");
       const logs = data.log_histogram.reduce((sum, bucket) => sum + bucket.total, 0);
       const errors = data.log_histogram.reduce((sum, bucket) => sum + bucket.errors, 0);
