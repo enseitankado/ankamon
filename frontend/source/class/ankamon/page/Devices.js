@@ -136,6 +136,9 @@ qx.Class.define("ankamon.page.Devices", {
     // "Oturum" sütunu: ekran kilitliyse "(kilitli)" ifadesi kırmızı+kalın (bkz. ui.table.SessionRenderer).
     this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "session"),
       new ankamon.ui.table.SessionRenderer());
+    // "Wi-Fi" sütunu: erişim noktası olarak ayarlanmış cihaz yeşil + ipucu (bkz. ui.table.WifiRenderer, 2026-11-24).
+    this.__table.getTableColumnModel().setDataCellRenderer(2 + this.__columns.findIndex(c => c.id === "wifi"),
+      new ankamon.ui.table.WifiRenderer());
     // Hücre ipuçları: sütunun görevi ve verinin kaynağı (kullanıcı isteği 2026-11-12; bkz. ui.network.AssetCellHints).
     // Özel çiziciler (Durum, Oturum) atandıktan SONRA: onların kendi ipucu açıklamanın üstünde kalır.
     ankamon.ui.network.AssetCellHints.apply(this.__columns, ankamon.ui.network.AssetCellHints.DEVICES, {

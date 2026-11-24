@@ -59,7 +59,8 @@ final class SchedulesApi
         'screen_unlock' => 'Ekran kilidini aç',
     ];
 
-    private const REPEATS = ['once', 'interval', 'weekly'];
+    // when_online: cihaz çevrimiçi olunca, cihaz başına bir kez (göç 061; worker tasks/user_schedules.py).
+    private const REPEATS = ['once', 'interval', 'weekly', 'when_online'];
     private const TARGETS = ['devices', 'all_online'];
 
     public function index(Request $request, array $user): array
@@ -69,7 +70,7 @@ final class SchedulesApi
                     s.repeat, extract(epoch FROM s.run_at)::bigint AS run_at, s.interval_minutes,
                     to_char(s.time_of_day, 'HH24:MI') AS time_of_day, s.weekdays,
                     extract(epoch FROM s.next_run_at)::bigint AS next_run_at,
-                    extract(epoch FROM s.last_run_at)::bigint AS last_run_at, s.last_job_id, s.run_requested,
+                    extract(epoch FROM s.last_run_at)::bigint AS last_run_at, s.last_job_id, s.run_requested, s.fired_device_ids,
                     j.status AS last_status, j.summary AS last_summary, u.username AS created_by,
                     (SELECT string_agg(COALESCE(NULLIF(d.label, ''), d.hostname, host(d.ip)), ', ' ORDER BY d.label)
                        FROM devices d WHERE d.id = ANY(s.device_ids)) AS device_names
@@ -82,6 +83,7 @@ final class SchedulesApi
             $s['job_request'] = json_decode((string) $s['job_request'], true) ?: new \stdClass();
             $s['device_ids'] = self::intArray($s['device_ids']);
             $s['weekdays'] = self::intArray($s['weekdays']);
+            $s['fired_device_ids'] = self::intArray($s['fired_device_ids']);
         }
         unset($s);
         return ['schedules' => $schedules, 'runs' => self::runs(), 'types' => self::TYPES];
@@ -173,7 +175,12 @@ final class SchedulesApi
         $interval = null;
         $timeOfDay = null;
         $weekdays = [1, 2, 3, 4, 5, 6, 7];
-        if ($repeat === 'once') {
+        if ($repeat === 'when_online') {
+            if ($mode !== 'devices' || !$deviceIds) {
+                throw ApiError::badRequest('"Çevrimiçi olunca" için hedef cihazları seçin.');
+            }
+            $runAt = null;
+        } elseif ($repeat === 'once') {
             if (!$runAt) {
                 throw ApiError::badRequest('Çalışma zamanını seçin.');
             }
@@ -211,7 +218,7 @@ final class SchedulesApi
                 "UPDATE user_schedules SET name = ?, enabled = ?, job_type = ?, job_title = ?, job_params = ?::jsonb,
                         job_request = ?::jsonb, target_mode = ?, device_ids = ?::int[], repeat = ?,
                         run_at = to_timestamp(?::bigint), interval_minutes = ?::int, time_of_day = ?::time,
-                        weekdays = ?::smallint[], next_run_at = NULL, updated_at = now()
+                        weekdays = ?::smallint[], next_run_at = NULL, fired_device_ids = '{}', updated_at = now()
                  WHERE id = ?",
                 array_merge($values, [$id])
             );
@@ -230,6 +237,26 @@ final class SchedulesApi
         Audit::log($user, $request, 'schedule.save', $name, ['id' => $id, 'type' => $type, 'repeat' => $repeat,
             'target_mode' => $mode, 'devices' => $deviceIds]);
         return ['id' => $id];
+    }
+
+    /**
+     * POST /api/schedules/when-online {job, device_ids, name?} — "cihaz çevrimiçi olunca, bir kez" çalışacak görev
+     * (kullanıcı isteği 2026-11-24: ör. Bakım ▸ Ahenk ▸ ETA Kayıt güncelle'de işaretli cihazların çevrimdışı olanları).
+     * Zamanlama listesi yönetici sayfasında olduğu halde bu uç görevi elle başlatabilen kullanıcıya açıktır: görev tanımı
+     * save() içinde JobsApi::spec'ten (yetki dahil) geçer; yineleme ve hedef sabittir.
+     */
+    public function whenOnline(Request $request, array $user): array
+    {
+        $job = $request->input('job', []);
+        if (!is_array($job)) {
+            throw ApiError::badRequest('Geçersiz görev.');
+        }
+        $name = trim((string) $request->input('name', ''));
+        return $this->save(Request::fromBody([
+            'name' => $name !== '' ? mb_substr($name, 0, 120) : 'Çevrimiçi olunca — ' . ($job['type'] ?? 'görev'),
+            'job' => $job, 'target_mode' => 'devices', 'device_ids' => (array) $request->input('device_ids', []),
+            'repeat' => 'when_online', 'enabled' => true,
+        ]), $user);
     }
 
     /** PUT /api/schedules/{id}/enabled {enabled} */

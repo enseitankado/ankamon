@@ -126,7 +126,9 @@ qx.Class.define("ankamon.ui.system.UserSchedules", {
       this.__table.getTableModel().setData(d.schedules.map((s, i) => [
         i, s.name, d.types[s.job_type] || s.job_type, this.__what(s),
         s.target_mode === "all_online" ? "Çevrimiçi bütün cihazlar" : `${s.device_ids.length} cihaz: ${s.device_names || ""}`,
-        this.__when(s), s.run_requested ? "şimdi (elle)…" : s.enabled ? (s.next_run_at ? at(s.next_run_at) : "hesaplanıyor…") : "—",
+        this.__when(s), s.run_requested ? "şimdi (elle)…" : !s.enabled ? "—" : s.repeat === "when_online"
+          ? `cihaz çevrimiçi olunca (${s.device_ids.length - (s.fired_device_ids || []).length} bekliyor)`
+          : s.next_run_at ? at(s.next_run_at) : "hesaplanıyor…",
         at(s.last_run_at), s.last_status ? F.jobStatus(s.last_status) + (s.last_summary ? " · " + s.last_summary : "") : "",
         s.enabled ? "Etkin" : "Durdu"
       ]));
@@ -140,7 +142,7 @@ qx.Class.define("ankamon.ui.system.UserSchedules", {
       ]));
       this.__sync();
       // Bekleyen hesap/elle çalıştırma varsa kısa süre sonra yeniden okunur (worker ≤10 sn).
-      const pending = d.schedules.some(s => s.run_requested || (s.enabled && !s.next_run_at));
+      const pending = d.schedules.some(s => s.run_requested || (s.enabled && !s.next_run_at && s.repeat !== "when_online"));
       if (pending && !this.__timer) {
         this.__timer = qx.event.Timer.once(() => {
           this.__timer = null;
@@ -171,6 +173,10 @@ qx.Class.define("ankamon.ui.system.UserSchedules", {
       const D = ankamon.ui.system.ScheduleEditor.DAYS;
       if (s.repeat === "once") {
         return "Bir kez: " + ankamon.util.Format.dateTime(s.run_at * 1000);
+      }
+      if (s.repeat === "when_online") {
+        // Cihaz çevrimiçi olunca, cihaz başına bir kez (göç 061).
+        return `Çevrimiçi olunca, bir kez (${(s.fired_device_ids || []).length}/${s.device_ids.length} cihazda çalıştı)`;
       }
       if (s.repeat === "interval") {
         const m = s.interval_minutes;

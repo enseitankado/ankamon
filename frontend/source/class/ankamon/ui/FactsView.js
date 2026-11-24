@@ -106,6 +106,11 @@ qx.Class.define("ankamon.ui.FactsView", {
       if (f.wifi_monitor && Date.now() / 1000 - f.wifi_monitor < this.WIFI_MONITOR_FRESH_S) {
         return { text: "Monitör modu", kind: "warn" };
       }
+      // Kalıcı erişim noktası ayarı (Wi-Fi eklentisinin «Kablosuz erişim noktası» işi başarıyla bitince facts.wifi_ap = ağ adı;
+      // kaldırılınca silinir — ext/wifi worker/job_hooks.py): yayın o an görünmese de (yeniden başlıyor) ayarlı sayılır.
+      if (f.wifi_ap && !(f.wifi_mode && f.wifi_mode !== "AP" && f.wifi_state === "connected")) {
+        return { text: `Erişim noktası (${f.wifi_ap})`, kind: "ok" };
+      }
       if (f.wifi_blocked === "soft" || f.wifi_radio === "disabled") {
         return { text: "Devre dışı", kind: "idle" };
       }

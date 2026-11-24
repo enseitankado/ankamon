@@ -131,6 +131,10 @@ if [ -n "$eth" ]; then
     echo "ETH_SPEED=$(cat /sys/class/net/$eth/speed 2>/dev/null | awk '$1>0{printf "%.0f", $1}')"
     echo "ETH_IP=$(ip -o -4 addr show dev $eth 2>/dev/null | awk '{print $4; exit}')"
     echo "ETH_CHIP=$(lspci -s "$(basename "$(readlink -f /sys/class/net/$eth/device)")" 2>/dev/null | sed 's/^[^ ]* [^:]*: //')"
+    # Uzaktan uyandırma (Genel bakış ▸ Öneriler, 2026-11-24): kartın Wake-on bayrakları ("g" = sihirli paket; ethtool yoksa
+    # yazılmaz) ve her açılışta yeniden açan servis (actions/wake-on-lan = TiHA tiha-wake-on-lan.service).
+    command -v ethtool >/dev/null 2>&1 && echo "ETH_WOL=$(ethtool "$eth" 2>/dev/null | awk -F': ' '/^[[:space:]]*Wake-on:/{print $2; exit}')"
+    echo "WOL_SERVICE=$(systemctl is-enabled tiha-wake-on-lan.service 2>/dev/null || true)"
 fi
 if [ -n "$wifi" ]; then
     echo "WIFI_IFACE=$wifi"
@@ -290,6 +294,8 @@ _FIELDS = {
     "ETH_SPEED": "eth_speed_mbps",
     "ETH_IP": "eth_ip",
     "ETH_CHIP": "eth_chip",
+    "ETH_WOL": "eth_wol",
+    "WOL_SERVICE": "wol_service",
     "WIFI_IFACE": "wifi_iface",
     "WIFI_MAC": "wifi_mac",
     "WIFI_DRIVER": "wifi_driver",

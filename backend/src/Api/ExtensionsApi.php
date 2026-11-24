@@ -63,7 +63,7 @@ final class ExtensionsApi
     {
         $out = [];
         foreach (Extensions::all() as $name => $ext) {
-            $out[$name] = Extensions::setting($name, 'enabled', true) !== false;
+            $out[$name] = Extensions::active($name);
         }
         return ['active' => (object) $out];
     }

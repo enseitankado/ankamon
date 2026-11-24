@@ -72,6 +72,15 @@ final class Extensions
         return $out;
     }
 
+    /**
+     * Eklenti etkin mi (ayar "enabled" — yoksa etkin sayılır). Arayüzün sekme/menü kararı (/api/extensions/active) ve
+     * eklentinin hazır komutlarının kataloğa girmesi (Core\Actions::all) aynı kuralı kullanır.
+     */
+    public static function active(string $name): bool
+    {
+        return self::setting($name, 'enabled', true) !== false;
+    }
+
     /** @return array<string,mixed>|null tek eklenti (ad bilinmiyorsa null) */
     public static function get(string $name): ?array
     {

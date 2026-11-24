@@ -63,6 +63,15 @@ return [
 
     ['GET',    '/api/devices',            [Api\DevicesApi::class, 'index'],      'devices'],
     ['POST',   '/api/devices',            [Api\DevicesApi::class, 'create'],     'devices.manage'],
+    // Yönetilemeyen cihazın katılımı (kullanıcı isteği 2026-11-24): süreli kod + cihazda tek komutla çekilen betik.
+    // Kısa adres nginx'te /k/<kod> → script, /k/<kod>/done → done (düz HTTP; kod sorgu parametresinde — {id} yalnız sayı).
+    // Genel bakış ▸ Öneriler (kullanıcı isteği 2026-11-24): kurallar Api/RecommendationsApi::RULES; her öneri kendi yetkisine bakar.
+    ['GET',    '/api/recommendations',    [Api\RecommendationsApi::class, 'index'], 'dashboard'],
+    ['GET',    '/api/enroll',             [Api\EnrollApi::class, 'status'],      'devices.manage'],
+    ['POST',   '/api/enroll',             [Api\EnrollApi::class, 'create'],      'devices.manage'],
+    ['POST',   '/api/enroll/revoke',      [Api\EnrollApi::class, 'revoke'],      'devices.manage'],
+    ['GET',    '/api/enroll/script',      [Api\EnrollApi::class, 'script'],      'public'],
+    ['POST',   '/api/enroll/done',        [Api\EnrollApi::class, 'done'],        'public'],
     ['GET',    '/api/devices/{id}',       [Api\DevicesApi::class, 'show'],       'devices'],
     ['PATCH',  '/api/devices/{id}',       [Api\DevicesApi::class, 'update'],     'devices.manage'],
     ['DELETE', '/api/devices/{id}',       [Api\DevicesApi::class, 'delete'],     'devices.manage'],
@@ -169,6 +178,8 @@ return [
     // Kullanıcı tanımlı zamanlanmış görevler (Sistem ▸ Zamanlanmış görevler ▸ Görevler/Sonuçlar; worker tasks/user_schedules.py).
     ['GET',    '/api/schedules',         [Api\SchedulesApi::class, 'index'],     'admin'],
     ['POST',   '/api/schedules',         [Api\SchedulesApi::class, 'save'],      'admin'],
+    // "Cihaz çevrimiçi olunca, bir kez" görevi (ör. Ahenk ▸ ETA Kayıt güncelle): görevi başlatabilen kullanıcıya açık.
+    ['POST',   '/api/schedules/when-online', [Api\SchedulesApi::class, 'whenOnline'], 'actions'],
     ['PUT',    '/api/schedules/{id}/enabled', [Api\SchedulesApi::class, 'setEnabled'], 'admin'],
     ['POST',   '/api/schedules/{id}/run', [Api\SchedulesApi::class, 'runNow'],   'admin'],
     ['DELETE', '/api/schedules/{id}',    [Api\SchedulesApi::class, 'delete'],    'admin'],
