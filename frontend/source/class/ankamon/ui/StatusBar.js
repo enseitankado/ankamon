@@ -94,7 +94,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
     this.add(this.__grip);
 
     const head = new qx.ui.container.Composite(new qx.ui.layout.HBox(6).set({ alignY: "middle" })).set({
-      padding: [4, 8], cursor: "pointer"
+      padding: [4, 8], cursor: "pointer", minWidth: 0
     });
     // Küçük ok (kullanıcı isteği); yazı sağdaki CPU/RAM ile aynı biçimde (app-mono, app-muted).
     this.__foldButton = new qx.ui.form.Button("▸").set({
@@ -118,7 +118,10 @@ qx.Class.define("ankamon.ui.StatusBar", {
     this.__updateUsersVisibility();
     qx.event.message.Bus.subscribe(ankamon.ext.Extensions.CHANGED, this.__updateUsersVisibility, this);
     // Mini paneller (CPU/RAM/Disk/Ağ trafiği, Ağ taraması, SSH), sağa hizalı — bkz. __buildPanels.
-    this.__panelBox = new qx.ui.container.Composite(new qx.ui.layout.HBox(4).set({ alignY: "middle" }));
+    // minWidth 0: panellerin toplamı (~960 px) çubuğa — dolayısıyla bütün arayüze — en küçük genişlik dayatıyordu; pencere
+    // ondan darken arayüz taşıyor, Chrome kök katmanı sağa kaydırıp sol menüyü ekran dışına itiyordu (2026-11-24). Artık
+    // dar pencerede sığmayan paneller kırpılır (sağ menüden azaltılabilir).
+    this.__panelBox = new qx.ui.container.Composite(new qx.ui.layout.HBox(4).set({ alignY: "middle" })).set({ minWidth: 0 });
     head.add(this.__panelBox);
     this.__buildPanels();
     this.add(head);

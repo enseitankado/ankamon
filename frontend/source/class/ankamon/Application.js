@@ -54,6 +54,17 @@ qx.Class.define("ankamon.Application", {
       // kullanıcı devre dışı kaldığını GÖRMEDEN farkına varamıyordu. Rengi burada bir kez
       // ayarlamak, tema/pencereden bağımsız tüm modallar için aynı saydam açık gri görünümü verir.
       this.getRoot().set({ blockerColor: "#808080", blockerOpacity: 0.35 });
+      // Arayüz pencereden genişse Chrome odaklanan öğeyi göstermek için kök katmanı (overflow: hidden) yatay/dikey kaydırır;
+      // kaydırma çubuğu olmadığından geri dönülemez ve sol menü ekran dışında kalır (2026-11-24, Firefox'ta yok). Kök hiç kaymaz.
+      this.getRoot().addListenerOnce("appear", () => {
+        const el = this.getRoot().getContentElement().getDomElement();
+        el.addEventListener("scroll", () => {
+          if (el.scrollLeft || el.scrollTop) {
+            el.scrollLeft = 0;
+            el.scrollTop = 0;
+          }
+        });
+      });
       // Grid'lerde sağ tıklama işaret (✓) değiştirmez, yalnız satırı seçip sağ menüyü açar.
       ankamon.ui.table.RightClickPatch.install();
       // Bütün grid'lerde (eklentiler dahil) sütun düğmesi menüsünde Yazdır / Dışa aktar (bkz. ui.table.GridExport).
