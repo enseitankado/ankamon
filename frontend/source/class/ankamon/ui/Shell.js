@@ -235,6 +235,8 @@ qx.Class.define("ankamon.ui.Shell", {
       // başına yetki sayfanın içinde. Eski "Bakım ▸ Bakım/Yardım" bağlantıları __openPage'de buraya yönlenir.
       // Etiket "Sağlık" (kullanıcı isteği 2026-11-10).
       { id: "anomalies", label: "Sağlık", features: ["anomalies", "diagnose"], collapsed: true, create: u => new ankamon.page.Anomalies(u),
+        // defaultTab: Sağlık düğümüne basınca her zaman Durum açılır (kullanıcı isteği 2026-11-24).
+        defaultTab: "status",
         // Denetle = eski Denetle + Tara tek sekmede (kullanıcı isteği 2026-11-12; eski "Tarama" kimliği buraya yönlenir).
         tabs: [{ key: "status", label: "Durum" }, { key: "reports", label: "Denetle" },
           { key: "Geçmiş", label: "Geçmiş", feature: "anomalies" },

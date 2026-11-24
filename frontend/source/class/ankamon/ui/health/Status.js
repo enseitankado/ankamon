@@ -70,18 +70,21 @@ qx.Class.define("ankamon.ui.health.Status", {
     this.add(split, { flex: 1 });
 
     this.__deviceColumns = [
-      { id: "device", label: "Cihaz", width: 200 },
-      { id: "online", label: "Açık mı", width: 90, hidden: true },
+      // Genişlikler oransal (kullanıcı isteği 2026-11-24: sütunlar pencere genişliğine göre boyutlansın) — bkz. FLEX_NOTE.
+      { id: "device", label: "Cihaz", width: "2*", minWidth: 120 },
+      { id: "online", label: "Açık mı", width: "1*", minWidth: 70, hidden: true },
       // Durum = iki yolun EN KÖTÜSÜ ve o düzeydeki uyarılar ("Acil: SMART hatası, Disk doluluğu") — kullanıcı isteği 2026-11-23.
-      { id: "level", label: "Durum", width: 320, hint: "En kötü düzey ve o düzeydeki uyarılar (Log ya da Uzak bağlantı yolundan)" },
+      { id: "level", label: "Durum", width: "3*", minWidth: 160, hint: "En kötü düzey ve o düzeydeki uyarılar (Log ya da Uzak bağlantı yolundan)" },
       // İki yolun (Log = sürekli izleme şu an, Uzak bağlantı = en son SSH denetimi) bulguları tek sütunda (eskiden iki sütun).
-      { id: "findings", label: "Bulgular", width: 360, hint: "Cihazın Log (sürekli izleme) ve Uzak bağlantı (son SSH denetimi) bulguları, düzeyleriyle" },
-      // İki yolun en yeni bakışı (SSH denetimi zamanı ya da sürekli izlemenin en yeni bulgusu) ve toplam bulgu sayıları;
-      // 10 saatten yeniyse geçen süre ("2 saat 23 dk önce" — kullanıcı isteği).
-      { id: "last", label: "Son denetim / bulgu", width: 300, hint: "Son SSH denetimi ya da sürekli izlemenin en yeni bulgusu" },
-      { id: "count", label: "Bulgu", width: 70, hidden: true }
+      { id: "findings", label: "Bulgular", width: "4*", minWidth: 180, hint: "Cihazın Log (sürekli izleme) ve Uzak bağlantı (son SSH denetimi) bulguları, düzeyleriyle" },
+      // İki yolun en yeni bakışı (SSH denetimi zamanı ya da sürekli izlemenin en yeni bulgusu); acil/dikkat sayıları
+      // yazılmaz (kullanıcı isteği 2026-11-24 — Durum sütunu zaten söylüyor). Biçim: bkz. when. Zamana göre sıralanır.
+      { id: "last", label: "Son denetim / bulgu", width: "2*", minWidth: 120, hint: "Son SSH denetimi ya da sürekli izlemenin en yeni bulgusu" },
+      { id: "count", label: "Bulgu", width: "1*", minWidth: 50, hidden: true }
     ];
     this.__deviceTable = page._createTable(this.__deviceColumns, { prefsKey: "health.status.devices.columns", persistSort: true });
+    this.__fitColumns(this.__deviceTable, this.__deviceColumns);
+    this.__sortByTime(this.__deviceTable, 5);
     this.__deviceFilters = page._addColumnFilters(this.__deviceTable, this.__deviceColumns, () => this.__applyDevices(),
       { rows: () => (this.__deviceRows || []).map(r => r.cells), persist: true });
     this.__levelRenderer(this.__deviceTable, 3);
@@ -93,17 +96,19 @@ qx.Class.define("ankamon.ui.health.Status", {
     split.add(top, 1);
 
     this.__findingColumns = [
-      { id: "device", label: "Cihaz", width: 180 },
-      { id: "level", label: "Düzey", width: 80 },
-      { id: "check", label: "Bulgu", width: 220 },
-      { id: "path", label: "Yol", width: 130 },
-      { id: "source", label: "Kaynak", width: 110 },
-      { id: "how", label: "Nasıl bakıldı", width: 300 },
-      { id: "every", label: "Sıklık", width: 120 },
-      { id: "at", label: "Zaman", width: 140 },
-      { id: "text", label: "Ayrıntı" }
+      { id: "device", label: "Cihaz", width: "3*", minWidth: 110 },
+      { id: "level", label: "Düzey", width: "1*", minWidth: 60 },
+      { id: "check", label: "Bulgu", width: "3*", minWidth: 120 },
+      { id: "path", label: "Yol", width: "2*", minWidth: 80 },
+      { id: "source", label: "Kaynak", width: "2*", minWidth: 80 },
+      { id: "how", label: "Nasıl bakıldı", width: "4*", minWidth: 140 },
+      { id: "every", label: "Sıklık", width: "2*", minWidth: 80 },
+      { id: "at", label: "Zaman", width: "2*", minWidth: 90 },
+      { id: "text", label: "Ayrıntı", width: "4*", minWidth: 140 }
     ];
     this.__findingTable = page._createTable(this.__findingColumns, { prefsKey: "health.status.findings.columns" });
+    this.__fitColumns(this.__findingTable, this.__findingColumns);
+    this.__sortByTime(this.__findingTable, 8);
     this.__findingFilters = page._addColumnFilters(this.__findingTable, this.__findingColumns, () => this.__applyFindings(),
       { rows: () => (this.__findingRows || []).map(r => r.cells) });
     this.__levelRenderer(this.__findingTable, 2);
@@ -128,30 +133,44 @@ qx.Class.define("ankamon.ui.health.Status", {
     SPLITTER: 12,
     /** Ayırıcıya bakan iç boşluk (px): üst bölmenin altı = alt bölmenin üstü. */
     PANE_GAP: 8,
-    /** Bu kadar saniyeden yeni zamanlar geçen süreyle yazılır ("2 saat 23 dk önce"). */
-    RELATIVE_S: 10 * 3600,
+    /** Bu kadar saniyeden eski zamanlar yalnız tarihle yazılır (kullanıcı isteği 2026-11-24: 1 günden eskiyse saat gereksiz). */
+    RELATIVE_S: 24 * 3600,
 
-    /** epoch sn → 10 saatten yeniyse "2 saat 23 dk önce", değilse tarih-saat. */
+    /**
+     * epoch sn → 1 günden eskiyse yalnız tarih ("23.11.2026"); daha yeniyse kaba geçen süre: "az önce", "N dk önce"
+     * (1 saatten az), "N saat önce" (dakika hassasiyeti yok — kullanıcı isteği 2026-11-24). Gelecekteki zaman: tarih.
+     * Hücre metin olduğundan sıralama zaman değerine göre ayrıca kurulur (bkz. __sortByTime).
+     */
     when(ts) {
       if (!ts) {
         return "";
       }
       const diff = Math.floor(Date.now() / 1000) - ts;
       if (diff < 0 || diff >= ankamon.ui.health.Status.RELATIVE_S) {
-        return ankamon.util.Format.dateTime(ts * 1000);
+        return new Date(ts * 1000).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
       }
-      const h = Math.floor(diff / 3600);
-      const m = Math.floor((diff % 3600) / 60);
-      if (!h && !m) {
+      if (diff < 60) {
         return "az önce";
       }
-      return (h ? `${h} saat ` : "") + `${m} dk önce`;
+      return diff < 3600 ? `${Math.floor(diff / 60)} dk önce` : `${Math.floor(diff / 3600)} saat önce`;
     },
 
     // Yol adları kısa (kullanıcı isteği 2026-11-23): sürekli izleme = "Log", SSH denetimi = "Uzak bağlantı".
     PATH: {
       watch: { text: "Log", color: "#1a73e8" },
-      ssh: { text: "Uzak bağlantı", color: "#7b1fa2" }
+      ssh: { text: "Uzak bağlantı", color: "#7b1fa2" },
+      // Sürekli izlenip logdan beslenmeyen kurallar (ör. "ETAP adı farklı" — ETAP sunucusunun kaydı): "Log" yanıltıcıydı
+      // (kullanıcı isteği 2026-11-24). Renk sürekli izlemeyle aynı.
+      watchOther: { text: "İzleme", color: "#1a73e8" }
+    },
+
+    /** Bulgunun Yol yazısı: sürekli izleme kuralı logdan beslenmiyorsa (Kaynak "Log" değilse) "İzleme". */
+    pathText(path, source) {
+      const P = ankamon.ui.health.Status.PATH;
+      if (path === "watch" && source && !/^log\b/i.test(String(source))) {
+        return P.watchOther.text;
+      }
+      return P[path] ? P[path].text : path;
     },
 
     /**
@@ -186,6 +205,33 @@ qx.Class.define("ankamon.ui.health.Status", {
     __findingRows: null,
     __shownFindings: null,
     __data: null,
+    /** satır dizisi (hücreler) → zaman sütununun epoch sn değeri (bkz. __sortByTime) */
+    __rowTimes: null,
+
+    /**
+     * Sütunlar tablonun genişliğini oransal doldurur (qx Resize davranışı, "N*" genişlik + en küçük genişlik): pencere
+     * daralıp genişledikçe yeniden dağılır. Kullanıcının elle sürüklediği genişlik, tablo yeniden boyutlanana (pencere
+     * değişene) ya da sayfa yeniden açılana dek geçerlidir — saklanmaz (bu tabloların prefsKey'i yalnız sıra/gizlilik
+     * saklar); kalıcı elle genişlik oransal doldurmayla çelişirdi (sütunlar tabloyu taşırır ya da boş bırakırdı).
+     */
+    __fitColumns(table, columns) {
+      const behavior = table.getTableColumnModel().getBehavior();
+      const offset = table.getUserData("offset") || 1;
+      columns.forEach((column, index) => {
+        if (column.minWidth) {
+          behavior.setMinWidth(index + offset, column.minWidth);
+        }
+      });
+    },
+
+    /** Zaman sütunu (metni "3 saat önce" / "23.11.2026") gerçek zamana göre sıralanır; zamansız satırlar en eski sayılır. */
+    __sortByTime(table, column) {
+      if (!this.__rowTimes) {
+        this.__rowTimes = new WeakMap();
+      }
+      const times = this.__rowTimes;
+      table.getTableModel().setSortMethods(column, (a, b) => (times.get(a) || 0) - (times.get(b) || 0));
+    },
 
     /** Düzey sütunu renkli ve kalın — bkz. installLevelRenderer. */
     __levelRenderer(table, column) {
@@ -198,8 +244,9 @@ qx.Class.define("ankamon.ui.health.Status", {
       const badge = key => `<span style="display:inline-block;padding:0 7px;border-radius:9px;background:${P[key].color};color:#fff;font-weight:600">${P[key].text}</span>`;
       return `<div style="max-width:560px;white-space:normal;line-height:1.5">` +
         "Bulgular iki yoldan gelir; her satırda hangisinden geldiği yazar. " +
-        (paths.includes("watch") ? `${badge("watch")} Ankamon cihaza bağlanmadan, cihazın gönderdiği loglardan ve kendi ` +
-          "okuduğu ölçümlerden birkaç dakikada bir çıkarır; burada yalnız şu an sürenler. " : "") +
+        (paths.includes("watch") ? `${badge("watch")} Ankamon cihaza bağlanmadan, cihazın gönderdiği loglardan, kendi ` +
+          "okuduğu ölçümlerden ve daha önce toplanmış verilerden (ör. ETAP kontrol sonucu) birkaç dakikada bir çıkarır — " +
+          "verinin nereden geldiği Kaynak sütununda; burada yalnız şu an sürenler. " : "") +
         (paths.includes("ssh") ? `${badge("ssh")} Ankamon cihaza SSH ile girip ölçer (haftada bir kendiliğinden ya da Tara ` +
           "sekmesinden elle); her cihazın en son denetimi. " : "") +
         "Her denetimin ne olduğu, nasıl ve ne sıklıkla bakıldığı: <b>Yardım ▸ Denetim türleri</b>.</div>";
@@ -233,13 +280,15 @@ qx.Class.define("ankamon.ui.health.Status", {
         const list = byDevice.get(b.id) || [];
         const worst = list.reduce((w, f) => (order[f.level] > order[w] ? f.level : w), "ok");
         const ssh = paths.includes("ssh") ? b.ssh || false : null;
-        const last = this.__lastText(list, ssh, when);
+        const at = this.__lastAt(list, ssh);
+        const last = this.__lastText(at, ssh, when);
         // Denetlenemeyen cihazda "Denetlenemedi" bilgi bulgusu ayrıca yazılmaz; Uzak bağlantı durumu sona eklenir.
         const shown = list.filter(f => f.check !== "Denetlenemedi");
         const notes = ssh === false ? ["Uzak bağlantı: hiç denetlenmedi"] : ssh && ssh.status !== "ok" ? ["Uzak bağlantı: denetlenemedi"] : [];
         const findings = [shown.length || !notes.length ? this.__pathText(shown) : ""].concat(notes).filter(Boolean).join(" · ");
-        return { id: b.id, name: b.name, level: worst,
-          cells: [b.id, b.name, b.online ? "Açık" : "Kapalı", this.__statusText(worst, list), findings, last, list.length] };
+        const cells = [b.id, b.name, b.online ? "Açık" : "Kapalı", this.__statusText(worst, list), findings, last, list.length];
+        this.__rowTimes.set(cells, at);
+        return { id: b.id, name: b.name, level: worst, cells };
       });
       // Kaydı silinmiş cihazın süren bulguları da görünsün.
       byDevice.forEach((list, key) => {
@@ -247,19 +296,24 @@ qx.Class.define("ankamon.ui.health.Status", {
           return;
         }
         const worst = list.reduce((w, f) => (order[f.level] > order[w] ? f.level : w), "ok");
-        this.__deviceRows.push({ id: key, name: list[0].device, level: worst, cells: [key, list[0].device || "?", "—",
-          this.__statusText(worst, list), this.__pathText(list), this.__lastText(list, null, when), list.length] });
+        const at = this.__lastAt(list, null);
+        const cells = [key, list[0].device || "?", "—", this.__statusText(worst, list), this.__pathText(list),
+          this.__lastText(at, null, when), list.length];
+        this.__rowTimes.set(cells, at);
+        this.__deviceRows.push({ id: key, name: list[0].device, level: worst, cells });
       });
       // Varsayılan sıra: Acil → Dikkat → Bilgi → Sorun yok (kullanıcı başka sütunla sıralarsa o geçerli — persistSort).
       this.__deviceRows.sort((a, b) => (order[b.level] - order[a.level]) ||
         String(a.name).localeCompare(String(b.name), "tr", { numeric: true }));
 
-      this.__findingRows = (data.findings || []).map(f => ({
-        finding: f,
-        cells: [f.device_id ?? f.device, f.device || "?", text(f.level), f.check, P[f.path] ? P[f.path].text : f.path,
-          f.source || "", f.how || "", f.every || "", f.since ? F.dateTime(f.since * 1000) : "",
-          (f.text || "") + (f.advice ? ` — Öneri: ${f.advice}` : "")]
-      }));
+      this.__findingRows = (data.findings || []).map(f => {
+        // Zaman: üst tablodaki gibi (1 günden eskiyse yalnız tarih, saniye/dakika hassasiyeti yok — kullanıcı isteği 2026-11-24).
+        const cells = [f.device_id ?? f.device, f.device || "?", text(f.level), f.check, ankamon.ui.health.Status.pathText(f.path, f.source),
+          f.source || "", f.how || "", f.every || "", f.since ? when(f.since) : "",
+          (f.text || "") + (f.advice ? ` — Öneri: ${f.advice}` : "")];
+        this.__rowTimes.set(cells, f.since || 0);
+        return { finding: f, cells };
+      });
 
       const devicesBad = this.__deviceRows.filter(r => r.level === "bad").length;
       const devicesWarn = this.__deviceRows.filter(r => r.level === "warn").length;
@@ -268,24 +322,28 @@ qx.Class.define("ankamon.ui.health.Status", {
         (devicesBad || devicesWarn
           ? [devicesBad && `${devicesBad} cihazda acil`, devicesWarn && `${devicesWarn} cihazda dikkat gerektiren`].filter(Boolean).join(", ") + " bulgu var"
           : "Şu an acil ya da dikkat gerektiren bulgu yok") +
-        `</span> <span style="opacity:.7">· ${esc(String(this.__deviceRows.length))} cihaz · güncellendi ${F.dateTime(data.generated_at * 1000)}</span>`);
+        `</span> <span style="opacity:.7">· ${esc(String(this.__deviceRows.length))} cihaz · güncellendi ${new Date(data.generated_at * 1000).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>`);
       this.__applyDevices();
     },
 
     /**
-     * "Son denetim / bulgu" hücresi: iki yolun en yeni zamanı (SSH denetimi ya da sürekli izlemenin en yeni bulgusu)
-     * + cihazın iki yoldaki bulgu sayıları; SSH denetimi yapılamadıysa/hiç yapılmadıysa o da yazılır.
+     * İki yolun en yeni zamanı (SSH denetimi ya da sürekli izlemenin en yeni bulgusu), epoch sn; yoksa 0.
      * @param list {Array} cihazın bulguları @param ssh {Map|false|null} son SSH denetimi (false: hiç; null: yetki yok)
      */
-    __lastText(list, ssh, when) {
+    __lastAt(list, ssh) {
       const times = list.filter(f => f.path === "watch" && f.since).map(f => f.since);
       if (ssh && ssh.at) {
         times.push(ssh.at);
       }
-      const at = times.length ? Math.max(...times) : null;
-      const bad = list.filter(f => f.level === "bad").length;
-      const warn = list.filter(f => f.level === "warn").length;
-      const parts = [at ? when(at) : "", bad || warn ? [bad && `${bad} acil`, warn && `${warn} dikkat`].filter(Boolean).join(", ") : "sorun yok"];
+      return times.length ? Math.max(...times) : 0;
+    },
+
+    /**
+     * "Son denetim / bulgu" hücresi: en yeni zaman (bkz. __lastAt, when); SSH denetimi yapılamadıysa/hiç yapılmadıysa o da
+     * yazılır. Acil/dikkat sayıları yazılmaz (kullanıcı isteği 2026-11-24).
+     */
+    __lastText(at, ssh, when) {
+      const parts = [at ? when(at) : ""];
       if (ssh === false) {
         parts.push("SSH: hiç denetlenmedi");
       } else if (ssh && ssh.status !== "ok") {

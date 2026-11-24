@@ -38,7 +38,9 @@
  * genişlikte ③ Sonuçlar — TEK grid: tam denetim raporunun kontrolleri (gömülü page.Diagnose'un yalnız üst satırı: Yenile,
  * Şimdi tara, Rapor seçici), son anlık yoklama ve süren sürekli izleme bulguları; Kaynak sütunu (uzak bağlantı / cihazın
  * gönderdiği loglar), "Yalnız sorunlular" (varsayılan), çift tık → satırın tamamı (ui.anomaly.RowDetail). Son seçimler
- * ve ayırıcı konumları kullanıcı başına sunucuda hatırlanır. Son anlık yoklamanın sonucu sekme yeniden açılınca gösterilir.
+ * ve ayırıcı konumları kullanıcı başına sunucuda hatırlanır. Son anlık yoklamanın sonucu sekme yeniden açılınca ③'te gösterilir;
+ * ②'deki Tara düğmesinin sağındaki ilerleme ve özet ("N cihazda M anomali bulundu …") ise yalnız bu oturumda buradan başlatılan
+ * taramada (kullanıcı isteği 2026-11-24: sekmeye her girişte eski özet yazmasın — bkz. __ownJobId).
  */
 qx.Class.define("ankamon.ui.anomaly.Scan", {
   extend: qx.ui.tabview.Page,
@@ -249,12 +251,14 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       this.__scanButton = new qx.ui.form.Button("Tara").set({ minWidth: 90 });
       this.__scanButton.addListener("execute", () => this.__start());
       run.add(this.__scanButton);
-      this.__progress = new qx.ui.indicator.ProgressBar(0, 1).set({ width: 180, height: 14, visibility: "excluded" });
+      // İnce çubuk (kullanıcı isteği 2026-11-24: yükseklik normal sınırda) — HBox satır yüksekliğine esnemesin.
+      this.__progress = new qx.ui.indicator.ProgressBar(0, 1).set({ width: 160, height: 8, minHeight: 8, maxHeight: 8,
+        allowGrowY: false, alignY: "middle", visibility: "excluded" });
       run.add(this.__progress);
       this.__status = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
       run.add(this.__status, { flex: 1 });
       box.add(run);
-      // Tam denetim başlatılınca kısa not (sonuçlar ③'te).
+      // Tam denetim başlatılamazsa kısa not (başarılı başlatma notu yok — kullanıcı isteği 2026-11-24; sonuçlar ③'te).
       this.__sshRow = new qx.ui.container.Composite(new qx.ui.layout.HBox(8).set({ alignY: "middle" })).set({ visibility: "excluded", marginTop: 4 });
       this.__sshNote = new qx.ui.basic.Label("").set({ rich: true, wrap: true, allowGrowX: true });
       this.__sshRow.add(this.__sshNote, { flex: 1 });
@@ -492,7 +496,8 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       const running = this.__job && ["queued", "running"].includes(this.__job.status);
       this.__scanButton.set({
         enabled: !running && devices.length > 0 && kinds > 0,
-        label: running ? "Taranıyor…" : (devices.length && kinds ? `Tara (${devices.length} cihaz, ${kinds} denetim)` : "Tara")
+        // "7 cihazda 9 denetim yap" (kullanıcı isteği 2026-11-24) — seçim değiştikçe güncellenir.
+        label: running ? "Taranıyor…" : `${devices.length} cihazda ${kinds} denetim yap`
       });
     },
 
@@ -509,16 +514,16 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       if (this.__sshSelected()) {
         // Kapalı cihaz SSH ile denetlenemez: yalnız çevrim içi olanlar.
         const online = (this.__devices || []).filter(b => this.__checked.has(b.id) && b.online).map(b => b.id);
-        this.__sshRow.setVisibility("visible");
+        this.__sshRow.setVisibility("excluded");
         if (!online.length) {
+          this.__sshRow.setVisibility("visible");
           this.__sshNote.setValue("Tam denetim: seçili cihazların hiçbiri açık değil; kapalı cihaz denetlenemez.");
         } else {
           try {
-            const job = await ankamon.io.Api.post("/jobs", { type: "diagnose", device_ids: online });
-            this.__sshNote.setValue(`Tam denetim başlatıldı (${online.length} açık cihaz, görev #${job.id}); ` +
-              "sonuçlar aşağıda ve Durum'da görünür.");
+            await ankamon.io.Api.post("/jobs", { type: "diagnose", device_ids: online });
             this.showReport(); // süren denetim raporu ③'e gelsin
           } catch (e) {
+            this.__sshRow.setVisibility("visible");
             this.__sshNote.setValue("Tam denetim başlatılamadı: " + qx.bom.String.escape(e.message || String(e)));
           }
         }
@@ -536,6 +541,7 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         return;
       }
       this.__lastJobShown = res.id;
+      this.__ownJobId = res.id;
       this.__showQuick();
       this.__follow(res.id);
     },
@@ -554,10 +560,12 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
         return;
       }
       this.__job = res.job;
+      this.__jobShownId = jobId;
       const targets = res.job.targets;
       const done = targets.filter(t => !["queued", "running"].includes(t.status)).length;
       const running = ["queued", "running"].includes(res.job.status);
-      this.__progress.set({ maximum: Math.max(1, targets.length), value: done, visibility: running ? "visible" : "excluded" });
+      const own = jobId === this.__ownJobId;
+      this.__progress.set({ maximum: Math.max(1, targets.length), value: done, visibility: running && own ? "visible" : "excluded" });
       this.__renderResults();
       this.__updateButton();
       if (running) {
@@ -677,10 +685,11 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       rows.sort((x, y) => x.rank - y.rank || String(x.plain.device).localeCompare(String(y.plain.device), "tr", { numeric: true }));
       this.__mergedRows = rows;
       this.__applyResults();
-      if (this.__job) {
+      // Özet yalnız bu oturumda buradan başlatılan taramada; sekmeye girişte yüklenen eski tarama ③'te kalır (bkz. __ownJobId).
+      if (this.__job && this.__jobShownId === this.__ownJobId) {
         this.__updateQuickStatus();
       } else {
-        this.__status.setValue("Cihazları ve denetimleri seçip Tara'ya basın.");
+        this.__status.setValue("");
       }
     },
 
@@ -726,6 +735,9 @@ qx.Class.define("ankamon.ui.anomaly.Scan", {
       this.__status.setValue(html);
     },
 
+    /** Bu oturumda Tara ile başlatılan son anlık yoklama görevi (ilerleme/özet yalnız onda). */
+    __ownJobId: null,
+    __jobShownId: null,
     __resultColumns: null,
     __resultFields: null,
     __resultNote: null,

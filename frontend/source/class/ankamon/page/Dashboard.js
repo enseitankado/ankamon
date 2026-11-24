@@ -495,7 +495,6 @@ qx.Class.define("ankamon.page.Dashboard", {
         return;
       }
       const F = ankamon.util.Format;
-      const P = ankamon.ui.health.Status.PATH;
       let data;
       try {
         data = await ankamon.io.Api.get("/device-health");
@@ -515,7 +514,7 @@ qx.Class.define("ankamon.page.Dashboard", {
       this.__urgentTitle.setValue(shown.length ? `Sağlık — acil ve dikkat gerektiren bulgular (${devices.size} cihazda ${parts})`
         : "Sağlık — acil ya da dikkat gerektiren bulgu yok");
       this.__urgent.getTableModel().setData(shown.map((f, i) => [i, f.device || "?", ankamon.ui.health.Status.levelText(f.level),
-        f.check, P[f.path] ? P[f.path].text : f.path,
+        f.check, ankamon.ui.health.Status.pathText(f.path, f.source),
         f.since ? ankamon.ui.health.Status.when(f.since) : "", (f.text || "") + (f.advice ? ` — Öneri: ${f.advice}` : "")]));
     },
 
