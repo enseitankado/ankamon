@@ -105,7 +105,52 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
      * yöneticisi ve Sohbet (2026-11-23) çoklu seçimde tek pencerede bütün cihazlarladır, burada değil. */
     // "Düzenle" yok: çoklu seçimde sağ menünün kendisi toplu düzenleme penceresini açar (ui.network.DeviceBulkEdit).
     PER_DEVICE: ["Bilgisayarı yönet", "Dosya yöneticisi"],
-    PER_DEVICE_CONFIRM: 6
+    PER_DEVICE_CONFIRM: 6,
+
+    /**
+     * Panel görünümü (zemin, çerçeve, gölge) — bu çubuk ve yanındaki başka çubuklar (ör. ui.network.AssetToolbar) aynı
+     * görünsün diye ortak. Zemin temanın yüzey renginden biraz koyu (koyu temada açık). Temalarda parçanın kendi arka plan
+     * rengi süslemenin (decorator) renginin önüne geçer: renk parçaya verilir. @return {Map} düğme renkleri {hover, pressed, text}
+     */
+    panelLook(widget) {
+      const mgr = qx.theme.manager.Color.getInstance();
+      const name = ["surface", "background"].find(n => mgr.isDynamic(n));
+      const rgb = qx.util.ColorUtil.cssStringToRgb(mgr.resolve(name || "#ffffff")).slice(0, 3);
+      const light = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 >= 128;
+      const shade = amount => `rgb(${rgb.map(c => Math.round(light ? c * (1 - amount) : c + (255 - c) * amount)).join(",")})`;
+      // Yazı rengi de buradan: temaların araç çubuğu yazı rengi koyu zeminde koyu kalabiliyor (Liste ve Başarım okunmuyordu).
+      widget.set({
+        backgroundColor: shade(0.055),
+        decorator: new qx.ui.decoration.Decorator().set({
+          width: 1, color: "app-border", radius: 8,
+          shadowHorizontalLength: 0, shadowVerticalLength: 2, shadowBlurRadius: 7,
+          shadowColor: light ? "rgba(0,0,0,0.16)" : "rgba(0,0,0,0.45)"
+        })
+      });
+      return { hover: shade(0.13), pressed: shade(0.2), text: light ? "#242424" : "#f2f2f2" };
+    },
+
+    /** Düz panel düğmesi (panelLook renkleriyle): yalnız üzerine gelince ya da basılıyken renklenir. */
+    flattenTool(button, colors, decorator) {
+      // Kenar boşluğu sıfır: bazı temalar (Simple) düğme başına 10 piksel ekliyor, çubuk sığmıyordu.
+      button.set({ decorator, backgroundColor: "transparent", margin: 0, showToolTipWhenDisabled: true });
+      button.getChildControl("label").setTextColor(colors.text);
+      const paint = color => {
+        if (!button.getUserData("ankamon.checked")) {
+          button.setBackgroundColor(color);
+        }
+      };
+      button.addListener("pointerover", () => button.getEnabled() && paint(colors.hover));
+      button.addListener("pointerout", () => paint("transparent"));
+      button.addListener("pointerdown", () => button.getEnabled() && paint(colors.pressed));
+      button.addListener("pointerup", () => button.getEnabled() && paint(colors.hover));
+    },
+
+    /** Panel düğmesinin içeriği: simge + altında küçük yazı. */
+    toolHtml(iconSvg, label) {
+      return `${iconSvg}` +
+        `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(label)}</div>`;
+    }
   },
 
   /**
@@ -196,38 +241,13 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
      * Tema değişince sayfa yeniden yüklenir; renkler bir kez hesaplanır.
      */
     __applyPanel() {
-      const mgr = qx.theme.manager.Color.getInstance();
-      const name = ["surface", "background"].find(n => mgr.isDynamic(n));
-      const rgb = qx.util.ColorUtil.cssStringToRgb(mgr.resolve(name || "#ffffff")).slice(0, 3);
-      const light = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 >= 128;
-      const shade = amount => `rgb(${rgb.map(c => Math.round(light ? c * (1 - amount) : c + (255 - c) * amount)).join(",")})`;
-      // Yazı rengi de buradan: temaların araç çubuğu yazı rengi koyu zeminde koyu kalabiliyor (Liste ve Başarım okunmuyordu).
-      this.__colors = { hover: shade(0.13), pressed: shade(0.2), text: light ? "#242424" : "#f2f2f2" };
-      this.set({
-        backgroundColor: shade(0.055),
-        decorator: new qx.ui.decoration.Decorator().set({
-          width: 1, color: "app-border", radius: 8,
-          shadowHorizontalLength: 0, shadowVerticalLength: 2, shadowBlurRadius: 7,
-          shadowColor: light ? "rgba(0,0,0,0.16)" : "rgba(0,0,0,0.45)"
-        })
-      });
+      this.__colors = ankamon.ui.devices.ActionBar.panelLook(this);
     },
 
     /** Panel düğmesi düz: yalnız üzerine gelince ya da basılıyken renklenir (temanın kutulu görünümü panelde kalabalık duruyordu). */
     __flatten(button) {
       const flat = this.__flatDecorator || (this.__flatDecorator = new qx.ui.decoration.Decorator().set({ radius: 5 }));
-      // Kenar boşluğu sıfır: bazı temalar (Simple) düğme başına 10 piksel ekliyor, çubuk sığmıyordu.
-      button.set({ decorator: flat, backgroundColor: "transparent", margin: 0, showToolTipWhenDisabled: true });
-      button.getChildControl("label").setTextColor(this.__colors.text);
-      const paint = color => {
-        if (!button.getUserData("ankamon.checked")) {
-          button.setBackgroundColor(color);
-        }
-      };
-      button.addListener("pointerover", () => button.getEnabled() && paint(this.__colors.hover));
-      button.addListener("pointerout", () => paint("transparent"));
-      button.addListener("pointerdown", () => button.getEnabled() && paint(this.__colors.pressed));
-      button.addListener("pointerup", () => button.getEnabled() && paint(this.__colors.hover));
+      ankamon.ui.devices.ActionBar.flattenTool(button, this.__colors, flat);
     },
 
     /** Kümeleri ayıran ince dikey çizgi. */
@@ -354,8 +374,7 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
       };
       items.forEach((item, index) => {
         const icon = this.__svgIcon(item);
-        const html = `${icon}` +
-          `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(item.label)}</div>`;
+        const html = ankamon.ui.devices.ActionBar.toolHtml(icon, item.label);
         const button = item.group ? new qx.ui.toolbar.RadioButton(html) : new qx.ui.toolbar.CheckBox(html);
         button.set({ rich: true, show: "label", center: true, padding: [4, 3], minWidth: 46, toolTipText: item.tip });
         this.__flatten(button);
@@ -405,8 +424,7 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
       const box = new qx.ui.container.Composite(new qx.ui.layout.HBox(0).set({ alignY: "middle" }));
       box.setBackgroundColor("transparent");   // temanın "widget" zemini panelde kutu gibi görünüyordu
       const icon = this.__svgIcon(group);
-      const html = `${icon}` +
-        `<div style="margin-top:2px;font-size:11px;line-height:13px;text-align:center;white-space:nowrap">${qx.bom.String.escape(group.label)}</div>`;
+      const html = ankamon.ui.devices.ActionBar.toolHtml(icon, group.label);
       const main = new qx.ui.toolbar.Button(html).set({ rich: true, show: "label", center: true, padding: [4, 3], minWidth: 46 });
       const arrow = new qx.ui.toolbar.Button("▾").set({ show: "label", padding: [4, 1], minWidth: 12, toolTipText: `${group.label}: tüm seçenekler` });
       this.__flatten(main);

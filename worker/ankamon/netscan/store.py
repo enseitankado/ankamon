@@ -461,6 +461,24 @@ def service_queue(conn, rescan_hours: int) -> tuple[int, int]:
     return row["pending"], row["total"]
 
 
+def request_services_after_sweep(conn, fresh_minutes: int) -> int:
+    """«Şimdi tara» = varlık + servis taraması (kullanıcı isteği 2026-11-24): elle başlatılan tarama bitince çevrim içi
+    taranabilir cihazlar servis sırasının başına alınır (services_requested_at). Zaten sırada olan ya da son fresh_minutes
+    içinde taranmış cihaz yeniden istenmez — art arda basışta aynı nmap işi iki kez çalışmaz. @return istenen cihaz sayısı."""
+    cur = conn.execute(
+        f"""UPDATE net_devices d SET services_requested_at = now()
+           FROM net_networks n
+           WHERE n.id = d.network_id AND d.online AND d.ip IS NOT NULL AND d.source <> 'self'
+             AND n.scan_enabled AND n.attached AND {_DEVICE_NET}
+             AND d.services_requested_at IS NULL
+             AND (d.services_scanned_at IS NULL OR d.services_scanned_at < now() - make_interval(mins => %s))""",
+        (fresh_minutes,),
+    )
+    if cur.rowcount:
+        bump(conn)
+    return cur.rowcount
+
+
 # ---------------------------------------------------------------- SMB/NetBIOS paylaşımları (ayrı kanal)
 # Aday cihaz: çevrim içi, taranabilir ağda, net_services'te 139 ya da 445 portu AÇIK (NetBIOS/SMB) olan.
 _SHARE_CAND = ("d.online AND d.ip IS NOT NULL AND d.source <> 'self' AND n.scan_enabled AND n.attached AND " + _DEVICE_NET +

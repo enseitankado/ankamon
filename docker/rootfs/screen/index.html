@@ -807,10 +807,13 @@ class Tile {
       this.wanted = false;
       this.disconnect();
       this.syncPerf();
-      // Ağda canlı ama SSH yanıt vermiyor (Akıllı Tahtalar ▸ Yönetilebilir: Hayır): kapalı DEĞİL, yönetilemiyor.
+      // Ağda canlı ama SSH yanıt vermiyor: kapalı DEĞİL. Yönetilebilir olduğu biliniyorsa (sshKnown — kullanıcı isteği
+      // 2026-11-24: kapatılan bilgisayarda sshd önce durur) «kapanıyor olabilir»; hiç girilememişse yönetilemiyor.
       // "Kapandı" süresinde (bkz. showClosed) görünür alan değişimi vb. ile çağrılınca yazı ezilmesin.
       this.setState("offline", this.closedUntil > Date.now() ? "Kapandı"
-        : this.device.alive ? "Cihaz açık — yönetilemiyor (SSH yanıt vermiyor)" : "Cihaz kapalı");
+        : !this.device.alive ? "Cihaz kapalı"
+          : this.device.sshKnown ? "Cihaz açık — SSH yanıt vermiyor (kapanıyor olabilir)"
+            : "Cihaz açık — yönetilemiyor (SSH yanıt vermiyor)");
       return;
     }
     // Ekranı ayrı pencerede açık (bkz. "tm-popped"): aynı cihaza ikinci akış açılmaz; pencere kapanınca döner.

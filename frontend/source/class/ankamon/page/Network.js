@@ -28,7 +28,8 @@
 /**
  * Ağ envanteri (sol menü "Ağ"): sunucunun bağlı olduğu BÜTÜN ağların cihazları tek listede — o an çevrim dışı
  * olanlar dahil (kullanıcı isteği 2026-11-09: ağ başına alt menü yok; cihazın ağı "Ağ", "IP/Maske" ve "Ağ arabirimi"
- * sütunlarında, ağ işlemleri — yeniden adlandır, taramayı durdur/başlat, bağlı olmayan ağı sil — "Ağlar" düğmesinde). Cihazların kimliği MAC adresidir. Cihazlar grid'iyle aynı kalıp (satır başı onay
+ * sütunlarında, ağ işlemleri — yeniden adlandır, taramayı durdur/başlat, bağlı olmayan ağı sil — "Ağlar" düğmesinde; tarama
+ * ağ başına değil, "Şimdi tara" ile bütün ağlarda ve ardından servis taramasıyla — kullanıcı isteği 2026-11-24). Cihazların kimliği MAC adresidir. Cihazlar grid'iyle aynı kalıp (satır başı onay
  * kutuları, sütun süzgeçleri, sütun genişliği/görünürlüğü kullanıcıya göre saklanır, sağ menü).
  *
  * Her cihaz satırının altında açık portları/servisleri alt satırlar olarak durur (varsayılan kapalı;
@@ -58,33 +59,37 @@ qx.Class.define("ankamon.page.Network", {
     this.__groups = [];
     const Ops = ankamon.ui.network.Ops;
 
-    this._addButton("Yenile", this.refresh);
-    // "Tümünü işaretle" kalktı (kullanıcı isteği 2026-11-10; başlıktaki onay kutusu işaretler) — yerinde "Şimdi tara".
+    // Sayfanın işleri ayrı bir düğme satırında değil: cihaz araç çubuğunun (ui.devices.ActionBar) SOLUNDA, aynı satırda
+    // ve aynı görünümde ikinci bir panel (kullanıcı isteği 2026-11-24 — dikey alan kazanıldı). Üstte Ekle/Düzenle/Sil/
+    // Servisleri tara yok: Düzenle/Sil/Servisleri tara sağ menüde (Varlık ekle… de orada), servis taraması Şimdi tara'nın içinde.
+    // "Tümünü işaretle"/"İşaretleri kaldır" yok (kullanıcı isteği 2026-11-10/11): başlıktaki onay kutusu işaretler.
+    const bar = this.__assetBar = new ankamon.ui.network.AssetToolbar();
+    bar.addTool({ label: "Yenile", icon: "refresh", tip: "Listeyi hemen yeniden okur", handler: () => this.refresh() });
     if (this._can("network.manage")) {
-      this._addButton("Şimdi tara", async () => {
-        await Ops.scanNow();
-        this.__pollState();
-      }).set({ toolTipText: "Bağlı bütün ağlarda varlık taramasını hemen başlatır (makine çok yoğunsa yine ertelenir)" });
+      bar.addTool({ label: "Şimdi tara", icon: "radar",
+        tip: "Bağlı BÜTÜN ağlarda varlık taramasını hemen başlatır; tarama bitince çevrim içi cihazların açık port ve " +
+          "servisleri de taranır (son 1 saatte taranmış olanlar atlanır, makine çok yoğunsa ertelenir). İlerleme alt " +
+          "çubuktaki «Ağ taraması» panelinde.",
+        handler: async () => {
+          await Ops.scanNow();
+          this.__pollState();
+        } });
     }
-    // "İşaretleri kaldır" kalktı (kullanıcı isteği 2026-11-11: Cihazlar/Varlıklar/gruplarda tümünü seç/kaldır yok) — başlıktaki
-    // onay kutusu görünen satırların hepsini işaretler/kaldırır.
-    this._addButton("Servisleri aç/kapat", () => this.__toggleAll())
-      .set({ toolTipText: "Bütün cihazların port/servis alt satırlarını açar ya da kapatır" });
+    bar.addTool({ label: "Servisler", icon: "listTree", tip: "Bütün cihazların port/servis alt satırlarını açar ya da kapatır",
+      handler: () => this.__toggleAll() });
     if (this._can("network.manage")) {
-      this._addButton("Ekle", () => this.__edit(null));
-      // Birden çok varlık işaretliyse toplu düzenleme (ui.network.DeviceBulkEdit — kullanıcı isteği 2026-11-10).
-      this.__editButton = this._addButton("Düzenle", () => this.__withSome(ds => this.__editMany(ds)));
-      this.__deleteButton = this._addButton("Sil", () => this.__withSome(ds => this.__remove(ds)));
-      this.__groupButton = this._addButton("Grup oluştur", () => this.__withSome(ds => this.__createGroup(ds)))
-        .set({ toolTipText: "İşaretli varlıklardan adlı bir grup kurar; grup sol menüde Varlıklar altında görünür" });
+      this.__groupButton = bar.addTool({ label: "Grup oluştur", icon: "categoryPlus",
+        tip: "İşaretli varlıklardan adlı bir grup kurar; grup sol menüde Ağ altında görünür",
+        handler: () => this.__withSome(ds => this.__createGroup(ds)) });
       // Grup görünümünde: gruptan çıkarma, yeniden adlandırma, grubu silme (varlıklar Tüm Varlıklar'da kalır).
-      this.__groupMenuButton = this._addButton("Grup ▾", () => this.__openGroupMenu(this.__groupMenuButton))
-        .set({ visibility: "excluded", toolTipText: "Bu grubun işlemleri: işaretlileri gruptan çıkar, yeniden adlandır, grubu sil" });
-      this.__servicesButton = this._addButton("Servisleri tara", () => this.__withSome(ds => this.__scanServices(ds)))
-        .set({ toolTipText: "İşaretli cihazların açık port ve servislerini sıranın başında tarar" });
-      // Ağ işlemleri (eskiden sol menüdeki ağ düğümlerinin sağ menüsü): ağ başına alt menü.
-      const netsButton = this._addButton("Ağlar ▾", () => this.__openNetworksMenu(netsButton))
-        .set({ toolTipText: "Ağ başına işlemler: yeniden adlandır, taramayı durdur/başlat, bağlı olmayan ağı sil" });
+      this.__groupMenuButton = bar.addTool({ label: "Grup", icon: "list", menu: true,
+        tip: "Bu grubun işlemleri: işaretlileri gruptan çıkar, yeniden adlandır, grubu sil",
+        handler: button => this.__openGroupMenu(button) });
+      this.__groupMenuButton.exclude();
+      // Ağ işlemleri (eskiden sol menüdeki ağ düğümlerinin sağ menüsü): ağ başına alt menü — tarama yok, o Şimdi tara'da.
+      bar.addTool({ label: "Ağlar", icon: "network", menu: true,
+        tip: "Ağ başına işlemler: yeniden adlandır, taramayı durdur/başlat, bağlı olmayan ağı sil",
+        handler: button => this.__openNetworksMenu(button) });
     }
 
     // Tarayıcı durumu (varlık/servis/paylaşım taraması) grid'in başında değil, alt çubukta "Ağ taraması" mini
@@ -93,6 +98,10 @@ qx.Class.define("ankamon.page.Network", {
     this.__columns = [
       { id: "exp", label: "", width: 30 },
       { id: "status", label: "Durum", width: 90 },
+      // Yönetilebilir (kullanıcı isteği 2026-11-24): Akıllı Tahtalar/grup grid'iyle AYNI ölçü ve metin — tek kaynak
+      // page.Devices.manageableText (cihaz kaydı + SSH ile root girişi biliniyor; anlık SSH kopukluğu Hayır yapmaz).
+      // Cihaz kaydı olmayan varlık (yazıcı, kamera…) Hayır. Cihaz kayıtları okunamıyorsa (yetki yok) boş.
+      { id: "manageable", label: "Yönetilebilir", width: 105, choices: true, hint: ankamon.page.Devices.MANAGEABLE_HINT },
       { id: "name", label: "Takma ad / Ad", width: 200 },
       // IP/maske (ör. 10.255.187.23/24) ve sunucunun o ağa bağlı olduğu arabirim — kullanıcı isteği 2026-11-09.
       { id: "ip_mask", label: "IP/Maske", width: 140 },
@@ -145,6 +154,10 @@ qx.Class.define("ankamon.page.Network", {
     // Yalnız cihaz satırlarında — servis/paylaşım alt satırlarının hücreleri başka anlam taşır.
     const deviceRow = row => typeof row[0] === "number";
     ankamon.ui.network.AssetCellHints.apply(this.__columns, ankamon.ui.network.AssetCellHints.NETWORK, {
+      manageable: row => {
+        const d = deviceRow(row) && this.__devices && this.__devices.get(row[0]);
+        return d ? ankamon.page.Devices.manageableNote(this.__managedFor(d)) : null;
+      },
       sensors: row => {
         const d = deviceRow(row) && this.__devices && this.__devices.get(row[0]);
         return d && d.sensors_at ? "Son sensör verisi: " + ankamon.util.Format.ago(d.sensors_at) : null;
@@ -202,14 +215,20 @@ qx.Class.define("ankamon.page.Network", {
     // olmayan varlık (yazıcı, kamera…) çubuğa girmez, yalnız onlar seçiliyse düğmeler devre dışı. Menü page.Devices
     // satır menüsünün ortak gövdesi (ui.DeviceOps.managedDeviceMenuBody); Düzenle/Sil/Cihaz ekle bu sayfada yok — Varlıklar'ın
     // kendi sağ menüsü (__rowMenu) ayrı kalır. Cihaz kayıtları: /devices?all=1 (bkz. __loadManaged).
+    // Tek satır: solda sayfanın çubuğu (AssetToolbar), sağda cihaz araç çubuğu (kullanıcı isteği 2026-11-24).
+    const barRow = new qx.ui.container.Composite(new qx.ui.layout.HBox(0));
+    barRow.add(this.__assetBar);
     if (this._can("devices")) {
       this.__actionBar = new ankamon.ui.devices.ActionBar(
         (device, devices) => ankamon.ui.devices.Platforms.decorate(
           ankamon.ui.DeviceOps.managedDeviceMenuBody(device, this._user, devices), devices),
         () => this.__managedOf(this.__checkedDevices()),
         { getAll: () => this.__managedOf(this.__currentAssets()) });
-      this.add(this.__actionBar);
+      barRow.add(this.__actionBar, { flex: 1 });
+    } else {
+      barRow.add(new qx.ui.core.Spacer(), { flex: 1 });
     }
+    this.add(barRow);
     this.add(this.__table, { flex: 1 });
     this.__note = new qx.ui.basic.Label("").set({ textColor: "app-muted", rich: true, wrap: true });
     this.add(this.__note);
@@ -285,9 +304,7 @@ qx.Class.define("ankamon.page.Network", {
     __note: null,
     __timer: null,
     __polling: false,
-    __editButton: null,
-    __deleteButton: null,
-    __servicesButton: null,
+    __assetBar: null,
     __fixingChecks: false,
     __netsMenu: null,
     __groupId: 0,
@@ -297,6 +314,8 @@ qx.Class.define("ankamon.page.Network", {
     __netNote: "",
     __actionBar: null,
     __managed: null,
+    __managedById: null,
+    __managedByMac: null,
 
     /**
      * Araç çubuğu için bütün cihaz kayıtları (LISTED süzgeci yok — türü ne olursa olsun; bkz. backend DevicesApi::index
@@ -312,19 +331,31 @@ qx.Class.define("ankamon.page.Network", {
       } catch (e) {
         this.__managed = [];
       }
+      this.__managedById = new Map(this.__managed.map(b => [b.id, b]));
+      this.__managedByMac = new Map();
+      this.__managed.forEach(b => [b.mac, b.wifi_mac].filter(Boolean)
+        .forEach(m => this.__managedByMac.set(String(m).toLowerCase(), b)));
     },
 
-    /** Varlıklar → cihaz kayıtları: varlığın bağlı cihaz kimliği (NetworkApi device_id) ya da kablolu/kablosuz MAC eşleşmesi. */
-    __managedOf(assets) {
-      if (!this.__managed || !assets.length) {
-        return [];
+    /** Varlığın cihaz kaydı: bağlı cihaz kimliği (NetworkApi device_id) ya da kablolu/kablosuz MAC eşleşmesi; yoksa null. */
+    __managedFor(d) {
+      if (!this.__managed || !d) {
+        return null;
       }
-      const byId = new Map(this.__managed.map(b => [b.id, b]));
-      const byMac = new Map();
-      this.__managed.forEach(b => [b.mac, b.wifi_mac].filter(Boolean).forEach(m => byMac.set(String(m).toLowerCase(), b)));
+      return (d.device_id != null && this.__managedById.get(d.device_id)) ||
+        (d.mac && this.__managedByMac.get(String(d.mac).toLowerCase())) || null;
+    },
+
+    /** "Yönetilebilir" hücresi (page.Devices.manageableText — tek kaynak); cihaz kayıtları okunamadıysa boş. */
+    __manageableCell(d) {
+      return this.__managed ? ankamon.page.Devices.manageableText(this.__managedFor(d)) : "";
+    },
+
+    /** Varlıklar → cihaz kayıtları (araç çubuğu; aynı kayıt bir kez). */
+    __managedOf(assets) {
       const out = new Map();
       assets.forEach(d => {
-        const b = (d.device_id != null && byId.get(d.device_id)) || (d.mac && byMac.get(String(d.mac).toLowerCase()));
+        const b = this.__managedFor(d);
         if (b) {
           out.set(b.id, b);
         }
@@ -435,6 +466,7 @@ qx.Class.define("ankamon.page.Network", {
         cells: [
           d.id, wasChecked.has(d.id), (d.services.length + (d.shares ? d.shares.length : 0)) ? "▸" : "",
           d.online ? "Çevrim içi" : "Çevrim dışı",
+          this.__manageableCell(d),
           Ops.deviceName(d), d.ip_mask || "", d.mac, d.vendor || (d.mac && /^.[26ae]/i.test(d.mac) ? "(rastgele MAC)" : ""),
           d.device_type || "", d.model || "", d.hostname || "", d.os_guess || "",
           d.services_scanned_at ? String(d.services.length) : "",
@@ -600,13 +632,10 @@ qx.Class.define("ankamon.page.Network", {
 
     __updateActionState() {
       const count = this.__checkedDevices().length;
-      [this.__editButton, this.__deleteButton, this.__servicesButton, this.__groupButton].filter(Boolean).forEach(button => {
-        if (button.getUserData("baseLabel") === null) {
-          button.setUserData("baseLabel", button.getLabel());
-        }
-        button.setLabel(count ? `${button.getUserData("baseLabel")} (${count})` : button.getUserData("baseLabel"));
-        button.setEnabled(count >= 1);
-      });
+      if (this.__groupButton) {
+        this.__assetBar.setToolLabel(this.__groupButton, count ? `Grup oluştur (${count})` : "Grup oluştur");
+        this.__groupButton.setEnabled(count >= 1);
+      }
       if (this.__actionBar) {
         this.__actionBar.refresh();
       }
@@ -689,20 +718,38 @@ qx.Class.define("ankamon.page.Network", {
       }
     },
 
-    /** "Grup oluştur": ad sorulur, işaretli varlıklarla grup kurulur ve sol menüde o grup açılır. */
+    /**
+     * "Grup oluştur": ad sorulur, işaretli varlıklarla grup kurulur ve sol menüde o grup açılır. Aşamalar, yapılan işler
+     * ve sonuçlar modal günlük penceresinde satır satır görünür; başarıda pencere birkaç saniye sonra solup kapanır, hata
+     * olursa açık kalır (ui.network.GroupBuildLog — kullanıcı isteği 2026-11-24).
+     */
     async __createGroup(devices) {
       const name = await ankamon.ui.Dialog.prompt(
         `İşaretli <b>${devices.length}</b> varlıktan grup oluşturulacak. Grup adı:`, "", "Oluştur", "Grup oluştur");
       if (!name) {
         return;
       }
+      const log = new ankamon.ui.network.GroupBuildLog(`Grup oluşturuluyor: ${name}`);
+      const managed = this.__managedOf(devices).length;
+      log.info(`${devices.length} varlık seçili` + (this.__managed ? `; ${managed} tanesinin cihaz kaydı var (yönetilebilir), ` +
+        `${devices.length - managed} tanesi pasif üye olacak` : ""));
       try {
-        const res = await ankamon.io.Api.post("/network/groups", { name, ids: devices.map(d => d.id) });
+        const res = await log.step(`Grup kaydı ve ${devices.length} varlık üyeliği yazılıyor`,
+          () => ankamon.io.Api.post("/network/groups", { name, ids: devices.map(d => d.id) }), r => `grup no ${r.id}`);
         this._checkAll(this.__table, false);
-        await this.__loadGroups();
-        qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "network", group: res.id });
+        const group = await log.step("Gruplar yeniden okunuyor, sol menü güncelleniyor",
+          async () => (await this.__loadGroups()).find(g => g.id === res.id),
+          g => (g ? `${g.members.length} üye` : "grup listede görünmedi"));
+        if (group && group.members.length !== devices.length) {
+          log.info(`Uyarı: ${devices.length} varlık gönderildi, grupta ${group.members.length} üye var ` +
+            "(bu arada silinmiş varlıklar olabilir).");
+        }
+        await log.step("Grup sayfası açılıyor", async () => {
+          qx.event.message.Bus.dispatchByName(ankamon.ui.Shell.OPEN_PAGE, { page: "network", group: res.id });
+        });
+        log.finish(`«${name}» grubu oluşturuldu.`);
       } catch (e) {
-        ankamon.ui.Dialog.error(e);
+        log.fail("Grup oluşturulamadı. Ayrıntı yukarıdaki kırmızı satırda.");
       }
     },
 
@@ -873,6 +920,9 @@ qx.Class.define("ankamon.page.Network", {
         }
         add(ICON.edit, "Düzenle" + count, () => this.__editMany(devices));
         add(ICON.delete, "Sil" + count, () => this.__remove(devices));
+        // Elle varlık ekleme üst çubuktan buraya taşındı (kullanıcı isteği 2026-11-24: üstte Ekle düğmesi yok).
+        menu.add(new qx.ui.menu.Separator());
+        add(ICON.add || "＋", "Varlık ekle…", () => this.__edit(null));
       }
       return menu;
     }

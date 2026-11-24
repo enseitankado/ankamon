@@ -297,7 +297,11 @@ final class NetworkApi
             self::changed();
             Audit::log($user, $request, 'network.scan.shares', implode(',', $ids));
         } else {
-            Db::exec("SELECT pg_notify('ankamon_netscan', 'sweep')");
+            // Varlıklar ▸ «Şimdi tara» (with_services): bütün ağlarda varlık taraması, bitince çevrim içi cihazların servis
+            // taraması (kullanıcı isteği 2026-11-24 — ayrı «Servisleri tara» düğmesi kalktı; bkz. worker netscan).
+            Db::exec($request->input('with_services')
+                ? "SELECT pg_notify('ankamon_netscan', 'sweep_services')"
+                : "SELECT pg_notify('ankamon_netscan', 'sweep')");
         }
         return ['ok' => true];
     }

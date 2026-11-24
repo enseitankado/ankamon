@@ -37,6 +37,10 @@ qx.Class.define("ankamon.ui.network.AssetCellHints", {
   statics: {
     /** Varlıklar (page.Network) — ağda görülen bütün cihazlar. */
     NETWORK: {
+      manageable: "Ankamon bu cihazı uzaktan yönetebiliyor mu? Akıllı Tahtalar ve grup listelerindeki 'Yönetilebilir' ile " +
+        "aynıdır. Evet: cihazın Ankamon'da cihaz kaydı var ve Ankamon cihaza SSH ile yönetici (root) olarak bağlanabildi — " +
+        "cihaz kapanırken ya da kapalıyken de Evet kalır (o an SSH yanıt vermiyorsa yukarıda yazar). Hayır (parola): cihaz " +
+        "yanıt veriyor ama parola kabul edilmiyor. Hayır: cihaz kaydı yok (yazıcı, kamera…) ya da hiç bağlanılamadı.",
       exp: "Bu cihazın açık portları ve paylaşılan klasörleri varsa ▸ işaretine tıklayınca altında listelenir.",
       status: "Cihaz şu an ağda mı? Ankamon ağı birkaç dakikada bir tarar (ARP/ping ile 'orada mısın?' diye sorar). " +
         "Yanıt veren cihaz 'Çevrim içi', son taramalarda görülmeyen 'Çevrim dışı' olur.",
@@ -83,8 +87,9 @@ qx.Class.define("ankamon.ui.network.AssetCellHints", {
     DEVICES: {
       status: "Cihaz şu an ağda mı? Varlıklar'daki durumla aynıdır: ağ taraması cihazı görüyorsa ya da SSH yanıt " +
         "veriyorsa 'Çevrimiçi', görülmüyorsa 'Kapalı'.",
-      manageable: "Ankamon bu cihazı uzaktan yönetebiliyor mu? Ankamon cihaza SSH ile yönetici (root) olarak bağlanmayı " +
-        "dener. Evet: son 3 dakikada bağlandı. Hayır (parola): cihaz yanıt veriyor ama parola kabul edilmiyor. Hayır: yanıt yok.",
+      manageable: "Ankamon bu cihazı uzaktan yönetebiliyor mu? Ankamon 30 saniyede bir cihaza SSH ile yönetici (root) olarak " +
+        "bağlanmayı dener. Evet: bağlanabildiği biliniyor — cihaz kapanırken ya da kapalıyken de Evet kalır (o an SSH yanıt " +
+        "vermiyorsa yukarıda yazar). Hayır (parola): cihaz yanıt veriyor ama parola kabul edilmiyor. Hayır: hiç bağlanılamadı.",
       name: "Cihazın adı: verdiğiniz takma ad, yoksa cihazın bilgisayar adı ya da IP adresi.",
       hostname: "Cihazın kendine verdiği ad (ör. etap-8ab8fb). Cihazın gönderdiği loglardan ya da SSH ile sorularak öğrenilir.",
       ip: "Cihazın ağdaki şu anki adresi. Cihazın MAC'i ağ taramasında hangi adreste görülürse o yazılır (DHCP adresi değiştirebilir).",

@@ -64,7 +64,7 @@ qx.Class.define("ankamon.page.Devices", {
     this.__columns = [
       // KALICI KURAL (kullanıcı 2026-11-10): Durum = ağda canlı mı (Varlıklar'la aynı); SSH erişimi ayrı "Yönetilebilir".
       { id: "status", label: "Durum", width: 100, hint: "Çevrimiçi: cihaz ağda canlı (Varlıklar'daki durumla aynı — ağ taraması görüyor ya da SSH yanıt veriyor). Kapalı: ağda görülmüyor." },
-      { id: "manageable", label: "Yönetilebilir", width: 120, hint: "Tek ölçüt: cihaza SSH ile root girişi başarılı mı. Evet: Ankamon son 3 dakikada cihaza SSH ile root olarak girebildi — komut, ekran, web terminali, oturum işlemleri yapılabilir. Hayır (parola): SSH portu açık ama giriş reddediliyor — cihazın root parolası Ayarlar ▸ SSH erişimi'ndekinden farklı (Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları'ndan cihazın parolası girilir). Hayır: SSH yanıt vermiyor." },
+      { id: "manageable", label: "Yönetilebilir", width: 120, choices: true, hint: ankamon.page.Devices.MANAGEABLE_HINT },
       { id: "name", label: "Takma ad / Ad" },
       { id: "hostname", label: "Bilgisayar adı", width: 150 },
       { id: "ip", label: "IP", width: 120 },
@@ -139,6 +139,7 @@ qx.Class.define("ankamon.page.Devices", {
     // Hücre ipuçları: sütunun görevi ve verinin kaynağı (kullanıcı isteği 2026-11-12; bkz. ui.network.AssetCellHints).
     // Özel çiziciler (Durum, Oturum) atandıktan SONRA: onların kendi ipucu açıklamanın üstünde kalır.
     ankamon.ui.network.AssetCellHints.apply(this.__columns, ankamon.ui.network.AssetCellHints.DEVICES, {
+      manageable: row => ankamon.page.Devices.manageableNote(this.__devices && this.__devices.get(row[0])),
       sensors: row => {
         const device = this.__devices && this.__devices.get(row[0]);
         return device && device.sensors_at ? "Son sensör verisi: " + ankamon.util.Format.ago(device.sensors_at) : null;
@@ -269,12 +270,42 @@ qx.Class.define("ankamon.page.Devices", {
      */
     /** "Durum" sütunu: ağda canlı (DevicesApi alive — Varlıklar'la aynı ölçü) → "Çevrimiçi", değilse "Kapalı". SSH erişimi
      * ayrı "Yönetilebilir" sütununda (device.online) — bkz. bellek smart-devices-online-vs-manageable. */
-    /** "Yönetilebilir" sütunu (DevicesApi manageable / ssh_login_failing). */
+    /** "Yönetilebilir" sütununun başlık ipucu (Akıllı Tahtalar/grup grid'i ve Varlıklar aynı metni kullanır). */
+    MANAGEABLE_HINT: "Ankamon bu cihazı SSH ile root olarak yönetebildiği biliniyor mu. Evet: Ankamon cihaza SSH ile root " +
+      "olarak girebildi — komut, ekran, web terminali, oturum işlemleri yapılabilir; cihaz kapanırken ya da kapalıyken de Evet " +
+      "kalır (SSH o an yanıt vermiyorsa hücre ipucunda yazar). Hayır (parola): SSH portu açık ama giriş reddediliyor — cihazın " +
+      "root parolası Ayarlar ▸ SSH erişimi'ndekinden farklı (Oturumlar ▸ Parola ayarla… ▸ Yönetici hesapları'ndan cihazın " +
+      "parolası girilir). Hayır: Ankamon cihaza hiç SSH ile girememiş ya da cihaz kaydı yok.",
+
+    /**
+     * "Yönetilebilir" sütunu — TEK KAYNAK (Akıllı Tahtalar/grup grid'i, Ağ ▸ Varlıklar, Cihaz ayrıntıları). Kararlı ölçü
+     * (kullanıcı isteği 2026-11-24): Ankamon'un cihaza SSH ile root girişi yapabildiği BİLİNİYOR mu — şu an başarılı
+     * (DevicesApi manageable) ya da daha önce en az bir kez başarılı oturum yoklaması (session_checked_at; worker
+     * tasks/session_probe yalnız başarılı girişte yazar). Anlık SSH kopukluğu «Hayır» yapmaz: kapatılan bilgisayarda sshd
+     * önce durur, ağ taraması onu birkaç dakika daha çevrim içi görür — «çevrim içi + Hayır» görünüp sonra çevrim dışına
+     * düşüyordu. Anlık durum manageableNote ile hücre ipucunda. Giriş reddediliyorsa (ssh_login_failing) yine
+     * «Hayır (parola)». SSH isteyen işlemlerin etkinliği bu sütuna değil device.online'a bakar.
+     */
     manageableText(device) {
+      if (!device || device.passive) {
+        return "Hayır";
+      }
       if (device.manageable ?? device.online) {
         return "Evet";
       }
-      return device.ssh_login_failing ? "Hayır (parola)" : "Hayır";
+      if (device.ssh_login_failing) {
+        return "Hayır (parola)";
+      }
+      return device.session_checked_at ? "Evet" : "Hayır";
+    },
+
+    /** Yönetilebilir «Evet» ama SSH şu an yanıt vermiyorsa hücre ipucu (anlık durum); değilse null. */
+    manageableNote(device) {
+      if (!device || device.passive || (device.manageable ?? device.online) || device.ssh_login_failing || !device.session_checked_at) {
+        return null;
+      }
+      return "SSH şu an yanıt vermiyor (cihaz kapanıyor ya da kapalı olabilir). Son başarılı SSH girişi: " +
+        ankamon.util.Format.ago(device.session_checked_at) + ". Komut, ekran gibi işlemler cihaz yeniden yanıt verince çalışır.";
     },
 
     statusText(device) {
@@ -1204,6 +1235,8 @@ qx.Class.define("ankamon.page.Devices", {
         const m = b.online ? metrics[b.id] : null;
         return {
           id: b.id, name: b.label || b.hostname || b.ip || ("#" + b.id), online: !!b.online, alive: !!(b.alive ?? b.online),
+          // Yönetilebilir (kararlı, manageableText): SSH anlık kopuksa kutucuk «yönetilemiyor» yerine «kapanıyor olabilir» der.
+          sshKnown: ankamon.page.Devices.manageableText(b) === "Evet",
           whoami: whoami.get(b.id) || null,
           // "Oturumu açık kullanıcı yok (23 dk)": oturumsuz durumun başladığı an (epoch sn; bkz. DevicesApi
           // no_session_since) — kutucuk süreyi kendisi sayar.

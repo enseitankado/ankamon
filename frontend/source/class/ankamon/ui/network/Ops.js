@@ -225,9 +225,10 @@ qx.Class.define("ankamon.ui.network.Ops", {
       }
     },
 
+    /** «Şimdi tara»: bütün ağlarda varlık taraması, bitince çevrim içi cihazların servis taraması (bkz. NetworkApi::scan). */
     async scanNow() {
       try {
-        await ankamon.io.Api.post("/network/scan", {});
+        await ankamon.io.Api.post("/network/scan", { with_services: true });
       } catch (e) {
         ankamon.ui.Dialog.error(e);
       }
@@ -268,7 +269,7 @@ qx.Class.define("ankamon.ui.network.Ops", {
           ankamon.ui.Dialog.error(e);
         }
       };
-      item("⟳ Şimdi tara", () => this.scanNow());
+      // Ağ başına "Şimdi tara" yok (kullanıcı isteği 2026-11-24): Varlıklar'daki Şimdi tara bütün ağları birlikte tarar.
       item("✎ Yeniden adlandır…", async () => {
         const name = await ankamon.ui.Dialog.prompt(
           `<b>${qx.bom.String.escape(net.cidr)}</b> ağının adı (ör. "Okul kablolu ağı"):`, net.name, "Kaydet", "Ağ adı");

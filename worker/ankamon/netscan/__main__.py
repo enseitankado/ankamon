@@ -33,7 +33,8 @@
     TEK TEK, yalnız makine gerçekten müsaitken tarar (her cihaz SERVICE_RESCAN_HOURS'ta bir).
     Kullanıcının "Servisleri tara" dediği cihazlar sıranın başına geçer.
 
-Arayüz istekleri pg_notify('ankamon_netscan', 'sweep' | 'services') ile anında gelir (bkz. NetworkApi).
+Arayüz istekleri pg_notify('ankamon_netscan', 'sweep' | 'sweep_services' | 'services') ile anında gelir (bkz. NetworkApi).
+'sweep_services' = Varlıklar ▸ «Şimdi tara»: varlık taraması biter bitmez çevrim içi cihazlar servis sırasına alınır.
 Her değişiklikte netscan_state.version artar; arayüz bunu birkaç saniyede bir okuyup listeyi tazeler.
 """
 
@@ -69,6 +70,8 @@ FLOW_PAUSE = 5
 # Hostname çözme (NetBIOS + ters DNS): hostname'i boş çevrim içi cihazlar tek tek adlandırılmaya çalışılır.
 HOSTNAME_RETRY_HOURS = int(os.environ.get("NETSCAN_HOSTNAME_RETRY_HOURS", "6"))
 HOSTNAME_PAUSE = 3
+# «Şimdi tara» sonrası servis isteği: bu kadar dakika içinde zaten taranmış cihaz yeniden istenmez.
+SERVICE_FRESH_MINUTES = int(os.environ.get("NETSCAN_SERVICE_FRESH_MINUTES", "60"))
 
 _state_lock = threading.Lock()
 _state: dict = {"phase": "starting"}
@@ -307,8 +310,11 @@ def main() -> None:
     threading.Thread(target=_hostname_loop, name="hostname", daemon=True).start()
 
     next_sweep = 0.0
+    # «Şimdi tara» servis isteği: makine yoğunken tarama ertelense de unutulmaz, ilk tamamlanan taramadan sonra uygulanır.
+    services_after_sweep = False
     while True:
-        forced = "sweep" in requests
+        forced = "sweep" in requests or "sweep_services" in requests
+        services_after_sweep = services_after_sweep or "sweep_services" in requests
         if "services" in requests:
             _wake_services.set()
         if "shares" in requests:
@@ -330,6 +336,11 @@ def main() -> None:
                     _set(conn, phase="sweeping", reason="", load=sample)
                     _sweep(conn)
                     next_sweep = time.monotonic() + decision["interval"]
+                    if services_after_sweep:
+                        services_after_sweep = False
+                        asked = store.request_services_after_sweep(conn, SERVICE_FRESH_MINUTES)
+                        log.info("Şimdi tara: %d cihaz servis taraması sırasına alındı", asked)
+                        _wake_services.set()
                     _set(conn, phase="idle", current=None, progress=None, interval=decision["interval"],
                          last_at=time.time(), next_at=time.time() + decision["interval"])
                 else:
