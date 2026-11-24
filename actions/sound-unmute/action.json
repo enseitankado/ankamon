@@ -1,9 +1,0 @@
-{
-  "title": "Sesi aç",
-  "description": "\"Sesi kapat\" ile sessize alınan bilgisayarın sesini yeniden açar (düzey değişmez). Oturum açık kullanıcı varsa onun ses sunucusunda, yoksa ses kartının ana kanalında (ALSA Master).",
-  "category": "Ses",
-  "feature": "actions",
-  "confirm": false,
-  "timeout": 30,
-  "params": []
-}

@@ -63,7 +63,8 @@ final class DevicesApi
         END AS no_session_since,
         b.display_state, b.netifs, b.autoshutdown, b.screen_locked, array_to_json(b.input_locks) AS input_locks,
         -- Ses durumu (göç 059, worker executor/soundstate.py — oturum yoklamasında okunur): sessiz mi, düzey %; NULL = bilinmiyor.
-        b.sound_muted, b.sound_volume,
+        -- sound_limit (göç 060): Yönet ▸ Ses kontrolü ▸ Sesi sınırla ile kurulan en yüksek düzey; NULL = sınır yok/bilinmiyor.
+        b.sound_muted, b.sound_volume, b.sound_limit,
         (SELECT r.source_device_id FROM screen_relays r WHERE r.target_device_id = b.id) AS relay_source,
         EXISTS (SELECT 1 FROM screen_relays r WHERE r.source_device_id = b.id) AS relay_is_source,
         extract(epoch FROM b.last_seen_at)::bigint AS last_seen_at,
@@ -180,7 +181,7 @@ final class DevicesApi
             'os_family' => null, 'os_source' => null, 'os_family_manual' => null, 'ssh_ok' => false, 'exporter_ok' => false,
             'facts' => new \stdClass(), 'etap' => null, 'session_username' => null, 'session_locked' => false,
             'session_checked_at' => null, 'no_session_since' => null, 'display_state' => null, 'netifs' => null,
-            'autoshutdown' => null, 'screen_locked' => false, 'input_locks' => [], 'relay_source' => null, 'sound_muted' => null, 'sound_volume' => null,
+            'autoshutdown' => null, 'screen_locked' => false, 'input_locks' => [], 'relay_source' => null, 'sound_muted' => null, 'sound_volume' => null, 'sound_limit' => null,
             'relay_is_source' => false, 'sensors_at' => null,
         ], $rows);
     }

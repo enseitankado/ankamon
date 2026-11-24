@@ -1,0 +1,34 @@
+{
+  "title": "Ses kontrolü",
+  "description": "Bilgisayarın sesini kapatır/açar, düzeyini ayarlar ya da en yüksek ses sınırı koyar. Oturum açık kullanıcı varsa onun ses sunucusunda (PipeWire/PulseAudio) varsayılan çıkış değişir, yoksa ses kartının ana kanalı (ALSA Master). Sınır cihazda kalıcı bir bekçiyle (systemd) korunur: kullanıcı sesi sınırın üstüne çıkarırsa hemen geri çekilir; yeniden başlatmada da sürer. Sağ menü: Yönet ▸ Ses kontrolü.",
+  "category": "Ses",
+  "feature": "devices.sound",
+  "confirm": false,
+  "timeout": 40,
+  "params": [
+    {
+      "key": "ISLEM",
+      "label": "İşlem",
+      "type": "select",
+      "default": "mute",
+      "required": true,
+      "options": [
+        { "value": "mute", "label": "Sesi devre dışı bırak (sessize al)" },
+        { "value": "unmute", "label": "Sesi etkinleştir" },
+        { "value": "set", "label": "Ses düzeyini ayarla (%)" },
+        { "value": "down", "label": "Sesi kıs (puan)" },
+        { "value": "limit", "label": "Ses sınırı koy (en yüksek %)" },
+        { "value": "unlimit", "label": "Ses sınırını kaldır" }
+      ]
+    },
+    {
+      "key": "DUZEY",
+      "label": "Düzey / puan (%)",
+      "type": "number",
+      "default": "50",
+      "required": false,
+      "pattern": "^(100|[1-9]?[0-9])$",
+      "pattern_error": "Düzey 0 ile 100 arasında bir sayı olmalı."
+    }
+  ]
+}

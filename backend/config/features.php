@@ -34,6 +34,7 @@ $ozellikKatalogu = [
     'anomalies' => 'Anomaliler: cihazlardaki sıra dışı durumları (ör. açık ama oturum açılmamış cihaz) anlık izleme ve geçmişe dönük raporlama',
     'anomalies.notify' => 'Anomaliler ▸ Bildirimler: ntfy konusunu ve bildirim kurallarını düzenleme, bildirim geçmişini silme — bildirim metni dış sunucuya gider',
     'screen.web' => 'Oturumu açık cihazda varsayılan tarayıcıyla web sitesi açma (sağ menü "Web sitesi aç")',
+    'devices.sound' => 'Cihazın sesini kapatma/açma, ses düzeyini ayarlama ve en yüksek ses sınırı koyma — cihazdaki kullanıcı sesi sınırın üstüne çıkaramaz (sağ menü "Yönet ▸ Ses kontrolü", hazır işlem "Ses kontrolü")',
     'devices.webfilter' => 'ETAP Pardus cihazlarda eta-kisit ile kara/beyaz liste web filtresi tanımlama, kapatma, adres başına ziyaret ve engel sayılarını görme (sağ menü "Web Filtre")',
     'diagnose' => 'Bakım (sorun tespiti): seçili cihazlarda donanım, disk sağlığı (SMART), sıcaklık ve sistem denetimi çalıştırma',
     'devices.users' => 'Cihaza kullanıcı hesabı ekleme (hazır işlem "Kullanıcı ekle") ve hesapları silme, isteğe bağlı tüm dosyalarıyla (sağ menü "Kullanıcılar ▸ Kullanıcı sil…" ve hazır işlem "Kullanıcı sil") — silme geri alınamaz',

@@ -304,6 +304,19 @@ final class JobsApi
         }
         // Eklentinin bu işleme bağladığı ek doğrulama (ör. TiHA adımı şemada var mı, ayarlar) — bkz. Actions::addJobCheck.
         [$values, $title] = Actions::checkJob($action, $values, $user);
+        if ($action['id'] === 'sound-control') {
+            // Görev başlığı ne yapıldığını söylesin (İşlemler/denetim kaydında "Ses kontrolü" tek başına anlaşılmıyor).
+            $level = (int) ($values['DUZEY'] ?? 0);
+            $title = match ($values['ISLEM'] ?? '') {
+                'mute' => 'Sesi devre dışı bırak',
+                'unmute' => 'Sesi etkinleştir',
+                'set' => "Sesi ayarla: %$level",
+                'down' => "Sesi kıs: $level puan",
+                'limit' => "Sesi sınırla: en çok %$level",
+                'unlimit' => 'Ses sınırını kaldır',
+                default => throw ApiError::badRequest('Geçersiz ses işlemi.'),
+            };
+        }
         return [$action['feature'], $title, ['action' => $action['id'], 'values' => $values], true];
     }
 
