@@ -103,10 +103,10 @@ qx.Class.define("ankamon.ui.StatusBar", {
     this.__foldButton.addListener("execute", () => this.__setFolded(!this.__folded));
     head.add(this.__foldButton);
     head.add(new qx.ui.basic.Label("Ankamon logs").set({ font: "app-mono", textColor: "app-muted" }));
-    // Küçültülmüş pencereler (bkz. ui.WindowDock): tıklanınca geri açılır.
+    // Küçültülmüş pencereler (bkz. ui.WindowDock): tıklanınca geri açılır. Boşluğu dolduran şerit (flex, kendi genişliği
+    // 0): onlarca pencere küçültülünce düğmeler çubuğu/panelleri sağa, ekran dışına itmez; sığmayanlar "+N" menüsünde.
     this.__dock = new ankamon.ui.WindowDock();
-    head.add(this.__dock);
-    head.add(new qx.ui.core.Spacer(), { flex: 1 });
+    head.add(this.__dock, { flex: 1 });
     // Oturum açmış Ankamon kullanıcıları (kullanıcı isteği): sayı + üzerine gelince ayrıntı (bkz. __pollUsers).
     // Varsayılan gizli; bir eklenti "statusBar.usersVisible" kancasıyla açar (bkz. ext.Extensions). Gizliyken
     // de yoklama sürer: bu oturumun durumu (odak, açık sayfa) göstergeyi gören başkalarına bildirilir.
@@ -131,7 +131,7 @@ qx.Class.define("ankamon.ui.StatusBar", {
     // çalışır, burada yalnız onun DIŞINDAKİ alana tıklanınca tetiklenir (paneller kendi tıklamasını kullanır).
     head.addListener("tap", e => {
       if (e.getTarget() !== this.__foldButton && e.getTarget() !== this.__usersLabel &&
-          !qx.ui.core.Widget.contains(this.__dock, e.getTarget()) &&
+          !this.__dock.ownsTarget(e.getTarget()) &&
           !qx.ui.core.Widget.contains(this.__panelBox, e.getTarget())) {
         this.__setFolded(!this.__folded);
       }

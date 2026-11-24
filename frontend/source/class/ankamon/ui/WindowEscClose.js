@@ -136,6 +136,11 @@ qx.Class.define("ankamon.ui.WindowEscClose", {
       win.close();
     },
 
+    /** Pencerede kaydedilmemiş değişiklik var mı (ESC onayıyla aynı kural; ör. ui.WindowDock toplu kapatma). */
+    isDirty(win) {
+      return this.__dirty(win);
+    },
+
     __dirty(win) {
       const custom = win.getUserData("escDirty");
       if (typeof custom === "function") {

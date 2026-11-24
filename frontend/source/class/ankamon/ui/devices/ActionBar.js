@@ -112,7 +112,7 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
    * @param getMenu {Function} (cihaz, cihazlar) → qx.ui.menu.Menu|null: sağ menüyü kurar
    * @param getSelected {Function} () → seçili cihazlar
    * @param config {Map?} groups/items/containers/perDevice (eklenti araç çubuğu); getAll: () → tüm cihazlar (verilirse
-   *   durum yazısı "çevrim içi N (k seçili) · çevrim dışı M (j seçili)" olur)
+   *   durum yazısı iki satır: "● N çevrim içi (k seçili)" / "● M çevrim dışı (j seçili)"; ipucunda toplam)
    */
   construct(getMenu, getSelected, config) {
     super(new qx.ui.layout.Flow(1, 2).set({ alignY: "middle" }));
@@ -258,15 +258,19 @@ qx.Class.define("ankamon.ui.devices.ActionBar", {
       const t = this.__totals;
       if (t) {
         // Seçim düğmesinin yerine (kullanıcı isteği, 2026-11-05): kaç cihaz çevrim içi / dışı ve bunlardan kaçı seçili.
+        // İki satır alt alta (kullanıcı isteği 2026-11-24): küçük yazı, dar satır aralığı — çubuk yükselmez.
         const sel = k => (k ? ` <span style="font-weight:bold">(${k} seçili)</span>` : "");
         const on = `<span style="color:#1e8e3e">●</span>`;
         const off = `<span style="color:#9aa0a6">●</span>`;
-        const value = this.__iconOnly
-          ? `${on} ${t.on}${t.onSel ? ` (${t.onSel})` : ""} ${off} ${t.off}${t.offSel ? ` (${t.offSel})` : ""}`
-          : `${on} ${t.on} çevrim içi${sel(t.onSel)} &nbsp;${off} ${t.off} çevrim dışı${sel(t.offSel)}`;
+        const lines = this.__iconOnly
+          ? [`${on} ${t.on}${t.onSel ? ` (${t.onSel})` : ""}`, `${off} ${t.off}${t.offSel ? ` (${t.offSel})` : ""}`]
+          : [`${on} ${t.on} çevrim içi${sel(t.onSel)}`, `${off} ${t.off} çevrim dışı${sel(t.offSel)}`];
+        const value = `<div style="font-size:11px;line-height:12px;white-space:nowrap">${lines.join("<br>")}</div>`;
+        const chosen = t.onSel + t.offSel;
         this.__count.set({
           value, visibility: "visible",
-          toolTipText: `${t.on} çevrim içi (${t.onSel} seçili), ${t.off} çevrim dışı (${t.offSel} seçili)`
+          toolTipText: `Toplam ${t.on + t.off} cihaz: ${t.on} çevrim içi, ${t.off} çevrim dışı` +
+            (chosen ? ` — ${chosen} seçili (${t.onSel} çevrim içi, ${t.offSel} çevrim dışı)` : "")
         });
         return;
       }
