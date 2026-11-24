@@ -99,6 +99,7 @@ main() {
     ok "$CFG (yedek: $CFG.ankamon-yedek)"
   fi
   ssh-keygen -A >/dev/null 2>&1
+  mkdir -p /run/sshd 2>/dev/null
   SSHD=$(command -v sshd || echo /usr/sbin/sshd)
   "$SSHD" -t 2>/dev/null || warn "sshd ayar denetimi uyarı verdi: $("$SSHD" -t 2>&1 | head -n 1)"
 
@@ -114,6 +115,10 @@ main() {
     rc-update add sshd default >/dev/null 2>&1; rc-service sshd restart >/dev/null 2>&1 && ok "sshd çalışıyor"
   else
     service ssh restart >/dev/null 2>&1 || service sshd restart >/dev/null 2>&1 || "$SSHD"
+  fi
+  # Servis yöneticisi yoksa ya da servis kalkmadıysa sshd doğrudan başlatılır.
+  if command -v pgrep >/dev/null 2>&1 && ! pgrep -x sshd >/dev/null 2>&1; then
+    "$SSHD" 2>/dev/null && ok "sshd doğrudan başlatıldı (bu sistemde açılışta başlaması elle ayarlanmalı)"
   fi
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
     ufw allow 22/tcp >/dev/null 2>&1 && ok "güvenlik duvarı (ufw): 22/tcp açıldı"
@@ -137,16 +142,34 @@ main() {
     fi
     macs="$macs${macs:+,}$n=$m=$k"
   done
+  # Fiziksel kart görünmüyorsa (sanal makine/konteyner) sanal arabirimler (köprü/veth/tünel hariç).
+  if [ -z "$macs" ]; then
+    for d in /sys/class/net/*; do
+      n=${d##*/}
+      case "$n" in lo|docker*|br-*|virbr*|veth*|tun*|tap*|wg*) continue ;; esac
+      m=$(cat "$d/address" 2>/dev/null)
+      case "$m" in ??:??:??:??:??:??) [ "$m" != 00:00:00:00:00:00 ] && macs="$macs${macs:+,}$n=$m=e" ;; esac
+    done
+  fi
   os=$(. /etc/os-release 2>/dev/null; echo "$PRETTY_NAME")
   host=$(hostname 2>/dev/null)
+  bildirildi=
   if command -v curl >/dev/null 2>&1; then
-    res=$(curl -fsS -X POST --data-urlencode "hostname=$host" --data-urlencode "os=$os" --data-urlencode "family=linux" \
-          --data-urlencode "macs=$macs" "$ANKAMON_URL/done" 2>&1)
+    res=$(curl -sS -w '\n%{http_code}' -X POST --data-urlencode "hostname=$host" --data-urlencode "os=$os" \
+          --data-urlencode "family=linux" --data-urlencode "macs=$macs" "$ANKAMON_URL/done" 2>&1)
+    kod=$(printf '%s\n' "$res" | tail -n 1)
+    res=$(printf '%s\n' "$res" | sed '$d')
+    [ "$kod" = 200 ] && bildirildi=1
   else
     enc() { printf '%s' "$1" | sed 's/%/%25/g; s/ /%20/g; s/&/%26/g; s/+/%2B/g; s/=/%3D/g; s/,/%2C/g'; }
-    res=$(wget -qO- --post-data "hostname=$(enc "$host")&os=$(enc "$os")&family=linux&macs=$(enc "$macs")" "$ANKAMON_URL/done" 2>&1)
+    res=$(wget -qO- --post-data "hostname=$(enc "$host")&os=$(enc "$os")&family=linux&macs=$(enc "$macs")" \
+          "$ANKAMON_URL/done" 2>/dev/null) && bildirildi=1
   fi
-  [ -n "$res" ] && ok "$res" || warn "Ankamon'a bildirilemedi; cihazı Ankamon'da Varlıklar ▸ Cihaz ekle ile ekleyebilirsiniz."
+  if [ -n "$bildirildi" ]; then
+    ok "$res"
+  else
+    warn "Ankamon'a bildirilemedi${res:+ ($res)}; cihazı Ankamon'da Varlıklar ▸ Cihaz ekle ile ekleyebilirsiniz."
+  fi
   say ""
   say "Bitti. Ankamon bu bilgisayara artık SSH ile erişebilir."
 }
