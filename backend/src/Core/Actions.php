@@ -74,9 +74,12 @@ final class Actions
         $dir = getenv('ACTIONS_DIR') ?: '/app/actions';
         $actions = [];
         // Çekirdek işlemleri + eklenti işlemleri (ext/<ad>/actions/<kimlik>; çekirdek eklenti adlarını bilmez).
+        // Eklentinin hazır komutları yalnız eklenti yüklü VE etkinken kataloğa girer (kullanıcı isteği 2026-11-24: ör.
+        // Ahenk komutları Ahenk eklentisi kapalıyken Komut çalıştır listesinde, zamanlamada ve görevde yok).
         $files = array_merge(
             glob($dir . '/*/action.json') ?: [],
-            glob(Extensions::dir() . '/*/actions/*/action.json') ?: []
+            array_filter(glob(Extensions::dir() . '/*/actions/*/action.json') ?: [],
+                static fn(string $f) => Extensions::active(basename(dirname($f, 3))))
         );
         foreach ($files as $file) {
             $action = json_decode((string) file_get_contents($file), true);
@@ -108,7 +111,9 @@ final class Actions
             return $core;
         }
         foreach (glob(Extensions::dir() . '/*/actions/' . $id . '/action.json') ?: [] as $file) {
-            return dirname($file);
+            if (Extensions::active(basename(dirname($file, 3)))) {
+                return dirname($file);
+            }
         }
         return null;
     }

@@ -169,6 +169,8 @@ return [
     // Kullanıcı tanımlı zamanlanmış görevler (Sistem ▸ Zamanlanmış görevler ▸ Görevler/Sonuçlar; worker tasks/user_schedules.py).
     ['GET',    '/api/schedules',         [Api\SchedulesApi::class, 'index'],     'admin'],
     ['POST',   '/api/schedules',         [Api\SchedulesApi::class, 'save'],      'admin'],
+    // "Cihaz çevrimiçi olunca, bir kez" görevi (ör. Ahenk ▸ ETA Kayıt güncelle): görevi başlatabilen kullanıcıya açık.
+    ['POST',   '/api/schedules/when-online', [Api\SchedulesApi::class, 'whenOnline'], 'actions'],
     ['PUT',    '/api/schedules/{id}/enabled', [Api\SchedulesApi::class, 'setEnabled'], 'admin'],
     ['POST',   '/api/schedules/{id}/run', [Api\SchedulesApi::class, 'runNow'],   'admin'],
     ['DELETE', '/api/schedules/{id}',    [Api\SchedulesApi::class, 'delete'],    'admin'],

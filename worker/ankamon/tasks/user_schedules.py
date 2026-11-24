@@ -30,6 +30,11 @@ görev jobs + job_targets'a ELLE BAŞLATILANLA AYNI biçimde yazılır (pg_notif
 sonuç olağan yerlerine yansır (SSH denetimi Sağlık ▸ Denetle/Durum, anomali taraması Sağlık, komut çıktısı görev
 penceresi). Her çalıştırma user_schedule_runs'a yazılır (Sonuçlar listesi).
 
+"Cihaz çevrimiçi olunca, bir kez" (repeat when_online — göç 061, kullanıcı isteği 2026-11-24; ör. Bakım ▸ Ahenk ▸ ETA
+Kayıt güncelle'de çevrimdışı cihazlar için): saatle değil cihaz durumuyla tetiklenir. Her turda hedeflerden henüz
+çalışmamış ve şimdi çevrimiçi + SSH'ı açık olanlara görev bir kez yazılır (fired_device_ids); hepsi çalışınca zamanlama
+kapanır.
+
 Zaman: konteynerin yerel saati (TZ, varsayılan Europe/Istanbul). Worker kapalıyken kaçırılan çalıştırmalar
 birikmez: açılınca bir kez çalışır, sonraki zaman şimdiden hesaplanır. Hızlı turda (10 sn) çalışır.
 """
@@ -76,7 +81,12 @@ def next_after(s: dict, after: dt.datetime) -> dt.datetime | None:
 
 
 def _targets(conn, s: dict) -> list[int]:
-    if s["target_mode"] == "all_online":
+    if s["repeat"] == "when_online":
+        # Elle "Şimdi çalıştır": henüz çalışmamış bütün hedefler (ulaşılamayanlar görevde "ulaşılamadı" olur).
+        fired = set(s.get("fired_device_ids") or [])
+        rows = conn.execute("SELECT id FROM devices WHERE id = ANY(%s::int[]) ORDER BY id",
+                            ([i for i in (s["device_ids"] or []) if i not in fired],)).fetchall()
+    elif s["target_mode"] == "all_online":
         rows = conn.execute("SELECT id FROM devices WHERE online AND ip IS NOT NULL ORDER BY id").fetchall()
     elif s["target_mode"] == "devices":
         rows = conn.execute("SELECT id FROM devices WHERE id = ANY(%s::int[]) ORDER BY id", (s["device_ids"] or [],)).fetchall()
@@ -85,9 +95,10 @@ def _targets(conn, s: dict) -> list[int]:
     return [r["id"] for r in rows]
 
 
-def fire(conn, s: dict, manual: bool) -> int | None:
-    """Zamanlamanın görevini kuyruğa yazar; döner: görev kimliği (hedef yoksa None — çalıştırma notla kaydedilir)."""
-    ids = _targets(conn, s)
+def fire(conn, s: dict, manual: bool, ids: list[int] | None = None) -> int | None:
+    """Zamanlamanın görevini kuyruğa yazar; döner: görev kimliği (hedef yoksa None — çalıştırma notla kaydedilir).
+    ids verilirse hedefler onlardır (when_online: şimdi çevrimiçi olanlar)."""
+    ids = _targets(conn, s) if ids is None else ids
     with conn.transaction():
         if s["target_mode"] != "none" and not ids:
             note = "Çalışma anında çevrimiçi cihaz yoktu" if s["target_mode"] == "all_online" else "Hedef cihazların hiçbiri artık kayıtlı değil"
@@ -112,10 +123,35 @@ def fire(conn, s: dict, manual: bool) -> int | None:
     return job_id
 
 
+def _run_when_online(conn) -> None:
+    """when_online zamanlamaları: çevrimiçi olan hedeflere görevi bir kez yazar; hepsi bitince kapatır."""
+    for s in conn.execute("SELECT * FROM user_schedules WHERE enabled AND repeat = 'when_online' ORDER BY id").fetchall():
+        fired = set(s["fired_device_ids"] or [])
+        rows = conn.execute(
+            "SELECT id, online AND ssh_ok AND ip IS NOT NULL AS ready FROM devices WHERE id = ANY(%s::int[]) ORDER BY id",
+            ([i for i in (s["device_ids"] or []) if i not in fired],)).fetchall()
+        if not rows:
+            # Bekleyen hedef kalmadı (hepsi çalıştı ya da kayıtları silindi).
+            conn.execute("UPDATE user_schedules SET enabled = false, updated_at = now() WHERE id = %s", (s["id"],))
+            continue
+        ready = [r["id"] for r in rows if r["ready"]]
+        if not ready:
+            continue
+        # Önce işaretlenir: görev yazılamasa da aynı cihaza her turda yeniden denenmesin.
+        done = len(ready) == len(rows)
+        conn.execute("UPDATE user_schedules SET fired_device_ids = fired_device_ids || %s::int[], enabled = %s WHERE id = %s",
+                     (ready, not done, s["id"]))
+        try:
+            fire(conn, s, manual=False, ids=ready)
+        except Exception:  # noqa: BLE001
+            log.exception("zamanlanmış görev #%s (çevrimiçi olunca) çalıştırılamadı", s["id"])
+
+
 def run(conn) -> None:
     now = _local_now()
-    # Yeni / düzenlenmiş zamanlamanın (next_run_at boş) ilk zamanı.
-    for s in conn.execute("SELECT * FROM user_schedules WHERE enabled AND next_run_at IS NULL AND NOT run_requested").fetchall():
+    # Yeni / düzenlenmiş zamanlamanın (next_run_at boş) ilk zamanı (when_online saatle değil cihaz durumuyla çalışır).
+    for s in conn.execute("SELECT * FROM user_schedules WHERE enabled AND next_run_at IS NULL AND NOT run_requested"
+                          " AND repeat <> 'when_online'").fetchall():
         nxt = next_after(s, now)
         if nxt is None:
             # Bir kezlik ve zamanı geçmiş (ör. hiç çalışmadan kapatılıp açıldı): kapatılır.
@@ -130,6 +166,8 @@ def run(conn) -> None:
             fire(conn, s, manual=True)
         except Exception:  # noqa: BLE001 — bir zamanlamanın hatası diğerlerini durdurmasın
             log.exception("zamanlanmış görev #%s elle çalıştırılamadı", s["id"])
+
+    _run_when_online(conn)
 
     # Zamanı gelenler.
     for s in conn.execute("SELECT * FROM user_schedules WHERE enabled AND next_run_at <= now() ORDER BY next_run_at").fetchall():

@@ -35,6 +35,13 @@ qx.Class.define("ankamon.ui.DeviceOps", {
 
   statics: {
     /**
+     * Komut çalıştır penceresinin hazır komut listesinde kategori yazı renkleri (sırayla; açık ve koyu temada okunur
+     * orta tonlar — kullanıcı isteği 2026-11-24).
+     */
+    CATEGORY_COLORS: ["#2b7bd6", "#2e9a57", "#c46a12", "#9b51d6", "#cf3f63", "#11949a", "#9a8414", "#5c6ce0",
+      "#b8508e", "#5f8f1f", "#d0532c", "#3a8fb7"],
+
+    /**
      * Cihaz ekle (device null) / Düzenle. Düzenle artık Cihaz ayrıntıları penceresi (kullanıcı isteği 2026-11-09):
      * cihazın ağ envanteri satırı + "Cihaz" sekmesinde cihaza özel alanlar (bkz. ui.network.DeviceWindow, deviceForm).
      * Cihazlar'ın ve Bakım ▸ Ahenk'in sağ menüsündeki "Düzenle" buradan geçer (tek kaynak). Verilen satırda kayıt
@@ -1681,19 +1688,41 @@ qx.Class.define("ankamon.ui.DeviceOps", {
       const win = ankamon.ui.Dialog.window(`Komut çalıştır — ${ids.length} cihaz`, 620);
       win.add(new qx.ui.basic.Label(`<b>Hedefler:</b> ${qx.bom.String.escape(P.summary(devices))}`)
         .set({ rich: true, toolTipText: "Cihazların işletim sistemi ailesi: komutlar ve hazır işlemler her cihaza kendi sistemine göre gönderilir." }));
-      const select = new qx.ui.form.SelectBox();
+      // Liste görünümü (kullanıcı isteği 2026-11-24): satırlar daha alçak (tema dolgusu yerine 2 px), açılan liste ekran
+      // yüksekliğine göre daha uzun (varsayılan 200 px yerine görünür yüksekliğin ~%55'i), her kategori kendi renginde.
+      const select = new qx.ui.form.SelectBox().set({
+        maxListHeight: Math.max(240, Math.round(qx.bom.Viewport.getHeight() * 0.55))
+      });
+      const ROW_PADDING = [2, 6];
       if (canCommand) {
-        select.add(new qx.ui.form.ListItem("— Serbest komut —", null, null));
+        select.add(new qx.ui.form.ListItem("— Serbest komut —", null, null).set({ padding: ROW_PADDING }));
       }
+      const categoryColor = {};
+      const colorOf = category => {
+        if (!(category in categoryColor)) {
+          const palette = ankamon.ui.DeviceOps.CATEGORY_COLORS;
+          categoryColor[category] = palette[Object.keys(categoryColor).length % palette.length];
+        }
+        return categoryColor[category];
+      };
+      // Seçili/üzerine gelinen satır temanın seçim rengine döner (renkli yazı seçim zemininde okunmaz).
+      select.getChildControl("list").addListener("changeSelection", e => {
+        const sel = e.getData();
+        select.getChildren().forEach(i => i.getUserData("ankamon.color") &&
+          i.setTextColor(sel.includes(i) ? null : i.getUserData("ankamon.color")));
+      });
       const famText = a => (a.platforms || ["linux"]).map(f => P.label(f)).join(", ");
       // Seçim satırının metni: sabitse başında ★ (sabitleme değişince yeniden yazılır — bkz. pinBtn).
       const itemText = (category, title, model) => `${Pins.isPinned(user, pinEntry(model).key) ? "★ " : ""}${category} — ${title}  [${famText(model.extEntry || model)}]`;
       const addItem = (category, title, model) => {
         const usable = present.filter(f => ((model.extEntry || model).platforms || ["linux"]).includes(f));
-        const item = new qx.ui.form.ListItem(itemText(category, title, model), null, model);
+        const item = new qx.ui.form.ListItem(itemText(category, title, model), null, model).set({ padding: ROW_PADDING });
         item.setUserData("ankamon.itemText", () => itemText(category, title, model));
+        item.setUserData("ankamon.color", colorOf(category));
+        item.setTextColor(colorOf(category));
         if (!usable.length) {
-          item.set({ enabled: false, toolTipText: `Seçili cihazların sisteminde (${present.map(f => P.label(f)).join(", ")}) bu işlemin uygulaması yok.` });
+          // Açık renk verildiğinden temanın soluk "devre dışı" rengi geçmez: saydamlıkla soluklaştırılır.
+          item.set({ enabled: false, opacity: 0.5, toolTipText: `Seçili cihazların sisteminde (${present.map(f => P.label(f)).join(", ")}) bu işlemin uygulaması yok.` });
         }
         select.add(item);
       };

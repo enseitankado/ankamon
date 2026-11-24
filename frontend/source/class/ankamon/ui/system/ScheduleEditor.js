@@ -148,7 +148,8 @@ qx.Class.define("ankamon.ui.system.ScheduleEditor", {
       // --- Zaman --------------------------------------------------------------------------------------------------
       section("Zaman");
       const repeatBox = new qx.ui.form.SelectBox();
-      [["weekly", "Seçili günlerde, belirli saatte"], ["once", "Bir kez"], ["interval", "Belirli aralıkla"]].forEach(([key, label]) => {
+      [["weekly", "Seçili günlerde, belirli saatte"], ["once", "Bir kez"], ["interval", "Belirli aralıkla"],
+        ["when_online", "Cihaz çevrimiçi olunca (bir kez)"]].forEach(([key, label]) => {
         const item = new qx.ui.form.ListItem(label, null, key);
         repeatBox.add(item);
         if (key === (s.repeat || "weekly")) {
@@ -193,8 +194,15 @@ qx.Class.define("ankamon.ui.system.ScheduleEditor", {
       const drawWhen = () => {
         when.removeAll(); // alanlar yeniden kullanılır (dispose edilmez)
         const repeat = repeatBox.getSelection()[0].getModel();
+        targetAll.setEnabled(repeat !== "when_online");
         if (repeat === "once") {
           when.add(line("Tarih", date, "Saat", onceTime));
+        } else if (repeat === "when_online") {
+          // Saatle değil cihaz durumuyla (göç 061): yalnız "Seçili cihazlar" hedefiyle.
+          when.add(new qx.ui.basic.Label("Seçili cihazlardan her biri çevrimiçi (ve SSH ile erişilebilir) olduğunda görev o " +
+            "cihazda bir kez çalışır; şu an çevrimiçi olanlarda hemen. Hepsinde çalışınca görev kendiliğinden durur.")
+            .set({ rich: true, wrap: true, textColor: "app-muted" }));
+          targetSel.setValue(true);
         } else if (repeat === "weekly") {
           when.add(line("Saat", dayTime));
           when.add(line(...days));
@@ -234,6 +242,8 @@ qx.Class.define("ankamon.ui.system.ScheduleEditor", {
         };
         if (repeat === "once") {
           payload.run_at = stamp(date.getValue(), onceTime.getValue());
+        } else if (repeat === "when_online") {
+          payload.target_mode = "devices";
         } else if (repeat === "weekly") {
           payload.time_of_day = (dayTime.getValue() || "").trim().padStart(5, "0");
           payload.weekdays = days.map((c, i) => (c.getValue() ? i + 1 : 0)).filter(Boolean);
