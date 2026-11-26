@@ -68,7 +68,7 @@ RUN npx qx compile --target=build \
 # Sürüm SABİT (digest ile). 2.1.3-beta: 1.5.x/2.0.x-stable'ı etkileyen güvenlik danışmalarının (symlink ile
 # kapsam dışı okuma/yazma, XSS…) hepsini kapatan ilk sürüm; 2.1.x-stable çıkınca ona geçilir. 2.x imajında
 # arayüz ikiliye gömülü DEĞİL: ikili çalışma dizinine göre internal/web/dist'i sunar (bkz. filemanager.sh).
-FROM gtstef/filebrowser:2.1.3-beta@sha256:c91fbf4b442ba14f5d45f8687b74cf71477e36a1a8118b5d0643522dcf78f73c AS filemanager
+FROM gtstef/filebrowser:2.1.5-beta@sha256:ad68b009f69e66d65a66d5f83f67b9bb5cae588614ac415dc0b23132b939f177 AS filemanager
 
 # ---------------------------------------------------------------- 1c) Ekran yansıtma aktarıcısı (MediaMTX):
 # resmi imajdan yalnız statik Go ikilisi alınır (Alpine deposunda paketi yok). Sürüm sabit tutulur.
