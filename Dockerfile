@@ -75,7 +75,7 @@ FROM gtstef/filebrowser:2.1.3-beta@sha256:c91fbf4b442ba14f5d45f8687b74cf71477e36
 FROM bluenviron/mediamtx:1.21.2 AS mediamtx
 
 # ---------------------------------------------------------------- 2) Çalışma imajı
-FROM timescale/timescaledb:2.31.0-pg17
+FROM timescale/timescaledb:2.32.1-pg17
 
 # Okul ağındaki filtre HTTPS'i kendi sertifikasıyla keser; depolar HTTP üzerinden kullanılır
 # (paketler imzalı olduğundan bütünlük apk tarafından doğrulanır). pip/composer kullanılmaz.
